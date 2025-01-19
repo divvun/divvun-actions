@@ -36,6 +36,8 @@ export default class Docker {
           "-v",
           `${Docker.DIVVUN_ACTIONS_PATH}:C:\\actions`,
           "-e",
+          "CI=1",
+          "-e",
           "_DIVVUN_ACTIONS_PLATFORM=windows",
           "-e",
           "_DIVVUN_ACTIONS_ENV=docker",
