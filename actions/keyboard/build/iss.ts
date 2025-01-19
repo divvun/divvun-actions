@@ -2,6 +2,7 @@
 import * as path from "@std/path"
 import * as uuid from "@std/uuid"
 import { InnoSetupBuilder } from "~/util/inno.ts"
+import logger from "~/util/log.ts"
 import { Kbdgen } from "~/util/shared.ts"
 
 const KBDGEN_NAMESPACE = "divvun.no"
@@ -77,7 +78,7 @@ export async function generateKbdInnoFromBundle(
     }
   }
   const fileName = path.join(buildDir, `install.all.iss`)
-  console.log(builder.build())
+  logger.info(builder.build())
   builder.write(fileName)
   return fileName
 }

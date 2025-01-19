@@ -4,11 +4,13 @@ import { Command } from "commander"
 import * as builder from "~/builder.ts"
 // import { version } from "./package.json" with { "type": "json" };
 
+import * as target from "~/target.ts"
+import Docker from "~/util/docker.ts"
+import logger from "~/util/log.ts"
+import Tart from "~/util/tart.ts"
 import divvunspellLinux from "./pipelines/divvunspell/linux.ts"
 import divvunspellMacos from "./pipelines/divvunspell/macos.ts"
 import divvunspellWindows from "./pipelines/divvunspell/windows.ts"
-import Docker from "./util/docker.ts"
-import Tart from "./util/tart.ts"
 
 function prettyPlatform() {
   switch (Deno.build.os) {
@@ -23,10 +25,8 @@ function prettyPlatform() {
   }
 }
 
-console.log(
-  `Loading Divvun Actions [Mode: ${builder.mode}] [Env: ${
-    Deno.env.get("_DIVVUN_ACTIONS_ENV")
-  }] [Platform: ${prettyPlatform()}]`,
+logger.info(
+  `Loading Divvun Actions [Mode: ${builder.mode}] [Env: ${target.env}] [Platform: ${prettyPlatform()}]`,
 )
 
 const program = new Command()
@@ -34,6 +34,10 @@ const program = new Command()
 program
   .name("divvun-actions")
   .description("CLI for Divvun Actions")
+  .option("--log-level <level>", "Log level", "info")
+  .action((options) => {
+    logger.setLogLevel(options.logLevel)
+  })
 // .version(version)
 
 // program
@@ -41,7 +45,7 @@ program
 //   .description("Build the project")
 //   .option("-p, --platform <platform>", "target platform")
 //   .action((options) => {
-//     console.log("Building for platform:", options.platform)
+//     logger.info("Building for platform:", options.platform)
 //     // Add your build logic here
 //   })
 
@@ -212,7 +216,7 @@ divvunspell
             })
             break
           default:
-            console.error("Unsupported platform. Use 'macos' or 'linux'")
+            logger.error("Unsupported platform. Use 'macos' or 'linux'")
             Deno.exit(1)
         }
       })
@@ -313,7 +317,7 @@ async function enterEnvironment(
   platform: string,
   callback: () => Promise<void>,
 ) {
-  const workingDir = Deno.env.get("_DIVVUN_ACTIONS_PWD")!
+  const workingDir = target.workingDir
   let id: string | undefined = undefined
 
   switch (platform) {
@@ -337,8 +341,8 @@ async function enterEnvironment(
       const isInContainer = await Docker.isInContainer()
 
       if (!isInContainer) {
-        console.log(`Working directory: ${workingDir}`)
-        console.log("Entering Windows Docker container environment...")
+        logger.info(`Working directory: ${workingDir}`)
+        logger.info("Entering Windows Docker container environment...")
         await Docker.enterEnvironment("divvun-actions", workingDir)
         return
       } else {
@@ -347,14 +351,14 @@ async function enterEnvironment(
       break
     }
     default:
-      console.error(`Unsupported platform: ${platform}`)
+      logger.error(`Unsupported platform: ${platform}`)
       Deno.exit(1)
   }
 
   try {
     await callback()
   } catch (e) {
-    console.error(e)
+    logger.error(e)
   }
 
   switch (platform) {
@@ -375,40 +379,40 @@ async function enterEnvironment(
 }
 
 async function localMain() {
-  const realWorkingDir = Deno.env.get("_DIVVUN_ACTIONS_PWD")
+  const realWorkingDir = target.workingDir
 
   if (realWorkingDir == null) {
-    console.error("main.ts cannot be run directly.")
+    logger.error("main.ts cannot be run directly.")
     Deno.exit(1)
   }
 
   await program.parseAsync(Deno.args)
 }
 
-function delay(timeout: number) {
-  return new Promise((resolve) => setTimeout(resolve, timeout))
-}
+// function delay(timeout: number) {
+//   return new Promise((resolve) => setTimeout(resolve, timeout))
+// }
 
 async function main() {
   // builder.startGroup("hello")
   // const secrets = await builder.secrets()
-  // console.log(secrets)
-  // builder.error("oh my")
+  // logger.info(secrets)
+  // logger.error("oh my")
   // await delay(500)
   // builder.warning("less oh my")
-  // console.log("1")
-  // console.log("2")
-  // console.log("3")
+  // logger.info("1")
+  // logger.info("2")
+  // logger.info("3")
   // await delay(500)
-  // console.log("4")
-  // console.log("5")
+  // logger.info("4")
+  // logger.info("5")
   // await delay(1000)
-  // console.log("example ends in 2 seconds")
+  // logger.info("example ends in 2 seconds")
   // await delay(2000)
   // builder.endGroup()
 
   // await delay(500)
-  // console.log("Group is now closed!")
+  // logger.info("Group is now closed!")
 
   builder.setMaxLines(-1)
 
@@ -425,6 +429,6 @@ async function main() {
 main()
   .then(() => Deno.exit(0))
   .catch((e) => {
-    console.error(e)
+    logger.error(e)
     Deno.exit(1)
   })

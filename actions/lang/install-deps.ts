@@ -1,4 +1,3 @@
-import * as builder from "~/builder.ts"
 import { Apt, Pip, Pipx, ProjectJJ, Ssh } from "~/util/shared.ts"
 
 // async function getSudo() {
@@ -24,7 +23,7 @@ export default async function langInstallDeps({
   requiresApertium,
   requiresSudo,
 }: Props) {
-  builder.debug("Requires sudo? " + requiresSudo)
+  logger.debug("Requires sudo? " + requiresSudo)
 
   const basePackages = [
     "autoconf",

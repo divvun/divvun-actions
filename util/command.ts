@@ -17,7 +17,6 @@ export type CommandName =
   | "redact"
   | "start-group"
   | "end-group"
-  | "log"
   | "config"
 
 export function stringify({ name, data, value }: Command): string {

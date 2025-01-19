@@ -1,5 +1,7 @@
+import * as fs from "@std/fs"
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 import { Bash } from "~/util/shared.ts"
 
 class Autotools {
@@ -44,7 +46,7 @@ class Autotools {
 //     const value: any = await builder.getInput(kebabInput)
 //     const input = camelCase(kebabInput)
 
-//     console.log(input, value)
+//     logger.info(input, value)
 
 //     if (typeof value === "string") {
 //       if (value.includes(",")) {
@@ -99,11 +101,11 @@ export default async function langBuild({
   const githubWorkspace = builder.context.workspace
 
   if (githubWorkspace == null) {
-    builder.setFailed("GITHUB_WORKSPACE not set, failing.")
-    throw new Error("GITHUB_WORKSPACE not set, failing.")
+    logger.error("GITHUB_WORKSPACE not set, failing.")
+    Deno.exit(1)
   }
 
-  console.log(JSON.stringify(config, null, 2))
+  logger.info(JSON.stringify(config, null, 2))
 
   const flags = [
     "--without-forrest",
@@ -168,19 +170,18 @@ export default async function langBuild({
   }
 
   // Begin build
-
-  builder.startGroup("Build giella-core and giella-shared")
-  await Bash.runScript("./autogen.sh && ./configure && make", {
-    cwd: path.join(githubWorkspace, "giella-core"),
+  builder.group("Build giella-core and giella-shared", async () => {
+    await Bash.runScript("./autogen.sh && ./configure && make", {
+      cwd: path.join(githubWorkspace, "giella-core"),
+    })
+    await Bash.runScript("./autogen.sh && ./configure && make", {
+      cwd: path.join(githubWorkspace, "giella-shared"),
+    })
   })
-  await Bash.runScript("./autogen.sh && ./configure && make", {
-    cwd: path.join(githubWorkspace, "giella-shared"),
-  })
-  builder.endGroup()
 
   const autotoolsBuilder = new Autotools(path.join(githubWorkspace, "lang"))
 
-  builder.debug(`Flags: ${flags}`)
+  logger.debug(`Flags: ${flags}`)
   await autotoolsBuilder.build(flags)
 
   await Bash.runScript("ls -lah build/tools/spellcheckers/", {
@@ -198,17 +199,16 @@ export default async function langBuild({
       desktop: {},
     }
 
-    const globber = await builder.globber(
+    const files = await fs.expandGlob(
       path.join(githubWorkspace, "lang/build/tools/spellcheckers/*.zhfst"),
-      {
-        followSymbolicLinks: false,
-      },
+      { followSymlinks: false },
     )
-    const files = await globber.glob()
 
     let hasSomeItems = false
 
-    for (const candidate of files) {
+    for await (const file of files) {
+      const candidate = file.path
+
       if (candidate.endsWith("-mobile.zhfst")) {
         const v = path.basename(candidate).split("-mobile.zhfst")[0]
         out.mobile[v] = path.basename(path.resolve(candidate))
@@ -227,7 +227,7 @@ export default async function langBuild({
     }
 
     if (requiresDesktopAsMobileWorkaround) {
-      builder.warning(
+      logger.warning(
         "WORKAROUND: FORCING DESKTOP SPELLERS AS MOBILE SPELLERS.",
       )
       for (const [key, value] of Object.entries(out.desktop)) {
@@ -237,16 +237,16 @@ export default async function langBuild({
       }
     }
 
-    console.log("Saving speller-paths")
+    logger.info("Saving speller-paths")
 
-    console.log("Setting speller paths to:")
-    console.log(JSON.stringify(out, null, 2))
+    logger.info("Setting speller paths to:")
+    logger.info(JSON.stringify(out, null, 2))
 
     return {
       spellerPaths: out,
     }
   } else {
-    console.log("Not setting speller paths.")
+    logger.info("Not setting speller paths.")
   }
 
   return { spellerPaths: null }

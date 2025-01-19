@@ -1,5 +1,6 @@
 import * as fs from "@std/fs"
 import * as path from "@std/path"
+import logger from "~/util/log.ts"
 import { Tar } from "~/util/shared.ts"
 
 export type Props = {
@@ -11,7 +12,7 @@ export type Output = {
 }
 
 export default async function createTxz({ filesPath }: Props): Promise<Output> {
-  console.log("Files path: " + filesPath)
+  logger.info("Files path: " + filesPath)
   const files = await fs.expandGlob(path.join(filesPath, "*"), {
     followSymlinks: false,
     includeDirs: true,
@@ -25,7 +26,7 @@ export default async function createTxz({ filesPath }: Props): Promise<Output> {
   for await (const file of files) {
     input.push(file.path)
   }
-  console.log(input)
+  logger.info(input)
 
   await Tar.createFlatTxz(input, outputTxz)
   return { txzPath: outputTxz }

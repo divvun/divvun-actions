@@ -2,7 +2,6 @@ import * as path from "@std/path"
 import * as toml from "@std/toml"
 
 import { makeInstaller } from "~/actions/inno-setup/lib.ts"
-import * as builder from "~/builder.ts"
 import { InnoSetupBuilder } from "~/util/inno.ts"
 import { DivvunBundler, SpellerPaths, Tar, ThfstTools } from "~/util/shared.ts"
 import {
@@ -42,13 +41,13 @@ export default async function spellerBundle({
       const bhfstPath = await ThfstTools.zhfstToBhfst(zhfstPath)
       const langTagBhfst = `${path.dirname(bhfstPath)}/${langTag}.bhfst`
 
-      builder.debug(`Copying ${bhfstPath} to ${langTagBhfst}`)
-      await builder.cp(bhfstPath, langTagBhfst)
+      logger.debug(`Copying ${bhfstPath} to ${langTagBhfst}`)
+      await Deno.copyFile(bhfstPath, langTagBhfst)
       bhfstPaths.push(langTagBhfst)
     }
 
     payloadPath = path.resolve(`./${packageId}_${version}_mobile.txz`)
-    builder.debug(
+    logger.debug(
       `Creating txz from [${bhfstPaths.join(", ")}] at ${payloadPath}`,
     )
     await Tar.createFlatTxz(bhfstPaths, payloadPath)
@@ -110,8 +109,8 @@ export default async function spellerBundle({
           }
         }
 
-        builder.debug("Writing speller.toml:")
-        builder.debug(toml.stringify(spellerToml))
+        logger.debug("Writing speller.toml:")
+        logger.debug(toml.stringify(spellerToml))
         Deno.writeTextFileSync(
           "./speller.toml",
           toml.stringify(spellerToml),
@@ -132,11 +131,11 @@ export default async function spellerBundle({
       })
       .write("./install.iss")
 
-    builder.debug("generated install.iss:")
-    builder.debug(innoBuilder.build())
+    logger.debug("generated install.iss:")
+    logger.debug(innoBuilder.build())
 
     payloadPath = await makeInstaller("./install.iss")
-    builder.debug(`Installer created at ${payloadPath}`)
+    logger.debug(`Installer created at ${payloadPath}`)
   } else if (spellerType == SpellerType.MacOS) {
     payloadPath = await DivvunBundler.bundleMacOS(
       spellername,

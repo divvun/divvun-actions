@@ -11,7 +11,7 @@ const SAVE_CURSOR = `${ESC}7`
 const RESTORE_CURSOR = `${ESC}8`
 const CLEAR_TO_END = `${ESC}[J`
 const CLEAR_SCREEN = `${ESC}[2J`
-const CURSOR_UP = (n: number) => `${ESC}[${n}A`
+// const CURSOR_UP = (n: number) => `${ESC}[${n}A`
 const CURSOR_TO_START = `${ESC}[H`
 
 // Platform-specific implementations
@@ -55,13 +55,18 @@ const WindowsTerminal: TerminalController = {
   startGroup(name: string) {
     return `${CURSOR_TO_START}${CLEAR_SCREEN}--- ${name}\n`
   },
-  endGroup(name: string, close: boolean) {
+  endGroup(_name: string, _close: boolean) {
     // if (close) {
     //   return `^^^\n${CURSOR_TO_START}${CLEAR_SCREEN}~~~ ${name}\n`
     // }
     return "^^^\n"
   },
-  updateGroup(name: string, lines: string[], total: number, maxLines: number) {
+  updateGroup(
+    _name: string,
+    _lines: string[],
+    _total: number,
+    _maxLines: number,
+  ) {
     // if (maxLines === Number.MAX_SAFE_INTEGER) {
     // For unlimited lines, don't do any cursor manipulation
     // return lines[lines.length - 1]
@@ -150,16 +155,6 @@ export function startListener() {
                     )
                     inGroup = false
                     groupLines = []
-                  }
-                  break
-                case "log":
-                  if (cmd.value != null) {
-                    const prefix = cmd.data?.level === "warning"
-                      ? "WARNING: "
-                      : cmd.data?.level === "error"
-                      ? "ERROR: "
-                      : ""
-                    outputLine(`${prefix}${cmd.value}\n`, controller)
                   }
                   break
               }

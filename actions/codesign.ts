@@ -1,10 +1,18 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
-import { Bash, secrets } from "~/util/shared.ts"
+import logger from "~/util/log.ts"
+import { Bash } from "~/util/shared.ts"
 
 export type Props = {
   filePath: string
   isInstaller?: boolean
+  secrets: {
+    developerAccount: string
+    appPassword: string
+    appCodeSignId: string
+    installerCodeSignId: string
+    teamId: string
+  }
 }
 
 export type Output = {
@@ -26,13 +34,12 @@ export type Output = {
 export default async function codesign({
   filePath,
   isInstaller = false,
+  secrets,
 }: Props): Promise<Output> {
-  const sec = await secrets()
-
   let signedPath: string | null = null
 
   if (Deno.build.os == "windows") {
-    builder.debug("  Windows platform")
+    logger.debug("  Windows platform")
     // Call our internal API to sign the file
     // This overwrites the unsigned file
     builder.exec("curl", [
@@ -53,7 +60,7 @@ export default async function codesign({
       appCodeSignId,
       installerCodeSignId,
       teamId,
-    } = sec.macos
+    } = secrets
 
     // Codesign with hardened runtime and timestamp
     if (!isInstaller) {
@@ -90,7 +97,7 @@ xcrun notarytool submit -v \
     --output-format json \
     --wait "${zipPath}"`)
 
-    console.log(response)
+    logger.info(response)
 
     const parsedResponse = JSON.parse(response)
 

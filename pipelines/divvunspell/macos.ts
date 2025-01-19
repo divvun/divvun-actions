@@ -106,6 +106,14 @@ async function codesign(props: DivvunSpellProps) {
   for (const target of TARGETS) {
     await doCodesign({
       filePath: `target/${target}/release/libdivvunspell.dylib`,
+      secrets: {
+        // TODO
+        developerAccount: "",
+        appPassword: "",
+        appCodeSignId: "",
+        installerCodeSignId: "",
+        teamId: "",
+      },
     })
   }
 }

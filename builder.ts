@@ -1,11 +1,8 @@
 // Re-export types
 import type {
   Context,
-  CopyOptions,
   ExecListeners,
   ExecOptions,
-  Globber,
-  GlobOptions,
   InputOptions,
 } from "./builder/types.ts"
 
@@ -25,24 +22,12 @@ if (isBuildkite) {
 
 // Re-export everything with proper typing
 export const {
-  debug,
-  setFailed,
-  error,
   exec,
   spawn,
   addPath,
-  downloadTool,
-  extractZip,
-  extractTar,
-  cp,
-  globber,
   redactSecret,
   getInput,
   setOutput,
-  startGroup,
-  endGroup,
-  warning,
-  exportVariable,
   context,
   secrets,
   tempDir,
@@ -52,12 +37,4 @@ export const {
 } = selectedBuilder
 
 // Re-export types
-export type {
-  Context,
-  CopyOptions,
-  ExecListeners,
-  ExecOptions,
-  Globber,
-  GlobOptions,
-  InputOptions,
-}
+export type { Context, ExecListeners, ExecOptions, InputOptions }

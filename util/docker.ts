@@ -2,6 +2,7 @@ import { which } from "@david/which"
 import * as fs from "@std/fs"
 import * as path from "@std/path"
 import { exec } from "~/builder.ts"
+import logger from "~/util/log.ts"
 import { Powershell } from "./shared.ts"
 
 export default class Docker {
@@ -56,7 +57,7 @@ export default class Docker {
       "-v",
       `${workingDir}:/workspace:ro`,
       "-v",
-      `${Docker.DIVVUN_ACTIONS_PATH}:/actions`,
+      `${Docker.DIVVUN_ACTIONS_PATH}:/actions:ro`,
       "-e",
       "CI=1",
       "-e",
@@ -78,7 +79,7 @@ export default class Docker {
 
     await Deno.mkdir(imagePath)
 
-    console.log("Copying workspace...")
+    logger.info("Copying workspace...")
     if (Deno.build.os === "windows") {
       await Powershell.runScript(
         `Copy-Item -Path C:\\workspace\\* -Destination ${imagePath} -Recurse -Force`,
@@ -87,17 +88,17 @@ export default class Docker {
       await exec("rsync", ["-ar", "/workspace/", imagePath])
     }
 
-    console.log(`Entering virtual workspace (${imagePath})...`)
+    logger.info(`Entering virtual workspace (${imagePath})...`)
     Deno.chdir(imagePath)
 
     return imagePath
   }
 
   static async exitWorkspace(imagePath: string) {
-    console.log(`Exiting virtual workspace (${imagePath})...`)
+    logger.info(`Exiting virtual workspace (${imagePath})...`)
     Deno.chdir(Deno.env.get("HOME")!)
 
-    console.log("Removing workspace...")
+    logger.info("Removing workspace...")
     await Deno.remove(imagePath, { recursive: true })
   }
 }

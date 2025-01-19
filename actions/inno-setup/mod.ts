@@ -1,3 +1,4 @@
+import logger from "~/util/log.ts"
 import { makeInstaller } from "./lib.ts"
 
 export type Props = {
@@ -21,7 +22,7 @@ export default async function innoSetup(props: Props) {
 
   // Workaround for setOutput being dumb and perhaps adding ::set-output
   // without checking it has a new line to write one.
-  console.log("Installer generated.\n\n")
+  logger.info("Installer generated.\n\n")
 
   return {
     installerPath: installerOutput,

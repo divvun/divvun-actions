@@ -1,6 +1,6 @@
 import * as path from "@std/path"
-import * as builder from "~/builder.ts"
 
+import logger from "~/util/log.ts"
 import {
   getArtifactSize,
   MacOSPackageTarget,
@@ -24,7 +24,7 @@ export enum PackageType {
 //   packageType: PackageType
 //   platform: string
 // }> {
-//   builder.debug(`Platform: '${platform}', Type: '${givenType}'`)
+//   logger.debug(`Platform: '${platform}', Type: '${givenType}'`)
 
 //   if (givenType == null) {
 //     if (platform == null) {
@@ -130,7 +130,7 @@ export default async function deploy({
 }: Props) {
   const repoPackageUrl = `${pahkatRepo}/packages/${packageId}`
 
-  builder.debug("Version: " + version)
+  logger.debug("Version: " + version)
 
   const ext = path.extname(payloadPath)
   const pathItems = [packageId, version, platform]
@@ -192,7 +192,7 @@ export default async function deploy({
         productCode = validateProductCode(kind, rawProductCode)
         break
       case null:
-        builder.debug("No Windows kind provided, not validating product code.")
+        logger.debug("No Windows kind provided, not validating product code.")
         productCode = rawProductCode
         break
       default:
@@ -222,7 +222,7 @@ export default async function deploy({
     throw new Error(`Unhandled package type: '${(props as any).packageType}'`)
   }
 
-  builder.debug(`Renaming from ${payloadPath} to ${artifactPath}`)
+  logger.debug(`Renaming from ${payloadPath} to ${artifactPath}`)
   await Deno.rename(payloadPath, artifactPath)
 
   await PahkatUploader.upload(
@@ -230,6 +230,11 @@ export default async function deploy({
     artifactUrl,
     "./metadata.toml",
     repoPackageUrl,
+    {
+      // TODO
+      awsAccessKeyId: "",
+      awsSecretAccessKey: "",
+    },
   )
 }
 

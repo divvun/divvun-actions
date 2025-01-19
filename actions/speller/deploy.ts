@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import * as path from "@std/path"
 import * as toml from "@std/toml"
-import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 import {
   getArtifactSize,
   MacOSPackageTarget,
@@ -189,7 +189,7 @@ export default async function spellerDeploy({
       throw new Error("artifact url is null; this is a logic error.")
     }
 
-    builder.debug(`Renaming from ${payloadPath} to ${artifactPath}`)
+    logger.debug(`Renaming from ${payloadPath} to ${artifactPath}`)
     await Deno.rename(payloadPath, artifactPath)
 
     await PahkatUploader.upload(
@@ -202,7 +202,8 @@ export default async function spellerDeploy({
       "speller",
     )
   } catch (error: any) {
-    builder.setFailed(error.message)
+    logger.error(error.message)
+    Deno.exit(1)
   }
 }
 

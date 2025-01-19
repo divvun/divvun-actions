@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 
-import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 import { Bash, versionAsNightly } from "~/util/shared.ts"
 
 // async function getCargoToml(cargo: string | null) {
@@ -140,17 +140,17 @@ export default async function version({
   let channel: string | null = null
 
   if (cargoToml != null) {
-    builder.debug("Getting version from TOML")
+    logger.debug("Getting version from TOML")
     version = cargoToml.package.version
   } else if (csharp != null) {
-    builder.debug("Getting version from GitVersioning C#")
+    logger.debug("Getting version from GitVersioning C#")
     version = Deno.env.get("GitBuildVersionSimple")
   } else if (spellerManifest != null) {
-    builder.debug("Getting version from speller manifest")
-    builder.debug(`spellerversion: ${spellerManifest.spellerversion}`)
+    logger.debug("Getting version from speller manifest")
+    logger.debug(`spellerversion: ${spellerManifest.spellerversion}`)
     version = spellerManifest.spellerversion
   } else if (plistPath != null) {
-    builder.debug("Getting version from plist")
+    logger.debug("Getting version from plist")
     const result = (
       await Bash.runScript(
         `/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "${plistPath}"`,
@@ -175,7 +175,7 @@ export default async function version({
   }
 
   if (isNightly) {
-    builder.debug(`Generating nightly version for channel ${NIGHTLY_CHANNEL}`)
+    logger.debug(`Generating nightly version for channel ${NIGHTLY_CHANNEL}`)
     version = await versionAsNightly(version)
 
     // await builder.setOutput("channel", nightlyChannel)
@@ -193,7 +193,7 @@ export default async function version({
     }
   }
 
-  builder.debug("Setting version to: " + version)
+  logger.debug("Setting version to: " + version)
   // await builder.setOutput("version", version)
 
   return { channel, version }

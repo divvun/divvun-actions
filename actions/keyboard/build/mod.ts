@@ -1,5 +1,4 @@
 import * as path from "@std/path"
-import * as builder from "~/builder.ts"
 import { isMatchingTag, Kbdgen, PahkatPrefix } from "~/util/shared.ts"
 import { makeInstaller } from "../../inno-setup/lib.ts"
 import { KeyboardType } from "../types.ts"
@@ -28,10 +27,10 @@ export default async function keyboardBuild({
   // Testing how to get name and description fields
   const project = Kbdgen.loadProjectBundle(bundlePath)
   const locales = project.locales
-  builder.debug("TESTING: NAMES AND DESCRIPTIONS FROM project.yaml:")
+  logger.debug("TESTING: NAMES AND DESCRIPTIONS FROM project.yaml:")
   for (const locale in locales) {
-    builder.debug(`  ${locales[locale].name}`)
-    builder.debug(`  ${locales[locale].description}`)
+    logger.debug(`  ${locales[locale].name}`)
+    logger.debug(`  ${locales[locale].description}`)
   }
 
   if (
@@ -48,19 +47,19 @@ export default async function keyboardBuild({
 
   if (keyboardType === KeyboardType.MacOS) {
     if (isMatchingTag(SEMVER_TAG_RE)) {
-      builder.debug("Using version from kbdgen project")
+      logger.debug("Using version from kbdgen project")
     } else {
       channel = nightlyChannel
-      builder.debug("Setting current version to nightly version")
+      logger.debug("Setting current version to nightly version")
       await Kbdgen.setNightlyVersion(bundlePath, "macos")
     }
     payloadPath = await Kbdgen.buildMacOS(bundlePath)
   } else if (keyboardType === KeyboardType.Windows) {
     if (isMatchingTag(SEMVER_TAG_RE)) {
-      builder.debug("Using version from kbdgen project")
+      logger.debug("Using version from kbdgen project")
     } else {
       channel = nightlyChannel
-      builder.debug("Setting current version to nightly version")
+      logger.debug("Setting current version to nightly version")
       await Kbdgen.setNightlyVersion(bundlePath, "windows")
     }
     await PahkatPrefix.install(["kbdi"])
@@ -80,8 +79,8 @@ export default async function keyboardBuild({
     )
 
     const outputPath = await Kbdgen.buildWindows(bundlePath)
-    await builder.cp(kbdi_path, outputPath)
-    await builder.cp(kbdi_x64_path, outputPath)
+    await Deno.copyFile(kbdi_path, outputPath)
+    await Deno.copyFile(kbdi_x64_path, outputPath)
 
     const issPath = await generateKbdInnoFromBundle(bundlePath, outputPath)
     payloadPath = await makeInstaller(issPath)

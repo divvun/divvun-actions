@@ -1,6 +1,7 @@
 import * as fs from "@std/fs"
 import * as path from "@std/path"
 import { exec, spawn } from "~/builder.ts"
+import logger from "~/util/log.ts"
 
 type TartStatus = {
   CPU: number
@@ -34,7 +35,7 @@ export default class Tart {
       silent: true,
     })
 
-    console.log("Waiting for VM to start...")
+    logger.info("Waiting for VM to start...")
 
     return new Promise((resolve, _) => {
       const waiter = async () => {
@@ -76,7 +77,7 @@ export default class Tart {
     })
 
     const output: TartStatus = JSON.parse(rawOutput)
-    // console.log(output)
+    // logger.info(output)
     return output
   }
 
@@ -90,14 +91,14 @@ export default class Tart {
   }
 
   static async enterVirtualMachine(realWorkingDir: string) {
-    console.log("Moving into virtualised environment...")
+    logger.info("Moving into virtualised environment...")
 
     await Tart.run("runner", {
-      workspace: realWorkingDir,
+      workspace: `${realWorkingDir}:ro`,
       "divvun-actions": `${path.resolve(Deno.cwd())}:ro`,
     })
 
-    console.log("Entering macOS Tart virtual machine environment...")
+    logger.info("Entering macOS Tart virtual machine environment...")
     const cmd = `
       "${Tart.DIVVUN_ACTIONS_PATH}/bin/divvun-actions" ${Deno.args.join(" ")}
     `
@@ -110,7 +111,7 @@ export default class Tart {
     const volName = `workspace-${id}`
     const imagePath = `/tmp/${volName}.sparseimage`
 
-    console.log("Creating sparse image at " + imagePath)
+    logger.info("Creating sparse image at " + imagePath)
     await exec("hdiutil", [
       "create",
       "-type",
@@ -124,40 +125,40 @@ export default class Tart {
       imagePath,
     ])
 
-    console.log("Attaching image...")
+    logger.info("Attaching image...")
     await exec("hdiutil", ["attach", imagePath], {
       silent: true,
     })
 
-    console.log("Copying workspace...")
+    logger.info("Copying workspace...")
     await exec("ditto", [Tart.WORKSPACE_PATH, `/Volumes/${volName}`])
 
-    console.log(`Entering virtual workspace (/Volumes/${volName})...`)
+    logger.info(`Entering virtual workspace (/Volumes/${volName})...`)
     Deno.chdir(`/Volumes/${volName}`)
 
     return id
   }
 
   static async exitWorkspace(id: string) {
-    console.log("Leaving virtual workspace...")
+    logger.info("Leaving virtual workspace...")
     Deno.chdir("/")
 
     const volName = `workspace-${id}`
     const imagePath = `/tmp/${volName}.sparseimage`
 
-    console.log("Copying workspace...")
+    logger.info("Copying workspace...")
     await exec("ditto", [`/Volumes/${volName}`, Tart.WORKSPACE_PATH])
 
-    console.log("Detaching image...")
+    logger.info("Detaching image...")
     await exec("hdiutil", ["detach", `/Volumes/${volName}`])
 
-    console.log("Deleting image...")
+    logger.info("Deleting image...")
     await Deno.remove(imagePath)
   }
 
   static ip(vmName: string) {
     let output = ""
-    console.log("Getting virtual machine's IP...")
+    logger.info("Getting virtual machine's IP...")
 
     return exec("tart", ["ip", vmName], {
       listeners: {
@@ -166,7 +167,7 @@ export default class Tart {
         },
       },
     }).then(() => {
-      // console.log("IP: " + output)
+      // logger.info("IP: " + output)
       return output.trim()
     })
   }
@@ -174,7 +175,7 @@ export default class Tart {
   static async exec(vmName: string, cmd: string) {
     const ip = await this.ip(vmName)
 
-    console.log("Running action...")
+    logger.info("Running action...")
     const args = [
       "-p",
       "admin",
@@ -187,7 +188,7 @@ export default class Tart {
       `\n${cmd}\n`,
       "'",
     ]
-    // console.log("Args", args)
+    // logger.info("Args", args)
     return await exec("sshpass", args)
   }
 }

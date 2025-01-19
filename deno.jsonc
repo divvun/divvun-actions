@@ -9,6 +9,20 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
+  "lint": {
+    "rules": {
+      "exclude": [
+        "no-explicit-any"
+      ],
+      "include": [
+        "no-console",
+        "no-unused-vars",
+        "no-debugger",
+        "no-eval",
+        "require-await"
+      ]
+    }
+  },
   "fmt": {
     "indentWidth": 2,
     "semiColons": false,

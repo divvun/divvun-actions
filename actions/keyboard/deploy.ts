@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 
 import {
   getArtifactSize,
@@ -35,15 +36,15 @@ function releaseReq(
     platform,
   }
 
-  console.log("releaseReq", version, channel)
+  logger.info("releaseReq", version, channel)
   if (channel) {
     req.channel = channel
   } else {
     if (version.startsWith("0")) {
-      console.log("channel: beta")
+      logger.info("channel: beta")
       req.channel = "beta"
     } else {
-      console.log("channel: stable")
+      logger.info("channel: stable")
       // Empty channel means stable
       req.channel = ""
     }
@@ -172,7 +173,7 @@ export default async function keyboardDeploy({
 
   const metadataJsonPath = await writeMetadataJson(bundlePath)
 
-  builder.debug(`Renaming from ${payloadPath} to ${artifactPath}`)
+  logger.debug(`Renaming from ${payloadPath} to ${artifactPath}`)
   await Deno.rename(payloadPath, artifactPath)
 
   await PahkatUploader.upload(
