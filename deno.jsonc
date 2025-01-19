@@ -1,0 +1,35 @@
+{
+  "tasks": {
+    "start": "deno run --allow-read --allow-write --allow-net --allow-run --allow-env index.ts"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "fmt": {
+    "indentWidth": 2,
+    "semiColons": false,
+    "singleQuote": false,
+    "proseWrap": "preserve"
+  },
+  "imports": {
+    "@david/which": "jsr:@david/which@^0.4.1",
+    "@infisical/sdk": "npm:@infisical/sdk@^3.0.4",
+    "@std/crypto": "jsr:@std/crypto@^1.0.3",
+    "@std/encoding": "jsr:@std/encoding@^1.0.6",
+    "@std/fs": "jsr:@std/fs@^1.0.9",
+    "@std/path": "jsr:@std/path@^1.0.8",
+    "@std/streams": "jsr:@std/streams@^1.0.8",
+    "@std/toml": "jsr:@std/toml@^1.0.2",
+    "@std/uuid": "jsr:@std/uuid@^1.0.4",
+    "@std/yaml": "jsr:@std/yaml@^1.0.5",
+    "case": "https://deno.land/x/case@2.2.0/mod.ts",
+    "commander": "https://deno.land/x/cmd@v1.2.0/mod.ts",
+    "extract-zip": "https://esm.sh/extract-zip@2.0.1",
+    "pretty-error": "https://esm.sh/pretty-error@4.0.0",
+    "~/": "./"
+  }
+}

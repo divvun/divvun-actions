@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+CWD=`pwd`
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+cd "$SCRIPT_DIR";
+
+# Check if node_modules exists, otherwise pnpm install
+# if [ ! -d "$SCRIPT_DIR/node_modules" ]; then
+# rm -rf "$SCRIPT_DIR/node_modules";
+# pnpm install -s;
+# fi
+
+export _DIVVUN_ACTIONS_ENV=${_DIVVUN_ACTIONS_ENV:-native}
+export _DIVVUN_ACTIONS_PWD=$CWD;
+deno -q run -A main.ts "$@" 2>&1 | deno -q run -A "./util/redactor.ts"
