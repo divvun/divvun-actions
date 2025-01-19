@@ -2,6 +2,7 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 import { Bash } from "~/util/shared.ts"
+import { sign as msCodesign } from "~/util/sslcom-codesigner.ts"
 
 export type Props = {
   filePath: string
@@ -42,16 +43,12 @@ export default async function codesign({
     logger.debug("  Windows platform")
     // Call our internal API to sign the file
     // This overwrites the unsigned file
-    builder.exec("curl", [
-      "-v",
-      "-X",
-      "POST",
-      "-F",
-      `file=@${filePath}`,
-      "http://192.168.122.1:5000",
-      "-o",
-      `${filePath}`,
-    ])
+    await msCodesign(filePath, {
+      username: "TODO",
+      password: "TODO",
+      credentialId: "TODO",
+      totpSecret: "TODO",
+    })
     signedPath = filePath
   } else if (Deno.build.os === "darwin") {
     const {
