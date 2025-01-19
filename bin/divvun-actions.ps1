@@ -15,7 +15,7 @@ try {
     $scriptArgs = if ($args.Count -eq 0) { @('-h') } else { $args }
     
     # Have to run it through cmd.exe because PS has trouble piping data... lol
-    cmd /c "deno -q run -A main.ts $scriptArgs | deno -q run -A ./util/redactor.ts"
+    cmd /NoNewWindow /c "deno -q run -A main.ts $scriptArgs | deno -q run -A ./util/redactor.ts"
 } finally {
     Set-Location -Path $CWD
 }

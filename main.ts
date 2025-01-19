@@ -337,8 +337,8 @@ async function enterEnvironment(
       const isInContainer = await Docker.isInContainer()
 
       if (!isInContainer) {
-        console.log("Running divvun-actions...")
         console.log(`Working directory: ${workingDir}`)
+        console.log("Entering Windows Docker container environment...")
         await Docker.enterEnvironment("divvun-actions", workingDir)
         return
       } else {

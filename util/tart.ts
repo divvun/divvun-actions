@@ -97,7 +97,7 @@ export default class Tart {
       "divvun-actions": `${path.resolve(Deno.cwd())}:ro`,
     })
 
-    console.log("Running divvun-actions...")
+    console.log("Entering macOS Tart virtual machine environment...")
     const cmd = `
       "${Tart.DIVVUN_ACTIONS_PATH}/bin/divvun-actions" ${Deno.args.join(" ")}
     `

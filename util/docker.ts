@@ -40,6 +40,8 @@ export default class Docker {
           "_DIVVUN_ACTIONS_ENV=docker",
           image + ":latest",
           "pwsh.exe",
+          "-NoNewWindow",
+          "-Command",
           `C:\\actions\\bin\\divvun-actions.ps1`,
           ...Deno.args,
         ],
