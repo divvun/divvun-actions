@@ -6,7 +6,7 @@ import getVersion from "~/actions/version.ts"
 import * as builder from "~/builder.ts"
 import { Bash } from "~/util/shared.ts"
 
-const TARGETS = ["x86_64-pc-windows-msvc"]
+const TARGETS = ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"]
 
 export type Step = "build" | "tarball" | "deploy"
 

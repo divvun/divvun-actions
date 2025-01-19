@@ -56,20 +56,21 @@ const WindowsTerminal: TerminalController = {
     return `${CURSOR_TO_START}${CLEAR_SCREEN}--- ${name}\n`
   },
   endGroup(name: string, close: boolean) {
-    if (close) {
-      return `^^^\n${CURSOR_TO_START}${CLEAR_SCREEN}~~~ ${name}\n`
-    }
+    // if (close) {
+    //   return `^^^\n${CURSOR_TO_START}${CLEAR_SCREEN}~~~ ${name}\n`
+    // }
     return "^^^\n"
   },
   updateGroup(name: string, lines: string[], total: number, maxLines: number) {
-    if (maxLines === Number.MAX_SAFE_INTEGER) {
-      // For unlimited lines, don't do any cursor manipulation
-      return lines[lines.length - 1]
-    }
-    const visibleLines = lines.slice(-maxLines)
-    return `${CURSOR_UP(visibleLines.length + 1)}${CLEAR_SCREEN}--- ${name} (${total} lines)\n${
-      visibleLines.join("")
-    }`
+    // if (maxLines === Number.MAX_SAFE_INTEGER) {
+    // For unlimited lines, don't do any cursor manipulation
+    // return lines[lines.length - 1]
+    // }
+    // const visibleLines = lines.slice(-maxLines)
+    // return `${CURSOR_UP(visibleLines.length + 1)}${CLEAR_SCREEN}--- ${name} (${total} lines)\n${
+    //   visibleLines.join("")
+    // }`
+    throw new Error("NO")
   },
 }
 
@@ -200,7 +201,10 @@ export function startListener() {
   ) {
     if (inGroup) {
       groupLines.push(line)
-      if (config.maxVisibleLines === Number.MAX_SAFE_INTEGER) {
+      if (
+        Deno.build.os === "windows" ||
+        config.maxVisibleLines === Number.MAX_SAFE_INTEGER
+      ) {
         // When showing all lines, just print directly
         controller.enqueue(encoder.encode(line))
       } else if (groupLines.length > config.maxVisibleLines) {

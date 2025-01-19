@@ -72,7 +72,7 @@ RUN Invoke-WebRequest -UseBasicParsing 'https://github.com/Kitware/CMake/release
 
 # Install Rust using rustup
 RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe; \
-    Start-Process -FilePath .\\rustup-init.exe -ArgumentList '-y' -NoNewWindow -Wait; \
+    Start-Process -FilePath .\\rustup-init.exe -ArgumentList @('-y', '--target', 'aarch64-pc-windows-msvc') -NoNewWindow -Wait; \
     Remove-Item -Force .\\rustup-init.exe
 
 # Install XZ
@@ -81,12 +81,6 @@ RUN Invoke-WebRequest -Uri https://tukaani.org/xz/xz-5.2.9-windows.zip -OutFile 
     Copy-Item 'C:\xz\bin_x86-64\xz.exe' 'C:\Windows\System32\' ; \
     Remove-Item -Recurse -Force C:\xz ; \
     Remove-Item -Force xz.zip
-    
-# Create powershell profile...
-RUN if (!(Test-Path -Path $PROFILE)) { \
-        New-Item -ItemType File -Path $PROFILE -Force ; \
-        New-Item -ItemType Directory -Path (Split-Path -Parent $PROFILE) -Force \
-    }
 
 # Install Deno
 RUN irm https://deno.land/install.ps1 | iex
@@ -94,6 +88,12 @@ RUN irm https://deno.land/install.ps1 | iex
 # Clear duplicates
 RUN $cleanPath = ($Env:PATH -split ';' | Select-Object -Unique) -join ';' ; \
     setx /M PATH $cleanPath
+    
+# Create powershell profile...
+RUN if (!(Test-Path -Path $PROFILE)) { \
+        New-Item -ItemType File -Path $PROFILE -Force ; \
+        New-Item -ItemType Directory -Path (Split-Path -Parent $PROFILE) -Force \
+    }
 
 # Default shell
 CMD ["pwsh", "-NoLogo"]
