@@ -35,28 +35,29 @@ export type Output = {
 export default async function codesign({
   filePath,
   isInstaller = false,
-  secrets,
 }: Props): Promise<Output> {
   let signedPath: string | null = null
+
+  const secrets = await builder.secrets()
 
   if (Deno.build.os == "windows") {
     logger.debug("  Windows platform")
     // Call our internal API to sign the file
     // This overwrites the unsigned file
     await msCodesign(filePath, {
-      username: "TODO",
-      password: "TODO",
-      credentialId: "TODO",
-      totpSecret: "TODO",
+      username: secrets["windows/sslcom_username"],
+      password: secrets["windows/sslcom_password"],
+      credentialId: secrets["windows/sslcom_credential_id"],
+      totpSecret: secrets["windows/sslcom_totp_secret"],
     })
     signedPath = filePath
   } else if (Deno.build.os === "darwin") {
     const {
-      developerAccount,
-      appPassword,
-      appCodeSignId,
-      installerCodeSignId,
-      teamId,
+      "macos/developerAccount": developerAccount,
+      "macos/appPassword": appPassword,
+      "macos/appCodeSignId": appCodeSignId,
+      "macos/installerCodeSignId": installerCodeSignId,
+      "macos/teamId": teamId,
     } = secrets
 
     // Codesign with hardened runtime and timestamp
