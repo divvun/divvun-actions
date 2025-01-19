@@ -1,4 +1,5 @@
 import * as path from "@std/path"
+import logger from "~/util/log.ts"
 import { isMatchingTag, Kbdgen, PahkatPrefix } from "~/util/shared.ts"
 import { makeInstaller } from "../../inno-setup/lib.ts"
 import { KeyboardType } from "../types.ts"
@@ -25,7 +26,7 @@ export default async function keyboardBuild({
   bundlePath,
 }: Props): Promise<Output> {
   // Testing how to get name and description fields
-  const project = Kbdgen.loadProjectBundle(bundlePath)
+  const project = await Kbdgen.loadProjectBundle(bundlePath)
   const locales = project.locales
   logger.debug("TESTING: NAMES AND DESCRIPTIONS FROM project.yaml:")
   for (const locale in locales) {
@@ -53,7 +54,7 @@ export default async function keyboardBuild({
       logger.debug("Setting current version to nightly version")
       await Kbdgen.setNightlyVersion(bundlePath, "macos")
     }
-    payloadPath = await Kbdgen.buildMacOS(bundlePath)
+    payloadPath = await Kbdgen.buildMacOS(bundlePath, secrets)
   } else if (keyboardType === KeyboardType.Windows) {
     if (isMatchingTag(SEMVER_TAG_RE)) {
       logger.debug("Using version from kbdgen project")

@@ -16,7 +16,7 @@ const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(() => resolve(), ms))
 
 export function tmpDir() {
-  return builder.tempDir()
+  return Deno.makeTempDirSync()
 }
 
 export function randomString64() {
@@ -408,10 +408,13 @@ export class PahkatUploader {
     secrets: {
       awsAccessKeyId: string
       awsSecretAccessKey: string
+      pahkatApiKey: string
     },
-    metadataJsonPath?: string | null,
-    manifestTomlPath?: string | null,
-    packageType?: string | null,
+    extra: {
+      metadataJsonPath?: string | null
+      manifestTomlPath?: string | null
+      packageType?: string | null
+    } = {},
   ) {
     const fileName = path.parse(artifactPath).base
 
@@ -419,7 +422,8 @@ export class PahkatUploader {
       logger.debug(
         "Skipping upload because `PAHKAT_NO_DEPLOY` is true. Creating artifact instead",
       )
-      await builder.createArtifact(fileName, artifactPath)
+      // TODO
+      // await builder.createArtifact(fileName, artifactPath)
       return
     }
 
@@ -483,19 +487,21 @@ export class PahkatUploader {
       "--release-meta",
       releaseMetadataPath,
     ]
-    if (metadataJsonPath != null) {
+    if (extra.metadataJsonPath != null) {
       args.push("--metadata-json")
-      args.push(metadataJsonPath)
+      args.push(extra.metadataJsonPath)
     }
-    if (manifestTomlPath != null) {
+    if (extra.manifestTomlPath != null) {
       args.push("--manifest-toml")
-      args.push(manifestTomlPath)
+      args.push(extra.manifestTomlPath)
     }
-    if (packageType != null) {
+    if (extra.packageType != null) {
       args.push("--package-type")
-      args.push(packageType)
+      args.push(extra.packageType)
     }
-    logger.info(await PahkatUploader.run(args))
+    logger.info(
+      await PahkatUploader.run(args, { apiKey: secrets.pahkatApiKey }),
+    )
   }
 
   static releaseArgs(release: ReleaseRequest) {
@@ -555,6 +561,9 @@ export class PahkatUploader {
       kind: WindowsExecutableKind | null,
       productCode: string,
       requiresReboot: RebootSpec[],
+      secrets: {
+        pahkatApiKey: string
+      },
     ): Promise<string> {
       const payloadArgs = [
         "windows-executable",
@@ -579,7 +588,9 @@ export class PahkatUploader {
       }
 
       const releaseArgs = PahkatUploader.releaseArgs(release)
-      return await PahkatUploader.run([...releaseArgs, ...payloadArgs])
+      return await PahkatUploader.run([...releaseArgs, ...payloadArgs], {
+        apiKey: secrets.pahkatApiKey,
+      })
     },
 
     async macosPackage(
@@ -590,6 +601,9 @@ export class PahkatUploader {
       pkgId: string,
       requiresReboot: RebootSpec[],
       targets: MacOSPackageTarget[],
+      secrets: {
+        pahkatApiKey: string
+      },
     ): Promise<string> {
       const payloadArgs = [
         "macos-package",
@@ -614,7 +628,9 @@ export class PahkatUploader {
       }
 
       const releaseArgs = PahkatUploader.releaseArgs(release)
-      return await PahkatUploader.run([...releaseArgs, ...payloadArgs])
+      return await PahkatUploader.run([...releaseArgs, ...payloadArgs], {
+        apiKey: secrets.pahkatApiKey,
+      })
     },
 
     async tarballPackage(
@@ -622,6 +638,9 @@ export class PahkatUploader {
       artifactUrl: string,
       installSize: number,
       size: number,
+      secrets: {
+        pahkatApiKey: string
+      },
     ): Promise<string> {
       const payloadArgs = [
         "tarball-package",
@@ -634,7 +653,9 @@ export class PahkatUploader {
       ]
 
       const releaseArgs = PahkatUploader.releaseArgs(release)
-      return await PahkatUploader.run([...releaseArgs, ...payloadArgs])
+      return await PahkatUploader.run([...releaseArgs, ...payloadArgs], {
+        apiKey: secrets.pahkatApiKey,
+      })
     },
   }
 }

@@ -97,6 +97,11 @@ export type Props =
     dependencies?: { [key: string]: string } | null
     pahkatRepo: string
     version: string
+    secrets: {
+      awsAccessKeyId: string
+      awsSecretAccessKey: string
+      pahkatApiKey: string
+    }
   }
   & (
     | {
@@ -126,6 +131,7 @@ export default async function deploy({
   dependencies,
   pahkatRepo,
   version,
+  secrets,
   ...props
 }: Props) {
   const repoPackageUrl = `${pahkatRepo}/packages/${packageId}`
@@ -178,6 +184,7 @@ export default async function deploy({
       pkgId,
       requiresReboot,
       targets,
+      secrets,
     )
     await Deno.writeTextFile("./metadata.toml", data)
   } else if (props.packageType === PackageType.WindowsExecutable) {
@@ -207,6 +214,7 @@ export default async function deploy({
       kind,
       productCode,
       requiresReboot,
+      secrets,
     )
     await Deno.writeTextFile("./metadata.toml", data)
   } else if (props.packageType === PackageType.TarballPackage) {
@@ -215,6 +223,7 @@ export default async function deploy({
       artifactUrl,
       1,
       artifactSize,
+      secrets,
     )
     await Deno.writeTextFile("./metadata.toml", data)
   } else {
@@ -230,11 +239,7 @@ export default async function deploy({
     artifactUrl,
     "./metadata.toml",
     repoPackageUrl,
-    {
-      // TODO
-      awsAccessKeyId: "",
-      awsSecretAccessKey: "",
-    },
+    secrets,
   )
 }
 

@@ -49,6 +49,11 @@ export type Props = {
   channel: string | null
   nightlyChannel: string
   pahkatRepo: string
+  secrets: {
+    pahkatApiKey: string
+    awsAccessKeyId: string
+    awsSecretAccessKey: string
+  }
 }
 
 export default async function spellerDeploy({
@@ -59,6 +64,7 @@ export default async function spellerDeploy({
   channel,
   nightlyChannel,
   pahkatRepo,
+  secrets,
 }: Props) {
   try {
     const packageId = derivePackageId(spellerType)
@@ -109,6 +115,7 @@ export default async function spellerDeploy({
         WindowsExecutableKind.Inno,
         productCode,
         [RebootSpec.Install, RebootSpec.Uninstall],
+        secrets,
       )
     } else if (spellerType === SpellerType.MacOS) {
       platform = "macos"
@@ -144,6 +151,7 @@ export default async function spellerDeploy({
         pkgId,
         [RebootSpec.Install, RebootSpec.Uninstall],
         [MacOSPackageTarget.System, MacOSPackageTarget.User],
+        secrets,
       )
     } else if (spellerType === SpellerType.Mobile) {
       platform = "mobile"
@@ -166,6 +174,7 @@ export default async function spellerDeploy({
         artifactUrl,
         1,
         artifactSize,
+        secrets,
       )
     } else {
       throw new Error(`Unsupported bundle type ${spellerType}`)
@@ -197,9 +206,11 @@ export default async function spellerDeploy({
       artifactUrl,
       "./metadata.toml",
       repoPackageUrl,
-      null,
-      manifestPath,
-      "speller",
+      secrets,
+      {
+        manifestTomlPath: manifestPath,
+        packageType: "speller",
+      },
     )
   } catch (error: any) {
     logger.error(error.message)

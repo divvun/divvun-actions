@@ -159,14 +159,6 @@ export async function secrets(): Promise<Record<string, string>> {
   return redactedSecrets
 }
 
-export function tempDir() {
-  return Deno.makeTempDirSync()
-}
-
-export function createArtifact(_fileName: string, _artifactPath: string) {
-  throw new Error("Artifacts are not available in local")
-}
-
 export async function setMaxLines(lines: number) {
   _cmd("config", undefined, { "maxVisibleLines": lines })
 }

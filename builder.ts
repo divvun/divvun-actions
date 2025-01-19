@@ -30,8 +30,6 @@ export const {
   setOutput,
   context,
   secrets,
-  tempDir,
-  createArtifact,
   setMaxLines,
   group,
 } = selectedBuilder

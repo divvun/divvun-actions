@@ -115,16 +115,8 @@ export const context: Context = {
   repo: Deno.env.get("BUILDKITE_REPO")!,
 }
 
-export function secrets() {
+export async function secrets(): Promise<Record<string, string>> {
   throw new Error("Secrets are not available in Buildkite")
-}
-
-export function tempDir() {
-  return Deno.makeTempDirSync()
-}
-
-export function createArtifact(_fileName: string, _artifactPath: string) {
-  throw new Error("Artifacts are not available in Buildkite")
 }
 
 export async function setMaxLines(lines: number) {
@@ -150,4 +142,8 @@ function _write(value: string) {
 
 function _cmd(name: command.CommandName, value?: string, data?: any) {
   return _write(command.stringify({ name, data, value }))
+}
+
+export async function redactSecret(value: string) {
+  _cmd("redact", value)
 }

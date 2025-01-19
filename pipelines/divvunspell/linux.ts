@@ -121,6 +121,8 @@ async function tarball(_: DivvunSpellProps) {
 async function deploy({
   inputs: { txzPath },
 }: DivvunSpellProps<{ txzPath: string }>) {
+  const secrets = await builder.secrets()
+
   const { channel, version } = await getVersion({
     cargoToml: "divvunspell/Cargo.toml",
   })
@@ -142,5 +144,10 @@ async function deploy({
     pahkatRepo: "https://pahkat.uit.no/devtools/",
     arch: "x86_64",
     dependencies: null,
+    secrets: {
+      awsAccessKeyId: secrets["awsAccessKeyId"],
+      awsSecretAccessKey: secrets["awsSecretAccessKey"],
+      pahkatApiKey: secrets["pahkatApiKey"],
+    },
   })
 }

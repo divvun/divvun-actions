@@ -4,7 +4,7 @@ import createTxz from "~/actions/create-txz.ts"
 import doDeploy, { PackageType } from "~/actions/deploy.ts"
 import pahkatInit from "~/actions/pahkat/init.ts"
 import getVersion from "~/actions/version.ts"
-import { exec } from "~/builder.ts"
+import * as builder from "~/builder.ts"
 import { Bash } from "~/util/shared.ts"
 
 const TARGETS = ["x86_64-apple-darwin", "aarch64-apple-darwin"]
@@ -84,7 +84,7 @@ export default async function run(
 async function build(_: DivvunSpellProps) {
   // Build
   for (const target of TARGETS) {
-    await exec("cargo", [
+    await builder.exec("cargo", [
       "--color",
       "always",
       "build",
@@ -137,6 +137,8 @@ async function tarball(_: DivvunSpellProps) {
 async function deploy({
   inputs: { txzPath },
 }: DivvunSpellProps<{ txzPath: string }>) {
+  const secrets = await builder.secrets()
+
   const { channel, version } = await getVersion({
     cargoToml: "divvunspell/Cargo.toml",
   })
@@ -158,5 +160,10 @@ async function deploy({
     pahkatRepo: "https://pahkat.uit.no/devtools/",
     arch: null,
     dependencies: null,
+    secrets: {
+      awsAccessKeyId: secrets["awsAccessKeyId"],
+      awsSecretAccessKey: secrets["awsSecretAccessKey"],
+      pahkatApiKey: secrets["pahkatApiKey"],
+    },
   })
 }

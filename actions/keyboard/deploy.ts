@@ -14,7 +14,7 @@ import {
   WindowsExecutableKind,
 } from "~/util/shared.ts"
 
-import { KeyboardType } from "../types.ts"
+import { KeyboardType } from "./types.ts"
 
 export function derivePackageId() {
   const repo = builder.context.repo
@@ -60,6 +60,11 @@ export type Props = {
   channel: string | null
   pahkatRepo: string
   packageId: string
+  secrets: {
+    pahkatApiKey: string
+    awsAccessKeyId: string
+    awsSecretAccessKey: string
+  }
 }
 
 export default async function keyboardDeploy({
@@ -69,6 +74,7 @@ export default async function keyboardDeploy({
   channel,
   pahkatRepo,
   packageId,
+  secrets,
 }: Props) {
   const repoPackageUrl = `${pahkatRepo}packages/${packageId}`
 
@@ -113,6 +119,7 @@ export default async function keyboardDeploy({
       pkgId,
       [RebootSpec.Install, RebootSpec.Uninstall],
       [MacOSPackageTarget.System, MacOSPackageTarget.User],
+      secrets,
     )
   } else if (keyboardType === KeyboardType.Windows) {
     const target = await Kbdgen.loadTarget(bundlePath, "windows")
@@ -144,6 +151,7 @@ export default async function keyboardDeploy({
       WindowsExecutableKind.Inno,
       productCode,
       [RebootSpec.Install, RebootSpec.Uninstall],
+      secrets,
     )
   } else {
     throw new Error("Unhandled keyboard type: " + keyboardType)
@@ -181,7 +189,10 @@ export default async function keyboardDeploy({
     artifactUrl,
     "./metadata.toml",
     repoPackageUrl,
-    metadataJsonPath,
+    secrets,
+    {
+      metadataJsonPath,
+    },
   )
 }
 

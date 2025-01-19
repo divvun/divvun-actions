@@ -35,7 +35,7 @@ program
   .name("divvun-actions")
   .description("CLI for Divvun Actions")
   .option("--log-level <level>", "Log level", "info")
-  .action((options) => {
+  .action((options: any) => {
     logger.setLogLevel(options.logLevel)
   })
 // .version(version)
@@ -220,36 +220,6 @@ divvunspell
             Deno.exit(1)
         }
       })
-    },
-  )
-
-divvunspell
-  .command("setup")
-  .description("Run setup step")
-  .option("-k, --divvun-key <key>", "Divvun key for signing")
-  .option("--skip-setup", "Skip setup step", false)
-  .option("--skip-signing", "Skip signing step", false)
-  .option("--ignore-dependencies", "Ignore step dependencies", false)
-  .action(
-    async (
-      options: {
-        divvunKey: any
-        skipSetup: any
-        skipSigning: any
-        ignoreDependencies: any
-      },
-    ) => {
-      await divvunspellMacos(
-        "setup",
-        {
-          divvunKey: options.divvunKey,
-          skipSetup: options.skipSetup,
-          skipSigning: options.skipSigning,
-        },
-        {
-          ignoreDependencies: options.ignoreDependencies,
-        },
-      )
     },
   )
 
