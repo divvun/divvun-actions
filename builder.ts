@@ -13,7 +13,7 @@ let selectedBuilder: typeof import("~/builder/local.ts")
 export let mode: string
 
 if (isBuildkite) {
-  selectedBuilder = await import("~/builder/buildkite.ts")
+  selectedBuilder = await import("~/builder/buildkite/mod.ts")
   mode = "buildkite"
 } else {
   selectedBuilder = await import("~/builder/local.ts")
