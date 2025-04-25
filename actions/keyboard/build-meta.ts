@@ -1,6 +1,6 @@
 import * as builder from "~/builder.ts"
 import { Kbdgen } from "~/util/shared.ts"
-import { KeyboardType } from "../types.ts"
+import { KeyboardType } from "./types.ts"
 
 export type Props = {
   keyboardType: KeyboardType
@@ -26,7 +26,7 @@ export default async function keyboardBuildMeta({
   let payloadPath
 
   let buildStart = 0
-  const githubRepo = builder.context.repo
+  const githubRepo = builder.env.repo
 
   if (githubRepo === "divvun/divvun-keyboard") {
     if (keyboardType === KeyboardType.Android) {

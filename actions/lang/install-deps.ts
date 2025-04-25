@@ -1,3 +1,4 @@
+import logger from "~/util/log.ts"
 import { Apt, Pip, Pipx, ProjectJJ, Ssh } from "~/util/shared.ts"
 
 // async function getSudo() {

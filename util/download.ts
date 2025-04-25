@@ -1,12 +1,11 @@
 import * as path from "@std/path"
-import { tempDir } from "~/builder.ts"
 
 export async function download(url: string, options: {
   fileName?: string
   path?: string
 } = {}): Promise<string> {
   const downloadPath = path.resolve(
-    options.path ?? tempDir(),
+    options.path ?? Deno.makeTempDirSync(),
     options.fileName ?? path.basename(url),
   )
 

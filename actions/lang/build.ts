@@ -98,7 +98,7 @@ export default async function langBuild({
   requiresDesktopAsMobileWorkaround,
   ...config
 }: Props): Promise<Output> {
-  const githubWorkspace = builder.context.workspace
+  const githubWorkspace = builder.env.workspace
 
   if (githubWorkspace == null) {
     logger.error("GITHUB_WORKSPACE not set, failing.")

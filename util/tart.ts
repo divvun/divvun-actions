@@ -1,6 +1,7 @@
 import * as fs from "@std/fs"
 import * as path from "@std/path"
 import { exec, spawn } from "~/builder.ts"
+import type { DivvunActionsTargetMacOSConfig } from "~/util/config.ts"
 import logger from "~/util/log.ts"
 
 type TartStatus = {
@@ -14,10 +15,12 @@ type TartStatus = {
   Running: boolean
 }
 
+const MNT_POINT = "/Volumes/My Shared Files"
+
 export default class Tart {
-  static readonly WORKSPACE_PATH = "/Volumes/My Shared Files/workspace"
-  static readonly DIVVUN_ACTIONS_PATH =
-    "/Volumes/My Shared Files/divvun-actions"
+  static readonly WORKSPACE_PATH = MNT_POINT + "/workspace"
+  static readonly DIVVUN_ACTIONS_PATH = MNT_POINT + "/divvun-actions"
+  static readonly ARTIFACTS_PATH = MNT_POINT + "/artifacts"
 
   static async run(vmName: string, dirs: Record<string, string> = {}) {
     if (await Tart.isRunning(vmName)) {
@@ -90,12 +93,57 @@ export default class Tart {
     return fs.existsSync(Tart.DIVVUN_ACTIONS_PATH)
   }
 
-  static async enterVirtualMachine(realWorkingDir: string) {
+  static async enterVirtualMachine(
+    config: DivvunActionsTargetMacOSConfig | undefined,
+    localWorkingDir: string,
+    artifactsDir: string,
+  ) {
     logger.info("Moving into virtualised environment...")
 
+    const url = new URL(config?.remote!)
+
+    if (url.protocol !== "ssh:") {
+      throw new Error(`Unsupported protocol: ${url.protocol}`)
+    }
+
+    async function runRemote(args: string[]) {
+      const command = await new Deno.Command("ssh", {
+        args: [
+          "-p",
+          "admin",
+          "ssh",
+          "-o",
+          "StrictHostKeyChecking no",
+          `${url.username}@${url.host}`,
+          ...args,
+        ],
+      }).output()
+
+      const decoder = new TextDecoder()
+
+      if (!command.success) {
+        throw new Error(
+          `Remote command failed with exit code ${command.code}`,
+          {
+            cause: new Error(decoder.decode(command.stderr)),
+          },
+        )
+      }
+
+      return decoder.decode(command.stdout)
+    }
+
+    const remoteWorkingDir = await runRemote([
+      "mktemp",
+      "-d",
+      "-t",
+      "divvun-actions.XXXXXXXXXXXXXXXXXXXXXXX",
+    ])
+
     await Tart.run("runner", {
-      workspace: `${realWorkingDir}:ro`,
+      workspace: `${remoteWorkingDir}:ro`,
       "divvun-actions": `${path.resolve(Deno.cwd())}:ro`,
+      artifacts: `${artifactsDir}`,
     })
 
     logger.info("Entering macOS Tart virtual machine environment...")

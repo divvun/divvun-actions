@@ -1,11 +1,11 @@
 // deno-lint-ignore-file require-await no-explicit-any
 // Buildkite implementation of the builder interface
 
-import type { Context, ExecOptions, InputOptions } from "~/builder/types.ts"
+import type { ExecOptions, InputOptions } from "~/builder/types.ts"
 import * as command from "~/util/command.ts"
+import { Env, local as getEnv } from "~/util/env.ts"
 import logger from "~/util/log.ts"
-
-// Buildkite-specific implementations
+import { OpenBao, SecretsStore } from "~/util/openbao.ts"
 
 export async function spawn(
   commandLine: string,
@@ -71,37 +71,33 @@ export async function exec(
   return status.code
 }
 
-export async function addPath() {
-  throw new Error("Add path is not available in Buildkite")
+export function addPath(path: string) {
+  const sep = Deno.build.os === "windows" ? ";" : ":"
+  const p = Deno.env.get("PATH")
+  Deno.env.set(
+    "PATH",
+    `${path}${sep}${p}`,
+  )
+}
+
+const encoder = new TextEncoder()
+
+function _write(value: string) {
+  Deno.stdout.writeSync(encoder.encode(value + "\n"))
+}
+
+function _cmd(name: command.CommandName, value?: string, data?: any) {
+  return _write(command.stringify({ name, data, value }))
+}
+
+export async function redactSecret(value: string) {
+  _cmd("redact", value)
 }
 
 export async function getInput(
   _variable: string,
   _options?: InputOptions,
 ): Promise<string> {
-  // try {
-  //   const value = await new Promise<string>((resolve, reject) => {
-  //     exec("buildkite-agent", ["meta-data", "get", variable])
-  //       .then((code) => {
-  //         if (code === 0) {
-  //           resolve(process.stdout.toString().trim())
-  //         } else {
-  //           reject(new Error(`Failed to get meta-data for ${variable}`))
-  //         }
-  //       })
-  //       .catch(reject)
-  //   })
-
-  //   if (value && options?.trimWhitespace !== false) {
-  //     return value.trim()
-  //   }
-  //   return value
-  // } catch (_) {
-  //   if (options?.required) {
-  //     throw new Error(`Input required and not supplied: ${variable}`)
-  //   }
-  //   return ""
-  // }
   throw new Error("Input is not available in Buildkite")
 }
 
@@ -109,14 +105,40 @@ export async function setOutput(name: string, value: any) {
   await exec("buildkite-agent", ["meta-data", "set", name, value.toString()])
 }
 
-export const context: Context = {
-  ref: Deno.env.get("BUILDKITE_COMMIT")!,
-  workspace: Deno.env.get("BUILDKITE_BUILD_CHECKOUT_PATH")!,
-  repo: Deno.env.get("BUILDKITE_REPO")!,
-}
+export const env: Env = getEnv()
 
-export async function secrets(): Promise<Record<string, string>> {
-  throw new Error("Secrets are not available in Buildkite")
+let redactedSecrets: SecretsStore | undefined
+
+export async function secrets(): Promise<SecretsStore> {
+  if (redactedSecrets != null) {
+    return redactedSecrets
+  }
+
+  const vaultRoleId = Deno.env.get("DIVVUN_ACTIONS_VAULT_ROLE_ID")
+  const vaultRoleSecret = Deno.env.get("DIVVUN_ACTIONS_VAULT_ROLE_SECRET")
+
+  if (vaultRoleId == null) {
+    throw new Error("DIVVUN_ACTIONS_VAULT_ROLE_ID is not defined")
+  }
+
+  if (vaultRoleSecret == null) {
+    throw new Error("DIVVUN_ACTIONS_VAULT_ROLE_SECRET is not defined")
+  }
+
+  const vault = await OpenBao.fromAppRole(
+    "https://vault.giellalt.org",
+    vaultRoleId,
+    vaultRoleSecret,
+  )
+  const raw = await vault.secrets()
+
+  for (const value of raw.values()) {
+    await redactSecret(value)
+  }
+
+  redactedSecrets = raw
+
+  return redactedSecrets
 }
 
 export async function setMaxLines(lines: number) {
@@ -132,18 +154,4 @@ export async function group(name: string, callback: () => Promise<void>) {
     logger.error(error)
     _cmd("end-group", undefined, { close: false })
   }
-}
-
-const encoder = new TextEncoder()
-
-function _write(value: string) {
-  Deno.stdout.writeSync(encoder.encode(value + "\n"))
-}
-
-function _cmd(name: command.CommandName, value?: string, data?: any) {
-  return _write(command.stringify({ name, data, value }))
-}
-
-export async function redactSecret(value: string) {
-  _cmd("redact", value)
 }

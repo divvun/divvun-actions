@@ -1,9 +1,13 @@
 // deno-lint-ignore-file no-explicit-any
-
-import { Command } from "commander"
+import { Command } from "@cliffy/command"
+import * as toml from "@std/toml"
 import * as builder from "~/builder.ts"
+import { DivvunActionsConfig } from "~/util/config.ts"
+
 // import { version } from "./package.json" with { "type": "json" };
 
+import type { CommandStep } from "~/builder/pipeline.ts"
+import { runLocalPipeline } from "~/pipelines/mod.ts"
 import * as target from "~/target.ts"
 import Docker from "~/util/docker.ts"
 import logger from "~/util/log.ts"
@@ -25,11 +29,12 @@ function prettyPlatform() {
   }
 }
 
-logger.info(
+logger.debug(
   `Loading Divvun Actions [Mode: ${builder.mode}] [Env: ${target.env}] [Platform: ${prettyPlatform()}]`,
 )
 
 const program = new Command()
+const local = new Command()
 
 program
   .name("divvun-actions")
@@ -38,151 +43,43 @@ program
   .action((options: any) => {
     logger.setLogLevel(options.logLevel)
   })
-// .version(version)
+  .command("local", local)
 
-// program
-//   .command("build")
-//   .description("Build the project")
-//   .option("-p, --platform <platform>", "target platform")
-//   .action((options) => {
-//     logger.info("Building for platform:", options.platform)
-//     // Add your build logic here
-//   })
+// const local = program
+// .command("local")
+// .description("Run local tasks")
+// .action(async () => {
+//   await localMain()
+// })
 
-// program
-//   .command("setup")
-//   .description("Setup the environment")
-//   .requiredOption("--divvun-key <key>", "Divvun key for authentication")
-//   .action(async (options) => {
-//     await setup({ divvunKey: options.divvunKey })
-//   })
+const pipeline = local
+  .command("pipeline")
+  .description("Run pipeline tasks")
+  .arguments("<file>")
+  .action(async (options: any, ...args: any[]) => {
+    // Default agent should be the host agent.
+    const config: DivvunActionsConfig = toml.parse(
+      await Deno.readTextFile(
+        "DivvunActions.toml",
+      ),
+    )
+    await runLocalPipeline(config, args[0])
+  })
 
-// program
-//   .command("version")
-//   .description("Version management")
-//   .option("--is-xcode", "Is Xcode project")
-//   .option("--is-nightly", "Is nightly build")
-//   .option("--cargo-toml <path>", "Path to Cargo.toml")
-//   .option("--speller-manifest <path>", "Path to speller manifest")
-//   .option("--plist-path <path>", "Path to plist file")
-//   .option("--csharp <path>", "Path to C# project")
-//   .option("--version-from-file <path>", "Get version from file")
-//   .option("--insta-stable", "Mark as stable")
-//   .option("--nightly-channel <channel>", "Nightly channel")
-//   .action(async (options) => {
-//     await versionCmd(options)
-//   })
+const step = new Command()
+local.command("step", step)
 
-// program
-//   .command("speller-bundle")
-//   .description("Bundle speller")
-//   .requiredOption("--version <version>", "Version")
-//   .requiredOption("--speller-type <type>", "Speller type")
-//   .requiredOption("--manifest <path>", "Manifest path")
-//   .requiredOption("--speller-paths <paths...>", "Speller paths")
-//   .action(async (options) => {
-//     await spellerBundle(options)
-//   })
-
-// program
-//   .command("speller-deploy")
-//   .description("Deploy speller")
-//   .requiredOption("--speller-type <type>", "Speller type")
-//   .requiredOption("--manifest-path <path>", "Manifest path")
-//   .requiredOption("--payload-path <path>", "Payload path")
-//   .requiredOption("--version <version>", "Version")
-//   .requiredOption("--channel <channel>", "Channel")
-//   .option("--nightly-channel <channel>", "Nightly channel")
-//   .requiredOption("--pahkat-repo <repo>", "Pahkat repository")
-//   .action(async (options) => {
-//     await spellerDeploy(options)
-//   })
-
-// program
-//   .command("keyboard-build")
-//   .description("Build keyboard")
-//   .requiredOption("--keyboard-type <type>", "Keyboard type")
-//   .option("--nightly-channel <channel>", "Nightly channel")
-//   .requiredOption("--bundle-path <path>", "Bundle path")
-//   .action(async (options) => {
-//     await keyboardBuild(options)
-//   })
-
-// program
-//   .command("keyboard-deploy")
-//   .description("Deploy keyboard")
-//   .requiredOption("--payload-path <path>", "Payload path")
-//   .requiredOption("--keyboard-type <type>", "Keyboard type")
-//   .requiredOption("--bundle-path <path>", "Bundle path")
-//   .requiredOption("--channel <channel>", "Channel")
-//   .requiredOption("--pahkat-repo <repo>", "Pahkat repository")
-//   .requiredOption("--package-id <id>", "Package ID")
-//   .action(async (options) => {
-//     await keyboardDeploy(options)
-//   })
-
-// program
-//   .command("keyboard-build-meta")
-//   .description("Build keyboard metadata")
-//   .requiredOption("--keyboard-type <type>", "Keyboard type")
-//   .requiredOption("--bundle-path <path>", "Bundle path")
-//   .action(async (options) => {
-//     await keyboardBuildMeta(options)
-//   })
-
-// program
-//   .command("deploy")
-//   .description("Deploy package")
-//   .requiredOption("--package-id <id>", "Package ID")
-//   .requiredOption("--platform <platform>", "Platform")
-//   .requiredOption("--payload-path <path>", "Payload path")
-//   .option("--arch <arch>", "Architecture")
-//   .requiredOption("--channel <channel>", "Channel")
-//   .option("--dependencies <deps...>", "Dependencies")
-//   .requiredOption("--pahkat-repo <repo>", "Pahkat repository")
-//   .requiredOption("--version <version>", "Version")
-//   .action(async (options) => {
-//     await deploy(options)
-//   })
-
-// program
-//   .command("inno-setup")
-//   .description("Create Inno Setup installer")
-//   .action(async (options) => {
-//     await innoSetup(options)
-//   })
-
-// program
-//   .command("lang-install-deps")
-//   .description("Install language dependencies")
-//   .option("--requires-apertium", "Requires Apertium")
-//   .option("--requires-sudo", "Requires sudo")
-//   .action(async (options) => {
-//     await langInstallDeps(options)
-//   })
-
-// program
-//   .command("enable-languages")
-//   .description("Enable languages")
-//   .requiredOption("--tags <tags...>", "Language tags")
-//   .action(async (options) => {
-//     await enableLanguages(options)
-//   })
-
-// program
-//   .command("pahkat-init")
-//   .description("Initialize Pahkat")
-//   .requiredOption("--repo-url <url>", "Repository URL")
-//   .requiredOption("--channel <channel>", "Channel")
-//   .requiredOption("--packages <packages...>", "Packages")
-//   .action(async (options) => {
-//     await pahkatInit(options)
-//   })
+step.command("command")
+  .arguments("<command>")
+  .action(async (options: any, ...args: any[]) => {
+    // Uh this makes no sense. We should just run whatever this is going to be directly from the pipeline runner above.
+    console.log("command", options, args)
+  })
 
 const divvunspell = program
   .command("divvunspell")
   .description("Run divvunspell pipeline tasks")
-  .requiredOption("--platform <platform>", "Target platform (macos, linux)")
+  .option("--platform <platform>", "Target platform (macos, linux)")
 
 divvunspell
   .command("build")
@@ -197,29 +94,38 @@ divvunspell
       const { divvunKey, skipSetup, ignoreDependencies } = options
       const platform = divvunspell.opts().platform.toLowerCase()
       const props = { divvunKey, skipSetup, ignoreDependencies }
+      const config: DivvunActionsConfig = toml.parse(
+        await Deno.readTextFile(
+          "DivvunActions.toml",
+        ),
+      )
 
-      await enterEnvironment(platform, async () => {
-        switch (platform) {
-          case "macos":
-            await divvunspellMacos("build", props, {
-              ignoreDependencies,
-            })
-            break
-          case "linux":
-            await divvunspellLinux("tarball", props, {
-              // ignoreDependencies,
-            })
-            break
-          case "windows":
-            await divvunspellWindows("build", props, {
-              ignoreDependencies,
-            })
-            break
-          default:
-            logger.error("Unsupported platform. Use 'macos' or 'linux'")
-            Deno.exit(1)
-        }
-      })
+      await enterEnvironment(
+        config.targets?.macos?.remote,
+        platform,
+        async () => {
+          switch (platform) {
+            case "macos":
+              await divvunspellMacos("build", props, {
+                ignoreDependencies,
+              })
+              break
+            case "linux":
+              await divvunspellLinux("tarball", props, {
+                // ignoreDependencies,
+              })
+              break
+            case "windows":
+              await divvunspellWindows("build", props, {
+                ignoreDependencies,
+              })
+              break
+            default:
+              logger.error("Unsupported platform. Use 'macos' or 'linux'")
+              Deno.exit(1)
+          }
+        },
+      )
     },
   )
 
@@ -284,7 +190,9 @@ divvunspell
   )
 
 async function enterEnvironment(
+  config: DivvunActionsConfig | undefined,
   platform: string,
+  artifactsDir: string,
   callback: () => Promise<void>,
 ) {
   const workingDir = target.workingDir
@@ -296,7 +204,11 @@ async function enterEnvironment(
         const isInVirtualMachine = Tart.isInVirtualMachine()
 
         if (!isInVirtualMachine) {
-          await Tart.enterVirtualMachine(workingDir)
+          await Tart.enterVirtualMachine(
+            config?.targets?.macos,
+            workingDir,
+            artifactsDir,
+          )
           return
         }
 
@@ -312,7 +224,7 @@ async function enterEnvironment(
 
       if (!isInContainer) {
         logger.info(`Working directory: ${workingDir}`)
-        logger.info("Entering Windows Docker container environment...")
+        logger.info("Entering Docker container environment...")
         await Docker.enterEnvironment("divvun-actions", workingDir)
         return
       } else {
@@ -350,13 +262,42 @@ async function enterEnvironment(
 
 async function localMain() {
   const realWorkingDir = target.workingDir
+  const realCommand = target.command
 
   if (realWorkingDir == null) {
     logger.error("main.ts cannot be run directly.")
     Deno.exit(1)
   }
 
-  await program.parseAsync(Deno.args)
+  if (realCommand != null) {
+    const workspaceDir = await Docker.enterWorkspace()
+    console.log(realCommand)
+
+    const command = JSON.parse(realCommand) as CommandStep
+
+    if (command.command == null) {
+      logger.error("command is null")
+      Deno.exit(1)
+    }
+
+    const proc = new Deno.Command("bash", {
+      args: [
+        "-c",
+        Array.isArray(command.command)
+          ? command.command.join("; ")
+          : command.command,
+      ],
+      cwd: workspaceDir,
+    })
+    await proc.spawn().status
+    await Docker.exitWorkspace(workspaceDir)
+    return
+  }
+  // if (realCommand != null) {
+  //   // Do this
+  // }
+
+  await program.parse(Deno.args)
 }
 
 // function delay(timeout: number) {
@@ -397,7 +338,10 @@ async function main() {
 }
 
 main()
-  .then(() => Deno.exit(0))
+  // .then(() => {
+  //   console.log("HELP")
+  //   Deno.exit(0)
+  // })
   .catch((e) => {
     logger.error(e)
     Deno.exit(1)

@@ -1,10 +1,11 @@
 // deno-lint-ignore-file require-await no-explicit-any
 // Local implementation of the builder interface
 
-import type { Context, ExecOptions, InputOptions } from "~/builder/types.ts"
+import type { ExecOptions, InputOptions } from "~/builder/types.ts"
 import * as command from "~/util/command.ts"
-import Infisical from "~/util/infisical.ts"
+import { Env, local as getEnv } from "~/util/env.ts"
 import logger from "~/util/log.ts"
+import { OpenBao, SecretsStore } from "~/util/openbao.ts"
 
 export async function spawn(
   commandLine: string,
@@ -127,33 +128,37 @@ export async function setOutput(name: string, value: any) {
   await exec("buildkite-agent", ["meta-data", "set", name, value.toString()])
 }
 
-export const context: Context = {
-  ref: Deno.env.get("BUILDKITE_COMMIT")!,
-  workspace: Deno.env.get("BUILDKITE_BUILD_CHECKOUT_PATH")!,
-  repo: Deno.env.get("BUILDKITE_REPO")!,
-}
+export const env: Env = getEnv()
 
-let redactedSecrets: Record<string, string> | undefined
+let redactedSecrets: SecretsStore | undefined
 
-export async function secrets(): Promise<Record<string, string>> {
+export async function secrets(): Promise<SecretsStore> {
   if (redactedSecrets != null) {
     return redactedSecrets
   }
 
-  const vaultKey = Deno.env.get("DIVVUN_ACTIONS_VAULT_KEY")
+  const vaultRoleId = Deno.env.get("DIVVUN_ACTIONS_VAULT_ROLE_ID")
+  const vaultRoleSecret = Deno.env.get("DIVVUN_ACTIONS_VAULT_ROLE_SECRET")
 
-  if (vaultKey == null) {
-    throw new Error("DIVVUN_ACTIONS_VAULT_KEY is not defined")
+  if (vaultRoleId == null) {
+    throw new Error("DIVVUN_ACTIONS_VAULT_ROLE_ID is not defined")
   }
 
-  const vault = await Infisical.fromKey(vaultKey)
+  if (vaultRoleSecret == null) {
+    throw new Error("DIVVUN_ACTIONS_VAULT_ROLE_SECRET is not defined")
+  }
+
+  const vault = await OpenBao.fromAppRole(
+    "https://vault.giellalt.org",
+    vaultRoleId,
+    vaultRoleSecret,
+  )
   const raw = await vault.secrets()
 
-  for (const value of Object.values(raw)) {
+  for (const value of raw.values()) {
     await redactSecret(value)
   }
 
-  Object.freeze(raw)
   redactedSecrets = raw
 
   return redactedSecrets

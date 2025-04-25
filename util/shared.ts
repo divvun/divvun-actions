@@ -1204,7 +1204,7 @@ export function validateProductCode(
 }
 
 export function isCurrentBranch(names: string[]) {
-  const value = builder.context.ref
+  const value = builder.env.branch
 
   logger.debug(`names: ${names}`)
   logger.debug(`GIT REF: '${value}'`)
@@ -1213,17 +1213,11 @@ export function isCurrentBranch(names: string[]) {
     return false
   }
 
-  for (const name of names) {
-    if (value === `refs/heads/${name}`) {
-      return true
-    }
-  }
-
-  return false
+  return names.includes(value)
 }
 
 export function isMatchingTag(tagPattern: RegExp) {
-  let value = builder.context.ref
+  const value = builder.env.tag
 
   logger.debug(`tag pattern: ${tagPattern}`)
   logger.debug(`GIT REF: '${value}'`)
@@ -1232,12 +1226,6 @@ export function isMatchingTag(tagPattern: RegExp) {
     return false
   }
 
-  const prefix = "refs/tags/"
-  if (!value.startsWith(prefix)) {
-    return false
-  }
-
-  value = value.substring(prefix.length)
   return tagPattern.test(value)
 }
 

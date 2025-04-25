@@ -81,7 +81,7 @@ export default async function run(
   }
 }
 
-async function build(_: DivvunSpellProps) {
+export async function build(_: DivvunSpellProps) {
   // Build
   for (const target of TARGETS) {
     await builder.exec("cargo", [
@@ -98,7 +98,7 @@ async function build(_: DivvunSpellProps) {
   }
 }
 
-async function codesign(props: DivvunSpellProps) {
+export async function codesign(props: DivvunSpellProps) {
   if (props.inputs.skipSigning) {
     return
   }
@@ -118,7 +118,7 @@ async function codesign(props: DivvunSpellProps) {
   }
 }
 
-async function tarball(_: DivvunSpellProps) {
+export async function tarball(_: DivvunSpellProps) {
   await Bash.runScript([
     "mkdir -p dist/lib/aarch64",
     "mkdir -p dist/lib/x86_64",
@@ -134,7 +134,18 @@ async function tarball(_: DivvunSpellProps) {
   return { txzPath }
 }
 
-async function deploy({
+const STEPS_MAP = new WeakMap()
+
+function $step(step: Function, meta: { os: string }) {
+  STEPS_MAP.set(step, meta)
+}
+
+function stepMeta(step: Function) {
+  return STEPS_MAP.get(step)
+}
+
+$step(deploy, { os: "macos" })
+export async function deploy({
   inputs: { txzPath },
 }: DivvunSpellProps<{ txzPath: string }>) {
   const secrets = await builder.secrets()

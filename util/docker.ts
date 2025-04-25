@@ -2,6 +2,7 @@ import { which } from "@david/which"
 import * as fs from "@std/fs"
 import * as path from "@std/path"
 import { exec } from "~/builder.ts"
+import type { CommandStep } from "~/builder/pipeline.ts"
 import logger from "~/util/log.ts"
 import { Powershell } from "./shared.ts"
 
@@ -12,9 +13,78 @@ export default class Docker {
 
   static async isInContainer() {
     if (Deno.build.os === "windows") {
-      return await fs.exists("C:\\actions") && await fs.exists("C:\\workspace")
+      return (
+        (await fs.exists("C:\\actions")) && (await fs.exists("C:\\workspace"))
+      )
     }
-    return await fs.exists("/actions") && await fs.exists("/workspace")
+    return (await fs.exists("/actions")) && (await fs.exists("/workspace"))
+  }
+
+  static async exec(
+    command: CommandStep,
+    config: {
+      workingDir?: string
+      artifactsDir?: string
+      image?: string
+      platform?: string
+      host?: string
+    },
+  ) {
+    const {
+      workingDir,
+      artifactsDir,
+      image = "divvun-actions",
+      platform = "linux",
+      host = "default",
+    } = config
+    const args = [
+      "-H",
+      host,
+      "run",
+      "--rm",
+      "-it",
+      // "--mount",
+      // `type=bind,source=${workingDir},target=C:\\workspace,readonly`,
+      "-v",
+      platform === "windows"
+        ? `${workingDir}:C:\\\\workspace:ro`
+        : `${workingDir}:/workspace:ro`,
+      // "-v",
+      // platform === "windows"
+      //   ? `${Docker.DIVVUN_ACTIONS_PATH}:C:\\actions`
+      //   : `${Docker.DIVVUN_ACTIONS_PATH}:/actions:ro`,
+    ]
+
+    if (artifactsDir != null) {
+      args.push(
+        "-v",
+        platform === "windows"
+          ? `${artifactsDir}:C:\\artifacts`
+          : `${artifactsDir}:/artifacts`,
+      )
+    }
+
+    const envArgs = [
+      "-e",
+      "CI=1",
+      "-e",
+      `_DIVVUN_ACTIONS_PLATFORM=${platform}`,
+      "-e",
+      "_DIVVUN_ACTIONS_ENV=docker",
+      "-e",
+      "_DIVVUN_ACTIONS_COMMAND=" + JSON.stringify(command),
+    ]
+
+    const cmdArgs = platform === "windows"
+      ? [
+        "pwsh.exe",
+        "-NoNewWindow",
+        "-Command",
+        `C:\\actions\\bin\\divvun-actions.ps1`,
+      ]
+      : ["bash", "-lic", `"/actions/bin/divvun-actions"`]
+
+    await exec("docker", [...args, ...envArgs, image + ":latest", ...cmdArgs])
   }
 
   static async enterEnvironment(image: string, workingDir: string) {
@@ -25,30 +95,27 @@ export default class Docker {
         throw new Error("Docker not found")
       }
 
-      await exec(
-        dockerPath,
-        [
-          "run",
-          "--rm",
-          "-it",
-          "-v",
-          `${workingDir}:C:\\workspace:ro`,
-          "-v",
-          `${Docker.DIVVUN_ACTIONS_PATH}:C:\\actions`,
-          "-e",
-          "CI=1",
-          "-e",
-          "_DIVVUN_ACTIONS_PLATFORM=windows",
-          "-e",
-          "_DIVVUN_ACTIONS_ENV=docker",
-          image + ":latest",
-          "pwsh.exe",
-          "-NoNewWindow",
-          "-Command",
-          `C:\\actions\\bin\\divvun-actions.ps1`,
-          ...Deno.args,
-        ],
-      )
+      await exec(dockerPath, [
+        "run",
+        "--rm",
+        "-it",
+        "-v",
+        `${workingDir}:C:\\workspace:ro`,
+        "-v",
+        `${Docker.DIVVUN_ACTIONS_PATH}:C:\\actions`,
+        "-e",
+        "CI=1",
+        "-e",
+        "_DIVVUN_ACTIONS_PLATFORM=windows",
+        "-e",
+        "_DIVVUN_ACTIONS_ENV=docker",
+        image + ":latest",
+        "pwsh.exe",
+        "-NoNewWindow",
+        "-Command",
+        `C:\\actions\\bin\\divvun-actions.ps1`,
+        ...Deno.args,
+      ])
       return
     }
 
@@ -81,7 +148,7 @@ export default class Docker {
 
     await Deno.mkdir(imagePath)
 
-    logger.info("Copying workspace...")
+    logger.debug("Copying workspace...")
     if (Deno.build.os === "windows") {
       await Powershell.runScript(
         `Copy-Item -Path C:\\workspace\\* -Destination ${imagePath} -Recurse -Force`,
@@ -90,17 +157,17 @@ export default class Docker {
       await exec("rsync", ["-ar", "/workspace/", imagePath])
     }
 
-    logger.info(`Entering virtual workspace (${imagePath})...`)
+    logger.debug(`Entering virtual workspace (${imagePath})...`)
     Deno.chdir(imagePath)
 
     return imagePath
   }
 
   static async exitWorkspace(imagePath: string) {
-    logger.info(`Exiting virtual workspace (${imagePath})...`)
+    logger.debug(`Exiting virtual workspace (${imagePath})...`)
     Deno.chdir(Deno.env.get("HOME")!)
 
-    logger.info("Removing workspace...")
+    logger.debug("Removing workspace...")
     await Deno.remove(imagePath, { recursive: true })
   }
 }

@@ -4,7 +4,7 @@ import logger from "~/util/log.ts"
 import { Bash } from "~/util/shared.ts"
 
 export default async function langCheck() {
-  const githubWorkspace = builder.context.workspace
+  const githubWorkspace = builder.env.workspace
   if (githubWorkspace == null) {
     logger.error("GITHUB_WORKSPACE not set, failing.")
     Deno.exit(1)

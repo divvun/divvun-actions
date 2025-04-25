@@ -28,7 +28,7 @@ export const {
   redactSecret,
   getInput,
   setOutput,
-  context,
+  env,
   secrets,
   setMaxLines,
   group,

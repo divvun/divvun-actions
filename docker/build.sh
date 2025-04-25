@@ -1,3 +1,3 @@
 #!/usr/bin/env sh
 
-docker build -t divvun-actions:latest -f ./Dockerfile.linux .
+docker build --platform linux/amd64 -t divvun-actions:latest -f ./Dockerfile.linux .

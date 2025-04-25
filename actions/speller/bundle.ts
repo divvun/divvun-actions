@@ -3,13 +3,14 @@ import * as toml from "@std/toml"
 
 import { makeInstaller } from "~/actions/inno-setup/lib.ts"
 import { InnoSetupBuilder } from "~/util/inno.ts"
+import logger from "~/util/log.ts"
 import { DivvunBundler, SpellerPaths, Tar, ThfstTools } from "~/util/shared.ts"
 import {
   deriveLangTag,
   derivePackageId,
   SpellerManifest,
   SpellerType,
-} from "../manifest.ts"
+} from "./manifest.ts"
 
 export type Props = {
   version: string
@@ -143,6 +144,7 @@ export default async function spellerBundle({
       packageId,
       langTag,
       spellerPaths,
+      secrets,
     )
   } else {
     throw new Error(`Unsupported speller type: ${spellerType}`)
