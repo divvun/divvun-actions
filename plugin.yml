@@ -1,0 +1,7 @@
+name: Divvun Actions
+description: Actions runner for Divvun
+author: https://github.com/divvun
+requirements: []
+configuration:
+  properties:
+  additionalProperties: false

@@ -9,7 +9,7 @@ import type {
 const isBuildkite = Deno.env.get("BUILDKITE")
 
 // Ensure we get the proper types from the implementations
-let selectedBuilder: typeof import("~/builder/local.ts")
+let selectedBuilder: typeof import("~/builder/buildkite/mod.ts")
 export let mode: string
 
 if (isBuildkite) {
@@ -26,11 +26,10 @@ export const {
   spawn,
   addPath,
   redactSecret,
-  getInput,
-  setOutput,
+  setMetadata,
+  metadata,
   env,
   secrets,
-  setMaxLines,
   group,
 } = selectedBuilder
 

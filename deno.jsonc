@@ -3,6 +3,7 @@
     "start": "deno run --allow-read --allow-write --allow-net --allow-run --allow-env index.ts"
   },
   "compilerOptions": {
+    "lib": ["deno.unstable","deno.ns"],
     "strict": true,
     "noImplicitAny": true,
     "noFallthroughCasesInSwitch": true,

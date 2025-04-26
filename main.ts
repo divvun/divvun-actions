@@ -325,16 +325,25 @@ async function main() {
   // await delay(500)
   // logger.info("Group is now closed!")
 
-  builder.setMaxLines(-1)
+  // builder.setMaxLines(-1)
+  console.log(builder.env)
 
   switch (builder.mode) {
     case "local": {
       await localMain()
       return
     }
+    case "buildkite": {
+      await buildkiteMain()
+      return
+    }
     default:
       throw new Error(`Unknown mode: ${builder.mode}`)
   }
+}
+
+async function buildkiteMain() {
+  logger.info("Buildkite main")
 }
 
 main()

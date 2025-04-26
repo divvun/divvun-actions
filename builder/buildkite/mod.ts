@@ -1,8 +1,7 @@
-// deno-lint-ignore-file require-await no-explicit-any
+// deno-lint-ignore-file no-explicit-any no-console
 // Buildkite implementation of the builder interface
 
-import type { ExecOptions, InputOptions } from "~/builder/types.ts"
-import * as command from "~/util/command.ts"
+import type { ExecOptions } from "~/builder/types.ts"
 import { Env, local as getEnv } from "~/util/env.ts"
 import logger from "~/util/log.ts"
 import { OpenBao, SecretsStore } from "~/util/openbao.ts"
@@ -71,6 +70,37 @@ export async function exec(
   return status.code
 }
 
+export async function output(
+  commandLine: string,
+  args?: string[],
+  options?: ExecOptions,
+): Promise<{stdout: string, stderr: string, status: CommandStatus }> {
+  let stdout = new Uint8Array()
+  let stderr = new Uint8Array()
+
+  const proc = await spawn(commandLine, args, {
+    ...options,
+    listeners: {
+      ...options?.listeners,
+      stdout: (chunk) => {
+        stdout = new Uint8Array([...stdout, ...chunk])
+      },
+      stderr: (chunk) => {
+        stderr = new Uint8Array([...stderr, ...chunk])
+      },
+    },
+  })
+
+  const status = await proc.status
+  const decoder = new TextDecoder()
+
+  return {
+    stdout: decoder.decode(stdout),
+    stderr: decoder.decode(stderr),
+    status,
+  }
+}
+
 export function addPath(path: string) {
   const sep = Deno.build.os === "windows" ? ";" : ":"
   const p = Deno.env.get("PATH")
@@ -80,29 +110,20 @@ export function addPath(path: string) {
   )
 }
 
-const encoder = new TextEncoder()
-
-function _write(value: string) {
-  Deno.stdout.writeSync(encoder.encode(value + "\n"))
-}
-
-function _cmd(name: command.CommandName, value?: string, data?: any) {
-  return _write(command.stringify({ name, data, value }))
-}
-
 export async function redactSecret(value: string) {
-  _cmd("redact", value)
+  await exec("buildkite-agent", ["redactor", "add"], { input: value })
 }
 
-export async function getInput(
-  _variable: string,
-  _options?: InputOptions,
-): Promise<string> {
-  throw new Error("Input is not available in Buildkite")
-}
-
-export async function setOutput(name: string, value: any) {
+export async function setMetadata(name: string, value: any) {
   await exec("buildkite-agent", ["meta-data", "set", name, value.toString()])
+}
+
+export async function metadata(name: string) {
+  const result = await output("buildkite-agent", ["meta-data", "get", name])
+  if (result.status.code !== 0) {
+    throw new Error(`Failed to get metadata for ${name}`)
+  }
+  return result.stdout
 }
 
 export const env: Env = getEnv()
@@ -141,17 +162,13 @@ export async function secrets(): Promise<SecretsStore> {
   return redactedSecrets
 }
 
-export async function setMaxLines(lines: number) {
-  _cmd("config", undefined, { "maxVisibleLines": lines })
-}
-
 export async function group(name: string, callback: () => Promise<void>) {
-  _cmd("start-group", name)
+  console.log(`--- ${name}`)
   try {
     await callback()
-    _cmd("end-group", undefined, { close: true })
+    console.log(`~~~ ${name}`)
   } catch (error) {
+    console.log(`^^^ +++`)
     logger.error(error)
-    _cmd("end-group", undefined, { close: false })
   }
 }

@@ -1,7 +1,7 @@
 // deno-lint-ignore-file require-await no-explicit-any
 // Local implementation of the builder interface
 
-import type { ExecOptions, InputOptions } from "~/builder/types.ts"
+import type { ExecOptions } from "~/builder/types.ts"
 import * as command from "~/util/command.ts"
 import { Env, local as getEnv } from "~/util/env.ts"
 import logger from "~/util/log.ts"
@@ -92,36 +92,6 @@ function _cmd(name: command.CommandName, value?: string, data?: any) {
 
 export async function redactSecret(value: string) {
   _cmd("redact", value)
-}
-
-export async function getInput(
-  _variable: string,
-  _options?: InputOptions,
-): Promise<string> {
-  // try {
-  //   const value = await new Promise<string>((resolve, reject) => {
-  //     exec("buildkite-agent", ["meta-data", "get", variable])
-  //       .then((code) => {
-  //         if (code === 0) {
-  //           resolve(process.stdout.toString().trim())
-  //         } else {
-  //           reject(new Error(`Failed to get meta-data for ${variable}`))
-  //         }
-  //       })
-  //       .catch(reject)
-  //   })
-
-  //   if (value && options?.trimWhitespace !== false) {
-  //     return value.trim()
-  //   }
-  //   return value
-  // } catch (error) {
-  //   if (options?.required) {
-  //     throw new Error(`Input required and not supplied: ${variable}`)
-  //   }
-  //   return ""
-  // }
-  throw new Error("Input is not available in Buildkite")
 }
 
 export async function setOutput(name: string, value: any) {
