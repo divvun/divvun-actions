@@ -15,4 +15,4 @@ buildkite-agent meta-data set "divvun_actions_openbao_role_id" "$role_id"
 buildkite-agent meta-data set "divvun_actions_openbao_role_secret" "$secret_id"
 
 echo `pwd`
-echo `ls -la`
+echo `env`
