@@ -1,6 +1,5 @@
 import { Client, createClient, Schema } from "@openbao/api"
 import { decodeBase64 } from "jsr:@std/encoding/base64"
-import * as builder from "~/builder.ts"
 
 type AppRoleLoginResponse = {
   auth: {
@@ -11,10 +10,10 @@ type AppRoleLoginResponse = {
 export class OpenBao {
   #client: Client
 
-  static async fromMetadata(): Promise<OpenBao> {
-    const endpoint = await builder.metadata("divvun_actions_openbao_endpoint")
-    const roleId = await builder.metadata("divvun_actions_openbao_role_id")
-    const roleSecret = await builder.metadata("divvun_actions_openbao_role_secret")
+  static async fromMetadata(getter: (key: string) => Promise<string>): Promise<OpenBao> {
+    const endpoint = await getter("divvun_actions_openbao_endpoint")
+    const roleId = await getter("divvun_actions_openbao_role_id")
+    const roleSecret = await getter("divvun_actions_openbao_role_secret")
 
     return OpenBao.fromAppRole(endpoint, roleId, roleSecret)
   }

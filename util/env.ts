@@ -15,8 +15,8 @@ function metadata(prefix: string): Record<string, string> {
 }
 
 const env = (prefix: string): Env => {
-  const repo = Deno.env.get(`${prefix}_REPO`)!
-  const repoName = repo.split("/").pop()!.split(".").shift()!
+  const repo = Deno.env.get(`${prefix}_REPO`) ?? ""
+  const repoName = (repo.split("/").pop() ?? "").split(".").shift() ?? ""
 
   return {
     jobId: Deno.env.get(`${prefix}_JOB_ID`),

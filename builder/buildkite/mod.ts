@@ -74,7 +74,7 @@ export async function output(
   commandLine: string,
   args?: string[],
   options?: ExecOptions,
-): Promise<{stdout: string, stderr: string, status: CommandStatus }> {
+): Promise<{stdout: string, stderr: string, status: any }> {
   let stdout = new Uint8Array()
   let stderr = new Uint8Array()
 
