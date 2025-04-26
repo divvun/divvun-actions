@@ -12,9 +12,9 @@ export class OpenBao {
   #client: Client
 
   static async fromMetadata(): Promise<OpenBao> {
-    const endpoint = await builder.metadata("divvun-actions-openbao-endpoint")
-    const roleId = await builder.metadata("divvun-actions-openbao-role-id")
-    const roleSecret = await builder.metadata("divvun-actions-openbao-role-secret")
+    const endpoint = await builder.metadata("divvun_actions_openbao_endpoint")
+    const roleId = await builder.metadata("divvun_actions_openbao_role_id")
+    const roleSecret = await builder.metadata("divvun_actions_openbao_role_secret")
 
     return OpenBao.fromAppRole(endpoint, roleId, roleSecret)
   }

@@ -2,7 +2,7 @@
 set -ueo pipefail
 
 export BAO_ADDR=https://vault.giellalt.org
-export BAO_TOKEN=$(buildkite-agent secret get divvun-actions-openbao-service-token)
+export BAO_TOKEN=$(buildkite-agent secret get divvun_actions_openbao_service_token)
 
 role_id=$(bao read -format=json -f auth/approle/role/builder/role-id | jq -r .data.role_id)
 secret_id=$(bao write -format=json -f auth/approle/role/builder/secret-id | jq -r .data.secret_id)
@@ -10,6 +10,6 @@ secret_id=$(bao write -format=json -f auth/approle/role/builder/secret-id | jq -
 echo $role_id | buildkite-agent redactor add
 echo $secret_id | buildkite-agent redactor add
 
-buildkite-agent meta-data set "divvun-actions-openbao-endpoint" "$BAO_ADDR"
-buildkite-agent meta-data set "divvun-actions-openbao-role-id" "$role_id"
-buildkite-agent meta-data set "divvun-actions-openbao-role-secret" "$secret_id"
+buildkite-agent meta-data set "divvun_actions_openbao_endpoint" "$BAO_ADDR"
+buildkite-agent meta-data set "divvun_actions_openbao_role_id" "$role_id"
+buildkite-agent meta-data set "divvun_actions_openbao_role_secret" "$secret_id"
