@@ -126,7 +126,7 @@ export async function metadata(name: string) {
   return result.stdout
 }
 
-export const env: Env = getEnv()
+export const env: () => Env = getEnv
 
 let redactedSecrets: SecretsStore | undefined
 

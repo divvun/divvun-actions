@@ -326,7 +326,6 @@ async function main() {
   // logger.info("Group is now closed!")
 
   // builder.setMaxLines(-1)
-  console.log(builder.env)
 
   switch (builder.mode) {
     case "local": {
@@ -343,6 +342,8 @@ async function main() {
 }
 
 async function buildkiteMain() {
+  console.log(builder.env())
+  console.log(Deno.env.toObject())
   logger.info("Buildkite main")
 }
 
