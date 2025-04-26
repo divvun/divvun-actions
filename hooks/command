@@ -3,3 +3,4 @@ set -ueo pipefail
 
 pwd
 env
+divvun-actions
