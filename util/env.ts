@@ -77,5 +77,5 @@ export type Env = {
   pullRequestRepo: string | undefined
 }
 
-export const buildkite = memoize(() => env("BUILDKITE"))
+export const buildkite = () => env("BUILDKITE")
 export const local = memoize(() => env("LOCAL"))
