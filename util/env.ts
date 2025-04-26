@@ -71,6 +71,7 @@ const env = (prefix: string): Env => {
       return Deno.env.get(`${prefix}_TRIGGERED_FROM_BUILD_PIPELINE_SLUG`)
     },
     get repo() {
+      console.log(`${prefix}_REPO`, Deno.env.get(`${prefix}_REPO`), Deno.env.toObject()[`${prefix}_REPO`])
       return Deno.env.get(`${prefix}_REPO`)!
     },
     get repoName() {
