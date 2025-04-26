@@ -2,7 +2,7 @@
 // Buildkite implementation of the builder interface
 
 import type { ExecOptions } from "~/builder/types.ts"
-import { Env, local as getEnv } from "~/util/env.ts"
+import { Env, buildkite as getEnv } from "~/util/env.ts"
 import logger from "~/util/log.ts"
 import { OpenBao, SecretsStore } from "~/util/openbao.ts"
 
