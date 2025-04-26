@@ -15,79 +15,39 @@ function metadata(prefix: string): Record<string, string> {
 }
 
 const env = (prefix: string): Env => {
+  const repo = Deno.env.get(`${prefix}_REPO`) ?? ""
+  const repoName = (repo.split("/").pop() ?? "").split(".").shift() ?? ""
+
   return {
-    get jobId() {
-      return Deno.env.get(`${prefix}_JOB_ID`)
-    },
-    get groupId() {
-      return Deno.env.get(`${prefix}_GROUP_ID`)
-    },
-    get groupKey() {
-      return Deno.env.get(`${prefix}_GROUP_KEY`)
-    },
-    get buildId() {
-      return Deno.env.get(`${prefix}_BUILD_ID`)
-    },
-    get buildNumber() {
-      return Deno.env.get(`${prefix}_BUILD_NUMBER`) 
-    },
-    get agentId() {
-      return Deno.env.get(`${prefix}_AGENT_ID`)
-    },
-    get agentMetaData() {
-      return metadata(prefix)
-    },
-    get artifactUploadDestination() {
-      return Deno.env.get(`${prefix}_ARTIFACT_UPLOAD_DESTINATION`)
-    },
-    get branch() {
-      return Deno.env.get(`${prefix}_BRANCH`)
-    },
-    get tag() {
-      return Deno.env.get(`${prefix}_TAG`)
-    },
-    get message() {
-      return Deno.env.get(`${prefix}_MESSAGE`) 
-    },
-    get commit() {
-      return Deno.env.get(`${prefix}_COMMIT`)
-    },
-    get pipelineSlug() {
-      return Deno.env.get(`${prefix}_PIPELINE_SLUG`)
-    },
-    get pipelineName() {
-      return Deno.env.get(`${prefix}_PIPELINE_NAME`)
-    },
-    get pipelineId() {
-      return Deno.env.get(`${prefix}_PIPELINE_ID`)
-    },
-    get pipelineProvider() {
-      return Deno.env.get(`${prefix}_PIPELINE_PROVIDER`)
-    },
-    get organizationSlug() {
-      return Deno.env.get(`${prefix}_ORGANIZATION_SLUG`)
-    },
-    get triggeredFromBuildPipelineSlug() {
-      return Deno.env.get(`${prefix}_TRIGGERED_FROM_BUILD_PIPELINE_SLUG`)
-    },
-    get repo() {
-      console.log(`${prefix}_REPO`, Deno.env.get(`${prefix}_REPO`), Deno.env.toObject()[`${prefix}_REPO`])
-      return Deno.env.get(`${prefix}_REPO`)!
-    },
-    get repoName() {
-      const repo = Deno.env.get(`${prefix}_REPO`)!
-      const repoName = (repo.split("/").pop() ?? "").split(".").shift() ?? ""
-      return repoName
-    },
-    get pullRequest() {
-      return Deno.env.get(`${prefix}_PULL_REQUEST`)
-    },
-    get pullRequestBaseBranch() {
-      return Deno.env.get(`${prefix}_PULL_REQUEST_BASE_BRANCH`)
-    },
-    get pullRequestRepo() {
-      return Deno.env.get(`${prefix}_PULL_REQUEST_REPO`)
-    },
+    jobId: Deno.env.get(`${prefix}_JOB_ID`),
+    groupId: Deno.env.get(`${prefix}_GROUP_ID`),
+    groupKey: Deno.env.get(`${prefix}_GROUP_KEY`),
+    buildId: Deno.env.get(`${prefix}_BUILD_ID`),
+    buildNumber: Deno.env.get(`${prefix}_BUILD_NUMBER`),
+    agentId: Deno.env.get(`${prefix}_AGENT_ID`),
+    agentMetaData: metadata(prefix),
+    artifactUploadDestination: Deno.env.get(
+      `${prefix}_ARTIFACT_UPLOAD_DESTINATION`,
+    ),
+    branch: Deno.env.get(`${prefix}_BRANCH`),
+    tag: Deno.env.get(`${prefix}_TAG`),
+    message: Deno.env.get(`${prefix}_MESSAGE`),
+    commit: Deno.env.get(`${prefix}_COMMIT`),
+    pipelineSlug: Deno.env.get(`${prefix}_PIPELINE_SLUG`),
+    pipelineName: Deno.env.get(`${prefix}_PIPELINE_NAME`),
+    pipelineId: Deno.env.get(`${prefix}_PIPELINE_ID`),
+    pipelineProvider: Deno.env.get(`${prefix}_PIPELINE_PROVIDER`),
+    organizationSlug: Deno.env.get(`${prefix}_ORGANIZATION_SLUG`),
+    triggeredFromBuildPipelineSlug: Deno.env.get(
+      `${prefix}_TRIGGERED_FROM_BUILD_PIPELINE_SLUG`,
+    ),
+    repo,
+    repoName,
+    pullRequest: Deno.env.get(`${prefix}_PULL_REQUEST`),
+    pullRequestBaseBranch: Deno.env.get(
+      `${prefix}_PULL_REQUEST_BASE_BRANCH`,
+    ),
+    pullRequestRepo: Deno.env.get(`${prefix}_PULL_REQUEST_REPO`),
   }
 }
 
