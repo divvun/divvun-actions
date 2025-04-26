@@ -342,7 +342,13 @@ async function main() {
 }
 
 async function buildkiteMain() {
-  console.log(builder.env)
+  console.log(builder.env.repo)
+  console.log(builder.env.repoName)
+  console.log(builder.env.commit)
+  console.log(builder.env.message)
+  console.log(builder.env.pipelineSlug)
+  console.log(builder.env.pipelineName)
+  console.log(builder.env.pipelineId)
   console.log(Deno.env.toObject())
   logger.info("Buildkite main")
 }
