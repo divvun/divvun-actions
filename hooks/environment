@@ -1,6 +1,8 @@
 #!/bin/bash
 set -ueo pipefail
 
+PLUGIN_DIR=$(dirname "${BASH_SOURCE[0]}")
+
 BAO_ADDR=https://vault.giellalt.org
 BAO_TOKEN=$(buildkite-agent secret get divvun_actions_openbao_service_token)
 
@@ -14,4 +16,4 @@ buildkite-agent meta-data set "divvun_actions_openbao_endpoint" "$BAO_ADDR"
 buildkite-agent meta-data set "divvun_actions_openbao_role_id" "$role_id"
 buildkite-agent meta-data set "divvun_actions_openbao_role_secret" "$secret_id"
 
-export TEST_EXPORT=true
+export DIVVUN_ACTIONS_PLUGIN_DIR=$PLUGIN_DIR
