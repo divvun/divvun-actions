@@ -342,7 +342,7 @@ async function main() {
 }
 
 async function buildkiteMain() {
-  console.log(builder.env())
+  console.log(builder.env)
   console.log(Deno.env.toObject())
   logger.info("Buildkite main")
 }
