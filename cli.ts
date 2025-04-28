@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any no-console
 import { parseArgs, ParseOptions } from "@std/cli/parse-args"
 import * as builder from "~/builder.ts"
+import { runDivvunKeyboard } from "~/pipelines/keyboard/divvun-keyboard.ts"
 
 enum Command {
   Run = "run",
@@ -113,6 +114,12 @@ async function runCi(args) {
         case "divvunspell":
             // await build()
             break
+        case "divvun-keyboard":
+        case "divvun-dev-keyboard": {
+            const kbdgenBundlePath = builder.env.repoName === "divvun-dev-keyboard" ? "divvun-dev.kbdgen" : "divvun.kbdgen"
+            await runDivvunKeyboard(kbdgenBundlePath)
+            break
+        }
         default:
             throw new Error(`Unknown repo: ${builder.env.repoName}`)
     }

@@ -20,7 +20,7 @@ async function apiKey(): Promise<FastlanePilotUploadApiKey> {
   }
 }
 
-export async function run(kbdgenBundlePath: string) {
+export async function runDivvunKeyboard(kbdgenBundlePath: string) {
   await pahkatInit({
     repoUrl: "https://pahkat.uit.no/devtools/",
     channel: "nightly",
@@ -40,8 +40,4 @@ export async function run(kbdgenBundlePath: string) {
   } else {
     logger.info("Not main branch; skipping upload")
   }
-}
-
-export default function pipeline() {
-    
 }
