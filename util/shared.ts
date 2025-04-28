@@ -182,41 +182,24 @@ export class Bash {
       : scriptInput.join(";\n")
     const thisEnv = Object.assign({}, env(), args.env)
 
-    let out: Uint8Array = new Uint8Array()
-    let err: Uint8Array = new Uint8Array()
+    const cmd = args.sudo ? "sudo" : "bash"
+    const cmdArgs = args.sudo ? ["bash", "-c", script] : ["-c", script]
 
-    const decoder = new TextDecoder()
+    const { stdout, stderr, status } = await builder.output(cmd, cmdArgs, {
+      env: thisEnv,
+      cwd: args.cwd,
+    })
 
-    const listeners = {
-      stdout: (data: Uint8Array) => {
-        out = new Uint8Array([...out, ...data])
-      },
-      stderr: (data: Uint8Array) => {
-        err = new Uint8Array([...err, ...data])
-      },
+    if (status !== 0) {
+      logger.error(`Process exited with code ${status}`)
+      logger.error("Stdout:")
+      logger.error(stdout)
+      logger.error("Stderr:")
+      logger.error(stderr)
+      Deno.exit(status)
     }
 
-    if (args.sudo) {
-      assertExit0(
-        await builder.exec("sudo", ["bash", "-c", script], {
-          env: thisEnv,
-          cwd: args.cwd,
-          listeners,
-        }),
-        decoder.decode(err),
-      )
-    } else {
-      assertExit0(
-        await builder.exec("bash", ["-c", script], {
-          env: thisEnv,
-          cwd: args.cwd,
-          listeners,
-        }),
-        decoder.decode(err),
-      )
-    }
-
-    return [decoder.decode(out), decoder.decode(err)]
+    return [stdout, stderr]
   }
 }
 

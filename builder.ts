@@ -24,6 +24,7 @@ if (isBuildkite) {
 export const {
   exec,
   spawn,
+  output,
   addPath,
   redactSecret,
   setMetadata,
