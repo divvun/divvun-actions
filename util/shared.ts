@@ -190,13 +190,13 @@ export class Bash {
       cwd: args.cwd,
     })
 
-    if (status !== 0) {
+    if (status.code !== 0) {
       logger.error(`Process exited with code ${status}`)
       logger.error("Stdout:")
       logger.error(stdout)
       logger.error("Stderr:")
       logger.error(stderr)
-      Deno.exit(status)
+      Deno.exit(status.code)
     }
 
     return [stdout, stderr]
