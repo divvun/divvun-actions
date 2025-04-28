@@ -191,7 +191,7 @@ export class Bash {
     })
 
     if (status.code !== 0) {
-      logger.error(`Process exited with code ${status}`)
+      logger.error(`Process exited with code ${status.code}`)
       logger.error("Stdout:")
       logger.error(stdout)
       logger.error("Stderr:")
