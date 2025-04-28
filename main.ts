@@ -321,6 +321,8 @@ async function main() {
 }
 
 async function buildkiteMain() {
+  const realWorkingDir = target.workingDir
+  Deno.chdir(realWorkingDir)
   // console.log(builder.env)
   // logger.info("Buildkite main")
   await runCli(Deno.args)
