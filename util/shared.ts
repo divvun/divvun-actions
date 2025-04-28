@@ -708,12 +708,15 @@ export class Kbdgen {
   }
 
   static async loadTarget(bundlePath: string, target: string) {
-    return nonUndefinedProxy(
-      yaml.parse(
-        await Deno.readTextFile(
-          path.resolve(bundlePath, "targets", `${target}.yaml`),
-        ),
+    const filePath = path.resolve(bundlePath, "targets", `${target}.yaml`)
+    const doc = yaml.parse(
+      await Deno.readTextFile(
+        filePath,
       ),
+    )
+
+    return nonUndefinedProxy(
+      doc,
       true,
     )
   }
