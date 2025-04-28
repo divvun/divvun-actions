@@ -15,6 +15,7 @@ function metadata(prefix: string): Record<string, string> {
 }
 
 function parseBuildkiteUrl(url: string) {
+  url = url.replace(/\.git$/, "")
   if (url.startsWith("git@")) {
     return new URL(`ssh://${url.replace(":", "/")}`)
   }
