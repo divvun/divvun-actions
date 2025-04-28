@@ -43,6 +43,7 @@ export default async function keyboardBuildMeta({
     payloadPath = await Kbdgen.buildAndroid(bundlePath, githubRepo)
   } else if (keyboardType === KeyboardType.iOS) {
     await Kbdgen.setBuildNumber(bundlePath, "ios", buildStart)
+    console.log("Building iOS")
     payloadPath = await Kbdgen.build_iOS(bundlePath)
   }
 

@@ -768,6 +768,7 @@ export class Kbdgen {
     target: string,
     start: number = 0,
   ) {
+    console.log("Setting build number for " + target)
     const targetData = await Kbdgen.loadTarget(bundlePath, target)
 
     // Set to run number
@@ -775,6 +776,9 @@ export class Kbdgen {
       (await Bash.runScript("git rev-list --count HEAD"))[0],
       10,
     )
+
+    console.log("Version number: " + versionNumber)
+
     targetData["build"] = start + versionNumber
     logger.debug("Set build number to " + targetData["build"])
 
@@ -782,6 +786,8 @@ export class Kbdgen {
       path.resolve(bundlePath, "targets", `${target}.yaml`),
       yaml.stringify({ ...targetData }),
     )
+
+    console.log("Wrote target data: " + targetData["build"])
 
     return targetData["build"]
   }
