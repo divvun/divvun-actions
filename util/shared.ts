@@ -1115,44 +1115,45 @@ export class DivvunBundler {
 }
 
 export function nonUndefinedProxy(obj: any, withNull: boolean = false): any {
-  return new Proxy(obj, {
-    get: (target, prop, receiver) => {
-      const v = Reflect.get(target, prop, receiver)
-      if (v === undefined) {
-        throw new Error(
-          `'${
-            String(
-              prop,
-            )
-          }' was undefined and this is disallowed. Available keys: ${
-            Object.keys(
-              obj,
-            ).join(", ")
-          }`,
-        )
-      }
+  return obj
+  // return new Proxy(obj, {
+  //   get: (target, prop, receiver) => {
+  //     const v = Reflect.get(target, prop, receiver)
+  //     if (v === undefined) {
+  //       throw new Error(
+  //         `'${
+  //           String(
+  //             prop,
+  //           )
+  //         }' was undefined and this is disallowed. Available keys: ${
+  //           Object.keys(
+  //             obj,
+  //           ).join(", ")
+  //         }`,
+  //       )
+  //     }
 
-      if (withNull && v === null) {
-        throw new Error(
-          `'${
-            String(
-              prop,
-            )
-          }' was null and this is disallowed. Available keys: ${
-            Object.keys(
-              obj,
-            ).join(", ")
-          }`,
-        )
-      }
+  //     if (withNull && v === null) {
+  //       throw new Error(
+  //         `'${
+  //           String(
+  //             prop,
+  //           )
+  //         }' was null and this is disallowed. Available keys: ${
+  //           Object.keys(
+  //             obj,
+  //           ).join(", ")
+  //         }`,
+  //       )
+  //     }
 
-      if (v != null && (Array.isArray(v) || typeof v === "object")) {
-        return nonUndefinedProxy(v, withNull)
-      } else {
-        return v
-      }
-    },
-  })
+  //     if (v != null && (Array.isArray(v) || typeof v === "object")) {
+  //       return nonUndefinedProxy(v, withNull)
+  //     } else {
+  //       return v
+  //     }
+  //   },
+  // })
 }
 
 export function validateProductCode(
