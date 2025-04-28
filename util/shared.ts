@@ -50,9 +50,13 @@ function env() {
   }
 }
 
-function assertExit0(code: number) {
+function assertExit0(code: number, stderr?: string) {
   if (code !== 0) {
     logger.error(`Process exited with exit code ${code}.`)
+    if (stderr) {
+      logger.error("Stderr:")
+      logger.error(stderr)
+    }
     Deno.exit(code)
   }
 }
@@ -178,15 +182,17 @@ export class Bash {
       : scriptInput.join(";\n")
     const thisEnv = Object.assign({}, env(), args.env)
 
-    const out: string[] = []
-    const err: string[] = []
+    let out: Uint8Array = new Uint8Array()
+    let err: Uint8Array = new Uint8Array()
+
+    const decoder = new TextDecoder()
 
     const listeners = {
       stdout: (data: Uint8Array) => {
-        out.push(data.toString())
+        out = new Uint8Array([...out, ...data])
       },
       stderr: (data: Uint8Array) => {
-        err.push(data.toString())
+        err = new Uint8Array([...err, ...data])
       },
     }
 
@@ -197,6 +203,7 @@ export class Bash {
           cwd: args.cwd,
           listeners,
         }),
+        decoder.decode(err),
       )
     } else {
       assertExit0(
@@ -205,10 +212,11 @@ export class Bash {
           cwd: args.cwd,
           listeners,
         }),
+        decoder.decode(err),
       )
     }
 
-    return [out.join(""), err.join("")]
+    return [decoder.decode(out), decoder.decode(err)]
   }
 }
 
@@ -321,6 +329,8 @@ export class PahkatPrefix {
       logger.debug(`${PahkatPrefix.path} exists; deleting first.`)
       await Deno.remove(PahkatPrefix.path, { recursive: true })
     }
+
+    logger.info(`Initializing pahkat prefix at ${PahkatPrefix.path}`)
     await DefaultShell.runScript(`pahkat-prefix init -c ${PahkatPrefix.path}`)
   }
 

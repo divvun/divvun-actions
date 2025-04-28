@@ -2,7 +2,7 @@
 // Buildkite implementation of the builder interface
 
 import type { ExecOptions } from "~/builder/types.ts"
-import { buildkite as getEnv, Env } from "~/util/env.ts"
+import { Env, buildkite as getEnv } from "~/util/env.ts"
 import logger from "~/util/log.ts"
 import { OpenBao, SecretsStore } from "~/util/openbao.ts"
 
@@ -64,7 +64,7 @@ export async function exec(
   const status = await proc.status
 
   if (status.code !== 0 && !options?.ignoreReturnCode) {
-    throw new Error(`Process exited with code ${status.code}`)
+    throw new Error(`Process '${commandLine}' exited with code ${status.code}`)
   }
 
   return status.code
