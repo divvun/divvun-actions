@@ -14,9 +14,16 @@ function metadata(prefix: string): Record<string, string> {
   return env
 }
 
+function parseBuildkiteUrl(url: string) {
+  if (url.startsWith("git@")) {
+    return new URL(`ssh://${url}`)
+  }
+  return new URL(url)
+}
+
 const env = (prefix: string): Env => {
   const repo = Deno.env.get(`${prefix}_REPO`) ?? ""
-  const repoUrl = new URL(repo)
+  const repoUrl = parseBuildkiteUrl(repo)
   const repoProtocol = repoUrl.protocol
   const repoHost = repoUrl.host
   const repoPath = repoUrl.pathname
