@@ -27,7 +27,7 @@ const env = (prefix: string): Env => {
   const repoUrl = parseBuildkiteUrl(repo)
   const repoProtocol = repoUrl.protocol
   const repoHost = repoUrl.host
-  const repoPath = repoUrl.pathname
+  const repoPath = repoUrl.pathname.replace(/^\//, "")
   const repoName = repoPath.split("/").pop()!
 
   return {
