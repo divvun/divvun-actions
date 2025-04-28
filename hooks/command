@@ -1,6 +1,4 @@
 #!/bin/bash
 set -ueo pipefail
 
-pwd
-env
-divvun-actions
+divvun-actions ci
