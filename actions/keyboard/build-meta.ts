@@ -26,7 +26,7 @@ export default async function keyboardBuildMeta({
   let payloadPath
 
   let buildStart = 0
-  const githubRepo = builder.env.repo
+  const githubRepo = builder.env.repoPath
 
   if (githubRepo === "divvun/divvun-keyboard") {
     if (keyboardType === KeyboardType.Android) {

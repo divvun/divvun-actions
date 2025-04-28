@@ -16,7 +16,11 @@ function metadata(prefix: string): Record<string, string> {
 
 const env = (prefix: string): Env => {
   const repo = Deno.env.get(`${prefix}_REPO`) ?? ""
-  const repoName = (repo.split("/").pop() ?? "").split(".").shift() ?? ""
+  const repoUrl = new URL(repo)
+  const repoProtocol = repoUrl.protocol
+  const repoHost = repoUrl.host
+  const repoPath = repoUrl.pathname
+  const repoName = repoPath.split("/").pop()!
 
   return {
     jobId: Deno.env.get(`${prefix}_JOB_ID`),
@@ -42,7 +46,10 @@ const env = (prefix: string): Env => {
       `${prefix}_TRIGGERED_FROM_BUILD_PIPELINE_SLUG`,
     ),
     repo,
+    repoPath,
+    repoHost,
     repoName,
+    repoProtocol,
     pullRequest: Deno.env.get(`${prefix}_PULL_REQUEST`),
     pullRequestBaseBranch: Deno.env.get(
       `${prefix}_PULL_REQUEST_BASE_BRANCH`,
@@ -72,6 +79,9 @@ export type Env = {
   triggeredFromBuildPipelineSlug: string | undefined
   repo: string
   repoName: string
+  repoPath: string
+  repoHost: string
+  repoProtocol: string
   pullRequest: string | undefined
   pullRequestBaseBranch: string | undefined
   pullRequestRepo: string | undefined
