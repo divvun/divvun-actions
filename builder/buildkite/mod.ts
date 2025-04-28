@@ -60,6 +60,7 @@ export async function exec(
   args?: string[],
   options?: ExecOptions,
 ): Promise<number> {
+  console.log(args, options)
   const proc = await spawn(commandLine, args, options)
   const status = await proc.status
 
