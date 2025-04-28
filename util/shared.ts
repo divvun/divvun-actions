@@ -270,6 +270,8 @@ export enum WindowsExecutableKind {
   Msi = "msi",
 }
 
+let _pahkatPrefixPath: string | null = null
+
 export class PahkatPrefix {
   static URL_LINUX =
     "https://pahkat.uit.no/devtools/download/pahkat-prefix-cli?platform=linux&channel=nightly"
@@ -279,7 +281,10 @@ export class PahkatPrefix {
     "https://pahkat.uit.no/devtools/download/pahkat-prefix-cli?platform=windows&channel=nightly"
 
   static get path(): string {
-    return path.join(tmpDir(), "pahkat-prefix")
+    if (_pahkatPrefixPath == null) {
+      _pahkatPrefixPath = path.join(tmpDir(), "pahkat-prefix")
+    }
+    return _pahkatPrefixPath
   }
 
   static async bootstrap() {
