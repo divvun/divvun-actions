@@ -3,6 +3,7 @@ import { Command } from "@cliffy/command"
 import * as toml from "@std/toml"
 import * as builder from "~/builder.ts"
 import { DivvunActionsConfig } from "~/util/config.ts"
+import runCli from "./cli.ts"
 
 // import { version } from "./package.json" with { "type": "json" };
 
@@ -305,28 +306,6 @@ async function localMain() {
 // }
 
 async function main() {
-  // builder.startGroup("hello")
-  // const secrets = await builder.secrets()
-  // logger.info(secrets)
-  // logger.error("oh my")
-  // await delay(500)
-  // builder.warning("less oh my")
-  // logger.info("1")
-  // logger.info("2")
-  // logger.info("3")
-  // await delay(500)
-  // logger.info("4")
-  // logger.info("5")
-  // await delay(1000)
-  // logger.info("example ends in 2 seconds")
-  // await delay(2000)
-  // builder.endGroup()
-
-  // await delay(500)
-  // logger.info("Group is now closed!")
-
-  // builder.setMaxLines(-1)
-
   switch (builder.mode) {
     case "local": {
       await localMain()
@@ -342,8 +321,9 @@ async function main() {
 }
 
 async function buildkiteMain() {
-  console.log(builder.env)
-  logger.info("Buildkite main")
+  // console.log(builder.env)
+  // logger.info("Buildkite main")
+  await runCli(Deno.args)
 }
 
 main()

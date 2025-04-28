@@ -3,7 +3,7 @@
     "start": "deno run --allow-read --allow-write --allow-net --allow-run --allow-env index.ts"
   },
   "compilerOptions": {
-    "lib": ["deno.unstable","deno.ns"],
+    "lib": ["deno.unstable", "deno.ns"],
     "strict": true,
     "noImplicitAny": true,
     "noFallthroughCasesInSwitch": true,
@@ -38,6 +38,7 @@
     "@infisical/sdk": "npm:@infisical/sdk@^3.0.4",
     "@openbao/api": "jsr:@openbao/api@^0.0.3",
     "@std/cache": "jsr:@std/cache@^0.1.3",
+    "@std/cli": "jsr:@std/cli@^1.0.17",
     "@std/crypto": "jsr:@std/crypto@^1.0.3",
     "@std/encoding": "jsr:@std/encoding@^1.0.10",
     "@std/fs": "jsr:@std/fs@^1.0.9",

@@ -1,0 +1,119 @@
+// deno-lint-ignore-file no-explicit-any no-console
+import { parseArgs, ParseOptions } from "@std/cli/parse-args"
+import * as builder from "~/builder.ts"
+
+enum Command {
+  Run = "run",
+  Ci = "ci",
+}
+
+type OptionConfig = {
+  long?: string
+  short?: string
+  help?: string
+  aliases?: string[]
+}
+
+type CommandConfig = {
+  options: CommandOption
+}
+
+const commands: Record<Command, { options: ParseOptions; help: string }> = {
+  [Command.Run]: {
+    options: {
+      boolean: ["help"],
+      alias: {
+        help: "h",
+      },
+    },
+    help: "Run a specific pipeline",
+  },
+  [Command.Ci]: {
+    options: {
+      boolean: ["help"],
+      alias: {
+        help: "h",
+      },
+    },
+    help: "Automatically determine pipelines in CI",
+  },
+}
+
+function printHelp(command?: Command) {
+  if (!command) {
+    console.log(`Usage: <command> [options]\n`)
+    console.log()
+    console.log("Commands:")
+    for (const [command, commandOptions] of Object.entries(commands)) {
+      console.log(`  ${command}\t${commandOptions.help}`)
+    }
+    return
+  }
+
+  const commandOptions = commands[command as Command]
+  console.log(`Usage: ${Deno.args[0]} ${command} [options]`)
+  console.log(commandOptions.help)
+}
+
+function parseCommand(input: string[]) {
+  const args = parseArgs(input, {
+    boolean: ["help"],
+    stopEarly: true,
+    alias: {
+      help: "h",
+    },
+  })
+
+  if (args.help) {
+    printHelp(args._[0] as Command)
+    Deno.exit(0)
+  }
+
+  const command = args._[0] as Command
+  const commandOptions = commands[command]?.options
+  if (!commandOptions) {
+    console.error(`Unknown command: ${command}`)
+    printHelp()
+    Deno.exit(1)
+  }
+
+  const commandArgs = parseArgs(
+    args._.slice(1).map((x) => x.toString()),
+    commandOptions,
+  )
+  if (commandArgs.help) {
+    printHelp(command)
+    Deno.exit(0)
+  }
+
+  return { command, args: commandArgs }
+}
+
+export default async function runCli(input: string[]) {
+  const { command, args } = parseCommand(input)
+  console.log(command, args)
+
+  switch (command) {
+    case Command.Run:
+    //   runPipeline(args)
+      break
+    case Command.Ci:
+      await runCi(args)
+      break
+  }
+}
+
+async function runCi(args) {
+    console.log("Running CI")
+
+    console.log(builder.env)
+    console.log(builder.env.repoName)
+
+    switch (builder.env.repoName) {
+        case "divvunspell":
+            // await build()
+            break
+        default:
+            throw new Error(`Unknown repo: ${builder.env.repoName}`)
+    }
+}

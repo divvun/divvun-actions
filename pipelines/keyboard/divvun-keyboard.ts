@@ -1,6 +1,6 @@
 import {
-  fastlanePilotUpload,
-  FastlanePilotUploadApiKey,
+    fastlanePilotUpload,
+    FastlanePilotUploadApiKey,
 } from "~/actions/fastlane/pilot.ts"
 import keyboardBuildMeta from "~/actions/keyboard/build-meta.ts"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
@@ -12,7 +12,7 @@ async function apiKey(): Promise<FastlanePilotUploadApiKey> {
   const secrets = await builder.secrets()
 
   return {
-    key_id: secrets.get("macos/apiKey/keykey_id"),
+    key_id: secrets.get("macos/apiKey/key_id"),
     issuer_id: secrets.get("macos/apiKey/issuer_id"),
     key: secrets.get("macos/apiKey/key"),
     duration: parseInt(secrets.get("macos/apiKey/duration"), 10),
@@ -40,4 +40,8 @@ export async function run(kbdgenBundlePath: string) {
   } else {
     logger.info("Not main branch; skipping upload")
   }
+}
+
+export default function pipeline() {
+    
 }

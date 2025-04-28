@@ -10,7 +10,9 @@ type AppRoleLoginResponse = {
 export class OpenBao {
   #client: Client
 
-  static async fromMetadata(getter: (key: string) => Promise<string>): Promise<OpenBao> {
+  static async fromMetadata(
+    getter: (key: string) => Promise<string>,
+  ): Promise<OpenBao> {
     const endpoint = await getter("divvun_actions_openbao_endpoint")
     const roleId = await getter("divvun_actions_openbao_role_id")
     const roleSecret = await getter("divvun_actions_openbao_role_secret")

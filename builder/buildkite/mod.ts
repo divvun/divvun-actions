@@ -2,7 +2,7 @@
 // Buildkite implementation of the builder interface
 
 import type { ExecOptions } from "~/builder/types.ts"
-import { Env, buildkite as getEnv } from "~/util/env.ts"
+import { buildkite as getEnv, Env } from "~/util/env.ts"
 import logger from "~/util/log.ts"
 import { OpenBao, SecretsStore } from "~/util/openbao.ts"
 
@@ -74,7 +74,7 @@ export async function output(
   commandLine: string,
   args?: string[],
   options?: ExecOptions,
-): Promise<{stdout: string, stderr: string, status: any }> {
+): Promise<{ stdout: string; stderr: string; status: any }> {
   let stdout = new Uint8Array()
   let stderr = new Uint8Array()
 
