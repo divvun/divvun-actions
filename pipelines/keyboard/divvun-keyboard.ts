@@ -58,7 +58,7 @@ export function pipelineDivvunKeyboard() {
           queue: "macos",
         },
         plugins: [
-         "ssh://git@github.com/divvun/divvun-actions.git#387d0c1",
+         "ssh://git@github.com/divvun/divvun-actions.git#main",
         ]
       },
     ],
