@@ -1,6 +1,6 @@
 import {
-    fastlanePilotUpload,
-    FastlanePilotUploadApiKey,
+  fastlanePilotUpload,
+  FastlanePilotUploadApiKey,
 } from "~/actions/fastlane/pilot.ts"
 import keyboardBuildMeta from "~/actions/keyboard/build-meta.ts"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
@@ -21,23 +21,25 @@ async function apiKey(): Promise<FastlanePilotUploadApiKey> {
 }
 
 export async function runDivvunKeyboard(kbdgenBundlePath: string) {
-  await pahkatInit({
-    repoUrl: "https://pahkat.uit.no/devtools/",
-    channel: "nightly",
-    packages: ["kbdgen"],
-  })
-
-  await keyboardBuildMeta({
-    keyboardType: KeyboardType.iOS,
-    bundlePath: kbdgenBundlePath,
-  })
-
-  if (builder.env.branch === "main") {
-    await fastlanePilotUpload({
-      apiKey: await apiKey(),
-      ipaPath: "output/ipa/HostingApp.ipa",
+  await builder.group("Building Divvun Keyboard for iOS", async () => {
+    await pahkatInit({
+      repoUrl: "https://pahkat.uit.no/devtools/",
+      channel: "nightly",
+      packages: ["kbdgen"],
     })
-  } else {
-    logger.info("Not main branch; skipping upload")
-  }
+
+    await keyboardBuildMeta({
+      keyboardType: KeyboardType.iOS,
+      bundlePath: kbdgenBundlePath,
+    })
+
+    if (builder.env.branch === "main") {
+      await fastlanePilotUpload({
+        apiKey: await apiKey(),
+        ipaPath: "output/ipa/HostingApp.ipa",
+      })
+    } else {
+      logger.info("Not main branch; skipping upload")
+    }
+  })
 }

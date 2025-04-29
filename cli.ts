@@ -96,7 +96,7 @@ export default async function runCli(input: string[]) {
 
   switch (command) {
     case Command.Run:
-    //   runPipeline(args)
+      //   runPipeline(args)
       break
     case Command.Ci:
       await runCi(args)
@@ -105,22 +105,24 @@ export default async function runCli(input: string[]) {
 }
 
 async function runCi(args) {
-    console.log("Running CI")
+  console.log("Running CI")
 
-    console.log(builder.env)
-    console.log(builder.env.repoName)
+  console.log(builder.env)
+  console.log(builder.env.repoName)
 
-    switch (builder.env.repoName) {
-        case "divvunspell":
-            // await build()
-            break
-        case "divvun-keyboard":
-        case "divvun-dev-keyboard": {
-            const kbdgenBundlePath = builder.env.repoName === "divvun-dev-keyboard" ? "divvun-dev.kbdgen" : "divvun.kbdgen"
-            await runDivvunKeyboard(kbdgenBundlePath)
-            break
-        }
-        default:
-            throw new Error(`Unknown repo: ${builder.env.repoName}`)
+  switch (builder.env.repoName) {
+    case "divvunspell":
+      // await build()
+      break
+    case "divvun-keyboard":
+    case "divvun-dev-keyboard": {
+      const kbdgenBundlePath = builder.env.repoName === "divvun-dev-keyboard"
+        ? "divvun-dev.kbdgen"
+        : "divvun.kbdgen"
+      await runDivvunKeyboard(kbdgenBundlePath)
+      break
     }
+    default:
+      throw new Error(`Unknown repo: ${builder.env.repoName}`)
+  }
 }
