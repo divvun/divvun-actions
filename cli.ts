@@ -135,6 +135,7 @@ async function runCi(args) {
   switch (builder.env.repoName) {
     case "divvunspell":
       // await build()
+      return
       break
     case "divvun-keyboard":
     case "divvun-dev-keyboard": {
@@ -145,7 +146,10 @@ async function runCi(args) {
       throw new Error(`Unknown repo: ${builder.env.repoName}`)
   }
 
+  console.log(pipeline)
+  const input = yaml.stringify(pipeline)
+
   builder.exec("buildkite-agent", ["pipeline", "upload"], {
-    input: yaml.stringify(pipeline),
+    input,
   })
 }
