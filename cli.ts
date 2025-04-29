@@ -3,7 +3,10 @@ import { parseArgs, ParseOptions } from "@std/cli/parse-args"
 import * as yaml from "@std/yaml"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline } from "~/builder/pipeline.ts"
-import { pipelineDivvunKeyboard, runDivvunKeyboard } from "~/pipelines/keyboard/divvun-keyboard.ts"
+import {
+  pipelineDivvunKeyboard,
+  runDivvunKeyboard,
+} from "~/pipelines/keyboard/divvun-keyboard.ts"
 
 enum Command {
   Run = "run",
@@ -108,7 +111,7 @@ export default async function runCli(input: string[]) {
 
 async function runPipeline(args) {
   const pipeline = args._[0]
-  
+
   switch (pipeline) {
     case "divvunspell":
       // await build()
@@ -141,7 +144,7 @@ async function runCi(args) {
     default:
       throw new Error(`Unknown repo: ${builder.env.repoName}`)
   }
-  
+
   builder.exec("buildkite-agent", ["pipeline", "upload"], {
     input: yaml.stringify(pipeline),
   })

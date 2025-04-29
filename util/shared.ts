@@ -828,7 +828,15 @@ export class Kbdgen {
     try {
       await Deno.writeTextFile(appStoreKeyJsonPath, secrets.appStoreKeyJson)
 
-      await builder.exec("kbdgen", ["target", "--output-path", "output", "--bundle-path", abs, "ios", "build"], {
+      await builder.exec("kbdgen", [
+        "target",
+        "--output-path",
+        "output",
+        "--bundle-path",
+        abs,
+        "ios",
+        "build",
+      ], {
         cwd,
         env,
       })
