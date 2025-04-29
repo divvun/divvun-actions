@@ -152,7 +152,7 @@ async function runCi(args) {
   try {
     Deno.writeTextFileSync(pipelinePath, input)
 
-    const { stdout } = await builder.output("buildkite-agent", ["pipeline", "upload", "pipeline.yml"])
+    const { stdout } = await builder.output("buildkite-agent", ["pipeline", "upload", pipelinePath])
     console.log(stdout)
   } finally {
     await Deno.remove(pipelinePath)
