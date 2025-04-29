@@ -136,22 +136,7 @@ export async function secrets(): Promise<SecretsStore> {
     return redactedSecrets
   }
 
-  const vaultRoleId = Deno.env.get("DIVVUN_ACTIONS_VAULT_ROLE_ID")
-  const vaultRoleSecret = Deno.env.get("DIVVUN_ACTIONS_VAULT_ROLE_SECRET")
-
-  if (vaultRoleId == null) {
-    throw new Error("DIVVUN_ACTIONS_VAULT_ROLE_ID is not defined")
-  }
-
-  if (vaultRoleSecret == null) {
-    throw new Error("DIVVUN_ACTIONS_VAULT_ROLE_SECRET is not defined")
-  }
-
-  const vault = await OpenBao.fromAppRole(
-    "https://vault.giellalt.org",
-    vaultRoleId,
-    vaultRoleSecret,
-  )
+  const vault = await OpenBao.fromMetadata(metadata)
   const raw = await vault.secrets()
 
   for (const value of raw.values()) {
