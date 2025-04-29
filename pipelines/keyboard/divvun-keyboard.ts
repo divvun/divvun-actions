@@ -56,7 +56,10 @@ export function pipelineDivvunKeyboard() {
         command: "divvun-pipeline run divvun-keyboard-ios",
         agents: {
           queue: "macos",
-        }
+        },
+        plugins: [
+         "ssh://git@github.com/divvun/divvun-actions.git#387d0c1",
+        ]
       },
     ],
   }
