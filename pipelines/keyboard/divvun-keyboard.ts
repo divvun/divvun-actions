@@ -53,7 +53,7 @@ export function pipelineDivvunKeyboard() {
     steps: [
       {
         label: "Build Divvun Keyboard for iOS",
-        command: "divvun-pipeline run divvun-keyboard-ios",
+        command: "divvun-actions run divvun-keyboard-ios",
         agents: {
           queue: "macos",
         },
