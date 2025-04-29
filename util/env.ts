@@ -25,7 +25,7 @@ function parseBuildkiteUrl(url: string) {
 const env = (prefix: string): Env => {
   const repo = Deno.env.get(`${prefix}_REPO`) ?? ""
   const repoUrl = parseBuildkiteUrl(repo)
-  const repoProtocol = repoUrl.protocol
+  const repoProtocol = repoUrl.protocol.replace(/:$/, "")
   const repoHost = repoUrl.host
   const repoPath = repoUrl.pathname.replace(/^\//, "")
   const repoName = repoPath.split("/").pop()!
