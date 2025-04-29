@@ -148,6 +148,7 @@ async function runCi(args) {
 
   console.log(pipeline)
   const input = yaml.stringify(pipeline)
+  console.log(input)
 
   Deno.writeTextFileSync("pipeline.yml", input)
 
