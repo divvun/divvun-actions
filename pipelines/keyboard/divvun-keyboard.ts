@@ -72,7 +72,5 @@ export function pipelineDivvunKeyboard() {
     ],
   }
 
-  console.log(pipeline)
-
   return pipeline
 }
