@@ -828,13 +828,11 @@ export class Kbdgen {
     try {
       await Deno.writeTextFile(appStoreKeyJsonPath, secrets.appStoreKeyJson)
 
-      await Bash.runScript(
-        `kbdgen target --output-path output --bundle-path ${abs} ios build`,
-        {
-          cwd,
-          env,
-        },
-      )
+      await builder.exec("kbdgen", ["target", "--output-path", "output", "--bundle-path", abs, "ios", "build"], {
+        cwd,
+        env,
+      })
+
       const files = await fs.expandGlob(
         path.resolve(abs, "../output/ipa/*.ipa"),
       )
