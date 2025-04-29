@@ -61,7 +61,7 @@ export class OpenBao {
   async secrets(): Promise<SecretsStore> {
     const response = await (this.#client as any)["/ci/data/build"].get()
     const json = await response.json()
-    return new SecretsStore(json.data)
+    return new SecretsStore(json.data.data)
   }
 }
 
