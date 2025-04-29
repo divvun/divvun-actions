@@ -1,7 +1,9 @@
 // deno-lint-ignore-file no-explicit-any no-console
 import { parseArgs, ParseOptions } from "@std/cli/parse-args"
+import * as yaml from "@std/yaml"
 import * as builder from "~/builder.ts"
-import { runDivvunKeyboard } from "~/pipelines/keyboard/divvun-keyboard.ts"
+import { BuildkitePipeline } from "~/builder/pipeline.ts"
+import { pipelineDivvunKeyboard, runDivvunKeyboard } from "~/pipelines/keyboard/divvun-keyboard.ts"
 
 enum Command {
   Run = "run",
@@ -96,7 +98,7 @@ export default async function runCli(input: string[]) {
 
   switch (command) {
     case Command.Run:
-      //   runPipeline(args)
+      await runPipeline(args)
       break
     case Command.Ci:
       await runCi(args)
@@ -104,18 +106,14 @@ export default async function runCli(input: string[]) {
   }
 }
 
-async function runCi(args) {
-  console.log("Running CI")
-
-  console.log(builder.env)
-  console.log(builder.env.repoName)
-
-  switch (builder.env.repoName) {
+async function runPipeline(args) {
+  const pipeline = args._[0]
+  
+  switch (pipeline) {
     case "divvunspell":
       // await build()
       break
-    case "divvun-keyboard":
-    case "divvun-dev-keyboard": {
+    case "divvun-keyboard-ios": {
       const kbdgenBundlePath = builder.env.repoName === "divvun-dev-keyboard"
         ? "divvun-dev.kbdgen"
         : "divvun.kbdgen"
@@ -125,4 +123,26 @@ async function runCi(args) {
     default:
       throw new Error(`Unknown repo: ${builder.env.repoName}`)
   }
+}
+
+async function runCi(args) {
+  console.log("Running CI")
+
+  let pipeline: BuildkitePipeline
+  switch (builder.env.repoName) {
+    case "divvunspell":
+      // await build()
+      break
+    case "divvun-keyboard":
+    case "divvun-dev-keyboard": {
+      pipeline = pipelineDivvunKeyboard()
+      break
+    }
+    default:
+      throw new Error(`Unknown repo: ${builder.env.repoName}`)
+  }
+  
+  builder.exec("buildkite-agent", ["pipeline", "upload"], {
+    input: yaml.stringify(pipeline),
+  })
 }

@@ -5,6 +5,7 @@ import {
 import keyboardBuildMeta from "~/actions/keyboard/build-meta.ts"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
 import * as builder from "~/builder.ts"
+import { BuildkitePipeline } from "~/builder/pipeline.ts"
 import logger from "~/util/log.ts"
 
 async function apiKey(): Promise<FastlanePilotUploadApiKey> {
@@ -45,4 +46,19 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
   } else {
     logger.info("Not main branch; skipping upload")
   }
+}
+
+export function pipelineDivvunKeyboard() {
+  const pipeline: BuildkitePipeline = {
+    steps: [
+      {
+        command: "divvun-pipeline run divvun-keyboard-ios",
+        agents: {
+          queue: "macos",
+        }
+      },
+    ],
+  }
+
+  return pipeline
 }
