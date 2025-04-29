@@ -4,7 +4,6 @@ import {
 } from "~/actions/fastlane/pilot.ts"
 import keyboardBuildMeta from "~/actions/keyboard/build-meta.ts"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
-import pahkatInit from "~/actions/pahkat/init.ts"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 
@@ -21,13 +20,13 @@ async function apiKey(): Promise<FastlanePilotUploadApiKey> {
 }
 
 export async function runDivvunKeyboard(kbdgenBundlePath: string) {
-  await builder.group("Initializing Pahkat", async () => {
-    await pahkatInit({
-      repoUrl: "https://pahkat.uit.no/devtools/",
-      channel: "nightly",
-      packages: ["kbdgen"],
-    })
-  })
+  // await builder.group("Initializing Pahkat", async () => {
+  //   await pahkatInit({
+  //     repoUrl: "https://pahkat.uit.no/devtools/",
+  //     channel: "nightly",
+  //     packages: ["kbdgen"],
+  //   })
+  // })
 
   await builder.group("Building Divvun Keyboard for iOS", async () => {
     await keyboardBuildMeta({
