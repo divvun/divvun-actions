@@ -329,11 +329,13 @@ async function buildkiteMain() {
 }
 
 main()
-  // .then(() => {
-  //   console.log("HELP")
-  //   Deno.exit(0)
-  // })
+  .then(() => {
+    logger.info("Finished successfully")
+    Deno.exit(0)
+  })
   .catch((e) => {
+    logger.error("Build failed with error:")
     logger.error(e)
+
     Deno.exit(1)
   })
