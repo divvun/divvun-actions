@@ -21,25 +21,29 @@ async function apiKey(): Promise<FastlanePilotUploadApiKey> {
 }
 
 export async function runDivvunKeyboard(kbdgenBundlePath: string) {
-  await builder.group("Building Divvun Keyboard for iOS", async () => {
+  await builder.group("Initializing Pahkat", async () => {
     await pahkatInit({
       repoUrl: "https://pahkat.uit.no/devtools/",
       channel: "nightly",
       packages: ["kbdgen"],
     })
+  })
 
+  await builder.group("Building Divvun Keyboard for iOS", async () => {
     await keyboardBuildMeta({
       keyboardType: KeyboardType.iOS,
       bundlePath: kbdgenBundlePath,
     })
+  })
 
-    if (builder.env.branch === "main") {
+  if (builder.env.branch === "main") {
+    await builder.group("Uploading to App Store", async () => {
       await fastlanePilotUpload({
         apiKey: await apiKey(),
         ipaPath: "output/ipa/HostingApp.ipa",
       })
-    } else {
-      logger.info("Not main branch; skipping upload")
-    }
-  })
+    })
+  } else {
+    logger.info("Not main branch; skipping upload")
+  }
 }
