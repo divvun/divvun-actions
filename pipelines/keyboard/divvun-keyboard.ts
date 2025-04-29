@@ -52,6 +52,7 @@ export function pipelineDivvunKeyboard() {
   const pipeline: BuildkitePipeline = {
     steps: [
       {
+        label: "Build Divvun Keyboard for iOS",
         command: "divvun-pipeline run divvun-keyboard-ios",
         agents: {
           queue: "macos",
