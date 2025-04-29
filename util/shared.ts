@@ -800,7 +800,6 @@ export class Kbdgen {
     fastlaneUser: string
     fastlanePassword: string
     appStoreKeyJson: string
-    appStoreKeyPassword: string
     adminPassword: string
   }): Promise<string> {
     const abs = path.resolve(bundlePath)
@@ -809,6 +808,7 @@ export class Kbdgen {
     // await Bash.runScript("brew install imagemagick")
     await Security.unlockKeychain("login", secrets.adminPassword)
 
+    const appStoreKeyJsonPath = Deno.makeTempFileSync({ suffix: ".json" })
     const env = {
       GITHUB_USERNAME: secrets.githubUsername,
       GITHUB_TOKEN: secrets.githubToken,
@@ -817,45 +817,31 @@ export class Kbdgen {
       FASTLANE_USER: secrets.fastlaneUser,
       PRODUCE_USERNAME: secrets.fastlaneUser,
       FASTLANE_PASSWORD: secrets.fastlanePassword,
-      APP_STORE_KEY_JSON: await base64AsFile(secrets.appStoreKeyJson),
+      APP_STORE_KEY_JSON: appStoreKeyJsonPath,
       MATCH_KEYCHAIN_NAME: "login.keychain",
       MATCH_KEYCHAIN_PASSWORD: secrets.adminPassword,
       LANG: "C.UTF-8",
       RUST_LOG: "kbdgen=debug",
     }
 
-    logger.debug("Gonna import certificates")
-    logger.debug("Deleting previous keychain for fastlane")
-    try {
-      logger.debug("Creating keychain for fastlane")
-    } catch (_) {
-      // Ignore error here, the keychain probably doesn't exist
-    }
-
-    logger.debug("ok, next")
-
-    // Initialise any missing languages first
-    // XXX: this no longer works since changes to the API!
-    // await Bash.runScript(
-    //     `kbdgen --logging debug build ios ${abs} init`,
-    //     {
-    //         cwd,
-    //         env
-    //     }
-    // )
-
     // Do the build
-    await Bash.runScript(
-      `kbdgen target --output-path output --bundle-path ${abs} ios build`,
-      {
-        cwd,
-        env,
-      },
-    )
-    const files = await fs.expandGlob(path.resolve(abs, "../output/ipa/*.ipa"))
+    try {
+      await Deno.writeTextFile(appStoreKeyJsonPath, secrets.appStoreKeyJson)
+  
+      await Bash.runScript(
+        `kbdgen target --output-path output --bundle-path ${abs} ios build`,
+        {
+          cwd,
+          env,
+        },
+      )
+      const files = await fs.expandGlob(path.resolve(abs, "../output/ipa/*.ipa"))
 
-    for await (const file of files) {
-      return file.path
+      for await (const file of files) {
+        return file.path
+      }
+    } finally {
+      await Deno.remove(appStoreKeyJsonPath)
     }
 
     throw new Error("No output found for build.")

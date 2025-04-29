@@ -38,13 +38,24 @@ export default async function keyboardBuildMeta({
     throw new Error(`Unsupported repository for release builds: ${githubRepo}`)
   }
 
+  const secrets = await builder.secrets()
+
   if (keyboardType === KeyboardType.Android) {
     await Kbdgen.setBuildNumber(bundlePath, "android", buildStart)
     payloadPath = await Kbdgen.buildAndroid(bundlePath, githubRepo)
   } else if (keyboardType === KeyboardType.iOS) {
     await Kbdgen.setBuildNumber(bundlePath, "ios", buildStart)
     console.log("Building iOS")
-    payloadPath = await Kbdgen.build_iOS(bundlePath)
+    payloadPath = await Kbdgen.build_iOS(bundlePath, {
+      githubUsername: secrets.get("github/username"),
+      githubToken: secrets.get("github/token"),
+      matchGitUrl: secrets.get("ios/matchGitUrl"),
+      matchPassword: secrets.get("ios/matchPassword"),
+      fastlaneUser: secrets.get("ios/fastlaneUser"),
+      fastlanePassword: secrets.get("ios/fastlanePassword"),
+      appStoreKeyJson: secrets.get("ios/appStoreKeyJson"),
+      adminPassword: secrets.get("macos/adminPassword"),
+    })
   }
 
   // In general, this will be unused, because iOS and Android builds are
