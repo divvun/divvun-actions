@@ -54,7 +54,7 @@ export default async function keyboardBuildMeta({
       matchPassword: secrets.get("ios/matchPassword"),
       fastlaneUser: secrets.get("ios/fastlaneUser"),
       fastlanePassword: secrets.get("ios/fastlanePassword"),
-      appStoreKeyJson: secrets.get("ios/appStoreKeyJson"),
+      appStoreKeyJson: secrets.get("macos/appStoreKeyJson"),
       adminPassword: secrets.get("macos/adminPassword"),
     })
   }
