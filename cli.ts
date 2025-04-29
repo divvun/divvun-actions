@@ -149,7 +149,8 @@ async function runCi(args) {
   console.log(pipeline)
   const input = yaml.stringify(pipeline)
 
-  builder.exec("buildkite-agent", ["pipeline", "upload"], {
-    input,
-  })
+  Deno.writeTextFileSync("pipeline.yml", input)
+
+  const { stdout } = await builder.output("buildkite-agent", ["pipeline", "upload", "pipeline.yml"])
+  console.log(stdout)
 }
