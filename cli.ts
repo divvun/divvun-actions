@@ -146,12 +146,15 @@ async function runCi(args) {
       throw new Error(`Unknown repo: ${builder.env.repoName}`)
   }
 
-  console.log(pipeline)
   const input = yaml.stringify(pipeline)
-  console.log(input)
+  const pipelinePath = await Deno.makeTempFile({ suffix: ".yml" })
+  
+  try {
+    Deno.writeTextFileSync(pipelinePath, input)
 
-  Deno.writeTextFileSync("pipeline.yml", input)
-
-  const { stdout } = await builder.output("buildkite-agent", ["pipeline", "upload", "pipeline.yml"])
-  console.log(stdout)
+    const { stdout } = await builder.output("buildkite-agent", ["pipeline", "upload", "pipeline.yml"])
+    console.log(stdout)
+  } finally {
+    await Deno.remove(pipelinePath)
+  }
 }
