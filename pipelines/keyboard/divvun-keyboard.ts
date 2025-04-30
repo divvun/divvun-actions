@@ -1,7 +1,4 @@
-import {
-  fastlanePilotUpload,
-  FastlanePilotUploadApiKey,
-} from "~/actions/fastlane/pilot.ts"
+import { fastlanePilotUpload } from "~/actions/fastlane/pilot.ts"
 import keyboardBuildMeta from "~/actions/keyboard/build-meta.ts"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
 import * as builder from "~/builder.ts"
@@ -9,19 +6,8 @@ import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import logger from "~/util/log.ts"
 
-async function apiKey(): Promise<FastlanePilotUploadApiKey> {
-  const secrets = await builder.secrets()
-
-  return {
-    key_id: secrets.get("macos/apiKey/key_id"),
-    issuer_id: secrets.get("macos/apiKey/issuer_id"),
-    key: secrets.get("macos/apiKey/key"),
-    duration: parseInt(secrets.get("macos/apiKey/duration"), 10),
-    in_house: secrets.get("macos/apiKey/in_house") === "true",
-  }
-}
-
 export async function runDivvunKeyboard(kbdgenBundlePath: string) {
+  const secrets = await builder.secrets()
   // await builder.group("Initializing Pahkat", async () => {
   //   await pahkatInit({
   //     repoUrl: "https://pahkat.uit.no/devtools/",
@@ -39,8 +25,9 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
 
   if (builder.env.branch === "main") {
     await builder.group("Uploading to App Store", async () => {
+      const apiKey = JSON.parse(secrets.get("macos/appStoreKeyJson"))
       await fastlanePilotUpload({
-        apiKey: await apiKey(),
+        apiKey,
         ipaPath: "output/ipa/HostingApp.ipa",
       })
     })
