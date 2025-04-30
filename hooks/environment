@@ -3,8 +3,11 @@ set -ueo pipefail
 
 PLUGIN_DIR=$(realpath $(dirname "${BASH_SOURCE[0]}")/..)
 
-git -C $PLUGIN_DIR checkout main
-git -C $PLUGIN_DIR pull
+# Ensure main isn't kept stale
+if [[ "$PLUGIN_DIR" == */main ]]; then
+  git -C $PLUGIN_DIR checkout main
+  git -C $PLUGIN_DIR pull
+fi
 
 BAO_ADDR=https://vault.giellalt.org
 BAO_TOKEN=$(buildkite-agent secret get divvun_actions_openbao_service_token)
