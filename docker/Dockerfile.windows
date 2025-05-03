@@ -45,6 +45,7 @@ RUN Invoke-WebRequest -Uri https://github.com/Schniz/fnm/releases/download/v1.38
 # Install Visual Studio components
 RUN $components = @( \
         'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', \
+        'Microsoft.VisualStudio.Component.VC.Tools.ARM64', \
         'Microsoft.VisualStudio.Workload.VCTools', \
         'Microsoft.VisualStudio.Workload.MSBuildTools', \
         'Microsoft.VisualStudio.Workload.NetCoreBuildTools', \
