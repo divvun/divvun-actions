@@ -54,7 +54,7 @@ export default async function keyboardBuild({
       logger.debug("Setting current version to nightly version")
       await Kbdgen.setNightlyVersion(bundlePath, "macos")
     }
-    payloadPath = await Kbdgen.buildMacOS(bundlePath, secrets)
+    payloadPath = await Kbdgen.buildMacOS(bundlePath)
   } else if (keyboardType === KeyboardType.Windows) {
     if (isMatchingTag(SEMVER_TAG_RE)) {
       logger.debug("Using version from kbdgen project")

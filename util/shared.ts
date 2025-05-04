@@ -903,37 +903,17 @@ export class Kbdgen {
     )
   }
 
-  static async buildMacOS(bundlePath: string, secrets: {
-    passwordChainItem: string
-    developerAccount: string
-  }): Promise<string> {
+  static async buildMacOS(bundlePath: string): Promise<string> {
     const abs = path.resolve(bundlePath)
     const cwd = path.dirname(abs)
-
-    // Install imagemagick if we're not using the self-hosted runner
-    // if (Deno.env.get(""ImageOS"] != null) {")
-    //   await Bash.runScript("brew install imagemagick")
-    // }
 
     await Bash.runScript(`kbdgen -V`)
     await Bash.runScript(
       `kbdgen target --output-path output --bundle-path ${abs} macos generate`,
-      {
-        env: {
-          DEVELOPER_PASSWORD_CHAIN_ITEM: secrets.passwordChainItem,
-          DEVELOPER_ACCOUNT: secrets.developerAccount,
-        },
-      },
     )
 
     await Bash.runScript(
       `kbdgen target --output-path output --bundle-path ${abs} macos build`,
-      {
-        env: {
-          DEVELOPER_PASSWORD_CHAIN_ITEM: secrets.passwordChainItem,
-          DEVELOPER_ACCOUNT: secrets.developerAccount,
-        },
-      },
     )
 
     return await Kbdgen.resolveOutput(path.join(cwd, "output", `*.pkg`))
