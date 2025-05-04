@@ -10,6 +10,7 @@ RUN Invoke-WebRequest -Uri https://github.com/git-for-windows/git/releases/downl
 # Add Git to PATH
 RUN setx /M PATH $($Env:PATH + 'C:\Program Files\Git\cmd;C:\Program Files\Git\bin;');
 
+ENV buildkiteAgentToken "XXX"
 ENV BUILDKITE_AGENT_TOKEN "XXX"
 
 RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
