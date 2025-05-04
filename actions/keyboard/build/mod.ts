@@ -64,7 +64,9 @@ export default async function keyboardBuild({
       await Kbdgen.setNightlyVersion(bundlePath, "windows")
     }
     await PahkatPrefix.bootstrap()
+    console.log("Installing kbdi")
     await PahkatPrefix.install(["kbdi"])
+    console.log("Installed kbdi")
     const kbdi_path = path.join(
       PahkatPrefix.path,
       "pkg",
@@ -80,12 +82,17 @@ export default async function keyboardBuild({
       "kbdi-x64.exe",
     )
 
+    console.log("Building Windows")
     const outputPath = await Kbdgen.buildWindows(bundlePath)
+    console.log("Built")
     await Deno.copyFile(kbdi_path, outputPath)
     await Deno.copyFile(kbdi_x64_path, outputPath)
 
+    console.log("Generating Inno")
     const issPath = await generateKbdInnoFromBundle(bundlePath, outputPath)
+    console.log("Inno generated")
     payloadPath = await makeInstaller(issPath)
+    console.log("Installer made")
   } else {
     throw new Error(`Unhandled keyboard type: ${keyboardType}`)
   }
