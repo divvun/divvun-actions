@@ -207,18 +207,21 @@ export class Tar {
   static async extractTxz(filePath: string, outputDir?: string) {
     // const platform = Deno.build.os
 
+    console.log("Extracting", filePath)
     // if (platform === "linux" || platform === "darwin") {
     const dir = outputDir || tmpDir()
     const proc = new Deno.Command("tar", {
       args: ["xf", filePath],
       cwd: dir,
     }).spawn()
-
+    console.log("Spawned tar")
     const code = (await proc.status).code
+    console.log("Tar exited with code", code)
     if (code !== 0) {
       throw new Error(`Process exited with code ${code}`)
     }
 
+    console.log("Extracted to", dir)
     return dir
     // } else if (platform === "windows") {
     //   // Now we unxz it
