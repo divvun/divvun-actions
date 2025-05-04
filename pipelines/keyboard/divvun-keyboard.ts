@@ -50,11 +50,13 @@ export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
 
 export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
   await builder.group("Building Divvun Keyboard for macOS", async () => {
+    console.log("Building Divvun Keyboard for macOS")
     await keyboardBuild({
       keyboardType: KeyboardType.MacOS,
       nightlyChannel: "nightly",
       bundlePath: kbdgenBundlePath,
     })
+    console.log("Done building Divvun Keyboard for macOS")
   })
 }
 
