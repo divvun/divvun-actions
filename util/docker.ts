@@ -78,7 +78,7 @@ export default class Docker {
     const cmdArgs = platform === "windows"
       ? [
         "pwsh.exe",
-        "-NoNewWindow",
+        // "-NoNewWindow",
         "-Command",
         `C:\\actions\\bin\\divvun-actions.ps1`,
       ]
@@ -111,7 +111,7 @@ export default class Docker {
         "_DIVVUN_ACTIONS_ENV=docker",
         image + ":latest",
         "pwsh.exe",
-        "-NoNewWindow",
+        // "-NoNewWindow",
         "-Command",
         `C:\\actions\\bin\\divvun-actions.ps1`,
         ...Deno.args,

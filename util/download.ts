@@ -12,7 +12,7 @@ export async function download(url: string, options: {
   if (Deno.build.os === "windows") {
     const proc = new Deno.Command("pwsh", {
       args: [
-        "-NoNewWindow",
+        // "-NoNewWindow",
         "-Command",
         `Invoke-WebRequest -Uri ${url} -OutFile ${downloadPath}`,
       ],
