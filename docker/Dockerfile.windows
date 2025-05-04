@@ -103,5 +103,9 @@ RUN if (!(Test-Path -Path $PROFILE)) { \
         New-Item -ItemType Directory -Path (Split-Path -Parent $PROFILE) -Force \
     }
 
+# Start ssh-agent
+RUN Start-Service ssh-agent ; \
+    Set-Service -Name ssh-agent -StartupType Automatic
+
 # Default shell
 CMD ["pwsh", "-NoLogo"]
