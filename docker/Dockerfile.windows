@@ -88,7 +88,7 @@ RUN Invoke-WebRequest -Uri https://tukaani.org/xz/xz-5.2.9-windows.zip -OutFile 
 RUN irm https://deno.land/install.ps1 | iex
 
 # Install OpenBao
-RUN Invoke-WebRequest -Uri https://github.com/openbao/openbao/releases/download/v2.2.1/bao_2.2.1_windows_amd64.zip -OutFile bao.zip ; \
+RUN Invoke-WebRequest -Uri https://github.com/openbao/openbao/releases/download/v2.2.1/bao_2.2.1_Windows_x86_64.zip -OutFile bao.zip ; \
     Expand-Archive bao.zip -DestinationPath C:\openbao ; \
     Remove-Item -Force bao.zip ; \
     setx /M PATH $($Env:PATH + ';C:\openbao') ;
