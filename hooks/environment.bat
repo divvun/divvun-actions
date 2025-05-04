@@ -35,6 +35,7 @@ buildkite-agent meta-data set "divvun_actions_openbao_role_secret" "!secret_id!"
 
 :: Set environment variables
 set "DIVVUN_ACTIONS_PLUGIN_DIR=%PLUGIN_DIR%"
+echo "Batch file"
 echo %PATH%
 set "PATH=%PLUGIN_DIR%\bin;%PATH%"
 
