@@ -104,8 +104,8 @@ RUN if (!(Test-Path -Path $PROFILE)) { \
     }
 
 # Start ssh-agent
-RUN Start-Service ssh-agent ; \
-    Set-Service -Name ssh-agent -StartupType Automatic
+RUN sc config ssh-agent start= auto ; \
+    sc start ssh-agent
 
 # Default shell
 CMD ["pwsh", "-NoLogo"]
