@@ -24,8 +24,8 @@ $role_id = (bao read -format=json auth/approle/role/builder/role-id | ConvertFro
 $secret_id = (bao write -format=json -f auth/approle/role/builder/secret-id | ConvertFrom-Json).data.secret_id
 
 # Add redactions
-buildkite-agent redactor add $role_id
-buildkite-agent redactor add $secret_id
+echo $role_id | buildkite-agent redactor add
+echo $secret_id | buildkite-agent redactor add
 
 # Set buildkite metadata
 buildkite-agent meta-data set "divvun_actions_openbao_endpoint" $BAO_ADDR

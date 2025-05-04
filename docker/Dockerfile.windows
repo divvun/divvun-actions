@@ -107,12 +107,5 @@ RUN if (!(Test-Path -Path $PROFILE)) { \
 RUN sc config ssh-agent start= auto ; \
     sc start ssh-agent
 
-# Install jq
-RUN Invoke-WebRequest -Uri https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-windows-amd64.exe -OutFile jq.exe ; \
-    New-Item -ItemType Directory -Path C:\jq ; \
-    Copy-Item jq.exe C:\jq ; \
-    Remove-Item -Force jq.exe ; \
-    setx /M PATH $($Env:PATH + ';C:\jq')
-
 # Default shell
 CMD ["pwsh", "-NoLogo"]
