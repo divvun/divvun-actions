@@ -10,6 +10,7 @@ export async function download(url: string, options: {
   )
 
   if (Deno.build.os === "windows") {
+    console.log("Downloading", url, "to", downloadPath)
     const proc = new Deno.Command("pwsh", {
       args: [
         // "-NoNewWindow",
@@ -17,8 +18,10 @@ export async function download(url: string, options: {
         `Invoke-WebRequest -Uri "${url}" -OutFile "${downloadPath}"`,
       ],
     })
+    console.log("Waiting for process to finish")
     const status = await proc.spawn().status
 
+    console.log("Process finished with status", status.code)
     if (status.code !== 0) {
       throw new Error(`Process exited with code ${status.code}`)
     }
