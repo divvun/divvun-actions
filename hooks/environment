@@ -23,4 +23,5 @@ buildkite-agent meta-data set "divvun_actions_openbao_role_id" "$role_id"
 buildkite-agent meta-data set "divvun_actions_openbao_role_secret" "$secret_id"
 
 export DIVVUN_ACTIONS_PLUGIN_DIR=$PLUGIN_DIR
+echo $PATH
 export PATH="$PLUGIN_DIR/bin:$PATH"
