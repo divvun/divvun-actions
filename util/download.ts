@@ -36,5 +36,6 @@ export async function download(url: string, options: {
     }
   }
 
+  console.log("Downloaded", url, "to", downloadPath)
   return path.resolve(downloadPath)
 }

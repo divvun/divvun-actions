@@ -305,21 +305,27 @@ export class PahkatPrefix {
       throw new Error(`Unsupported platform: ${platform}`)
     }
 
+    console.log("Extracting", txz)
     // Extract the file
     const outputPath = await Tar.extractTxz(txz)
     const binPath = path.resolve(outputPath, "bin")
-
+    console.log("Extracted to", outputPath)
     logger.info(`Bin path: ${binPath}, platform: ${Deno.build.os}`)
     builder.addPath(binPath)
 
     // Init the repo
     if (await fs.exists(PahkatPrefix.path)) {
+      console.log(`${PahkatPrefix.path} exists; deleting first.`)
       logger.debug(`${PahkatPrefix.path} exists; deleting first.`)
       await Deno.remove(PahkatPrefix.path, { recursive: true })
     }
 
+    console.log("Initializing pahkat prefix at", PahkatPrefix.path)
     logger.info(`Initializing pahkat prefix at ${PahkatPrefix.path}`)
+
+    console.log("Running pahkat-prefix init")
     await DefaultShell.runScript(`pahkat-prefix init -c ${PahkatPrefix.path}`)
+    console.log("Done running pahkat-prefix init")
   }
 
   static async addRepo(url: string, channel?: string) {
