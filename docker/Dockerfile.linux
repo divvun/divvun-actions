@@ -23,4 +23,8 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
 
 RUN curl -fsSL https://deno.land/install.sh | bash -s -- -y
 
+RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.2.1/bao_2.2.1_linux_amd64.deb -o bao.deb && \
+    dpkg -i bao.deb && \
+    rm bao.deb
+
 ENTRYPOINT []
