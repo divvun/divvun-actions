@@ -10,6 +10,7 @@ import {
   runDesktopKeyboardWindows,
   runDivvunKeyboard,
 } from "~/pipelines/keyboard/divvun-keyboard.ts"
+import logger from "~/util/log.ts"
 
 enum Command {
   Run = "run",
@@ -99,6 +100,11 @@ function parseCommand(input: string[]) {
 }
 
 export default async function runCli(input: string[]) {
+  const logLevel = Deno.env.get("LOG_LEVEL")
+  if (logLevel) {
+    logger.setLogLevel(logLevel)
+  }
+
   const { command, args } = parseCommand(input)
   console.log(command, args)
 
