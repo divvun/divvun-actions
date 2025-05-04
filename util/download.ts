@@ -14,7 +14,7 @@ export async function download(url: string, options: {
       args: [
         // "-NoNewWindow",
         "-Command",
-        `Invoke-WebRequest -Uri ${url} -OutFile ${downloadPath}`,
+        `Invoke-WebRequest -Uri "${url}" -OutFile "${downloadPath}"`,
       ],
     })
     const status = await proc.spawn().status
