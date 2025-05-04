@@ -1,5 +1,6 @@
 import { fastlanePilotUpload } from "~/actions/fastlane/pilot.ts"
 import keyboardBuildMeta from "~/actions/keyboard/build-meta.ts"
+import keyboardBuild from "~/actions/keyboard/build/mod.ts"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
@@ -36,6 +37,26 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
   }
 }
 
+export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
+  await builder.group("Building Divvun Keyboard for Windows", async () => {
+    await keyboardBuild({
+      keyboardType: KeyboardType.Windows,
+      nightlyChannel: "nightly",
+      bundlePath: kbdgenBundlePath,
+    })
+  })
+}
+
+export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
+  await builder.group("Building Divvun Keyboard for macOS", async () => {
+    await keyboardBuild({
+      keyboardType: KeyboardType.MacOS,
+      nightlyChannel: "nightly",
+      bundlePath: kbdgenBundlePath,
+    })
+  })
+}
+
 function command(input: CommandStep): CommandStep {
   return {
     ...input,
@@ -52,6 +73,29 @@ export function pipelineDivvunKeyboard() {
       command({
         label: "Build Divvun Keyboard for iOS",
         command: "divvun-actions run divvun-keyboard-ios",
+        agents: {
+          queue: "macos",
+        },
+      }),
+    ],
+  }
+
+  return pipeline
+}
+
+export function pipelineDesktopKeyboard() {
+  const pipeline: BuildkitePipeline = {
+    steps: [
+      command({
+        label: "Build Divvun Keyboard for Windows",
+        command: "divvun-actions run divvun-keyboard-windows",
+        agents: {
+          queue: "windows",
+        },
+      }),
+      command({
+        label: "Build Divvun Keyboard for macOS",
+        command: "divvun-actions run divvun-keyboard-macos",
         agents: {
           queue: "macos",
         },

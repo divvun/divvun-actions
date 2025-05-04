@@ -4,7 +4,10 @@ import * as yaml from "@std/yaml"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline } from "~/builder/pipeline.ts"
 import {
+  pipelineDesktopKeyboard,
   pipelineDivvunKeyboard,
+  runDesktopKeyboardMacOS,
+  runDesktopKeyboardWindows,
   runDivvunKeyboard,
 } from "~/pipelines/keyboard/divvun-keyboard.ts"
 
@@ -123,8 +126,19 @@ async function runPipeline(args) {
       await runDivvunKeyboard(kbdgenBundlePath)
       break
     }
-    default:
+    case "divvun-keyboard-windows": {
+      const kbdgenBundlePath = builder.env.repoName.split("-")[1] + ".kbdgen"
+      await runDesktopKeyboardWindows(kbdgenBundlePath)
+      break
+    }
+    case "divvun-keyboard-macos": {
+      const kbdgenBundlePath = builder.env.repoName.split("-")[1] + ".kbdgen"
+      await runDesktopKeyboardMacOS(kbdgenBundlePath)
+      break
+    }
+    default: {
       throw new Error(`Unknown repo: ${builder.env.repoName}`)
+    }
   }
 }
 
@@ -142,8 +156,13 @@ async function runCi(args) {
       pipeline = pipelineDivvunKeyboard()
       break
     }
-    default:
+    default: {
+      if (builder.env.repoName.startsWith("keyboard-")) {
+        pipeline = pipelineDesktopKeyboard()
+        break
+      }
       throw new Error(`Unknown repo: ${builder.env.repoName}`)
+    }
   }
 
   const input = yaml.stringify(pipeline)
