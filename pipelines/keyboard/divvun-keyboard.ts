@@ -39,11 +39,12 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
 
 export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
   await builder.group("Building Divvun Keyboard for Windows", async () => {
-    await keyboardBuild({
+    const { payloadPath, channel } =await keyboardBuild({
       keyboardType: KeyboardType.Windows,
       nightlyChannel: "nightly",
       bundlePath: kbdgenBundlePath,
     })
+    console.log(payloadPath, channel)
   })
 }
 
