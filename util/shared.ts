@@ -904,16 +904,17 @@ export class Kbdgen {
   }
 
   static async buildMacOS(bundlePath: string): Promise<string> {
+    logger.setLogLevel("trace")
     const abs = path.resolve(bundlePath)
     const cwd = path.dirname(abs)
 
     await Bash.runScript(`kbdgen -V`)
     await Bash.runScript(
-      `kbdgen target --output-path output --bundle-path ${abs} macos generate`,
+      `RUST_LOG=trace kbdgen target --output-path output --bundle-path ${abs} macos generate`,
     )
 
     await Bash.runScript(
-      `kbdgen target --output-path output --bundle-path ${abs} macos build`,
+      `RUST_LOG=trace kbdgen target --output-path output --bundle-path ${abs} macos build`,
     )
 
     return await Kbdgen.resolveOutput(path.join(cwd, "output", `*.pkg`))
