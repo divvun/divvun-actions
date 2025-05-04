@@ -213,11 +213,16 @@ export class Tar {
     const proc = new Deno.Command("tar", {
       args: ["xf", filePath],
       cwd: dir,
-    }).spawn()
+    }).output()
     console.log("Spawned tar")
-    const code = (await proc.status).code
-    console.log("Tar exited with code", code)
-    if (code !== 0) {
+    const output = await proc
+    const decoder = new TextDecoder()
+
+    console.log(decoder.decode(output.stderr))
+    console.log(decoder.decode(output.stdout))
+
+    console.log("Tar exited with code", output.code)
+    if (output.code !== 0) {
       throw new Error(`Process exited with code ${code}`)
     }
 
