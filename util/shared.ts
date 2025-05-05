@@ -344,15 +344,29 @@ export class PahkatPrefix {
   }
 
   static async addRepo(repoName: string, channel?: string) {
+    const args = ["config", "repo", "add", "-c", PahkatPrefix.path, repoName]
     if (channel != null) {
-      await DefaultShell.runScript(
-        `pahkat-prefix config repo add https://pahkat.uit.no/${repoName} ${channel} -c ${PahkatPrefix.path}`,
-      )
-    } else {
-      await DefaultShell.runScript(
-        `pahkat-prefix config repo add https://pahkat.uit.no/${repoName} -c ${PahkatPrefix.path}`,
-      )
+      args.push(channel)
     }
+
+    const proc = new Deno.Command("pahkat-prefix", {
+      args
+    }).spawn()
+
+    const code = (await proc.status).code
+    if (code !== 0) {
+      throw new Error(`Process exited with code ${code}`)
+    }
+
+    // if (channel != null) {
+    //   await DefaultShell.runScript(
+    //     `pahkat-prefix config repo add https://pahkat.uit.no/${repoName} ${channel} -c ${PahkatPrefix.path}`,
+    //   )
+    // } else {
+    //   await DefaultShell.runScript(
+    //     `pahkat-prefix config repo add https://pahkat.uit.no/${repoName} -c ${PahkatPrefix.path}`,
+    //   )
+    // }
   }
 
   static async install(packages: string[]) {
