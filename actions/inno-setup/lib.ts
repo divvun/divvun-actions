@@ -22,6 +22,7 @@ export async function makeInstaller(
       ...defines,
       issPath,
     ],
+    windowsRawArguments: true,
   }).spawn()
 
   const code = (await proc.status).code
