@@ -17,7 +17,6 @@ import type { DivvunActionsConfig } from "~/util/config.ts"
 import Docker from "~/util/docker.ts"
 import logger from "~/util/log.ts"
 import Tart from "~/util/tart.ts"
-import { pipeline as divvunspellPipeline } from "./divvunspell/mod.ts"
 
 export type PipelineName = "divvunspell"
 
@@ -208,7 +207,7 @@ export function generatePipeline<
 
   switch (name) {
     case "divvunspell":
-      pipeline = divvunspellPipeline(options as any)
+      // pipeline = divvunspellPipeline(options as any)
       break
     default:
       throw new Error(`Unknown pipeline: ${name}`)
