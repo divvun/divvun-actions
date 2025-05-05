@@ -963,9 +963,6 @@ export class Kbdgen {
       const proc = new Deno.Command("kbdgen", {
         args: ["-V"],
         cwd,
-        env: {
-          RUST_LOG: "trace",
-        },
       }).spawn()
 
       const code = (await proc.status).code
@@ -978,9 +975,6 @@ export class Kbdgen {
       const proc = new Deno.Command("kbdgen", {
         args: ["target", "--output-path", "output", "--bundle-path", abs, "macos", "generate"],
         cwd,
-        env: {
-          RUST_LOG: "debug",
-        },
       }).spawn()
 
       const code = (await proc.status).code
@@ -993,9 +987,6 @@ export class Kbdgen {
       const proc = new Deno.Command("kbdgen", {
         args: ["target", "--output-path", "output", "--bundle-path", abs, "macos", "build"],
         cwd,
-        env: {
-          RUST_LOG: "debug",
-        },
       }).spawn()
 
       const code = (await proc.status).code
