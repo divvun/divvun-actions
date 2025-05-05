@@ -223,7 +223,7 @@ export class Tar {
       return dir
     } else if (platform === "windows") {
       const dir = outputDir || tmpDir()
-      const proc = new Deno.Command("7z", {
+      const proc = new Deno.Command("7zr", {
         args: ["x", filePath],
         cwd: dir,
       }).spawn()
