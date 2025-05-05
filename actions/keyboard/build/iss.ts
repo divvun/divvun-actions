@@ -5,8 +5,6 @@ import { InnoSetupBuilder } from "~/util/inno.ts"
 import logger from "~/util/log.ts"
 import { Kbdgen } from "~/util/shared.ts"
 
-const KBDGEN_NAMESPACE = "divvun.no"
-
 function layoutTarget(layout: { [key: string]: any }) {
   const targets = layout["windows"] || {}
   return targets["config"] || {}
@@ -83,17 +81,9 @@ export async function generateKbdInnoFromBundle(
   return fileName
 }
 
-function stringToBytes(str: string) {
-  const s = unescape(encodeURIComponent(str))
+const textEncoder = new TextEncoder()
 
-  const bytes = new Uint8Array(s.length)
-
-  for (let i = 0; i < s.length; ++i) {
-    bytes[i] = str.charCodeAt(i)
-  }
-
-  return bytes
-}
+const KBDGEN_NAMESPACE = await uuid.v5.generate(uuid.NAMESPACE_DNS, textEncoder.encode("divvun.no"))
 
 async function addLayoutToInstaller(
   builder: InnoSetupBuilder,
@@ -106,7 +96,7 @@ async function addLayoutToInstaller(
   const languageCode = target["locale"] || locale
   const languageName = target["languageName"]
   const layoutDisplayName = layout["displayNames"][locale]
-  const guidStr = await uuid.v5.generate(KBDGEN_NAMESPACE, stringToBytes(kbdId))
+  const guidStr = await uuid.v5.generate(KBDGEN_NAMESPACE, textEncoder.encode(kbdId))
   if (!layoutDisplayName) {
     throw new Error(`Display name for ${locale} not found`)
   }
