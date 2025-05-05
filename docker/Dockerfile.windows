@@ -38,10 +38,10 @@ RUN Invoke-WebRequest -Uri https://download.microsoft.com/download/6/f/5/6f5ce43
     Start-Process -FilePath msiexec.exe -ArgumentList '/i .\\MSKLC\\msklc.msi /qn /norestart' -Wait ; \
     Remove-Item MSKLC.exe
 
-# Install fnm
-RUN Invoke-WebRequest -Uri https://github.com/Schniz/fnm/releases/download/v1.38.1/fnm-windows.zip -OutFile fnm.zip ; \
-    Expand-Archive -Path fnm.zip -DestinationPath ($Env:APPDATA + '\fnm') -Force ; \
-    Remove-Item fnm.zip
+# # Install fnm
+# RUN Invoke-WebRequest -Uri https://github.com/Schniz/fnm/releases/download/v1.38.1/fnm-windows.zip -OutFile fnm.zip ; \
+#     Expand-Archive -Path fnm.zip -DestinationPath ($Env:APPDATA + '\fnm') -Force ; \
+#     Remove-Item fnm.zip
 
 # Install Visual Studio components
 RUN $components = @( \
@@ -77,21 +77,20 @@ RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
     Start-Process -FilePath .\\rustup-init.exe -ArgumentList @('-y', '--target', 'aarch64-pc-windows-msvc') -NoNewWindow -Wait; \
     Remove-Item -Force .\\rustup-init.exe
 
-# Install XZ
-RUN Invoke-WebRequest -Uri https://tukaani.org/xz/xz-5.2.9-windows.zip -OutFile xz.zip; \
-    Expand-Archive xz.zip -DestinationPath C:\xz ; \
-    Copy-Item 'C:\xz\bin_x86-64\xz.exe' 'C:\Windows\System32\' ; \
-    Remove-Item -Recurse -Force C:\xz ; \
-    Remove-Item -Force xz.zip
-
 # Install Deno
 RUN irm https://deno.land/install.ps1 | iex
 
+# Create C:\bin
+RUN New-Item -ItemType Directory -Path C:\bin ; \
+    setx /M PATH $('C:\bin;' + $Env:PATH)
+
 # Install OpenBao
 RUN Invoke-WebRequest -Uri https://github.com/openbao/openbao/releases/download/v2.2.1/bao_2.2.1_Windows_x86_64.zip -OutFile bao.zip ; \
-    Expand-Archive bao.zip -DestinationPath C:\openbao ; \
-    Remove-Item -Force bao.zip ; \
-    setx /M PATH $($Env:PATH + ';C:\openbao') ;
+    Expand-Archive bao.zip -DestinationPath C:\bin ; \
+    Remove-Item -Force bao.zip
+
+# Install 7-zip
+RUN Invoke-WebRequest -Uri https://www.7-zip.org/a/7zr.exe -OutFile C:\bin\7zr.exe
 
 # Clear duplicates
 RUN $cleanPath = ($Env:PATH -split ';' | Select-Object -Unique) -join ';' ; \

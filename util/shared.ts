@@ -133,9 +133,11 @@ export class Powershell {
 
     const listeners = {
       stdout: (data: Uint8Array) => {
+        console.log("stdout", data.toString())
         out.push(data.toString())
       },
       stderr: (data: Uint8Array) => {
+        console.log("stderr", data.toString())
         err.push(data.toString())
       },
     }
