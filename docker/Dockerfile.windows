@@ -116,7 +116,7 @@ RUN sc config ssh-agent start= auto ; \
     sc start ssh-agent
 
 # Install MSYS2
-RUN Invoke-WebRequest -Uri "https://github.com/msys2/msys2-installer/releases/download/2025-02-21/msys2-x86_64-20250221.exe" -OutFile msys2-installer.exe ; \
+RUN Invoke-WebRequest -Uri "https://github.com/msys2/msys2-installer/releases/download/2024-01-13/msys2-x86_64-20240113.exe" -OutFile msys2-installer.exe ; \
     Start-Process -Wait -FilePath .\msys2-installer.exe -ArgumentList @('-install', '-confirm-command', '-confirm-shortcuts', '-no-desktop', '-no-startmenu', '-no-update-db', '-root', 'C:\msys64') ; \
     Remove-Item -Force msys2-installer.exe
 
