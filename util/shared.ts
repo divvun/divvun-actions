@@ -326,7 +326,7 @@ export class PahkatPrefix {
     logger.info(`Initializing pahkat prefix at ${PahkatPrefix.path}`)
 
     console.log("Running pahkat-prefix init")
-    await DefaultShell.runScript(`pahkat-prefix init -c ${PahkatPrefix.path}`)
+    await DefaultShell.runScript(`${path.resolve(binPath, "pahkat-prefix")} init -c ${PahkatPrefix.path}`)
     console.log("Done running pahkat-prefix init")
   }
 
