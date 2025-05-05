@@ -11,22 +11,24 @@ import {
   runDivvunKeyboard,
 } from "~/pipelines/keyboard/divvun-keyboard.ts"
 import logger from "~/util/log.ts"
+import sign from "./services/windows-codesign.ts"
 
 enum Command {
   Run = "run",
   Ci = "ci",
+  Sign = "sign",
 }
 
-type OptionConfig = {
-  long?: string
-  short?: string
-  help?: string
-  aliases?: string[]
-}
+// type OptionConfig = {
+//   long?: string
+//   short?: string
+//   help?: string
+//   aliases?: string[]
+// }
 
-type CommandConfig = {
-  options: CommandOption
-}
+// type CommandConfig = {
+//   options: CommandOption
+// }
 
 const commands: Record<Command, { options: ParseOptions; help: string }> = {
   [Command.Run]: {
@@ -46,6 +48,15 @@ const commands: Record<Command, { options: ParseOptions; help: string }> = {
       },
     },
     help: "Automatically determine pipelines in CI",
+  },
+  [Command.Sign]: {
+    options: {
+      boolean: ["help"],
+      alias: {
+        help: "h",
+      },
+    },
+    help: "Sign a file",
   },
 }
 
@@ -115,7 +126,15 @@ export default async function runCli(input: string[]) {
     case Command.Ci:
       await runCi(args)
       break
+    case Command.Sign:
+      await runSign(args)
+      break
   }
+}
+
+async function runSign(args) {
+  const inputFile = args._[0]
+  await sign(inputFile)
 }
 
 async function runPipeline(args) {
