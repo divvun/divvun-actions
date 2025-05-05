@@ -356,9 +356,14 @@ export class PahkatPrefix {
   }
 
   static async install(packages: string[]) {
-    await DefaultShell.runScript(
-      `pahkat-prefix install ${packages.join(" ")} -c ${PahkatPrefix.path}`,
-    )
+    const proc = new Deno.Command("pahkat-prefix", {
+      args: ["install", ...packages, "-c", PahkatPrefix.path],
+    }).spawn()
+
+    const code = (await proc.status).code
+    if (code !== 0) {
+      throw new Error(`Process exited with code ${code}`)
+    }
 
     for (const pkg of packages) {
       builder.addPath(
