@@ -954,18 +954,55 @@ export class Kbdgen {
   }
 
   static async buildMacOS(bundlePath: string): Promise<string> {
+    console.log("Building macOS")
     logger.setLogLevel("trace")
     const abs = path.resolve(bundlePath)
     const cwd = path.dirname(abs)
 
-    await Bash.runScript(`kbdgen -V`)
-    await Bash.runScript(
-      `RUST_LOG=trace kbdgen target --output-path output --bundle-path ${abs} macos generate`,
-    )
+    {
+      const proc = new Deno.Command("kbdgen", {
+        args: ["-V"],
+        cwd,
+        env: {
+          RUST_LOG: "trace",
+        },
+      }).spawn()
 
-    await Bash.runScript(
-      `RUST_LOG=trace kbdgen target --output-path output --bundle-path ${abs} macos build`,
-    )
+      const code = (await proc.status).code
+      if (code !== 0) {
+        throw new Error(`Process exited with code ${code}`)
+      }
+    }
+
+    {
+      const proc = new Deno.Command("kbdgen", {
+        args: ["target", "--output-path", "output", "--bundle-path", abs, "macos", "generate"],
+        cwd,
+        env: {
+          RUST_LOG: "debug",
+        },
+      }).spawn()
+
+      const code = (await proc.status).code
+      if (code !== 0) {
+        throw new Error(`Process exited with code ${code}`)
+      }
+    }
+
+    {
+      const proc = new Deno.Command("kbdgen", {
+        args: ["target", "--output-path", "output", "--bundle-path", abs, "macos", "build"],
+        cwd,
+        env: {
+          RUST_LOG: "debug",
+        },
+      }).spawn()
+
+      const code = (await proc.status).code
+      if (code !== 0) {
+        throw new Error(`Process exited with code ${code}`)
+      }
+    }
 
     return await Kbdgen.resolveOutput(path.join(cwd, "output", `*.pkg`))
   }
