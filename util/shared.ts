@@ -312,7 +312,13 @@ export class PahkatPrefix {
     const binPath = path.resolve(outputPath, "bin")
     console.log("Extracted to", outputPath)
     logger.info(`Bin path: ${binPath}, platform: ${Deno.build.os}`)
-    builder.addPath(binPath)
+
+    if (Deno.build.os === "windows") {
+      // Move binPath/pahkat-prefix.exe to C:\bin
+      await Deno.rename(path.resolve(binPath, "pahkat-prefix.exe"), "C:\\bin\\pahkat-prefix.exe")
+    } else {
+      builder.addPath(binPath)
+    }
 
     // Init the repo
     if (await fs.exists(PahkatPrefix.path)) {
@@ -325,7 +331,7 @@ export class PahkatPrefix {
     logger.info(`Initializing pahkat prefix at ${PahkatPrefix.path}`)
 
     console.log("Running pahkat-prefix init")
-    await DefaultShell.runScript(`${path.resolve(binPath, "pahkat-prefix")} init -c ${PahkatPrefix.path}`)
+    await DefaultShell.runScript(`pahkat-prefix init -c ${PahkatPrefix.path}`)
     console.log("Done running pahkat-prefix init")
   }
 
