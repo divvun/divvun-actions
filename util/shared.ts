@@ -223,9 +223,8 @@ export class Tar {
       return dir
     } else if (platform === "windows") {
       const dir = outputDir || tmpDir()
-      const proc = new Deno.Command("7zr", {
-        args: ["x", filePath],
-        cwd: dir,
+      const proc = new Deno.Command("bsdtar", {
+        args: ["-xvf", filePath, "-C", dir],
       }).spawn()
 
       const code = (await proc.status).code

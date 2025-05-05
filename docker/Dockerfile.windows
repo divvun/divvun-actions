@@ -89,8 +89,10 @@ RUN Invoke-WebRequest -Uri https://github.com/openbao/openbao/releases/download/
     Expand-Archive bao.zip -DestinationPath C:\bin ; \
     Remove-Item -Force bao.zip
 
-# Install 7-zip
-RUN Invoke-WebRequest -Uri https://www.7-zip.org/a/7zr.exe -OutFile C:\bin\7zr.exe
+# Install bsdtar
+RUN Invoke-WebRequest -Uri https://x.giellalt.org/bsdtar.zip -OutFile bsdtar.zip ; \
+    Expand-Archive bsdtar.zip -DestinationPath C:\bin ; \
+    Remove-Item -Force bsdtar.zip
 
 # Clear duplicates
 RUN $cleanPath = ($Env:PATH -split ';' | Select-Object -Unique) -join ';' ; \
