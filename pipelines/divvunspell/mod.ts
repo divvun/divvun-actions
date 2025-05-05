@@ -64,80 +64,73 @@ function command(input: CommandStep): CommandStep {
 }
 
 export function pipelineDivvunspell() {
-  const pipeline: BuildkitePipeline = {
-    steps: [],
-  }
+  const binSteps = []
+  const libSteps = []
 
   for (const [os, archs] of Object.entries(binPlatforms)) {
     for (const arch of archs) {
-      // const ext = os === "windows" ? ".exe" : ""
-      const steps = []
-
       const { cmd, args } = buildBin(arch)
 
       if (os === "windows") {
-        steps.push(command({
+        binSteps.push(command({
           agents: {
             queue: os,
           },
-          label: "Build",
+          label: arch,
           command: [
             `${cmd} ${args.join(" ")}`,
           ],
         }))
       } else {
-        steps.push(command({
+        binSteps.push(command({
           agents: {
             queue: os,
           },
-          label: "Build",
+          label: arch,
           command: [
             `${cmd} ${args.join(" ")}`,
           ],
         }))
       }
-
-      pipeline.steps.push({
-        group: `cli ${os} ${arch}`,
-        steps,
-      })
     }
   }
 
   for (const [os, archs] of Object.entries(libPlatforms)) {
     for (const arch of archs) {
-      // const ext = os === "windows" ? ".exe" : ""
-      const steps = []
-
       const { cmd, args } = buildLib(arch)
 
       if (os === "windows") {
-        steps.push(command({
+        libSteps.push(command({
           agents: {
             queue: os,
           },
-          label: "Build",
+          label: arch,
           command: [
             `${cmd} ${args.join(" ")}`,
           ],
         }))
       } else {
-        steps.push(command({
+        libSteps.push(command({
           agents: {
             queue: os,
           },
-          label: "Build",
+          label: arch,
           command: [
             `${cmd} ${args.join(" ")}`,
           ],
         }))
       }
-
-      pipeline.steps.push({
-        group: `lib ${os} ${arch}`,
-        steps,
-      })
     }
+  }
+
+  const pipeline: BuildkitePipeline = {
+    steps: [{
+      group: "binaries",
+      steps: binSteps,
+    }, {
+      group: "libraries",
+      steps: libSteps,
+    }],
   }
 
   return pipeline
