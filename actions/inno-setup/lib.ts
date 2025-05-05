@@ -1,4 +1,5 @@
 import * as path from "@std/path"
+import * as target from "~/target.ts"
 
 export async function makeInstaller(
   issPath: string,
@@ -14,7 +15,7 @@ export async function makeInstaller(
 
   const proc = new Deno.Command("iscc.exe", {
     args: [
-      `/S"signtool=divvun-actions sign $f"`,
+      `/S"signtool=${target.projectPath}\\bin\\divvun-actions sign $f"`,
       "/Qp",
       `/O${installerOutput}`,
       ...defines,

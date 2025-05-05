@@ -1,6 +1,6 @@
 import * as path from "@std/path"
 
-const projectPath = path.resolve(
+export const projectPath = path.resolve(
   path.dirname(path.fromFileUrl(import.meta.url)),
 )
 
