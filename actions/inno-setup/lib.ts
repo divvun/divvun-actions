@@ -1,7 +1,4 @@
 import * as path from "@std/path"
-import * as builder from "~/builder.ts"
-
-const ISCC_PATH = `"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe"`
 
 export async function makeInstaller(
   issPath: string,
@@ -10,17 +7,26 @@ export async function makeInstaller(
   const installerOutput = await Deno.makeTempDir()
 
   // Use our custom code signing service running on the CI machine
-  const signCmd = `/S"signtool=curl -v ` +
-    `-F file=@$f ` +
-    `http://192.168.122.1:5000 ` +
-    `-o $f"`
+  // const signCmd = `/S"signtool=curl -v ` +
+  //   `-F file=@$f ` +
+  //   `http://192.168.122.1:5000 ` +
+  //   `-o $f"`
 
-  await builder.exec(`${ISCC_PATH} ${signCmd}`, [
-    "/Qp",
-    `/O${installerOutput}`,
-    ...defines,
-    issPath,
-  ])
+  const proc = new Deno.Command("iscc.exe", {
+    args: [
+      "/Qp",
+      `/O${installerOutput}`,
+      ...defines,
+      issPath,
+    ],
+  }).spawn()
+
+  console.warn("TODO: THERE IS NO CODE SIGNING SET UP YET!!")
+
+  const code = (await proc.status).code
+  if (code !== 0) {
+    throw new Error(`Process exited with code ${code}`)
+  }
 
   return path.join(installerOutput, "install.exe")
 }
