@@ -332,6 +332,7 @@ export class PahkatPrefix {
 
     console.log("Running pahkat-prefix init")
     await DefaultShell.runScript(`pahkat-prefix init -c ${PahkatPrefix.path}`)
+    await PahkatPrefix.addRepo("https://pahkat.uit.no")
     console.log("Done running pahkat-prefix init")
   }
 
