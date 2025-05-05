@@ -39,7 +39,9 @@ export function pipelineKbdgen() {
           ],
         }))
       } else {
-        const cargoCmd = arch === "x86_64-unknown-linux-gnu" ? "cargo" : "cross"
+        const cargoCmd = os !== "linux" || arch === "x86_64-unknown-linux-gnu"
+          ? "cargo"
+          : "cross"
 
         steps.push(command({
           agents: {
