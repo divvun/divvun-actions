@@ -13,9 +13,12 @@ export async function makeInstaller(
   //   `http://192.168.122.1:5000 ` +
   //   `-o $f"`
 
+  const scriptPath = `${target.projectPath}\\bin\\divvun-actions.ps1`
+  console.log(scriptPath)
+
   const proc = new Deno.Command("iscc.exe", {
     args: [
-      `/S"signtool=${target.projectPath}\\bin\\divvun-actions sign $f"`,
+      `/S"signtool=${scriptPath} sign $f"`,
       "/Qp",
       `/O${installerOutput}`,
       ...defines,
