@@ -82,8 +82,10 @@ export async function generateKbdInnoFromBundle(
 }
 
 const textEncoder = new TextEncoder()
-
-const KBDGEN_NAMESPACE = await uuid.v5.generate(uuid.NAMESPACE_DNS, textEncoder.encode("divvun.no"))
+const KBDGEN_NAMESPACE = await uuid.v5.generate(
+  uuid.NAMESPACE_DNS,
+  textEncoder.encode("divvun.no"),
+)
 
 async function addLayoutToInstaller(
   builder: InnoSetupBuilder,
@@ -96,7 +98,10 @@ async function addLayoutToInstaller(
   const languageCode = target["locale"] || locale
   const languageName = target["languageName"]
   const layoutDisplayName = layout["displayNames"][locale]
-  const guidStr = await uuid.v5.generate(KBDGEN_NAMESPACE, textEncoder.encode(kbdId))
+  const guidStr = await uuid.v5.generate(
+    KBDGEN_NAMESPACE,
+    textEncoder.encode(kbdId),
+  )
   if (!layoutDisplayName) {
     throw new Error(`Display name for ${locale} not found`)
   }

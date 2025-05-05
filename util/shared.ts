@@ -320,7 +320,10 @@ export class PahkatPrefix {
 
     if (Deno.build.os === "windows") {
       // Move binPath/pahkat-prefix.exe to C:\bin
-      await Deno.rename(path.resolve(binPath, "pahkat-prefix.exe"), "C:\\bin\\pahkat-prefix.exe")
+      await Deno.rename(
+        path.resolve(binPath, "pahkat-prefix.exe"),
+        "C:\\bin\\pahkat-prefix.exe",
+      )
     } else {
       builder.addPath(binPath)
     }
@@ -344,13 +347,20 @@ export class PahkatPrefix {
   }
 
   static async addRepo(repoName: string, channel?: string) {
-    const args = ["config", "repo", "add", "-c", PahkatPrefix.path, `https://pahkat.uit.no/${repoName}`]
+    const args = [
+      "config",
+      "repo",
+      "add",
+      "-c",
+      PahkatPrefix.path,
+      `https://pahkat.uit.no/${repoName}`,
+    ]
     if (channel != null) {
       args.push(channel)
     }
 
     const proc = new Deno.Command("pahkat-prefix", {
-      args
+      args,
     }).spawn()
 
     const code = (await proc.status).code
@@ -965,18 +975,25 @@ export class Kbdgen {
     const cwd = Deno.cwd()
 
     const proc = new Deno.Command("kbdgen", {
-      args: ["target", "--output-path", "output", "--bundle-path", abs, "windows"],
+      args: [
+        "target",
+        "--output-path",
+        "output",
+        "--bundle-path",
+        abs,
+        "windows",
+      ],
       cwd,
       env: {
         RUST_LOG: "debug",
-      }
+      },
     }).spawn()
 
     const code = (await proc.status).code
     if (code !== 0) {
       throw new Error(`Process exited with code ${code}`)
     }
-    
+
     return `${cwd}/output`
   }
 }
