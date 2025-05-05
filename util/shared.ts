@@ -126,7 +126,7 @@ export class Powershell {
       env?: { [key: string]: string }
     } = {},
   ) {
-    const thisEnv = Object.assign({ PATH: Deno.env.get("PATH") }, env(), opts.env)
+    const thisEnv = Object.assign({}, env(), opts.env)
 
     const out: string[] = []
     const err: string[] = []
@@ -289,7 +289,11 @@ export class PahkatPrefix {
     return _pahkatPrefixPath
   }
 
-  static async bootstrap() {
+  static async bootstrap(repos: string[]) {
+    if (repos.length === 0) {
+      throw new Error("At least one repository must be specified")
+    }
+
     const platform = Deno.build.os
 
     let txz
@@ -333,18 +337,20 @@ export class PahkatPrefix {
 
     console.log("Running pahkat-prefix init")
     await DefaultShell.runScript(`pahkat-prefix init -c ${PahkatPrefix.path}`)
-    await PahkatPrefix.addRepo("https://pahkat.uit.no")
+    for (const repo of repos) {
+      await PahkatPrefix.addRepo(repo)
+    }
     console.log("Done running pahkat-prefix init")
   }
 
-  static async addRepo(url: string, channel?: string) {
+  static async addRepo(repoName: string, channel?: string) {
     if (channel != null) {
       await DefaultShell.runScript(
-        `pahkat-prefix config repo add -c ${PahkatPrefix.path} ${url} ${channel}`,
+        `pahkat-prefix config repo add https://pahkat.uit.no/${repoName} ${channel} -c ${PahkatPrefix.path}`,
       )
     } else {
       await DefaultShell.runScript(
-        `pahkat-prefix config repo add -c ${PahkatPrefix.path} ${url}`,
+        `pahkat-prefix config repo add https://pahkat.uit.no/${repoName} -c ${PahkatPrefix.path}`,
       )
     }
   }
