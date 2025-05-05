@@ -26,23 +26,6 @@ FROM buildkite-agent
 
 SHELL ["pwsh", "-command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
-# Install Inno Setup
-RUN Invoke-WebRequest -Uri https://jrsoftware.org/download.php/is.exe?site=2 -OutFile innosetup.exe; \
-    Start-Process -FilePath .\innosetup.exe -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-' -Wait; \
-    Remove-Item innosetup.exe; \
-    setx /M PATH $($Env:PATH + ';C:\Program Files (x86)\Inno Setup 6');
-
-# Install MSKLC
-RUN Invoke-WebRequest -Uri https://download.microsoft.com/download/6/f/5/6f5ce43a-e892-4fd1-b9a6-1a0cbb64e6e2/MSKLC.exe -OutFile MSKLC.exe ; \
-    Start-Process -FilePath tar -ArgumentList '-xf .\\MSKLC.exe' -Wait ; \
-    Start-Process -FilePath msiexec.exe -ArgumentList '/i .\\MSKLC\\msklc.msi /qn /norestart' -Wait ; \
-    Remove-Item MSKLC.exe
-
-# # Install fnm
-# RUN Invoke-WebRequest -Uri https://github.com/Schniz/fnm/releases/download/v1.38.1/fnm-windows.zip -OutFile fnm.zip ; \
-#     Expand-Archive -Path fnm.zip -DestinationPath ($Env:APPDATA + '\fnm') -Force ; \
-#     Remove-Item fnm.zip
-
 # Install Visual Studio components
 RUN $components = @( \
         'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', \
@@ -64,6 +47,23 @@ RUN $components = @( \
         Wait-Process -Id $id -ErrorAction SilentlyContinue \
     } ; \
     Remove-Item '.\vs_buildtools.exe'
+
+# Install Inno Setup
+RUN Invoke-WebRequest -Uri https://jrsoftware.org/download.php/is.exe?site=2 -OutFile innosetup.exe; \
+    Start-Process -FilePath .\innosetup.exe -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-' -Wait; \
+    Remove-Item innosetup.exe; \
+    setx /M PATH $($Env:PATH + ';C:\Program Files (x86)\Inno Setup 6');
+
+# Install MSKLC
+RUN Invoke-WebRequest -Uri https://download.microsoft.com/download/6/f/5/6f5ce43a-e892-4fd1-b9a6-1a0cbb64e6e2/MSKLC.exe -OutFile MSKLC.exe ; \
+    Start-Process -FilePath tar -ArgumentList '-xf .\\MSKLC.exe' -Wait ; \
+    Start-Process -FilePath msiexec.exe -ArgumentList '/i .\\MSKLC\\msklc.msi /qn /norestart' -Wait ; \
+    Remove-Item MSKLC.exe
+
+# # Install fnm
+# RUN Invoke-WebRequest -Uri https://github.com/Schniz/fnm/releases/download/v1.38.1/fnm-windows.zip -OutFile fnm.zip ; \
+#     Expand-Archive -Path fnm.zip -DestinationPath ($Env:APPDATA + '\fnm') -Force ; \
+#     Remove-Item fnm.zip
 
 # Install CMake
 RUN Invoke-WebRequest -UseBasicParsing 'https://github.com/Kitware/CMake/releases/download/v3.28.1/cmake-3.28.1-windows-x86_64.msi' -OutFile cmake.msi ; \
