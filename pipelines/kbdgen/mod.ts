@@ -24,6 +24,7 @@ export function pipelineKbdgen() {
 
   for (const [os, archs] of Object.entries(platforms)) {
     for (const arch of archs) {
+      const ext = os === "windows" ? ".exe" : ""
       pipeline.steps.push({
         group: `${os} ${arch}`,
         steps: [
@@ -34,9 +35,7 @@ export function pipelineKbdgen() {
             label: "Build and sign",
             command: [
               `cargo build --release --target ${arch}`,
-              `divvun-actions sign target/${arch}/release/kbdgen${
-                os === "windows" ? ".exe" : ""
-              }`,
+              `divvun-actions sign target/${arch}/release/kbdgen${ext}`,
             ],
           }),
         ],
