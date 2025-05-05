@@ -65,7 +65,7 @@ export default async function keyboardBuild({
     }
     await PahkatPrefix.bootstrap(["devtools"], "nightly")
     console.log("Installing kbdi")
-    await PahkatPrefix.install(["kbdi"])
+    await PahkatPrefix.install(["kbdi", "kbdgen"])
     console.log("Installed kbdi")
     const kbdi_path = path.join(
       PahkatPrefix.path,
