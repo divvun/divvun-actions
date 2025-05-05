@@ -11,6 +11,7 @@ import {
   runDivvunKeyboard,
 } from "~/pipelines/keyboard/divvun-keyboard.ts"
 import logger from "~/util/log.ts"
+import { pipelineDivvunspell } from "./pipelines/divvunspell/mod.ts"
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
 import sign from "./services/windows-codesign.ts"
 
@@ -174,8 +175,7 @@ async function runCi(args) {
   let pipeline: BuildkitePipeline
   switch (builder.env.repoName) {
     case "divvunspell":
-      // await build()
-      return
+      pipeline = pipelineDivvunspell()
       break
     case "divvun-keyboard":
     case "divvun-dev-keyboard": {
