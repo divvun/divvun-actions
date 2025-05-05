@@ -133,11 +133,9 @@ export class Powershell {
 
     const listeners = {
       stdout: (data: Uint8Array) => {
-        console.log("stdout", data.toString())
         out.push(data.toString())
       },
       stderr: (data: Uint8Array) => {
-        console.log("stderr", data.toString())
         err.push(data.toString())
       },
     }
@@ -207,35 +205,36 @@ export class Bash {
 
 export class Tar {
   static async extractTxz(filePath: string, outputDir?: string) {
-    // const platform = Deno.build.os
+    const platform = Deno.build.os
 
-    console.log("Spawning tar for", filePath)
-    // if (platform === "linux" || platform === "darwin") {
-    const dir = outputDir || tmpDir()
-    const proc = await Powershell.runScript(`tar -xf ${filePath} -C ${dir}`)
-    console.log("Spawned tar")
-    console.log(proc)
+    console.log("Extracting", filePath)
+    if (platform === "linux" || platform === "darwin") {
+      const dir = outputDir || tmpDir()
+      const proc = new Deno.Command("tar", {
+        args: ["xf", filePath],
+        cwd: dir,
+      }).spawn()
 
-    // console.log("Tar exited with code", output.code)
-    // if (output.code !== 0) {
-    //   throw new Error(`Process exited with code ${code}`)
-    // }
+      const code = (await proc.status).code
+      if (code !== 0) {
+        throw new Error(`Process exited with code ${code}`)
+      }
 
-    console.log("Extracted to", dir)
-    return dir
-    // } else if (platform === "windows") {
-    //   // Now we unxz it
-    //   logger.debug("Attempt to unxz")
-    //   await builder.exec("xz", ["-d", filePath])
+      return dir
+    } else if (platform === "windows") {
+      const dir = outputDir || tmpDir()
+      const proc = new Deno.Command("7z", {
+        args: ["x", filePath],
+        cwd: dir,
+      }).spawn()
 
-    //   logger.debug("Attempted to extract tarball")
-    //   return await builder.extractTar(
-    //     `${path.dirname(filePath)}\\${path.basename(filePath, ".txz")}.tar`,
-    //     outputDir || tmpDir(),
-    //   )
-    // } else {
-    //   throw new Error(`Unsupported platform: ${platform}`)
-    // }
+      const code = (await proc.status).code
+      if (code !== 0) {
+        throw new Error(`Process exited with code ${code}`)
+      }
+
+      return dir
+    }
   }
 
   static async createFlatTxz(paths: string[], outputPath: string) {
