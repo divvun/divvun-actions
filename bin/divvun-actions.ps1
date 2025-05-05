@@ -16,6 +16,9 @@ try {
     
     # Have to run it through cmd.exe because PS has trouble piping data... lol
     cmd /NoNewWindow /c "deno -q run -A main.ts $scriptArgs | deno -q run -A ./util/redactor.ts"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Command failed with exit code $LASTEXITCODE"
+    }
 } finally {
     Set-Location -Path $CWD
 }
