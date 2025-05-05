@@ -28,7 +28,7 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
   if (arch.includes("android")) {
     return {
       cmd: "cargo",
-      args: ["ndk", "build", "--lib", "--release", "--target", arch],
+      args: ["ndk", "build", "--lib", "--release", "--target", arch, "-vv"],
     }
   }
 
