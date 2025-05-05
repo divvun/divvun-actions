@@ -41,7 +41,7 @@ export function pipelineKbdgen() {
       } else {
         const cargoCmd = os !== "linux" || arch === "x86_64-unknown-linux-gnu"
           ? "cargo"
-          : "cross"
+          : "CROSS_CONTAINER_IN_CONTAINER=1 cross"
 
         steps.push(command({
           agents: {
