@@ -973,7 +973,15 @@ export class Kbdgen {
 
     {
       const proc = new Deno.Command("kbdgen", {
-        args: ["target", "--output-path", "output", "--bundle-path", abs, "macos", "generate"],
+        args: [
+          "target",
+          "--output-path",
+          "output",
+          "--bundle-path",
+          abs,
+          "macos",
+          "generate",
+        ],
         cwd,
       }).spawn()
 
@@ -985,7 +993,15 @@ export class Kbdgen {
 
     {
       const proc = new Deno.Command("kbdgen", {
-        args: ["target", "--output-path", "output", "--bundle-path", abs, "macos", "build"],
+        args: [
+          "target",
+          "--output-path",
+          "output",
+          "--bundle-path",
+          abs,
+          "macos",
+          "build",
+        ],
         cwd,
       }).spawn()
 
