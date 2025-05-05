@@ -108,11 +108,5 @@ RUN if (!(Test-Path -Path $PROFILE)) { \
 RUN sc config ssh-agent start= auto ; \
     sc start ssh-agent
 
-# AHAHAH OH NOOOoooo...
-RUN Invoke-WebRequest -Uri "https://raw.githubusercontent.com/microsoft/Windows-Containers/Main/helpful_tools/Install-DockerCE/install-docker-ce.ps1" \
-    -OutFile install-docker-ce.ps1 ; \
-    .\install-docker-ce.ps1 ; \
-    Remove-Item install-docker-ce.ps1
-
 # Default shell
 CMD ["pwsh", "-NoLogo"]
