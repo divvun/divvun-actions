@@ -1,9 +1,20 @@
-import { BuildkitePipeline } from "../../builder/pipeline.ts"
+import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
+import * as target from "~/target.ts"
 
 const platforms = {
   macos: ["x86_64-apple-darwin", "aarch64-apple-darwin"],
   linux: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"],
   windows: ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"],
+}
+
+function command(input: CommandStep): CommandStep {
+  return {
+    ...input,
+    plugins: [
+      ...(input.plugins ?? []),
+      `ssh://git@github.com/divvun/divvun-actions.git#${target.gitHash}`,
+    ],
+  }
 }
 
 export function pipelineKbdgen() {
@@ -15,18 +26,19 @@ export function pipelineKbdgen() {
     for (const arch of archs) {
       pipeline.steps.push({
         group: `${os} ${arch}`,
-        agents: {
-          queue: os,
-        },
         steps: [
-          {
-            label: "Build",
-            command: `cargo build --release --target ${arch}`,
-          },
-          {
-            label: "Sign",
-            command: `cargo sign target/${arch}/release/kbdgen${os === "windows" ? ".exe" : ""}`,
-          },
+          command({
+            agents: {
+              queue: os,
+            },
+            label: "Build and sign",
+            command: [
+              `cargo build --release --target ${arch}`,
+              `divvun-actions sign target/${arch}/release/kbdgen${
+                os === "windows" ? ".exe" : ""
+              }`,
+            ],
+          }),
         ],
       })
     }
