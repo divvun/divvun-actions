@@ -39,7 +39,7 @@ export function pipelineKbdgen() {
           ],
         }))
       } else {
-        command({
+        steps.push(command({
           agents: {
             queue: os,
           },
@@ -47,7 +47,7 @@ export function pipelineKbdgen() {
           command: [
             `cargo build --release --target ${arch}`,
           ],
-        })
+        }))
       }
 
       pipeline.steps.push({
