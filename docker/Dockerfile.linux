@@ -46,7 +46,7 @@ RUN ~/.cargo/bin/rustup target add \
 
 RUN curl -fsSL https://dl.google.com/android/repository/android-ndk-r27c-linux.zip -o android-ndk.zip && \
     mkdir -p ~/Android/Sdk/ndk/27.2.12479018 && \
-    unzip android-ndk.zip "android-ndk-r27c/*" -d ~/Android/Sdk/ndk/27.2.12479018 && \
+    tar xf android-ndk.zip --strip-components=1 -C ~/Android/Sdk/ndk/27.2.12479018 && \
     rm android-ndk.zip
 
 ENTRYPOINT []
