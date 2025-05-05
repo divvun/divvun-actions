@@ -126,7 +126,7 @@ export class Powershell {
       env?: { [key: string]: string }
     } = {},
   ) {
-    const thisEnv = Object.assign({}, env(), opts.env)
+    const thisEnv = Object.assign({ PATH: Deno.env.get("PATH") }, env(), opts.env)
 
     const out: string[] = []
     const err: string[] = []
@@ -146,6 +146,7 @@ export class Powershell {
         cwd: opts.cwd,
         listeners,
       }),
+      err.join(""),
     )
     return [out.join(""), err.join("")]
   }
