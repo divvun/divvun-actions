@@ -964,10 +964,19 @@ export class Kbdgen {
     const abs = path.resolve(bundlePath)
     const cwd = Deno.cwd()
 
-    await Powershell.runScript(
-      `kbdgen target --output-path output --bundle-path ${abs} windows`,
-    )
+    const proc = new Deno.Command("kbdgen", {
+      args: ["target", "--output-path", "output", "--bundle-path", abs, "windows"],
+      cwd,
+      env: {
+        RUST_LOG: "trace",
+      }
+    }).spawn()
 
+    const code = (await proc.status).code
+    if (code !== 0) {
+      throw new Error(`Process exited with code ${code}`)
+    }
+    
     return `${cwd}/output`
   }
 }
