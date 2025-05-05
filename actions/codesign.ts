@@ -2,7 +2,7 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 import { Bash } from "~/util/shared.ts"
-import { sign as msCodesign } from "~/util/sslcom-codesigner.ts"
+import { sslComCodeSign } from "~/util/sslcom-codesigner.ts"
 
 export type Props = {
   filePath: string
@@ -44,21 +44,19 @@ export default async function codesign({
     logger.debug("  Windows platform")
     // Call our internal API to sign the file
     // This overwrites the unsigned file
-    await msCodesign(filePath, {
-      username: secrets["windows/sslcom_username"],
-      password: secrets["windows/sslcom_password"],
-      credentialId: secrets["windows/sslcom_credential_id"],
-      totpSecret: secrets["windows/sslcom_totp_secret"],
+    await sslComCodeSign(filePath, {
+      username: secrets.get("sslcom/username"),
+      password: secrets.get("sslcom/password"),
+      credentialId: secrets.get("sslcom/credentialId"),
+      totpSecret: secrets.get("sslcom/totpSecret"),
     })
     signedPath = filePath
   } else if (Deno.build.os === "darwin") {
-    const {
-      "macos/developerAccount": developerAccount,
-      "macos/appPassword": appPassword,
-      "macos/appCodeSignId": appCodeSignId,
-      "macos/installerCodeSignId": installerCodeSignId,
-      "macos/teamId": teamId,
-    } = secrets
+    const developerAccount = secrets.get("macos/developerAccount")
+    const appPassword = secrets.get("macos/appPassword")
+    const appCodeSignId = secrets.get("macos/appCodeSignId")
+    const installerCodeSignId = secrets.get("macos/installerCodeSignId")
+    const teamId = secrets.get("macos/teamId")
 
     // Codesign with hardened runtime and timestamp
     if (!isInstaller) {
