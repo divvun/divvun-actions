@@ -968,7 +968,7 @@ export class Kbdgen {
       args: ["target", "--output-path", "output", "--bundle-path", abs, "windows"],
       cwd,
       env: {
-        RUST_LOG: "trace",
+        RUST_LOG: "debug",
       }
     }).spawn()
 

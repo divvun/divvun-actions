@@ -85,8 +85,8 @@ export default async function keyboardBuild({
     console.log("Building Windows")
     const outputPath = await Kbdgen.buildWindows(bundlePath)
     console.log("Built")
-    await Deno.copyFile(kbdi_path, outputPath)
-    await Deno.copyFile(kbdi_x64_path, outputPath)
+    await Deno.copyFile(kbdi_path, path.resolve(outputPath, "kbdi.exe"))
+    await Deno.copyFile(kbdi_x64_path, path.resolve(outputPath, "kbdi-x64.exe"))
 
     console.log("Generating Inno")
     const issPath = await generateKbdInnoFromBundle(bundlePath, outputPath)
