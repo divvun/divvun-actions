@@ -38,4 +38,15 @@ RUN apt-get update && \
     apt-get update && \
     apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
+RUN ~/.cargo/bin/cargo install cargo-ndk --git https://github.com/bbqsrc/cargo-ndk
+RUN ~/.cargo/bin/rustup target add \
+    aarch64-linux-android \
+    armv7-linux-androideabi \
+    x86_64-linux-android
+
+RUN curl -fsSL https://dl.google.com/android/repository/android-ndk-r27c-linux.zip -o android-ndk.zip && \
+    mkdir -p ~/Android/Sdk/ndk/27.2.12479018 && \
+    unzip android-ndk.zip "android-ndk-r27c/*" -d ~/Android/Sdk/ndk/27.2.12479018 && \
+    rm android-ndk.zip
+
 ENTRYPOINT []
