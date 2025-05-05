@@ -17,9 +17,8 @@ RUN apt-get update && \
     apertium-all-dev \
     divvun-gramcheck
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
-    --target aarch64-unknown-linux-gnu \
-    --target x86_64-unknown-linux-gnu
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+RUN ~/.cargo/bin/cargo install cross --git https://github.com/cross-rs/cross
 
 RUN curl -fsSL https://deno.land/install.sh | bash -s -- -y
 

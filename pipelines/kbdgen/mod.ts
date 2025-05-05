@@ -39,13 +39,15 @@ export function pipelineKbdgen() {
           ],
         }))
       } else {
+        const cargoCmd = arch === "x86_64-unknown-linux-gnu" ? "cargo" : "cross"
+
         steps.push(command({
           agents: {
             queue: os,
           },
           label: "Build",
           command: [
-            `cargo build --release --target ${arch}`,
+            `${cargoCmd} build --release --target ${arch}`,
           ],
         }))
       }
