@@ -344,7 +344,7 @@ export class PahkatPrefix {
   }
 
   static async addRepo(repoName: string, channel?: string) {
-    const args = ["config", "repo", "add", "-c", PahkatPrefix.path, repoName]
+    const args = ["config", "repo", "add", "-c", PahkatPrefix.path, `https://pahkat.uit.no/${repoName}`]
     if (channel != null) {
       args.push(channel)
     }
