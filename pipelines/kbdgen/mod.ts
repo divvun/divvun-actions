@@ -6,7 +6,7 @@ const platforms = {
   windows: ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"],
 }
 
-export function kbdgenPipeline() {
+export function pipelineKbdgen() {
   const pipeline: BuildkitePipeline = {
     steps: [],
   }

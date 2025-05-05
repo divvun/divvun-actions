@@ -11,6 +11,7 @@ import {
   runDivvunKeyboard,
 } from "~/pipelines/keyboard/divvun-keyboard.ts"
 import logger from "~/util/log.ts"
+import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
 import sign from "./services/windows-codesign.ts"
 
 enum Command {
@@ -203,8 +204,4 @@ async function runCi(args) {
   } finally {
     await Deno.remove(pipelinePath)
   }
-}
-
-function pipelineKbdgen(): BuildkitePipeline {
-  throw new Error("Function not implemented.")
 }
