@@ -14,14 +14,13 @@ export async function makeInstaller(
 
   const proc = new Deno.Command("iscc.exe", {
     args: [
+      `/S"signtool=divvun-actions sign $f"`,
       "/Qp",
       `/O${installerOutput}`,
       ...defines,
       issPath,
     ],
   }).spawn()
-
-  console.warn("TODO: THERE IS NO CODE SIGNING SET UP YET!!")
 
   const code = (await proc.status).code
   if (code !== 0) {
