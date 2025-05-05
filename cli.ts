@@ -181,6 +181,10 @@ async function runCi(args) {
       pipeline = pipelineDivvunKeyboard()
       break
     }
+    case "kbdgen": {
+      pipeline = pipelineKbdgen()
+      break
+    }
     default: {
       if (builder.env.repoName.startsWith("keyboard-")) {
         pipeline = pipelineDesktopKeyboard()
@@ -199,4 +203,8 @@ async function runCi(args) {
   } finally {
     await Deno.remove(pipelinePath)
   }
+}
+
+function pipelineKbdgen(): BuildkitePipeline {
+  throw new Error("Function not implemented.")
 }
