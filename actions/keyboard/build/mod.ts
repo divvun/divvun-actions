@@ -63,7 +63,7 @@ export default async function keyboardBuild({
       logger.debug("Setting current version to nightly version")
       await Kbdgen.setNightlyVersion(bundlePath, "windows")
     }
-    await PahkatPrefix.bootstrap(["devtools"])
+    await PahkatPrefix.bootstrap(["devtools"], "nightly")
     console.log("Installing kbdi")
     await PahkatPrefix.install(["kbdi"])
     console.log("Installed kbdi")

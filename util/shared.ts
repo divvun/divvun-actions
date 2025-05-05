@@ -289,7 +289,7 @@ export class PahkatPrefix {
     return _pahkatPrefixPath
   }
 
-  static async bootstrap(repos: string[]) {
+  static async bootstrap(repos: string[], channel?: string) {
     if (repos.length === 0) {
       throw new Error("At least one repository must be specified")
     }
@@ -338,7 +338,7 @@ export class PahkatPrefix {
     console.log("Running pahkat-prefix init")
     await DefaultShell.runScript(`pahkat-prefix init -c ${PahkatPrefix.path}`)
     for (const repo of repos) {
-      await PahkatPrefix.addRepo(repo)
+      await PahkatPrefix.addRepo(repo, channel)
     }
     console.log("Done running pahkat-prefix init")
   }
@@ -371,7 +371,7 @@ export class PahkatPrefix {
 
   static async install(packages: string[]) {
     const proc = new Deno.Command("pahkat-prefix", {
-      args: ["install", ...packages, "-c", PahkatPrefix.path],
+      args: ["install", "-c", PahkatPrefix.path, ...packages],
     }).spawn()
 
     const code = (await proc.status).code
