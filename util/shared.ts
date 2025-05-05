@@ -1038,7 +1038,7 @@ export class Kbdgen {
       throw new Error(`Process exited with code ${code}`)
     }
 
-    return `${cwd}/output`
+    return `${cwd}\\output`
   }
 }
 
