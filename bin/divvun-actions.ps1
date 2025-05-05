@@ -15,9 +15,13 @@ try {
     $scriptArgs = if ($args.Count -eq 0) { @('-h') } else { $args }
     
     # Have to run it through cmd.exe because PS has trouble piping data... lol
+    $ErrorActionPreference = 'Continue'  # Temporarily allow errors to propagate
     cmd /NoNewWindow /c "deno -q run -A main.ts $scriptArgs | deno -q run -A ./util/redactor.ts"
-    if ($LASTEXITCODE -ne 0) {
-        throw "Command failed with exit code $LASTEXITCODE"
+    $pipeError = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'  # Restore strict error handling
+    
+    if ($pipeError -ne 0) {
+        throw "Command failed with exit code $pipeError"
     }
 } finally {
     Set-Location -Path $CWD
