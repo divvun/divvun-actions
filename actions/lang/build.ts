@@ -107,13 +107,13 @@ export default async function langBuild({
 
   // General configuration
 
-  if (config.fst.includes("foma")) {
-    flags.push("--with-foma")
-  }
+  // if (config.fst.includes("foma")) {
+  //   flags.push("--with-foma")
+  // }
 
-  if (!config.fst.includes("hfst")) {
-    flags.push("--without-hfst")
-  }
+  // if (!config.fst.includes("hfst")) {
+  //   flags.push("--without-hfst")
+  // }
 
   if (config.generators) {
     flags.push("--enable-generators")
