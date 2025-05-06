@@ -13,6 +13,7 @@ import {
 import logger from "~/util/log.ts"
 import { pipelineDivvunspell } from "./pipelines/divvunspell/mod.ts"
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
+import { pipelineLang, runLang } from "./pipelines/lang/mod.ts"
 import sign from "./services/windows-codesign.ts"
 
 enum Command {
@@ -163,6 +164,10 @@ async function runPipeline(args) {
       await runDesktopKeyboardMacOS(kbdgenBundlePath)
       break
     }
+    case "lang": {
+      await runLang()
+      break
+    }
     default: {
       throw new Error(`Unknown repo: ${builder.env.repoName}`)
     }
@@ -184,6 +189,10 @@ async function runCi(args) {
     }
     case "kbdgen": {
       pipeline = pipelineKbdgen()
+      break
+    }
+    case "lang": {
+      pipeline = pipelineLang()
       break
     }
     default: {

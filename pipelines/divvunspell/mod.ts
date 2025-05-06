@@ -1,5 +1,5 @@
-import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts";
-import * as target from "~/target.ts";
+import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
+import * as target from "~/target.ts"
 
 const binPlatforms = {
   macos: ["x86_64-apple-darwin", "aarch64-apple-darwin"],
@@ -28,7 +28,16 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
   if (arch.includes("android")) {
     return {
       cmd: "cargo",
-      args: ["ndk", "--bindgen", "build", "--lib", "--release", "--target", arch, "-v"],
+      args: [
+        "ndk",
+        "--bindgen",
+        "build",
+        "--lib",
+        "--release",
+        "--target",
+        arch,
+        "-v",
+      ],
     }
   }
 

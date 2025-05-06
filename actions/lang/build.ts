@@ -1,6 +1,5 @@
 import * as fs from "@std/fs"
 import * as path from "@std/path"
-import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 import { Bash } from "~/util/shared.ts"
 
@@ -98,13 +97,6 @@ export default async function langBuild({
   requiresDesktopAsMobileWorkaround,
   ...config
 }: Props): Promise<Output> {
-  const githubWorkspace = builder.env.workspace
-
-  if (githubWorkspace == null) {
-    logger.error("GITHUB_WORKSPACE not set, failing.")
-    Deno.exit(1)
-  }
-
   logger.info(JSON.stringify(config, null, 2))
 
   const flags = [
@@ -169,24 +161,10 @@ export default async function langBuild({
     flags.push("--enable-minimised-spellers")
   }
 
-  // Begin build
-  builder.group("Build giella-core and giella-shared", async () => {
-    await Bash.runScript("./autogen.sh && ./configure && make", {
-      cwd: path.join(githubWorkspace, "giella-core"),
-    })
-    await Bash.runScript("./autogen.sh && ./configure && make", {
-      cwd: path.join(githubWorkspace, "giella-shared"),
-    })
-  })
-
-  const autotoolsBuilder = new Autotools(path.join(githubWorkspace, "lang"))
+  const autotoolsBuilder = new Autotools(Deno.cwd())
 
   logger.debug(`Flags: ${flags}`)
   await autotoolsBuilder.build(flags)
-
-  await Bash.runScript("ls -lah build/tools/spellcheckers/", {
-    cwd: path.join(githubWorkspace, "lang"),
-  })
 
   if (config.spellers) {
     // Glob the zhfst files made available in the spellcheckers directory.
@@ -200,7 +178,7 @@ export default async function langBuild({
     }
 
     const files = await fs.expandGlob(
-      path.join(githubWorkspace, "lang/build/tools/spellcheckers/*.zhfst"),
+      path.join("build/tools/spellcheckers/*.zhfst"),
       { followSymlinks: false },
     )
 
