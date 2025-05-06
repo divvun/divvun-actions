@@ -191,16 +191,14 @@ async function runCi(args) {
       pipeline = pipelineKbdgen()
       break
     }
-    case "lang": {
-      pipeline = pipelineLang()
-      break
-    }
     default: {
       if (builder.env.repoName.startsWith("keyboard-")) {
         pipeline = pipelineDesktopKeyboard()
-        break
+      } else if (builder.env.repoName.startsWith("lang-")) {
+        pipeline = pipelineLang()
+      } else {
+        throw new Error(`Unknown repo: ${builder.env.repoName}`)
       }
-      throw new Error(`Unknown repo: ${builder.env.repoName}`)
     }
   }
 
