@@ -15,7 +15,7 @@ function command(input: CommandStep): CommandStep {
 
 export async function runLang() {
   const yml = await Deno.readTextFile(".build-config.yml")
-  const config = await yaml.parse(yml) as Props
+  const config = (await yaml.parse(yml) as any)?.build as Props
 
   console.log(await langBuild(config))
 }
