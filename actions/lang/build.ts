@@ -1,7 +1,6 @@
 import * as fs from "@std/fs"
 import * as path from "@std/path"
 import logger from "~/util/log.ts"
-import { Bash } from "~/util/shared.ts"
 
 class Autotools {
   private directory: string
@@ -11,23 +10,51 @@ class Autotools {
   }
 
   async makeBuildDir() {
-    await Bash.runScript("mkdir -p build", { cwd: this.directory })
+    const proc = new Deno.Command("mkdir", {
+      args: ["-p", "build"],
+      cwd: this.directory,
+    }).spawn()
+
+    const status = await proc.status
+    if (status.code !== 0) {
+      throw new Error(`Failed to make build directory: ${status.code}`)
+    }
   }
 
   async runAutogen() {
-    await Bash.runScript("./autogen.sh", { cwd: this.directory })
+    const proc = new Deno.Command("bash", {
+      args: ["-c", "./autogen.sh"],
+      cwd: this.directory,
+    }).spawn()
+
+    const status = await proc.status
+    if (status.code !== 0) {
+      throw new Error(`Failed to run autogen: ${status.code}`)
+    }
   }
 
   async runConfigure(flags: string[]) {
-    await Bash.runScript(`../configure ${flags.join(" ")}`, {
+    const proc = new Deno.Command("bash", {
+      args: ["-c", `../configure ${flags.join(" ")}`],
       cwd: path.join(this.directory, "build"),
-    })
+    }).spawn()
+
+    const status = await proc.status
+    if (status.code !== 0) {
+      throw new Error(`Failed to run configure: ${status.code}`)
+    }
   }
 
   async runMake() {
-    await Bash.runScript("make -j$(nproc)", {
+    const proc = new Deno.Command("bash", {
+      args: ["-c", "make -j$(nproc)"],
       cwd: path.join(this.directory, "build"),
-    })
+    }).spawn()
+
+    const status = await proc.status
+    if (status.code !== 0) {
+      throw new Error(`Failed to run make: ${status.code}`)
+    }
   }
 
   async build(flags: string[]) {
