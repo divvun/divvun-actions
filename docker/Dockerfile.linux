@@ -15,7 +15,8 @@ RUN apt-get update && \
     rsync \
     crossbuild-essential-arm64 \
     apertium-all-dev \
-    divvun-gramcheck
+    divvun-gramcheck \
+    bc
 
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 RUN ~/.cargo/bin/cargo install cross --git https://github.com/cross-rs/cross
