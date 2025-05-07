@@ -9,14 +9,18 @@ export const env = Deno.env.get("_DIVVUN_ACTIONS_ENV")!
 export const platform = Deno.env.get("_DIVVUN_ACTIONS_PLATFORM")!
 export const command = Deno.env.get("_DIVVUN_ACTIONS_COMMAND")
 
-export let gitHash: string = "unknown"
+export let gitHash: string = "main"
 
-const hash = await new Deno.Command("git", {
-  args: ["rev-parse", "--short", "HEAD"],
-  cwd: projectPath,
-}).output()
+try {
+  const hash = await new Deno.Command("git", {
+    args: ["rev-parse", "--short", "HEAD"],
+    cwd: projectPath,
+  }).output()
 
-if (hash.success) {
-  const decoder = new TextDecoder()
-  gitHash = decoder.decode(hash.stdout).trim()
+  if (hash.success) {
+    const decoder = new TextDecoder()
+    gitHash = decoder.decode(hash.stdout).trim()
+  }
+} catch (_) {
+  // Ignore
 }
