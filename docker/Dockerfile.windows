@@ -21,6 +21,7 @@ RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
 RUN $components = @( \
         'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', \
         'Microsoft.VisualStudio.Component.VC.Tools.ARM64', \
+        'Microsoft.VisualStudio.Component.VC.Llvm.Clang', \
         'Microsoft.VisualStudio.Workload.VCTools', \
         'Microsoft.VisualStudio.Workload.MSBuildTools', \
         'Microsoft.VisualStudio.Workload.NetCoreBuildTools', \
