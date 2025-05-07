@@ -1,7 +1,6 @@
 FROM mcr.microsoft.com/powershell:lts-windowsservercore-ltsc2022 AS buildkite-agent
 
 SHELL ["pwsh", "-command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
-USER ContainerAdministrator
 
 # Download and install Git for Windows silently
 RUN Invoke-WebRequest -Uri https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.1/Git-2.47.1-64-bit.exe -OutFile git-installer.exe ; \
@@ -64,14 +63,6 @@ RUN Invoke-WebRequest -UseBasicParsing 'https://github.com/Kitware/CMake/release
     $env:PATH = 'C:\Program Files\CMake\bin;' + $env:PATH ; \
     [Environment]::SetEnvironmentVariable('PATH', $env:PATH, [EnvironmentVariableTarget]::Machine)
 
-# Install Rust using rustup
-RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe; \
-    Start-Process -FilePath .\\rustup-init.exe -ArgumentList @('-y', '--target', 'aarch64-pc-windows-msvc') -NoNewWindow -Wait; \
-    Remove-Item -Force .\\rustup-init.exe
-
-# Install Deno
-RUN irm https://deno.land/install.ps1 | iex
-
 # Create C:\bin
 RUN New-Item -ItemType Directory -Path C:\bin ; \
     setx /M PATH $('C:\bin;' + $Env:PATH)
@@ -116,6 +107,16 @@ RUN if (!(Test-Path -Path $PROFILE)) { \
 # Start ssh-agent
 RUN sc config ssh-agent start= auto ; \
     sc start ssh-agent
+
+USER ContainerAdministrator
+
+# Install Rust using rustup
+RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe; \
+    Start-Process -FilePath .\\rustup-init.exe -ArgumentList @('-y', '--target', 'aarch64-pc-windows-msvc') -NoNewWindow -Wait; \
+    Remove-Item -Force .\\rustup-init.exe
+
+# Install Deno
+RUN irm https://deno.land/install.ps1 | iex
 
 # Default shell
 CMD ["pwsh", "-NoLogo"]
