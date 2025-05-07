@@ -17,6 +17,13 @@ function command(input: CommandStep): CommandStep {
   }
 }
 
+const msvcEnvCmd = (arch: string) => {
+  if (arch.startsWith("aarch64")) {
+    return "arm64"
+  }
+  return "x64"
+}
+
 export function pipelineKbdgen() {
   const pipeline: BuildkitePipeline = {
     steps: [],
@@ -34,7 +41,7 @@ export function pipelineKbdgen() {
           },
           label: "Build and sign",
           command: [
-            `cargo build --release --target ${arch}`,
+            `eval $(msvc-env ${msvcEnvCmd(arch)} --sh) && cargo build --release --target ${arch}`,
             `divvun-actions sign target/${arch}/release/kbdgen${ext}`,
           ],
         }))
