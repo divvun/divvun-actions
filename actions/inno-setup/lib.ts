@@ -16,9 +16,14 @@ export async function makeInstaller(
   const scriptPath = `${target.projectPath}\\bin\\divvun-actions`
   console.log(scriptPath)
 
+  const envPath = await Deno.makeTempFile()
+  const env = Deno.env.toObject()
+  delete env["PATH"]
+  await Deno.writeTextFile(envPath, JSON.stringify(env))
+
   const proc = new Deno.Command("iscc.exe", {
     args: [
-      `/S"signtool=C:\\msys2\\usr\\bin\\bash -ec 'whoami && \`/usr/bin/cygpath $q${scriptPath}$q\` sign $f'"`,
+      `/S"signtool=C:\\msys2\\usr\\bin\\bash -ec 'ENV_PATH=$q${envPath}$q \`/usr/bin/cygpath $q${scriptPath}$q\` sign $f'"`,
       // "/Qp",
       `/O${installerOutput}`,
       ...defines,
