@@ -297,6 +297,15 @@ async function localMain() {
 // }
 
 async function main() {
+  const envFilePath = Deno.env.get("ENV_FILE")
+  if (envFilePath != null) {
+    const envFile = await Deno.readTextFile(envFilePath)
+    const env = JSON.parse(envFile)
+    for (const [key, value] of Object.entries(env)) {
+      Deno.env.set(key, value as string)
+    }
+  }
+
   switch (builder.mode) {
     case "local": {
       await localMain()
