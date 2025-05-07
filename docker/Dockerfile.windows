@@ -101,6 +101,16 @@ RUN Invoke-WebRequest -OutFile CodeSignTool.zip "https://github.com/SSLcom/CodeS
     Remove-Item -Force CodeSignTool.zip ; \
     setx /M PATH $($Env:PATH + ';C:\CodeSignTool')
 
+# Install MSYS2
+RUN Invoke-WebRequest -Uri "https://github.com/msys2/msys2-installer/releases/download/2025-02-21/msys2-x86_64-20250221.exe" -OutFile msys2-installer.exe ; \
+    Start-Process -Wait -FilePath .\msys2-installer.exe -ArgumentList @('install', '--root', 'C:\MSYS2', '--confirm-command') ; \
+    Remove-Item -Force msys2-installer.exe
+
+# Install msvc-env
+RUN Invoke-WebRequest -Uri https://x.giellalt.org/msvc-env.zip -OutFile msvc-env.zip ; \
+    Expand-Archive msvc-env.zip -DestinationPath C:\bin ; \
+    Remove-Item -Force msvc-env.zip
+
 # Clear duplicates
 RUN $cleanPath = ($Env:PATH -split ';' | Select-Object -Unique) -join ';' ; \
     setx /M PATH $cleanPath
@@ -114,11 +124,6 @@ RUN if (!(Test-Path -Path $PROFILE)) { \
 # Start ssh-agent
 RUN sc config ssh-agent start= auto ; \
     sc start ssh-agent
-
-# Install MSYS2
-RUN Invoke-WebRequest -Uri "https://github.com/msys2/msys2-installer/releases/download/2025-02-21/msys2-x86_64-20250221.exe" -OutFile msys2-installer.exe ; \
-    Start-Process -Wait -FilePath .\msys2-installer.exe -ArgumentList @('install', '--root', 'C:\MSYS2', '--confirm-command') ; \
-    Remove-Item -Force msys2-installer.exe
 
 # Default shell
 CMD ["pwsh", "-NoLogo"]
