@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/powershell:lts-windowsservercore-ltsc2022 AS buildkite-agent
 
-SHELL ["pwsh", "-Command"]
+SHELL ["pwsh", "-command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+USER ContainerAdministrator
 
 # Download and install Git for Windows silently
 RUN Invoke-WebRequest -Uri https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.1/Git-2.47.1-64-bit.exe -OutFile git-installer.exe ; \
@@ -16,15 +17,6 @@ ENV BUILDKITE_AGENT_TOKEN "XXX"
 RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
     iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/buildkite/agent/main/install.ps1')); \
     setx /M PATH $($Env:PATH + 'C:\buildkite-agent\bin;');
-
-CMD ["buildkite-agent.exe", "start"]
-
-# Use Windows Server Core as the base image
-#FROM mcr.microsoft.com/powershell:lts-windowsservercore-ltsc2022
-
-FROM buildkite-agent
-
-SHELL ["pwsh", "-command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 # Install Visual Studio components
 RUN $components = @( \
