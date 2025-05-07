@@ -18,7 +18,7 @@ export async function makeInstaller(
 
   const proc = new Deno.Command("iscc.exe", {
     args: [
-      `/S"signtool=C:\\msys2\\usr\\bin\\bash -ec \"${scriptPath} sign $f\""`,
+      `/S"signtool=C:\\msys2\\usr\\bin\\bash -ec '${scriptPath} sign $f'"`,
       "/Qp",
       `/O${installerOutput}`,
       ...defines,
