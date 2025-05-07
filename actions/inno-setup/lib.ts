@@ -18,15 +18,12 @@ export async function makeInstaller(
 
   const proc = new Deno.Command("iscc.exe", {
     args: [
-      `/S"signtool=C:\\msys2\\usr\\bin\\bash -ec '$q${scriptPath}$q sign $f'"`,
+      `/S"signtool=C:\\msys2\\usr\\bin\\bash -ec 'echo $$PATH && ${scriptPath} sign $f'"`,
       // "/Qp",
       `/O${installerOutput}`,
       ...defines,
       issPath,
     ],
-    env: {
-      MSYS2_PATH_TYPE: 'inherit',
-    },
     windowsRawArguments: true,
   }).spawn()
 
