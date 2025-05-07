@@ -24,6 +24,9 @@ export async function makeInstaller(
       ...defines,
       issPath,
     ],
+    env: {
+      MSYS2_PATH_TYPE: 'inherit',
+    },
     windowsRawArguments: true,
   }).spawn()
 
