@@ -321,7 +321,6 @@ async function main() {
 }
 
 async function buildkiteMain() {
-  Deno.chdir(target.workingDir)
   await runCli(Deno.args)
 }
 
