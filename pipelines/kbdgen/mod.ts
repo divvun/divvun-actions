@@ -41,8 +41,7 @@ export function pipelineKbdgen() {
           },
           label: "Build and sign",
           command: [
-            "echo $$PATH",
-            `eval $(msvc-env ${msvcEnvCmd(arch)} --sh) && echo $$PATH && cargo build --release --target ${arch}`,
+            `msvc-env ${msvcEnvCmd(arch)} | Invoke-Expression; cargo build --release --target ${arch}`,
             `divvun-actions sign target/${arch}/release/kbdgen${ext}`,
           ],
         }))
