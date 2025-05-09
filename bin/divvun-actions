@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -o pipefail
 
-deno -q run -A main.ts "$@"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+
+deno -q run -A $SCRIPT_DIR/main.ts "$@"
 exit $?
