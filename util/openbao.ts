@@ -17,6 +17,10 @@ export class OpenBao {
     const roleId = await getter("divvun_actions_openbao_role_id")
     const roleSecret = await getter("divvun_actions_openbao_role_secret")
 
+    if (endpoint == null || roleId == null || roleSecret == null) {
+      throw new Error("OpenBao endpoint, roleId or roleSecret not found")
+    }
+
     return OpenBao.fromAppRole(endpoint, roleId, roleSecret)
   }
 
