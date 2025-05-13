@@ -70,16 +70,18 @@ export function pipelineKbdgen() {
           command: [
             `${cargoCmd} build --bin kbdgen --release --target ${arch}`,
           ],
-          plugins: [
-            {
-              "cache#v1.7.0": {
-                manifest: "Cargo.lock",
-                path: "target",
-                restore: "file",
-                save: "file",
+          plugins: os === "linux"
+            ? [
+              {
+                "cache#v1.7.0": {
+                  manifest: "Cargo.lock",
+                  path: "target",
+                  restore: "file",
+                  save: "file",
+                },
               },
-            },
-          ],
+            ]
+            : [],
         }))
       }
 
