@@ -16,6 +16,16 @@ export class OpenBao {
   ): Promise<OpenBao> {
     const client = createClient<Schema>({
       endpoint: `${endpoint}/v1`,
+      plugins: [
+        {
+          onRequestInit: ({ requestInit }) => {
+            requestInit.headers = {
+              ...requestInit.headers,
+              Authorization: `Bearer ${serviceToken}`,
+            }
+          },
+        },
+      ],
     })
 
     const { role_id: roleId } =
