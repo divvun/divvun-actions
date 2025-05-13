@@ -19,12 +19,12 @@ export async function sslComCodeSign(
         `-password=${secrets.password}`,
         `-credential_id=${secrets.credentialId}`,
         "-override",
-      ].join(""),
+      ].join(" "),
     ],
   }).spawn();
 
   const result = await proc.status;
   if (result.code != 0) {
-    throw new Error(` exited with code ${result.code}`);
+    throw new Error(`CodeSignTool exited with code ${result.code}`);
   }
 }
