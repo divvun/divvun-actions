@@ -40,17 +40,19 @@ export default async function codesign({
 
   const secrets = await builder.secrets()
 
+  const absFilePath = path.resolve(filePath)
+
   if (Deno.build.os == "windows") {
     logger.debug("  Windows platform")
     // Call our internal API to sign the file
     // This overwrites the unsigned file
-    await sslComCodeSign(filePath, {
+    await sslComCodeSign(absFilePath, {
       username: secrets.get("sslcom/username"),
       password: secrets.get("sslcom/password"),
       credentialId: secrets.get("sslcom/credentialId"),
       totpSecret: secrets.get("sslcom/totpSecret"),
     })
-    signedPath = filePath
+    signedPath = absFilePath
   } else if (Deno.build.os === "darwin") {
     const developerAccount = secrets.get("macos/developerAccount")
     const appPassword = secrets.get("macos/appPassword")
