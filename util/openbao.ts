@@ -28,14 +28,14 @@ export class OpenBao {
       ],
     })
 
-    const { role_id: roleId } =
+    const roleResponse =
       await client["/auth/{approle_mount_path}/role/{role_name}/role-id"].get({
         params: {
           approle_mount_path: "approle",
           role_name: "builder",
         },
       }).json()
-    const { secret_id: roleSecret } =
+    const secretResponse =
       await client["/auth/{approle_mount_path}/role/{role_name}/secret-id"]
         .post({
           params: {
@@ -44,6 +44,12 @@ export class OpenBao {
           },
           json: {},
         }).json()
+
+    console.log(roleResponse)
+    console.log(secretResponse)
+
+    const { role_id: roleId } = roleResponse
+    const { secret_id: roleSecret } = secretResponse
 
     if (endpoint == null || roleId == null || roleSecret == null) {
       throw new Error("OpenBao endpoint, roleId or roleSecret not found")
