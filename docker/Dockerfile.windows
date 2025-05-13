@@ -120,6 +120,11 @@ RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
 # Install Deno
 RUN irm https://deno.land/install.ps1 | iex
 
+# Install pahkat-uploader
+RUN Invoke-WebRequest -Uri https://pahkat.uit.no/devtools/download/pahkat-uploader?platform=windows -OutFile pahkat-uploader.txz ; \
+    Start-Process -FilePath bsdtar.exe -ArgumentList '-xf .\\pahkat-uploader.txz -C C:\\' -Wait ; \
+    Remove-Item -Force pahkat-uploader.txz
+
 # Create cache folder
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="C:\\buildkite-cache"
 RUN New-Item -ItemType Directory -Path $env:BUILDKITE_PLUGIN_FS_CACHE_FOLDER -Force

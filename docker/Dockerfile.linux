@@ -51,6 +51,11 @@ RUN curl -fsSL https://dl.google.com/android/repository/android-ndk-r27c-linux.z
     mv android-ndk-r27c ~/Android/Sdk/ndk/27.2.12479018 && \
     rm android-ndk.zip
 
+# Install pahkat-uploader
+RUN curl -fsSL https://pahkat.uit.no/devtools/download/pahkat-uploader?platform=linux -o pahkat-uploader.txz && \
+    tar -xf pahkat-uploader.txz -C /usr/local && \
+    rm pahkat-uploader.txz
+
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="/var/cache/buildkite"
 RUN mkdir -p $BUILDKITE_PLUGIN_FS_CACHE_FOLDER
 
