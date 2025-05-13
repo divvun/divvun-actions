@@ -4,10 +4,12 @@ export async function sslComCodeSign(inputFile: string, secrets: {
   credentialId: string
   totpSecret: string
 }) {
+  const absFilePath = await Deno.realPath(inputFile)
+
   const proc = new Deno.Command("CodeSignTool.bat", {
     args: [
       "sign",
-      `-input_file_path=${inputFile}`,
+      `-input_file_path=${absFilePath}`,
       `-totp_secret=${secrets.totpSecret}`,
       `-username=${secrets.username}`,
       `-password=${secrets.password}`,

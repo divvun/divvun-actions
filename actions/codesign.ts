@@ -40,9 +40,6 @@ export default async function codesign({
 
   const secrets = await builder.secrets()
 
-  const absFilePath = await Deno.realPath(filePath)
-  console.log(filePath, absFilePath)
-
   if (Deno.build.os == "windows") {
     logger.debug("  Windows platform")
     // Call our internal API to sign the file
