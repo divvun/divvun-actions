@@ -56,6 +56,12 @@ RUN curl -fsSL https://pahkat.uit.no/devtools/download/pahkat-uploader?platform=
     tar -xf pahkat-uploader.txz -C /usr/local && \
     rm pahkat-uploader.txz
 
+# Install aws-cli
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws/install && \
+    rm awscliv2.zip
+
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="/var/cache/buildkite"
 RUN mkdir -p $BUILDKITE_PLUGIN_FS_CACHE_FOLDER
 
