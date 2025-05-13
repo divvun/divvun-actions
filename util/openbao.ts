@@ -29,21 +29,21 @@ export class OpenBao {
     })
 
     const roleResponse =
-      await client["/auth/{approle_mount_path}/role/{role_name}/role-id"].get({
+      (await client["/auth/{approle_mount_path}/role/{role_name}/role-id"].get({
         params: {
           approle_mount_path: "approle",
           role_name: "builder",
         },
-      }).json()?.data
+      }).json())?.data
     const secretResponse =
-      await client["/auth/{approle_mount_path}/role/{role_name}/secret-id"]
+      await (client["/auth/{approle_mount_path}/role/{role_name}/secret-id"]
         .post({
           params: {
             approle_mount_path: "approle",
             role_name: "builder",
           },
           json: {},
-        }).json()?.data
+        }).json())?.data
 
     const { role_id: roleId } = roleResponse
     const { secret_id: roleSecret } = secretResponse
