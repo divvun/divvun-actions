@@ -53,6 +53,7 @@ export function pipelineKbdgen() {
                 path: "target",
                 restore: "file",
                 save: "file",
+                "key-extra": arch,
               },
             },
           ],
@@ -78,6 +79,7 @@ export function pipelineKbdgen() {
                   path: "target",
                   restore: "file",
                   save: "file",
+                  "key-extra": arch,
                 },
               },
             ]
