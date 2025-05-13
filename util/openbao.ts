@@ -34,7 +34,7 @@ export class OpenBao {
           approle_mount_path: "approle",
           role_name: "builder",
         },
-      }).json()
+      }).json()?.data
     const secretResponse =
       await client["/auth/{approle_mount_path}/role/{role_name}/secret-id"]
         .post({
@@ -43,10 +43,7 @@ export class OpenBao {
             role_name: "builder",
           },
           json: {},
-        }).json()
-
-    console.log(roleResponse)
-    console.log(secretResponse)
+        }).json()?.data
 
     const { role_id: roleId } = roleResponse
     const { secret_id: roleSecret } = secretResponse
