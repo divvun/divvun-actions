@@ -121,7 +121,7 @@ RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
 RUN irm https://deno.land/install.ps1 | iex
 
 # Create cache folder
-ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="D:\\buildkite\\cache"
+ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="C:\\buildkite-cache"
 RUN New-Item -ItemType Directory -Path $env:BUILDKITE_PLUGIN_FS_CACHE_FOLDER -Force
 
 # Default shell
