@@ -43,6 +43,10 @@ export class OpenBao {
     })
     const json = await response.json() as AppRoleLoginResponse
 
+    if (json?.auth?.client_token == null) {
+      throw new Error("OpenBao client token not found")
+    }
+
     return new OpenBao(endpoint, json.auth.client_token)
   }
 
