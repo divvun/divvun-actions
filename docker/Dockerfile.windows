@@ -125,6 +125,9 @@ RUN Invoke-WebRequest -Uri https://pahkat.uit.no/devtools/download/pahkat-upload
     Start-Process -FilePath bsdtar.exe -ArgumentList '-xf .\\pahkat-uploader.txz -C C:\\' -Wait ; \
     Remove-Item -Force pahkat-uploader.txz
 
+# install aws
+RUN msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi /qn
+
 # Create cache folder
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="C:\\buildkite-cache"
 RUN New-Item -ItemType Directory -Path $env:BUILDKITE_PLUGIN_FS_CACHE_FOLDER -Force
