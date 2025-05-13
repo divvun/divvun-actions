@@ -9,19 +9,6 @@ if [[ "$PLUGIN_DIR" == *-main ]]; then
   git -C $PLUGIN_DIR pull
 fi
 
-BAO_ADDR=https://vault.giellalt.org
-BAO_TOKEN=$(buildkite-agent secret get divvun_actions_openbao_service_token)
-
-role_id=$(BAO_ADDR=$BAO_ADDR BAO_TOKEN=$BAO_TOKEN bao read -format=json auth/approle/role/builder/role-id | jq -r .data.role_id)
-secret_id=$(BAO_ADDR=$BAO_ADDR BAO_TOKEN=$BAO_TOKEN bao write -format=json -f auth/approle/role/builder/secret-id | jq -r .data.secret_id)
-
-echo $role_id | buildkite-agent redactor add
-echo $secret_id | buildkite-agent redactor add
-
-buildkite-agent meta-data set "divvun_actions_openbao_endpoint" "$BAO_ADDR"
-buildkite-agent meta-data set "divvun_actions_openbao_role_id" "$role_id"
-buildkite-agent meta-data set "divvun_actions_openbao_role_secret" "$secret_id"
-
 export DIVVUN_ACTIONS_PLUGIN_DIR=$PLUGIN_DIR
 export PATH="$PLUGIN_DIR/bin:$PATH"
 echo "Bash"

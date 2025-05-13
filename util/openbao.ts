@@ -10,12 +10,30 @@ type AppRoleLoginResponse = {
 export class OpenBao {
   #client: Client
 
-  static async fromMetadata(
-    getter: (key: string) => Promise<string>,
+  static async fromServiceToken(
+    endpoint: string,
+    serviceToken: string,
   ): Promise<OpenBao> {
-    const endpoint = await getter("divvun_actions_openbao_endpoint")
-    const roleId = await getter("divvun_actions_openbao_role_id")
-    const roleSecret = await getter("divvun_actions_openbao_role_secret")
+    const client = createClient<Schema>({
+      endpoint: `${endpoint}/v1`,
+    })
+
+    const { role_id: roleId } =
+      await client["/auth/{approle_mount_path}/role/{role_name}/role-id"].get({
+        params: {
+          approle_mount_path: "approle",
+          role_name: "builder",
+        },
+      }).json()
+    const { secret_id: roleSecret } =
+      await client["/auth/{approle_mount_path}/role/{role_name}/secret-id"]
+        .post({
+          params: {
+            approle_mount_path: "approle",
+            role_name: "builder",
+          },
+          json: {},
+        }).json()
 
     if (endpoint == null || roleId == null || roleSecret == null) {
       throw new Error("OpenBao endpoint, roleId or roleSecret not found")

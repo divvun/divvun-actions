@@ -122,6 +122,14 @@ export async function setMetadata(name: string, value: any) {
   await exec("buildkite-agent", ["meta-data", "set", name, value.toString()])
 }
 
+async function bkSecret(name: string) {
+  const result = await output("buildkite-agent", ["secret", "get", name])
+  if (result.status.code !== 0) {
+    throw new Error(`Failed to get metadata for ${name}`)
+  }
+  return result.stdout.trim()
+}
+
 export async function metadata(name: string) {
   const result = await output("buildkite-agent", ["meta-data", "get", name])
   if (result.status.code !== 0) {
@@ -139,7 +147,10 @@ export async function secrets(): Promise<SecretsStore> {
     return redactedSecrets
   }
 
-  const vault = await OpenBao.fromMetadata(metadata)
+  const serviceToken = await bkSecret("divvun_actions_openbao_service_token")
+  const endpoint = "https://vault.giellalt.org"
+
+  const vault = await OpenBao.fromServiceToken(endpoint, serviceToken)
   const raw = await vault.secrets()
 
   for (const value of raw.values()) {

@@ -13,21 +13,6 @@ if ($PLUGIN_DIR -like "*-main") {
     Pop-Location
 }
 
-$env:BAO_ADDR = "https://vault.giellalt.org"
-$env:BAO_TOKEN = buildkite-agent secret get divvun_actions_openbao_service_token
-
-$role_id = (bao read -format=json auth/approle/role/builder/role-id | ConvertFrom-Json).data.role_id
-$secret_id = (bao write -format=json -f auth/approle/role/builder/secret-id | ConvertFrom-Json).data.secret_id
-
-# Add redactions
-echo $role_id | buildkite-agent redactor add
-echo $secret_id | buildkite-agent redactor add
-
-# Set buildkite metadata
-buildkite-agent meta-data set "divvun_actions_openbao_endpoint" $env:BAO_ADDR
-buildkite-agent meta-data set "divvun_actions_openbao_role_id" $role_id
-buildkite-agent meta-data set "divvun_actions_openbao_role_secret" $secret_id
-
 # Set environment variables
 $env:DIVVUN_ACTIONS_PLUGIN_DIR = $PLUGIN_DIR
 $env:PATH = "$PLUGIN_DIR\bin;$env:PATH"

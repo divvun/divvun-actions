@@ -1,5 +1,5 @@
-import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts";
-import * as target from "~/target.ts";
+import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
+import * as target from "~/target.ts"
 
 const binPlatforms = {
   macos: ["x86_64-apple-darwin", "aarch64-apple-darwin"],
