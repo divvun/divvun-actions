@@ -40,7 +40,8 @@ export default async function codesign({
 
   const secrets = await builder.secrets()
 
-  const absFilePath = path.resolve(filePath)
+  const absFilePath = await Deno.realPath(filePath)
+  console.log(filePath, absFilePath)
 
   if (Deno.build.os == "windows") {
     logger.debug("  Windows platform")
