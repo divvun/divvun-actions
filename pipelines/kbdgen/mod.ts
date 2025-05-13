@@ -46,6 +46,16 @@ export function pipelineKbdgen() {
             } | Invoke-Expression; cargo build --bin kbdgen --release --target ${arch}`,
             `divvun-actions sign target/${arch}/release/kbdgen${ext}`,
           ],
+          plugins: [
+            {
+              "cache#v1.7.0": {
+                manifest: "Cargo.lock",
+                path: "target",
+                restore: "file",
+                save: "file",
+              },
+            },
+          ],
         }))
       } else {
         const cargoCmd = os !== "linux" || arch === "x86_64-unknown-linux-gnu"
@@ -59,6 +69,16 @@ export function pipelineKbdgen() {
           label: "Build",
           command: [
             `${cargoCmd} build --bin kbdgen --release --target ${arch}`,
+          ],
+          plugins: [
+            {
+              "cache#v1.7.0": {
+                manifest: "Cargo.lock",
+                path: "target",
+                restore: "file",
+                save: "file",
+              },
+            },
           ],
         }))
       }
