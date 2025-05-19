@@ -128,6 +128,18 @@ RUN Invoke-WebRequest -Uri https://pahkat.uit.no/devtools/download/pahkat-upload
 # install aws
 RUN msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi /qn
 
+RUN Invoke-WebRequest -Uri https://github.com/casey/just/releases/download/1.40.0/just-1.40.0-x86_64-pc-windows-msvc.zip -OutFile just.zip ; \
+    Expand-Archive just.zip -DestinationPath .\just ; \
+    Move-Item -Path .\just\just.exe -Destination C:\bin\just.exe ; \
+    Remove-Item -Force just.zip ; \
+    Remove-Item -Force just
+
+
+# Install kbdgen
+RUN Invoke-WebRequest -Uri https://x.giellalt.org/kbdgen.zip -OutFile kbdgen.zip ; \
+    Expand-Archive kbdgen.zip -DestinationPath C:\bin ; \
+    Remove-Item -Force kbdgen.zip
+
 # Create cache folder
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="C:\\buildkite-cache"
 RUN New-Item -ItemType Directory -Path $env:BUILDKITE_PLUGIN_FS_CACHE_FOLDER -Force

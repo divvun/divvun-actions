@@ -45,6 +45,7 @@ export function pipelineKbdgen() {
               msvcEnvCmd(arch)
             } | Invoke-Expression; cargo build --bin kbdgen --release --target ${arch}`,
             `divvun-actions sign target/${arch}/release/kbdgen${ext}`,
+            `buildkite-agent artifact upload target/${arch}/release/kbdgen${ext}`,
           ],
           plugins: [
             {
@@ -70,6 +71,7 @@ export function pipelineKbdgen() {
           label: "Build",
           command: [
             `${cargoCmd} build --bin kbdgen --release --target ${arch}`,
+            `buildkite-agent artifact upload target/${arch}/release/kbdgen${ext}`,
           ],
           plugins: os === "linux"
             ? [
