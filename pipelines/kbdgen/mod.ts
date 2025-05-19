@@ -62,7 +62,7 @@ export function pipelineKbdgen() {
       } else {
         const cargoCmd = os !== "linux" || arch === "x86_64-unknown-linux-gnu"
           ? "cargo"
-          : "CROSS_CONTAINER_IN_CONTAINER=1 cross"
+          : "rustup update && CROSS_CONTAINER_IN_CONTAINER=1 cross"
 
         steps.push(command({
           agents: {
