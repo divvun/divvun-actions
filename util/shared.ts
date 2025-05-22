@@ -461,6 +461,8 @@ export class PahkatUploader {
       packageType?: string | null
     } = {},
   ) {
+    console.log(arguments)
+
     const fileName = path.parse(artifactPath).base
 
     if (Deno.env.get("PAHKAT_NO_DEPLOY") === "true") {
