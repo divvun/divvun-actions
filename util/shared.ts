@@ -531,7 +531,7 @@ export class PahkatUploader {
       "upload",
       "--url",
       repoUrl,
-      "--release-meta-path",
+      "--release-meta",
       releaseMetadataPath,
     ]
     if (extra.metadataJsonPath != null) {
