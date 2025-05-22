@@ -52,7 +52,7 @@ RUN curl -fsSL https://dl.google.com/android/repository/android-ndk-r27c-linux.z
     rm android-ndk.zip
 
 # Install pahkat-uploader
-RUN curl -fsSL https://pahkat.uit.no/devtools/download/pahkat-uploader?platform=linux -o pahkat-uploader.txz && \
+RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/pahkat-uploader?platform=linux&channel=nightly' -o pahkat-uploader.txz && \
     tar -xf pahkat-uploader.txz -C /usr/local && \
     rm pahkat-uploader.txz
 

@@ -121,7 +121,7 @@ RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
 RUN irm https://deno.land/install.ps1 | iex
 
 # Install pahkat-uploader
-RUN Invoke-WebRequest -Uri https://pahkat.uit.no/devtools/download/pahkat-uploader?platform=windows&channel=nightly -OutFile pahkat-uploader.txz ; \
+RUN Invoke-WebRequest -Uri 'https://pahkat.uit.no/devtools/download/pahkat-uploader?platform=windows&channel=nightly' -OutFile pahkat-uploader.txz ; \
     Start-Process -FilePath bsdtar.exe -ArgumentList '-xf .\\pahkat-uploader.txz -C C:\\' -Wait ; \
     Remove-Item -Force pahkat-uploader.txz
 
