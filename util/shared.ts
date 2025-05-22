@@ -431,13 +431,18 @@ export class PahkatUploader {
       exe = "pahkat-uploader"
     }
     
-    await builder.exec(exe, args, {
+    const result = await builder.output(exe, args, {
       env: Object.assign({}, env(), {
         PAHKAT_API_KEY: secrets.apiKey,
       }),
     })
 
-    
+    if (result.status.code !== 0) {
+      logger.error(result.stderr)
+      throw new Error(`Failed to upload`)
+    }
+
+    return result.stdout
   }
 
   static async upload(
@@ -539,9 +544,9 @@ export class PahkatUploader {
       args.push("--package-type")
       args.push(extra.packageType)
     }
-    logger.info(
-      await PahkatUploader.run(args, { apiKey: secrets.pahkatApiKey }),
-    )
+    const result = await PahkatUploader.run(args, { apiKey: secrets.pahkatApiKey })
+
+
   }
 
   static releaseArgs(release: ReleaseRequest) {
