@@ -430,7 +430,7 @@ export class PahkatUploader {
     } else {
       exe = "pahkat-uploader"
     }
-    
+
     const result = await builder.output(exe, args, {
       env: Object.assign({}, env(), {
         PAHKAT_API_KEY: secrets.apiKey,
@@ -547,7 +547,9 @@ export class PahkatUploader {
       args.push(extra.packageType)
     }
 
-    const result = await PahkatUploader.run(args, { apiKey: secrets.pahkatApiKey })
+    const result = await PahkatUploader.run(args, {
+      apiKey: secrets.pahkatApiKey,
+    })
     logger.info(result)
   }
 

@@ -2,9 +2,11 @@ import * as path from "@std/path"
 import * as toml from "@std/toml"
 
 import { makeInstaller } from "~/actions/inno-setup/lib.ts"
+import * as builder from "~/builder.ts"
 import { InnoSetupBuilder } from "~/util/inno.ts"
 import logger from "~/util/log.ts"
-import { DivvunBundler, SpellerPaths, Tar, ThfstTools } from "~/util/shared.ts"
+import { SpellerPaths, Tar, ThfstTools } from "~/util/shared.ts"
+import { createInstaller } from "./bundle-macos.ts"
 import {
   deriveLangTag,
   derivePackageId,
@@ -138,14 +140,18 @@ export default async function spellerBundle({
     payloadPath = await makeInstaller("./install.iss")
     logger.debug(`Installer created at ${payloadPath}`)
   } else if (spellerType == SpellerType.MacOS) {
-    payloadPath = await DivvunBundler.bundleMacOS(
-      spellername,
-      version,
+    payloadPath = await createInstaller({
       packageId,
-      langTag,
-      spellerPaths,
-      secrets,
-    )
+      bcp47code: langTag,
+      version,
+      build: parseInt(builder.env.buildNumber ?? "1"),
+      zhfstFile: spellerPaths.desktop[langTag],
+      outputDir: "./",
+      installerCodeSignId:
+        "Developer ID Installer: The University of Tromsø (2K5J2584NX)",
+      appCodeSignId:
+        "Developer ID Application: The University of Tromsø (2K5J2584NX)",
+    })
   } else {
     throw new Error(`Unsupported speller type: ${spellerType}`)
   }

@@ -9,8 +9,9 @@ export async function sslComCodeSign(inputFile: string, secrets: {
   const absFilePath = await Deno.realPath(inputFile)
   let signedPath = inputFile
 
-  const hasInvalidExt = !inputFile.endsWith(".exe") && !inputFile.endsWith(".dll")
-  
+  const hasInvalidExt = !inputFile.endsWith(".exe") &&
+    !inputFile.endsWith(".dll")
+
   if (hasInvalidExt) {
     signedPath = `${absFilePath}.exe`
     await Deno.rename(absFilePath, signedPath)
@@ -18,11 +19,11 @@ export async function sslComCodeSign(inputFile: string, secrets: {
 
   const dir = path.dirname(inputFile)
   const files = await Deno.readDir(dir)
-  console.log('##---##')
+  console.log("##---##")
   for await (const file of files) {
     console.log(file.name)
   }
-  console.log('##---##')
+  console.log("##---##")
 
   const proc = new Deno.Command("CodeSignTool.bat", {
     args: [

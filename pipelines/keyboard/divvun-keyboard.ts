@@ -45,7 +45,7 @@ export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
       nightlyChannel: "nightly",
       bundlePath: kbdgenBundlePath,
     })
-    
+
     const secrets = await builder.secrets()
 
     await keyboardDeploy({

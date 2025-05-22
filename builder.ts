@@ -29,6 +29,8 @@ export const {
   redactSecret,
   setMetadata,
   metadata,
+  uploadArtifacts,
+  downloadArtifacts,
   env,
   secrets,
   group,

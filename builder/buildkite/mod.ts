@@ -2,7 +2,7 @@
 // Buildkite implementation of the builder interface
 
 import type { ExecOptions } from "~/builder/types.ts"
-import { Env, buildkite as getEnv } from "~/util/env.ts"
+import { buildkite as getEnv, Env } from "~/util/env.ts"
 import logger from "~/util/log.ts"
 import { OpenBao, SecretsStore } from "~/util/openbao.ts"
 
@@ -115,7 +115,9 @@ export function addPath(path: string) {
 }
 
 export async function redactSecret(value: string) {
-  const result = await output("buildkite-agent", ["redactor", "add"], { input: value })
+  const result = await output("buildkite-agent", ["redactor", "add"], {
+    input: value,
+  })
   if (result.status.code !== 0) {
     throw new Error(`Failed to redact secret: ${result.stderr}`)
   }
@@ -175,4 +177,12 @@ export async function group(name: string, callback: () => Promise<void>) {
     logger.error(error)
     throw error
   }
+}
+
+export async function uploadArtifacts(path: string) {
+  await exec("buildkite-agent", ["artifact", "upload", path])
+}
+
+export async function downloadArtifacts(path: string, outputDir: string) {
+  await exec("buildkite-agent", ["artifact", "download", path, outputDir])
 }

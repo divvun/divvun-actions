@@ -1,5 +1,6 @@
 import * as fs from "@std/fs"
 import * as path from "@std/path"
+import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 
 class Autotools {
@@ -246,6 +247,9 @@ export default async function langBuild({
 
     logger.info("Setting speller paths to:")
     logger.info(JSON.stringify(out, null, 2))
+
+    await builder.uploadArtifacts("build/tools/spellcheckers/*.zhfst")
+    await builder.setMetadata("speller-paths", JSON.stringify(out, null, 0))
 
     return {
       spellerPaths: out,
