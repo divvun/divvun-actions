@@ -529,7 +529,7 @@ export class PahkatUploader {
       "upload",
       "--url",
       repoUrl,
-      "--release-meta",
+      "--release-meta-path",
       releaseMetadataPath,
     ]
     if (extra.metadataJsonPath != null) {
@@ -544,9 +544,9 @@ export class PahkatUploader {
       args.push("--package-type")
       args.push(extra.packageType)
     }
+
     const result = await PahkatUploader.run(args, { apiKey: secrets.pahkatApiKey })
-
-
+    logger.info(result)
   }
 
   static releaseArgs(release: ReleaseRequest) {
