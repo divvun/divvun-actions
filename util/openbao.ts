@@ -45,8 +45,6 @@ export class OpenBao {
           json: {},
         }).json()
 
-    console.log(roleResponse, roleResponse.data)
-
     const { role_id: roleId } = roleResponse?.data
     const { secret_id: roleSecret } = secretResponse?.data
 
