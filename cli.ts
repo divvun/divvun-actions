@@ -120,7 +120,6 @@ export default async function runCli(input: string[]) {
   }
 
   const { command, args } = parseCommand(input)
-  console.log(command, args)
 
   switch (command) {
     case Command.Run:
@@ -136,7 +135,6 @@ export default async function runCli(input: string[]) {
 }
 
 async function runSign(args) {
-  console.log(args)
   const inputFile = args._[0]
   await sign(inputFile)
 }

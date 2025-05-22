@@ -6,25 +6,12 @@ export async function makeInstaller(
   defines: string[] = [],
 ): Promise<string> {
   const installerOutput = await Deno.makeTempDir()
-
-  // Use our custom code signing service running on the CI machine
-  // const signCmd = `/S"signtool=curl -v ` +
-  //   `-F file=@$f ` +
-  //   `http://192.168.122.1:5000 ` +
-  //   `-o $f"`
-
   const scriptPath = `${target.projectPath}\\bin\\divvun-actions`
-  console.log(scriptPath)
-
-  const envPath = await Deno.makeTempFile()
-  const env = Deno.env.toObject()
-  delete env["PATH"]
-  await Deno.writeTextFile(envPath, JSON.stringify(env))
 
   const proc = new Deno.Command("iscc.exe", {
     args: [
-      `/S"signtool=C:\\msys2\\usr\\bin\\bash -ec 'ENV_PATH=$q${envPath}$q \`/usr/bin/cygpath $q${scriptPath}$q\` sign $f'"`,
-      // "/Qp",
+      `/S"signtool=C:\\msys2\\usr\\bin\\bash -ec '\`/usr/bin/cygpath $q${scriptPath}$q\` sign $f'"`,
+      "/Qp",
       `/O${installerOutput}`,
       ...defines,
       issPath,
