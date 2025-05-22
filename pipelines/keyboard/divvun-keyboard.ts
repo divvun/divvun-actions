@@ -6,6 +6,7 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import logger from "~/util/log.ts"
+import keyboardDeploy from "../../actions/keyboard/deploy.ts"
 
 export async function runDivvunKeyboard(kbdgenBundlePath: string) {
   const secrets = await builder.secrets()
@@ -43,6 +44,22 @@ export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
       keyboardType: KeyboardType.Windows,
       nightlyChannel: "nightly",
       bundlePath: kbdgenBundlePath,
+    })
+    
+    const secrets = await builder.secrets()
+
+    await keyboardDeploy({
+      packageId: builder.env.repoName,
+      keyboardType: KeyboardType.Windows,
+      bundlePath: kbdgenBundlePath,
+      channel,
+      pahkatRepo: "https://pahkat.uit.no/main/",
+      payloadPath,
+      secrets: {
+        awsAccessKeyId: secrets.get("s3/accessKeyId"),
+        awsSecretAccessKey: secrets.get("s3/secretAccessKey"),
+        pahkatApiKey: secrets.get("pahkat/apiKey"),
+      },
     })
     console.log(payloadPath, channel)
   })
