@@ -5,7 +5,12 @@ import { makeInstaller } from "~/actions/inno-setup/lib.ts"
 import * as builder from "~/builder.ts"
 import { InnoSetupBuilder } from "~/util/inno.ts"
 import logger from "~/util/log.ts"
-import { SpellerPaths, Tar, ThfstTools } from "~/util/shared.ts"
+import {
+  SpellerPaths,
+  Tar,
+  ThfstTools,
+  versionAsNightly,
+} from "~/util/shared.ts"
 import { createInstaller } from "./bundle-macos.ts"
 import {
   deriveLangTag,
@@ -15,7 +20,6 @@ import {
 } from "./manifest.ts"
 
 export type Props = {
-  version: string
   spellerType: SpellerType
   manifest: SpellerManifest
   spellerPaths: SpellerPaths
@@ -26,7 +30,6 @@ export type Output = {
 }
 
 export default async function spellerBundle({
-  version,
   spellerType,
   manifest,
   spellerPaths,
@@ -36,6 +39,9 @@ export default async function spellerBundle({
   const langTag = deriveLangTag(false)
 
   let payloadPath: string
+
+  // TODO: allow release builds
+  const version = await versionAsNightly(manifest.spellerversion)
 
   if (spellerType == SpellerType.Mobile) {
     const bhfstPaths = []
@@ -155,6 +161,10 @@ export default async function spellerBundle({
   } else {
     throw new Error(`Unsupported speller type: ${spellerType}`)
   }
+
+  await builder.uploadArtifacts(payloadPath)
+  await builder.setMetadata("speller-version", version)
+  await builder.setMetadata("speller-type", spellerType)
 
   return {
     payloadPath,

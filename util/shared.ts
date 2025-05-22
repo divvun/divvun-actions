@@ -1058,13 +1058,6 @@ export async function versionAsNightly(version: string): Promise<string> {
   if (verChunks == null) {
     throw new Error(`Provided version '${version}' is not semantic.`)
   }
-
-  // const queueService = new taskcluster.Queue({
-  //   rootUrl: Deno.env.get("TASKCLUSTER_PROXY_URL,")
-  // })
-
-  // const task = await queueService.task(Deno.env.get("TASK_ID)")
-
   const nightlyTs = new Date().toISOString().replace(/[-:\.]/g, "")
 
   return `${verChunks.join(".")}-nightly.${nightlyTs}`

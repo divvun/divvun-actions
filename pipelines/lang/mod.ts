@@ -1,8 +1,11 @@
+import * as toml from "@std/toml"
 import * as yaml from "@std/yaml"
 import langBuild, { Props } from "~/actions/lang/build.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
+import spellerBundle from "../../actions/speller/bundle.ts"
+import { SpellerManifest, SpellerType } from "../../actions/speller/manifest.ts"
 
 function command(input: CommandStep): CommandStep {
   return {
@@ -26,8 +29,29 @@ export async function runLangBundle(
 ) {
   await builder.downloadArtifacts("build/tools/spellcheckers/*.zhfst", ".")
   const spellerPaths = JSON.parse(await builder.metadata("speller-paths"))
+  const manifest = toml.parse(
+    await Deno.readTextFile("./manifest.toml"),
+  ) as SpellerManifest
 
-  console.log("target", target, spellerPaths)
+  let spellerType: SpellerType
+
+  switch (target) {
+    case "windows":
+      spellerType = SpellerType.Windows
+      break
+    case "macos":
+      spellerType = SpellerType.MacOS
+      break
+    case "mobile":
+      spellerType = SpellerType.Mobile
+      break
+  }
+
+  await spellerBundle({
+    spellerType,
+    manifest,
+    spellerPaths,
+  })
   // const yml = await Deno.readTextFile(".build-config.yml")
   // const config = (await yaml.parse(yml) as any)?.build as Props
 
