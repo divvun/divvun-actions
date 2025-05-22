@@ -217,13 +217,13 @@ export default async function langBuild({
 
       if (candidate.endsWith("-mobile.zhfst")) {
         const v = path.basename(candidate).split("-mobile.zhfst")[0]
-        out.mobile[v] = path.basename(path.resolve(candidate))
+        out.mobile[v] = path.join("build/tools/spellcheckers", path.basename(path.resolve(candidate)))
         hasSomeItems = true
       }
 
       if (candidate.endsWith("-desktop.zhfst")) {
         const v = path.basename(candidate).split("-desktop.zhfst")[0]
-        out.desktop[v] = path.basename(path.resolve(candidate))
+        out.desktop[v] = path.join("build/tools/spellcheckers", path.basename(path.resolve(candidate)))
         hasSomeItems = true
       }
     }
