@@ -424,28 +424,20 @@ export class PahkatUploader {
       return ""
     }
 
-    let output: string = ""
-
     let exe: string
     if (Deno.build.os === "windows") {
       exe = "pahkat-uploader.exe"
     } else {
       exe = "pahkat-uploader"
     }
-
-    assertExit0(
-      await builder.exec(exe, args, {
-        env: Object.assign({}, env(), {
-          PAHKAT_API_KEY: secrets.apiKey,
-        }),
-        listeners: {
-          stdout: (data: Uint8Array) => {
-            output += data.toString()
-          },
-        },
+    
+    await builder.exec(exe, args, {
+      env: Object.assign({}, env(), {
+        PAHKAT_API_KEY: secrets.apiKey,
       }),
-    )
-    return output
+    })
+
+    
   }
 
   static async upload(
