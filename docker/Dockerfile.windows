@@ -132,7 +132,7 @@ RUN Invoke-WebRequest -Uri https://github.com/casey/just/releases/download/1.40.
     Expand-Archive just.zip -DestinationPath .\just ; \
     Move-Item -Path .\just\just.exe -Destination C:\bin\just.exe ; \
     Remove-Item -Force just.zip ; \
-    Remove-Item -Force just
+    Remove-Item -Recurse -Force .\just
 
 
 # Install kbdgen
