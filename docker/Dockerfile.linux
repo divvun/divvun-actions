@@ -56,6 +56,11 @@ RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/pahkat-uploader?platform
     tar -xf pahkat-uploader.txz -C /usr/local && \
     rm pahkat-uploader.txz
 
+# Install thfst-tools
+RUN curl -fsSL 'https://pahkat.uit.no/artifacts/thfst-tools_1.0.0-alpha.2_linux_amd64.txz' -o thfst-tools.txz && \
+    tar -xf thfst-tools.txz -C /usr/local && \
+    rm thfst-tools.txz
+
 # Install aws-cli
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
     unzip awscliv2.zip && \
