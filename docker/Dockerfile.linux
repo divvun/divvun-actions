@@ -29,7 +29,9 @@ RUN apt-get update && \
     bc
 
 RUN curl -fsSL https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-2.4.1%2Bcpu.zip -o libtorch.zip && \
-    unzip libtorch.zip -d /usr && \
+    unzip libtorch.zip && \
+    cp -r libtorch/* /usr/ && \
+    rm -rf libtorch && \
     rm libtorch.zip
 
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
