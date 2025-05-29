@@ -83,6 +83,9 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
     ./aws/install && \
     rm awscliv2.zip
 
+# Install just
+RUN ~/.cargo/bin/cargo install just
+
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="/var/cache/buildkite"
 RUN mkdir -p $BUILDKITE_PLUGIN_FS_CACHE_FOLDER
 
