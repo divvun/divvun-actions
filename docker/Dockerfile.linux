@@ -2,6 +2,10 @@ FROM buildkite/agent:3-ubuntu-24.04
 
 SHELL ["bash", "-lic"]
 
+# Replace archive.ubuntu.com with Finnish mirror
+RUN sed -i 's/archive\.ubuntu/fi\.archive\.ubuntu/g' /etc/apt/sources.list && \
+    sed -i 's/security\.ubuntu/fi\.archive\.ubuntu/g' /etc/apt/sources.list
+
 RUN curl -fsSL https://apertium.projectjj.com/apt/install-nightly.sh | bash
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive \
