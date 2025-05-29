@@ -79,7 +79,9 @@ RUN apt-get update && \
     libc++-dev \
     libc++abi-dev \
     libicu-dev \
-    bc
+    bc \
+    flex \
+    bison
 
 # Update Docker
 RUN apt-get update && \
