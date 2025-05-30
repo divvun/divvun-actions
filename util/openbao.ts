@@ -35,6 +35,13 @@ export class OpenBao {
           role_name: "builder",
         },
       }).json()
+
+    if (roleResponse?.errors != null) {
+      throw new Error(
+        `OpenBao: ${roleResponse.errors.map((e) => e.message).join(", ")}`,
+      )
+    }
+
     const secretResponse =
       await client["/auth/{approle_mount_path}/role/{role_name}/secret-id"]
         .post({
@@ -45,8 +52,11 @@ export class OpenBao {
           json: {},
         }).json()
 
-    console.log(roleResponse)
-    console.log(secretResponse)
+    if (secretResponse?.errors != null) {
+      throw new Error(
+        `OpenBao: ${secretResponse.errors.map((e) => e.message).join(", ")}`,
+      )
+    }
 
     const { role_id: roleId } = roleResponse?.data
     const { secret_id: roleSecret } = secretResponse?.data
