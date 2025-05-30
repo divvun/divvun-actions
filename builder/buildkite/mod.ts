@@ -2,7 +2,7 @@
 // Buildkite implementation of the builder interface
 
 import type { ExecOptions } from "~/builder/types.ts"
-import { buildkite as getEnv, Env } from "~/util/env.ts"
+import { Env, buildkite as getEnv } from "~/util/env.ts"
 import logger from "~/util/log.ts"
 import { OpenBao, SecretsStore } from "~/util/openbao.ts"
 
@@ -153,6 +153,9 @@ export async function secrets(): Promise<SecretsStore> {
   }
 
   const serviceToken = await bkSecret("divvun_actions_openbao_service_token")
+  if (serviceToken == null) {
+    throw new Error("No service token found")
+  }
   const endpoint = "https://vault.giellalt.org"
 
   const vault = await OpenBao.fromServiceToken(endpoint, serviceToken)
