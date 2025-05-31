@@ -1,4 +1,5 @@
 import * as path from "jsr:@std/path"
+import * as builder from "~/builder.ts"
 
 const APP_NAME = "MacDivvun"
 
@@ -224,23 +225,18 @@ async function signBundle(
 ): Promise<void> {
   const bundleDir = path.join(outputDir, bundleName)
 
-  try {
-    const cmd = new Deno.Command("codesign", {
-      args: [
-        "-f",
-        "-v",
-        "-s",
-        codeSignId,
-        bundleDir,
-      ],
-      cwd: outputDir,
-    })
-    const { success } = await cmd.output()
-    if (!success) {
-      throw new Error("bundle signing failed")
-    }
-  } catch (err) {
-    throw new Error("bundle signing failed")
+  const code = await builder.exec("codesign", [
+    "-f",
+    "-v",
+    "-s",
+    codeSignId,
+    bundleDir,
+  ], {
+    cwd: outputDir,
+  })
+
+  if (code !== 0) {
+    throw new Error(`bundle signing failed: error code${code}`)
   }
 }
 
