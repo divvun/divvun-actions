@@ -21,6 +21,9 @@ export async function makeInstaller(
 
   const code = (await proc.status).code
   if (code !== 0) {
+    console.log("=== Inno setup file ===")
+    console.log(await Deno.readTextFile(issPath))
+    console.log("=/= === =/=")
     throw new Error(`Process exited with code ${code}`)
   }
 
