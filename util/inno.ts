@@ -1,3 +1,5 @@
+import * as path from "@std/path"
+
 type InnoFile = {
   Source: string
   DestDir: string
@@ -24,6 +26,12 @@ function stringFromInnoFile(input: InnoFile): string {
 }
 
 export class InnoSetupBuilder {
+  #cwd: string
+
+  constructor(cwd: string) {
+    this.#cwd = cwd
+  }
+
   // deno-lint-ignore no-explicit-any
   private data: { [key: string]: any } = {}
 
@@ -69,7 +77,7 @@ export class InnoSetupBuilder {
   files(
     callback: (builder: InnoSetupFilesBuilder) => InnoSetupFilesBuilder,
   ): InnoSetupBuilder {
-    this.data.files = callback(new InnoSetupFilesBuilder())
+    this.data.files = callback(new InnoSetupFilesBuilder(this.#cwd))
     return this
   }
 
@@ -463,6 +471,12 @@ ${INNO_CODE_EVENTS}
 }
 
 class InnoSetupFilesBuilder {
+  #cwd: string
+
+  constructor(cwd: string) {
+    this.#cwd = cwd
+  }
+
   private files: InnoFile[] = []
 
   // Source can be an absolute path, or relative to the .iss file
@@ -473,8 +487,9 @@ class InnoSetupFilesBuilder {
     check?: string,
     destName?: string,
   ): InnoSetupFilesBuilder {
+    const relSource = path.relative(this.#cwd, source)
     this.files.push({
-      Source: source,
+      Source: relSource,
       DestDir: dest,
       Check: check,
       Flags: flags,
