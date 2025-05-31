@@ -306,7 +306,7 @@ begin
     end;
 end;
 
-function PrepareToInstall(NeedsRestart: Boolean): String;
+function PrepareToInstall(let NeedsRestart: Boolean): String;
 begin
     Result := RunPreInstall();
 end;
