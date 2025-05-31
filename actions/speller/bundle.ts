@@ -47,6 +47,7 @@ export default async function spellerBundle({
     const bhfstPaths = []
 
     for (const [langTag, zhfstPath] of Object.entries(spellerPaths.mobile)) {
+      
       const bhfstPath = await ThfstTools.zhfstToBhfst(zhfstPath)
       const langTagBhfst = `${path.dirname(bhfstPath)}/${langTag}.bhfst`
 
@@ -146,12 +147,14 @@ export default async function spellerBundle({
     payloadPath = await makeInstaller("./install.iss")
     logger.debug(`Installer created at ${payloadPath}`)
   } else if (spellerType == SpellerType.MacOS) {
+    const zhfstFile = spellerPaths.desktop[langTag]
+    console.log("zhfstFile", zhfstFile, spellerPaths)
     payloadPath = await createInstaller({
       packageId,
       bcp47code: langTag,
       version,
       build: parseInt(builder.env.buildNumber ?? "1"),
-      zhfstFile: spellerPaths.desktop[langTag],
+      zhfstFile,
       outputDir: "./",
       installerCodeSignId:
         "Developer ID Installer: The University of Tromsø (2K5J2584NX)",
