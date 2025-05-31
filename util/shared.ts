@@ -1045,7 +1045,7 @@ export class Kbdgen {
 
 export class ThfstTools {
   static async zhfstToBhfst(zhfstPath: string): Promise<string> {
-    await DefaultShell.runScript(`thfst-tools zhfst-to-bhfst ${zhfstPath}`)
+    await builder.exec("thfst-tools", ["zhfst-to-bhfst", zhfstPath])
     return `${path.basename(zhfstPath, ".zhfst")}.bhfst`
   }
 }

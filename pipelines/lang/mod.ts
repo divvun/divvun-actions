@@ -28,15 +28,12 @@ export async function runLangBundle(
   { target }: { target: "windows" | "macos" | "mobile" },
 ) {
   await builder.downloadArtifacts("build/tools/spellcheckers/*.zhfst", ".")
-  await builder.exec("ls", ["-la"])
 
   const spellerPaths = JSON.parse(await builder.metadata("speller-paths"))
-  console.log(spellerPaths)
   const manifest = toml.parse(
     await Deno.readTextFile("./manifest.toml"),
   ) as SpellerManifest
 
-  console.log(manifest)
   let spellerType: SpellerType
 
   switch (target) {
