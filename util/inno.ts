@@ -314,7 +314,7 @@ begin
     end;
 end;
 
-function PrepareToInstall(let NeedsRestart: Boolean): String;
+function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
     Result := RunPreInstall();
 end;
