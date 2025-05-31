@@ -4,7 +4,6 @@ import * as toml from "@std/toml"
 import { makeInstaller } from "~/actions/inno-setup/lib.ts"
 import * as builder from "~/builder.ts"
 import { InnoSetupBuilder } from "~/util/inno.ts"
-import logger from "~/util/log.ts"
 import {
   SpellerPaths,
   Tar,
@@ -51,17 +50,18 @@ export default async function spellerBundle({
       const bhfstPath = await ThfstTools.zhfstToBhfst(zhfstPath)
       const langTagBhfst = `${path.dirname(bhfstPath)}/${langTag}.bhfst`
 
-      logger.debug(`Copying ${bhfstPath} to ${langTagBhfst}`)
+      console.log/*logger.debug*/(`Copying ${bhfstPath} to ${langTagBhfst}`)
       await Deno.copyFile(bhfstPath, langTagBhfst)
       bhfstPaths.push(langTagBhfst)
     }
 
     payloadPath = path.resolve(`./${packageId}_${version}_mobile.txz`)
-    logger.debug(
+    console.log/*logger.debug*/(
       `Creating txz from [${bhfstPaths.join(", ")}] at ${payloadPath}`,
     )
     await Tar.createFlatTxz(bhfstPaths, payloadPath)
   } else if (spellerType == SpellerType.Windows) {
+    console.log(manifest.windows)
     if (manifest.windows.system_product_code == null) {
       throw new Error("Missing system_product_code")
     }
@@ -74,7 +74,7 @@ export default async function spellerBundle({
       await Deno.rename(value, out)
       zhfstPaths.push(out)
     }
-
+    console.log(zhfstPaths)
     const innoBuilder = new InnoSetupBuilder()
 
     innoBuilder
@@ -119,8 +119,8 @@ export default async function spellerBundle({
           }
         }
 
-        logger.debug("Writing speller.toml:")
-        logger.debug(toml.stringify(spellerToml))
+        console.log/*logger.debug*/("Writing speller.toml:")
+        console.log/*logger.debug*/(toml.stringify(spellerToml))
         Deno.writeTextFileSync(
           "./speller.toml",
           toml.stringify(spellerToml),
@@ -141,11 +141,11 @@ export default async function spellerBundle({
       })
       .write("./install.iss")
 
-    logger.debug("generated install.iss:")
-    logger.debug(innoBuilder.build())
+    console.log/*logger.debug*/("generated install.iss:")
+    console.log/*logger.debug*/(innoBuilder.build())
 
     payloadPath = await makeInstaller("./install.iss")
-    logger.debug(`Installer created at ${payloadPath}`)
+    console.log/*logger.debug*/(`Installer created at ${payloadPath}`)
   } else if (spellerType == SpellerType.MacOS) {
     const zhfstFile = spellerPaths.desktop[langTag]
     console.log("zhfstFile", zhfstFile, spellerPaths)
