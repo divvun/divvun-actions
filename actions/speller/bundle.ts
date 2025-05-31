@@ -75,7 +75,7 @@ export default async function spellerBundle({
       zhfstPaths.push(out)
     }
     console.log(zhfstPaths)
-    const innoBuilder = new InnoSetupBuilder()
+    const innoBuilder = new InnoSetupBuilder(Deno.cwd())
 
     innoBuilder
       .name(`${spellername} Speller`)
