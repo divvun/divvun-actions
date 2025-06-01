@@ -225,6 +225,9 @@ async function signBundle(
 ): Promise<void> {
   const bundleDir = path.join(outputDir, bundleName)
 
+  await builder.exec("security", ["find-identity", "-v", "-p", "codesigning"])
+  await builder.exec("security", ["unlock-keychain", "-p", "admin", "~/Library/Keychains/login.keychain-db"])
+
   const code = await builder.exec("codesign", [
     "-f",
     "-v",
