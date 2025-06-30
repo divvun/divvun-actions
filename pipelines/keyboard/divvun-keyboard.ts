@@ -7,6 +7,7 @@ import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import logger from "~/util/log.ts"
 import keyboardDeploy from "../../actions/keyboard/deploy.ts"
+import { sentryUploadIOSDebugFiles } from "../../actions/sentry/upload-debug-files.ts"
 
 export async function runDivvunKeyboard(kbdgenBundlePath: string) {
   const secrets = await builder.secrets()
@@ -36,6 +37,18 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
   } else {
     logger.info("Not main branch; skipping upload")
   }
+
+  await builder.group("Uploading debug files to Sentry", async () => {
+    const projectId =
+      builder.env.repoName === "divvun-dev-keyboard"
+        ? "divvun-dev-keyboard-ios"
+        : "sami-keyboards-ios";
+    await sentryUploadIOSDebugFiles({
+      authToken: secrets.get("sentry/token"),
+      projectId: projectId,
+      dsymSearchPath: "output",
+    })
+  })
 }
 
 export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
