@@ -4,7 +4,7 @@ import logger from "../../util/log.ts"
 export type SentryUploadIOSDebugFilesOptions = {
   authToken: string;
   projectId: string;
-  dsymPath: string;
+  dsymSearchPath: string;
 };
 
 export async function sentryUploadIOSDebugFiles(options: SentryUploadIOSDebugFilesOptions) {
@@ -20,7 +20,7 @@ export async function sentryUploadIOSDebugFiles(options: SentryUploadIOSDebugFil
         "divvun",
         "--project",
         options.projectId,
-        options.dsymPath,
+        options.dsymSearchPath,
       ]
     );
   } catch (error) {
