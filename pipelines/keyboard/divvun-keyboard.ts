@@ -17,6 +17,7 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
   //     packages: ["kbdgen"],
   //   })
   // })
+  logger.info("WILL BUILD KEYBOARD FOR IOS")
 
   await builder.group("Building Divvun Keyboard for iOS", async () => {
     await keyboardBuildMeta({
@@ -24,6 +25,8 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
       bundlePath: kbdgenBundlePath,
     })
   })
+
+  logger.info("HELLOOOOOO")
 
   await builder.group("Find dysm files and print their paths", async () => {
     const dsymFiles = await builder.output("find", ["output", "-name", "*.dSYM.zip"])
