@@ -26,18 +26,6 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
     })
   })
 
-  await builder.group("Uploading debug files to Sentry", async () => {
-    const projectId =
-      builder.env.repoName === "divvun-dev-keyboard"
-        ? "divvun-dev-keyboard-ios"
-        : "sami-keyboards-ios";
-    await sentryUploadIOSDebugFiles({
-      authToken: secrets.get("sentry/token"),
-      projectId: projectId,
-      dsymPath: "output", // Providing directory instead of direct filepath will make Sentry find and upload necessary dSYM files in given directory
-    })
-  })
-
   if (builder.env.branch === "main") {
     await builder.group("Uploading to App Store", async () => {
       const apiKey = JSON.parse(secrets.get("macos/appStoreKeyJson"))
@@ -49,6 +37,18 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
   } else {
     logger.info("Not main branch; skipping upload")
   }
+
+  await builder.group("Uploading debug files to Sentry", async () => {
+    const projectId =
+      builder.env.repoName === "divvun-dev-keyboard"
+        ? "divvun-dev-keyboard-ios"
+        : "sami-keyboards-ios";
+    await sentryUploadIOSDebugFiles({
+      authToken: secrets.get("sentry/token"),
+      projectId: projectId,
+      dsymPath: "output", // Providing directory instead of direct filepath will make Sentry find and upload necessary dSYM files in given directory
+    })
+  })
 }
 
 export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
