@@ -179,7 +179,6 @@ async function runPipeline(args) {
 
 async function runCi(args) {
   console.log("Running CI")
-  logger.info("hello from branch")
 
   let pipeline: BuildkitePipeline
   switch (builder.env.repoName) {
