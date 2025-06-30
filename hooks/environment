@@ -9,6 +9,12 @@ if [[ "$PLUGIN_DIR" == *-main ]]; then
   git -C $PLUGIN_DIR pull
 fi
 
+# Temporarily ensure branch isn't stale either
+if [[ "$PLUGIN_DIR" == *-sentry-dsym ]]; then
+  git -C $PLUGIN_DIR checkout main
+  git -C $PLUGIN_DIR pull
+fi
+
 export DIVVUN_ACTIONS_PLUGIN_DIR=$PLUGIN_DIR
 export PATH="$PLUGIN_DIR/bin:$PATH"
 echo "Bash"
