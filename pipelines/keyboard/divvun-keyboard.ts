@@ -44,7 +44,7 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
         ? "divvun-dev-keyboard-ios"
         : "sami-keyboards-ios";
     await sentryUploadIOSDebugFiles({
-      authToken: secrets.get("sentry/authToken"),
+      authToken: secrets.get("sentry/token"),
       projectId: projectId,
       dsymPath: "output", // Providing directory instead of direct filepath will make Sentry find and upload necessary dSYM files in given directory
     })
