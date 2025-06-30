@@ -17,6 +17,7 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
   //     packages: ["kbdgen"],
   //   })
   // })
+  logger.info("TEST THAT BRANCH REFRESHES")
   logger.info("WILL BUILD KEYBOARD FOR IOS")
 
   await builder.group("Building Divvun Keyboard for iOS", async () => {
