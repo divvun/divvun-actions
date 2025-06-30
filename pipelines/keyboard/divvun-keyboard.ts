@@ -29,7 +29,7 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
   logger.info("HELLOOOOOO")
 
   await builder.group("Find dysm files and print their paths", async () => {
-    const dsymFiles = await builder.output("find", ["output", "-name", "*.dSYM.zip"])
+    const dsymFiles = await builder.output("find", ["output", "-name", "*.dSYM"])
     if (dsymFiles.status.code !== 0) {
       logger.error("Failed to find dSYM files:", dsymFiles.stderr)
       throw new Error("Failed to find dSYM files")
