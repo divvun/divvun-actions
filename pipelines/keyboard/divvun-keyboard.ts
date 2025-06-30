@@ -25,6 +25,20 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
     })
   })
 
+  await builder.group("Find dysm files and print their paths", async () => {
+    const dsymFiles = await builder.output("find", ["output", "-name", "*.dSYM.zip"])
+    if (dsymFiles.status.code !== 0) {
+      logger.error("Failed to find dSYM files:", dsymFiles.stderr)
+      throw new Error("Failed to find dSYM files")
+    }
+    const dsymPaths = dsymFiles.stdout.trim().split("\n").filter(Boolean)
+    if (dsymPaths.length === 0) {
+      logger.warn("No dSYM files found")
+    } else {
+      logger.info("Found dSYM files:", dsymPaths.join(", "))
+    }
+  })
+
   if (builder.env.branch === "main") {
     await builder.group("Uploading to App Store", async () => {
       const apiKey = JSON.parse(secrets.get("macos/appStoreKeyJson"))
