@@ -33,7 +33,7 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
     }
     const dsymPaths = dsymFiles.stdout.trim().split("\n").filter(Boolean)
     if (dsymPaths.length === 0) {
-      logger.warn("No dSYM files found")
+      logger.warning("No dSYM files found")
     } else {
       logger.info("Found dSYM files:", dsymPaths.join(", "))
     }
