@@ -1,1 +1,1 @@
-& docker build -t divvun-actions:windows-latest -f .\Dockerfile.windows .
+& docker build -t ghcr.io/divvun/divvun-actions:windows-latest -f .\Dockerfile.windows .
