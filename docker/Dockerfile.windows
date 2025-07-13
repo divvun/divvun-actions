@@ -96,16 +96,6 @@ RUN Invoke-WebRequest -Uri https://x.giellalt.org/msvc-env.zip -OutFile msvc-env
     Expand-Archive msvc-env.zip -DestinationPath C:\bin ; \
     Remove-Item -Force msvc-env.zip
 
-# Clear duplicates
-RUN $cleanPath = ($Env:PATH -split ';' | Select-Object -Unique) -join ';' ; \
-    setx /M PATH $cleanPath
-    
-# Create powershell profile...
-RUN if (!(Test-Path -Path $PROFILE)) { \
-        New-Item -ItemType File -Path $PROFILE -Force ; \
-        New-Item -ItemType Directory -Path (Split-Path -Parent $PROFILE) -Force \
-    }
-
 # Start ssh-agent
 RUN sc config ssh-agent start= auto ; \
     sc start ssh-agent
@@ -134,15 +124,30 @@ RUN Invoke-WebRequest -Uri https://github.com/casey/just/releases/download/1.40.
     Remove-Item -Force just.zip ; \
     Remove-Item -Recurse -Force .\just
 
-
 # Install kbdgen
 RUN Invoke-WebRequest -Uri https://x.giellalt.org/kbdgen.zip -OutFile kbdgen.zip ; \
     Expand-Archive kbdgen.zip -DestinationPath C:\bin ; \
     Remove-Item -Force kbdgen.zip
 
+# Install Docker
+RUN Invoke-WebRequest -Uri "https://download.docker.com/win/static/stable/x86_64/docker-28.3.2.zip" -OutFile docker.zip ; \
+    Expand-Archive docker.zip -DestinationPath $Env:ProgramFiles ; \
+    Remove-Item -Force docker.zip ; \
+    setx /M PATH $($Env:PATH + ';' + $Env:ProgramFiles + '\Docker')
+
 # Create cache folder
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="C:\\buildkite-cache"
 RUN New-Item -ItemType Directory -Path $env:BUILDKITE_PLUGIN_FS_CACHE_FOLDER -Force
+
+# Clear duplicates
+RUN $cleanPath = ($Env:PATH -split ';' | Select-Object -Unique) -join ';' ; \
+    setx /M PATH $cleanPath
+
+# Create powershell profile...
+RUN if (!(Test-Path -Path $PROFILE)) { \
+        New-Item -ItemType File -Path $PROFILE -Force ; \
+        New-Item -ItemType Directory -Path (Split-Path -Parent $PROFILE) -Force \
+    }
 
 # Default shell
 CMD ["pwsh", "-NoLogo"]
