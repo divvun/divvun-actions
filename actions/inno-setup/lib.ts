@@ -12,7 +12,7 @@ export async function makeInstaller(
     // `/S"signtool=C:\\msys2\\usr\\bin\\bash -ec '\`/usr/bin/cygpath $q${scriptPath}$q\` sign $f'"`,
     `/Ssigntool=$q${scriptPath}$q sign $f`,
     "/Qp",
-    `/O${installerOutput}`,
+    `/O"${installerOutput}"`,
     ...defines,
     issPath,
   ]
