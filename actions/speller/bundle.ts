@@ -156,9 +156,9 @@ export default async function spellerBundle({
       zhfstFile,
       outputDir: "./",
       installerCodeSignId:
-        "Developer ID Installer: The University of Tromsø (2K5J2584NX)",
+        "Developer ID Installer: The University of Tromso (2K5J2584NX)",
       appCodeSignId:
-        "Developer ID Application: The University of Tromsø (2K5J2584NX)",
+        "Developer ID Application: The University of Tromso (2K5J2584NX)",
     })
   } else {
     throw new Error(`Unsupported speller type: ${spellerType}`)
