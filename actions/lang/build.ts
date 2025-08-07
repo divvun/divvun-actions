@@ -127,6 +127,33 @@ export default async function langBuild({
 }: Props): Promise<Output> {
   logger.info(JSON.stringify(config, null, 2))
 
+  // Check ../giella-core and ../shared-mul
+  const giellaCorePath = path.join(Deno.cwd(), "..", "giella-core")
+  if (await fs.exists(giellaCorePath)) {
+    // git pull
+    const proc = new Deno.Command("git", {
+      args: ["pull"],
+      cwd: giellaCorePath,
+    }).spawn()
+    const status = await proc.status
+    if (status.code !== 0) {
+      throw new Error(`Failed to update giella-core: ${status.code}`)
+    }
+  }
+
+  const sharedMulPath = path.join(Deno.cwd(), "..", "shared-mul")
+  if (await fs.exists(sharedMulPath)) {
+    // git pull
+    const proc = new Deno.Command("git", {
+      args: ["pull"],
+      cwd: sharedMulPath,
+    }).spawn()
+    const status = await proc.status
+    if (status.code !== 0) {
+      throw new Error(`Failed to update shared-mul: ${status.code}`)
+    }
+  }
+
   const flags = [
     "--without-forrest",
     "--disable-silent-rules",
