@@ -143,7 +143,7 @@ export default async function spellerBundle({
     console.log /*logger.debug*/("generated install.iss:")
     console.log /*logger.debug*/(innoBuilder.build())
 
-    payloadPath = await makeInstaller("./install.iss")
+    payloadPath = await makeInstaller(".\\install.iss")
     console.log /*logger.debug*/(`Installer created at ${payloadPath}`)
   } else if (spellerType == SpellerType.MacOS) {
     const zhfstFile = spellerPaths.desktop[langTag]
