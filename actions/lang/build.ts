@@ -139,6 +139,12 @@ export default async function langBuild({
     if (status.code !== 0) {
       throw new Error(`Failed to update giella-core: ${status.code}`)
     }
+
+    const proc2 = new Deno.Command("make", { cwd: giellaCorePath }).spawn()
+    const status2 = await proc2.status
+    if (status2.code !== 0) {
+      throw new Error(`Failed to build giella-core: ${status2.code}`)
+    }
   }
 
   const sharedMulPath = path.join(Deno.cwd(), "..", "shared-mul")
@@ -244,13 +250,19 @@ export default async function langBuild({
 
       if (candidate.endsWith("-mobile.zhfst")) {
         const v = path.basename(candidate).split("-mobile.zhfst")[0]
-        out.mobile[v] = path.join("build/tools/spellcheckers", path.basename(path.resolve(candidate)))
+        out.mobile[v] = path.join(
+          "build/tools/spellcheckers",
+          path.basename(path.resolve(candidate)),
+        )
         hasSomeItems = true
       }
 
       if (candidate.endsWith("-desktop.zhfst")) {
         const v = path.basename(candidate).split("-desktop.zhfst")[0]
-        out.desktop[v] = path.join("build/tools/spellcheckers", path.basename(path.resolve(candidate)))
+        out.desktop[v] = path.join(
+          "build/tools/spellcheckers",
+          path.basename(path.resolve(candidate)),
+        )
         hasSomeItems = true
       }
     }

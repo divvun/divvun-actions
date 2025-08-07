@@ -2,12 +2,14 @@ import { exec } from "~/builder.ts"
 import logger from "../../util/log.ts"
 
 export type SentryUploadIOSDebugFilesOptions = {
-  authToken: string;
-  projectId: string;
-  dsymSearchPath: string;
-};
+  authToken: string
+  projectId: string
+  dsymSearchPath: string
+}
 
-export async function sentryUploadIOSDebugFiles(options: SentryUploadIOSDebugFilesOptions) {
+export async function sentryUploadIOSDebugFiles(
+  options: SentryUploadIOSDebugFilesOptions,
+) {
   try {
     await exec(
       "sentry-cli",
@@ -21,9 +23,9 @@ export async function sentryUploadIOSDebugFiles(options: SentryUploadIOSDebugFil
         "--project",
         options.projectId,
         options.dsymSearchPath,
-      ]
-    );
+      ],
+    )
   } catch (error) {
-    logger.error("Failed to upload dSYM files to Sentry:", error);
+    logger.error("Failed to upload dSYM files to Sentry:", error)
   }
 }

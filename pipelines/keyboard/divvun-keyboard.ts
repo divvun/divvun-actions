@@ -39,10 +39,9 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
   }
 
   await builder.group("Uploading debug files to Sentry", async () => {
-    const projectId =
-      builder.env.repoName === "divvun-dev-keyboard"
-        ? "divvun-dev-keyboard-ios"
-        : "sami-keyboards-ios";
+    const projectId = builder.env.repoName === "divvun-dev-keyboard"
+      ? "divvun-dev-keyboard-ios"
+      : "sami-keyboards-ios"
     await sentryUploadIOSDebugFiles({
       authToken: secrets.get("sentry/token"),
       projectId: projectId,
