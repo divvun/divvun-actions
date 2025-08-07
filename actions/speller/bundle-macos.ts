@@ -233,7 +233,9 @@ async function signBundle(
     "/Users/admin/Library/Keychains/login.keychain-db",
   ])
 
-  const code = await builder.exec("codesign", [
+  const code = await builder.exec("timeout", [
+    "60s",
+    "codesign",
     "-f",
     "-v",
     "-s",

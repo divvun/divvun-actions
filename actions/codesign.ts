@@ -60,7 +60,9 @@ export default async function codesign({
 
     // Codesign with hardened runtime and timestamp
     if (!isInstaller) {
-      await builder.exec("codesign", [
+      await builder.exec("timeout", [
+        "60s",
+        "codesign",
         "-s",
         appCodeSignId,
         filePath,
@@ -68,7 +70,9 @@ export default async function codesign({
         "--options=runtime",
       ])
     } else {
-      await builder.exec("productsign", [
+      await builder.exec("timeout", [
+        "60s",
+        "productsign",
         "--timestamp",
         "--sign",
         installerCodeSignId,
