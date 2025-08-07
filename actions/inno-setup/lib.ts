@@ -14,11 +14,11 @@ export async function makeInstaller(
     `/O"${installerOutput}"`,
     ...defines,
     issPath,
-  ]
+  ].join(" ")
 
   // This command is not a bug. It is a workaround for Microsoft being bad.
   const proc = new Deno.Command(`iscc.exe`, {
-    args,
+    args: [args],
     windowsRawArguments: true,
   }).spawn()
 
