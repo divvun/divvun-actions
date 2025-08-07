@@ -9,17 +9,14 @@ export async function makeInstaller(
   const scriptPath = `${target.projectPath}\\bin\\divvun-actions`
 
   const args = [
-    issPath,
-    // `/S"signtool=C:\\msys2\\usr\\bin\\bash -ec '\`/usr/bin/cygpath $q${scriptPath}$q\` sign $f'"`,
-    `"/Ssigntool=$q${scriptPath}$q sign $f"`,
     "/Qp",
     `/O"${installerOutput}"`,
     ...defines,
+    issPath,
   ]
 
-  console.log(args)
-
-  const proc = new Deno.Command("iscc.exe", {
+  // This command is not a bug. It is a workaround for Microsoft being bad.
+  const proc = new Deno.Command(`iscc.exe /S"signtool=$q${scriptPath}$q sign $f"`, {
     args,
   }).spawn()
 
