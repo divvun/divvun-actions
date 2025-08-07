@@ -16,9 +16,12 @@ export async function makeInstaller(
     issPath,
   ]
 
+  const windowsArgs = ["/c", "iscc.exe", ...args]
+  console.log(windowsArgs)
+
   // This command is not a bug. It is a workaround for Microsoft being bad.
   const proc = new Deno.Command("cmd", {
-    args: ["/c", "iscc.exe", ...args],
+    args: windowsArgs,
     windowsRawArguments: true,
   }).spawn()
 
