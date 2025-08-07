@@ -11,5 +11,11 @@ fi
 
 export DIVVUN_ACTIONS_PLUGIN_DIR=$PLUGIN_DIR
 export PATH="$PLUGIN_DIR/bin:$PATH"
+
+if [[ "$(uname)" == "Darwin" ]]; then
+  # Ensure that the PATH is set correctly for macOS
+  export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
+fi
+
 echo "Bash"
 echo $PATH
