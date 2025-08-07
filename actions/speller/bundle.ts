@@ -140,8 +140,8 @@ export default async function spellerBundle({
       })
       .write("./install.iss")
 
-    console.log /*logger.debug*/("generated install.iss:")
-    console.log /*logger.debug*/(innoBuilder.build())
+    // console.log /*logger.debug*/("generated install.iss:")
+    // console.log /*logger.debug*/(innoBuilder.build())
 
     payloadPath = await makeInstaller(".\\install.iss")
     console.log /*logger.debug*/(`Installer created at ${payloadPath}`)
