@@ -18,6 +18,7 @@ export async function makeInstaller(
   // This command is not a bug. It is a workaround for Microsoft being bad.
   const proc = new Deno.Command(`iscc.exe /S"signtool=$q${scriptPath}$q sign $f"`, {
     args,
+    windowsRawArguments: true,
   }).spawn()
 
   const code = (await proc.status).code
