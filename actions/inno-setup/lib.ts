@@ -9,7 +9,7 @@ export async function makeInstaller(
   const scriptPath = `${target.projectPath}\\bin\\divvun-actions`
 
   const args = [
-    `"/Ssigntool=$q${scriptPath}$q sign $f"`,
+    `"/Ssigntool=${scriptPath} sign $f"`,
     "/Qp",
     `/O"${installerOutput}"`,
     ...defines,
