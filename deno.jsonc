@@ -42,7 +42,7 @@
     "@std/crypto": "jsr:@std/crypto@^1.0.3",
     "@std/encoding": "jsr:@std/encoding@^1.0.10",
     "@std/fs": "jsr:@std/fs@^1.0.9",
-    "@std/path": "jsr:@std/path@^1.0.8",
+    "@std/path": "jsr:@std/path@^1.1.1",
     "@std/streams": "jsr:@std/streams@^1.0.8",
     "@std/toml": "jsr:@std/toml@^1.0.2",
     "@std/uuid": "jsr:@std/uuid@^1.0.4",

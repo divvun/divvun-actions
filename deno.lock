@@ -20,8 +20,10 @@
     "jsr:@std/fmt@~1.0.2": "1.0.5",
     "jsr:@std/fs@^1.0.9": "1.0.9",
     "jsr:@std/internal@^1.0.6": "1.0.6",
+    "jsr:@std/internal@^1.0.9": "1.0.10",
     "jsr:@std/path@*": "1.0.9",
-    "jsr:@std/path@^1.0.8": "1.0.8",
+    "jsr:@std/path@^1.0.8": "1.1.1",
+    "jsr:@std/path@^1.1.1": "1.1.1",
     "jsr:@std/streams@^1.0.8": "1.0.8",
     "jsr:@std/testing@*": "1.0.11",
     "jsr:@std/text@~1.0.7": "1.0.10",
@@ -76,7 +78,7 @@
     "@std/assert@1.0.13": {
       "integrity": "ae0d31e41919b12c656c742b22522c32fb26ed0cba32975cb0de2a273cb68b29",
       "dependencies": [
-        "jsr:@std/internal"
+        "jsr:@std/internal@^1.0.6"
       ]
     },
     "@std/bytes@1.0.4": {
@@ -109,11 +111,20 @@
     "@std/internal@1.0.6": {
       "integrity": "9533b128f230f73bd209408bb07a4b12f8d4255ab2a4d22a1fd6d87304aca9a4"
     },
+    "@std/internal@1.0.10": {
+      "integrity": "e3be62ce42cab0e177c27698e5d9800122f67b766a0bea6ca4867886cbde8cf7"
+    },
     "@std/path@1.0.8": {
       "integrity": "548fa456bb6a04d3c1a1e7477986b6cffbce95102d0bb447c67c4ee70e0364be"
     },
     "@std/path@1.0.9": {
       "integrity": "260a49f11edd3db93dd38350bf9cd1b4d1366afa98e81b86167b4e3dd750129e"
+    },
+    "@std/path@1.1.1": {
+      "integrity": "fe00026bd3a7e6a27f73709b83c607798be40e20c81dde655ce34052fd82ec76",
+      "dependencies": [
+        "jsr:@std/internal@^1.0.9"
+      ]
     },
     "@std/streams@1.0.8": {
       "integrity": "b41332d93d2cf6a82fe4ac2153b930adf1a859392931e2a19d9fabfb6f154fb3",
@@ -125,7 +136,7 @@
       "integrity": "12b3db12d34f0f385a26248933bde766c0f8c5ad8b6ab34d4d38f528ab852f48",
       "dependencies": [
         "jsr:@std/assert@^1.0.12",
-        "jsr:@std/internal"
+        "jsr:@std/internal@^1.0.6"
       ]
     },
     "@std/text@1.0.10": {
@@ -973,7 +984,7 @@
       "jsr:@std/crypto@^1.0.3",
       "jsr:@std/encoding@^1.0.10",
       "jsr:@std/fs@^1.0.9",
-      "jsr:@std/path@^1.0.8",
+      "jsr:@std/path@^1.1.1",
       "jsr:@std/streams@^1.0.8",
       "jsr:@std/toml@^1.0.2",
       "jsr:@std/uuid@^1.0.4",
