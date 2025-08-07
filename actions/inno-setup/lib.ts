@@ -8,15 +8,19 @@ export async function makeInstaller(
   const installerOutput = await Deno.makeTempDir()
   const scriptPath = `${target.projectPath}\\bin\\divvun-actions`
 
+  const args = [
+    // `/S"signtool=C:\\msys2\\usr\\bin\\bash -ec '\`/usr/bin/cygpath $q${scriptPath}$q\` sign $f'"`,
+    `/S\"signtool=$q${scriptPath}$q sign $f\"`,
+    "/Qp",
+    `/O${installerOutput}`,
+    ...defines,
+    issPath,
+  ]
+
+  console.log(args)
+
   const proc = new Deno.Command("iscc.exe", {
-    args: [
-      // `/S"signtool=C:\\msys2\\usr\\bin\\bash -ec '\`/usr/bin/cygpath $q${scriptPath}$q\` sign $f'"`,
-      `/S\"signtool=$q${scriptPath}$q sign $f\"`,
-      "/Qp",
-      `/O${installerOutput}`,
-      ...defines,
-      issPath,
-    ],
+    args,
     windowsRawArguments: true,
   }).spawn()
 
