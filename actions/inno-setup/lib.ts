@@ -8,9 +8,15 @@ export async function makeInstaller(
   const scriptPath = `${target.projectPath}\\bin\\divvun-actions`
 
   const proc = new Deno.Command(
-    path.join(import.meta.dirname ?? "", "build.cmd"),
+    "cmd",
     {
-      args: [scriptPath, installerOutput, issPath],
+      args: [
+        "/C",
+        path.join(import.meta.dirname ?? "", "build.cmd"),
+        scriptPath,
+        installerOutput,
+        issPath,
+      ],
     },
   ).spawn()
 
