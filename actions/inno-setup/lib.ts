@@ -3,29 +3,16 @@ import * as target from "~/target.ts"
 
 export async function makeInstaller(
   issPath: string,
-  defines: string[] = [],
 ): Promise<string> {
   const installerOutput = await Deno.makeTempDir()
   const scriptPath = `${target.projectPath}\\bin\\divvun-actions`
 
-  const args = [
-    "pwsh",
-    "-c",
-    `"/Ssigntool=${scriptPath} sign $f"`,
-    "/Qp",
-    `/O"${installerOutput}"`,
-    ...defines,
-    issPath,
-  ]
-
-  const windowsArgs = ["/c", "iscc.exe", ...args]
-  console.log(windowsArgs)
-
-  // This command is not a bug. It is a workaround for Microsoft being bad.
-  const proc = new Deno.Command("cmd", {
-    args: windowsArgs,
-    windowsRawArguments: true,
-  }).spawn()
+  const proc = new Deno.Command(
+    path.join(import.meta.dirname ?? "", "build.cmd"),
+    {
+      args: [scriptPath, installerOutput, issPath],
+    },
+  ).spawn()
 
   const code = (await proc.status).code
   if (code !== 0) {
