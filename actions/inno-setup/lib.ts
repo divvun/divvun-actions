@@ -5,7 +5,7 @@ export async function makeInstaller(
   issPath: string,
 ): Promise<string> {
   const installerOutput = await Deno.makeTempDir()
-  const scriptPath = `${target.projectPath}\\bin\\divvun-actions`
+  const scriptPath = `${target.projectPath}\\bin\\divvun-actions.bat`
 
   const proc = new Deno.Command(
     "cmd",

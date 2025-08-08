@@ -11,7 +11,5 @@ set scriptPath=%1
 set installerOutput=%2
 set issPath=%3
 
-REM Build the iscc command arguments
-set signToolArg="/Ssigntool=%scriptPath% sign $f"
-
-iscc.exe %signToolArg% /Qp "/O%installerOutput%" %issPath%
+echo iscc.exe /S"signtool=$q%scriptPath%$q sign $f" /Qp "/O%installerOutput%" %issPath%
+iscc.exe /S"signtool=$q%scriptPath%$q sign $f" /Qp "/O%installerOutput%" %issPath%
