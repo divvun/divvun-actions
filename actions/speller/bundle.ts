@@ -28,9 +28,7 @@ export type Output = {
   payloadPath: string
 }
 
-async function renameFile(filePath: string, newName: string) {
-  const dir = path.dirname(filePath)
-  const newPath = path.join(dir, newName)
+async function renameFile(filePath: string, newPath: string) {
   await Deno.rename(filePath, newPath)
   return newPath
 }
@@ -64,7 +62,7 @@ export default async function spellerBundle({
       bhfstPaths.push(langTagBhfst)
     }
 
-    const txzPath = path.resolve(`./${packageId}_${version}_mobile.txz`)
+    const txzPath = path.resolve(`${packageId}_${version}_mobile.txz`)
     console.log /*logger.debug*/(
       `Creating txz from [${bhfstPaths.join(", ")}] at ${txzPath}`,
     )
