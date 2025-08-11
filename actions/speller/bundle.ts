@@ -68,7 +68,7 @@ export default async function spellerBundle({
     console.log /*logger.debug*/(
       `Creating txz from [${bhfstPaths.join(", ")}] at ${txzPath}`,
     )
-    payloadPath = await renameFile(txzPath, `${packageId}_${version}_mobile.txz`)
+    payloadPath = txzPath
     await Tar.createFlatTxz(bhfstPaths, payloadPath)
     console.log /*logger.debug*/(`Created txz at ${payloadPath}`)
   } else if (spellerType == SpellerType.Windows) {

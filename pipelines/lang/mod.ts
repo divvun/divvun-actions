@@ -56,27 +56,8 @@ export async function runLangBundle(
     manifest,
     spellerPaths,
   })
-  // const yml = await Deno.readTextFile(".build-config.yml")
-  // const config = (await yaml.parse(yml) as any)?.build as Props
-
-  // console.log(await langBuild(config))
 }
 
-
-// export type Props = {
-//   spellerType: SpellerType
-//   manifestPath: string
-//   payloadPath: string
-//   version: string
-//   channel: string | null
-//   nightlyChannel: string
-//   pahkatRepo: string
-//   secrets: {
-//     pahkatApiKey: string
-//     awsAccessKeyId: string
-//     awsSecretAccessKey: string
-//   }
-// }
 
 async function globOneFile(pattern: string): Promise<string | null> {
   const files = await fs.expandGlob(pattern)
