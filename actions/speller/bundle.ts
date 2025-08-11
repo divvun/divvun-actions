@@ -62,7 +62,7 @@ export default async function spellerBundle({
       bhfstPaths.push(langTagBhfst)
     }
 
-    const txzPath = path.resolve(`${packageId}_${version}_mobile.txz`)
+    const txzPath = `${packageId}_${version}_mobile.txz`
     console.log /*logger.debug*/(
       `Creating txz from [${bhfstPaths.join(", ")}] at ${txzPath}`,
     )
