@@ -82,13 +82,13 @@ export async function runLangDeploy() {
     awsSecretAccessKey: allSecrets.get("s3/secretAccessKey"),
   }
 
-  await builder.downloadArtifacts("*.txz", "out/mobile")
-  await builder.downloadArtifacts("*.exe", "out/windows")
-  await builder.downloadArtifacts("*.pkg", "out/macos")
+  await builder.downloadArtifacts("*.txz", ".")
+  await builder.downloadArtifacts("*.exe", ".")
+  await builder.downloadArtifacts("*.pkg", ".")
 
-  const windowsFiles = await globOneFile("out/windows/*.exe")
-  const macosFiles = await globOneFile("out/macos/*.pkg")
-  const mobileFiles = await globOneFile("out/mobile/*.txz")
+  const windowsFiles = await globOneFile("*.exe")
+  const macosFiles = await globOneFile("*.pkg")
+  const mobileFiles = await globOneFile("*.txz")
 
   console.log("Deploying language files:")
   console.log(`- Windows: ${windowsFiles}`)

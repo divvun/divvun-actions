@@ -2,7 +2,7 @@
 // Buildkite implementation of the builder interface
 
 import type { ExecOptions } from "~/builder/types.ts"
-import { buildkite as getEnv, Env } from "~/util/env.ts"
+import { Env, buildkite as getEnv } from "~/util/env.ts"
 import logger from "~/util/log.ts"
 import { OpenBao, SecretsStore } from "~/util/openbao.ts"
 
@@ -182,8 +182,10 @@ export async function group(name: string, callback: () => Promise<void>) {
   }
 }
 
-export async function uploadArtifacts(path: string) {
-  await exec("buildkite-agent", ["artifact", "upload", path])
+export async function uploadArtifacts(path: string, { cwd }: { cwd?: string } = {}) {
+  await exec("buildkite-agent", ["artifact", "upload", path], {
+    cwd,
+  })
 }
 
 export async function downloadArtifacts(path: string, outputDir: string) {
