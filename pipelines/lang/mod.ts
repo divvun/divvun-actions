@@ -163,11 +163,11 @@ export function pipelineLang() {
       {
         group: "Bundle",
         key: "bundle",
+        depends_on: "build",
         steps: [
           command({
             label: "Bundle (Windows)",
             command: "divvun-actions run lang-bundle windows",
-            depends_on: "build",
             agents: {
               queue: "windows",
             },
@@ -175,7 +175,6 @@ export function pipelineLang() {
           command({
             label: "Bundle (Mobile)",
             command: "divvun-actions run lang-bundle mobile",
-            depends_on: "build",
             agents: {
               queue: "linux",
             },
@@ -183,7 +182,6 @@ export function pipelineLang() {
           command({
             label: "Bundle (macOS)",
             command: "divvun-actions run lang-bundle macos",
-            depends_on: "build",
             agents: {
               queue: "macos",
             },
