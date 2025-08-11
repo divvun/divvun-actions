@@ -45,6 +45,8 @@ export function deriveLangTag(force3: boolean) {
     "dan": "da", // Danish
     "isl": "is", // Icelandic
     "nor": "no", // Norwegian
+    "nno": "nn", // Norwegian Nynorsk
+    "nob": "nb", // Norwegian Bokmål
     "swe": "sv", // Swedish
     "fao": "fo", // Faroese
     
