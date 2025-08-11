@@ -192,7 +192,7 @@ export function deriveLangTag(force3: boolean) {
 }
 
 export function derivePackageId(_type: SpellerType) {
-  const lang = builder.env.repo.split("lang-")[1]
+  const lang = builder.env.repo.split("lang-")[1].replace(/\.git$/, "")
 
   return `speller-${lang}`
 }

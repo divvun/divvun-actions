@@ -47,7 +47,6 @@ export type Props = {
   payloadPath: string
   version: string
   channel: string | null
-  nightlyChannel: string
   pahkatRepo: string
   secrets: {
     pahkatApiKey: string
@@ -62,7 +61,6 @@ export default async function spellerDeploy({
   payloadPath,
   version,
   channel,
-  nightlyChannel,
   pahkatRepo,
   secrets,
 }: Props) {
@@ -102,7 +100,7 @@ export default async function spellerDeploy({
       let deps: any = { "https://pahkat.uit.no/tools/packages/windivvun": "*" }
       if (channel != null) {
         const windivvun =
-          `https://pahkat.uit.no/tools/packages/windivvun?channel=${nightlyChannel}`
+          `https://pahkat.uit.no/tools/packages/windivvun?channel=nightly`
         deps = {}
         deps[windivvun] = "*"
       }
@@ -138,7 +136,7 @@ export default async function spellerDeploy({
       let deps: any = { "https://pahkat.uit.no/tools/packages/macdivvun": "*" }
       if (channel != null) {
         const macdivvun =
-          `https://pahkat.uit.no/tools/packages/macdivvun?channel=${nightlyChannel}`
+          `https://pahkat.uit.no/tools/packages/macdivvun?channel=nightly`
         deps = {}
         deps[macdivvun] = "*"
       }

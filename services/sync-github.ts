@@ -99,6 +99,7 @@ type BuildkitePipeline = {
   slug: string
   tags: string[]
   url: string
+  webhook_url: string
   repository: string
   created_at: string
   updated_at: string
@@ -106,25 +107,41 @@ type BuildkitePipeline = {
   default_branch: string
   visibility: string
   configuration: string
+  branch_configuration: string | null
+}
+
+type GithubWebhook = {
+  id: number
+  name: string
+  active: boolean
+  events: string[]
+  config: {
+    url: string
+    content_type: string
+    insecure_ssl?: string
+  }
+  updated_at: string
+  created_at: string
 }
 
 async function listBuildkitePipelines(
   props: SyncGithubProps["buildkite"],
 ): Promise<BuildkitePipeline[]> {
   let nextUrl: string | null =
-    `https://api.buildkite.com/v2/organizations/${props.orgName}/pipelines`
+    `https://api.buildkite.com/v2/organizations/${props.orgName}/pipelines?per_page=100`
   let responses: any[] = []
 
   while (nextUrl != null) {
+    console.log(`Fetching pipelines from ${nextUrl}`)
     const response = await fetch(
-      `https://api.buildkite.com/v2/organizations/${props.orgName}/pipelines`,
+      nextUrl,
       {
         headers: {
           Authorization: `Bearer ${props.apiKey}`,
         },
       },
     )
-
+    
     nextUrl = parseNextLinkHeader(response.headers.get("link"))
     const data = await response.json()
     responses = [...responses, ...data]
@@ -136,6 +153,7 @@ async function listBuildkitePipelines(
     slug: pipeline.slug,
     tags: pipeline.tags || [],
     url: pipeline.web_url,
+    webhook_url: pipeline.provider.webhook_url,
     repository: pipeline.repository,
     created_at: pipeline.created_at,
     updated_at: pipeline.updated_at,
@@ -143,6 +161,7 @@ async function listBuildkitePipelines(
     default_branch: pipeline.default_branch,
     visibility: pipeline.visibility,
     configuration: pipeline.configuration,
+    branch_configuration: pipeline.branch_configuration,
   }))
 }
 
@@ -157,6 +176,101 @@ steps:
     plugins:
     - ssh://git@github.com/divvun/divvun-actions.git#main: ~
 `.trim()
+
+async function listGithubWebhooks(
+  props: Required<SyncGithubProps["github"]>,
+  repoName: string,
+): Promise<GithubWebhook[]> {
+  const [owner, repo] = repoName.split("/")
+  
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/hooks`,
+    {
+      headers: {
+        Authorization: `Bearer ${props.apiKey}`,
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    },
+  )
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      return []
+    }
+    throw new Error(`Failed to list webhooks for ${repoName}: ${response.status}`)
+  }
+
+  const data = await response.json()
+  return data.map((hook: any) => ({
+    id: hook.id,
+    name: hook.name,
+    active: hook.active,
+    events: hook.events,
+    config: hook.config,
+    updated_at: hook.updated_at,
+    created_at: hook.created_at,
+  }))
+}
+
+function hasWebhookForPipeline(
+  webhooks: GithubWebhook[],
+  pipeline: BuildkitePipeline,
+): boolean {
+  return webhooks.some(webhook =>
+    webhook.name === "web" &&
+    webhook.active &&
+    webhook.config.url === pipeline.webhook_url
+  )
+}
+
+async function createBuildkiteWebhook(
+  props: Required<SyncGithubProps["github"]>,
+  repoName: string,
+  pipeline: BuildkitePipeline,
+): Promise<GithubWebhook> {
+  const [owner, repo] = repoName.split("/")
+  
+  const payload = {
+    name: "web",
+    active: true,
+    events: ["push"],
+    config: {
+      url: pipeline.webhook_url,
+      content_type: "json",
+      insecure_ssl: "0",
+    },
+  }
+
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/hooks`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${props.apiKey}`,
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(`Failed to create webhook for ${repoName}: ${response.status}`)
+  }
+
+  const data = await response.json()
+  return {
+    id: data.id,
+    name: data.name,
+    active: data.active,
+    events: data.events,
+    config: data.config,
+    updated_at: data.updated_at,
+    created_at: data.created_at,
+  }
+}
 
 // curl -H "Authorization: Bearer $TOKEN" \
 //   -X POST "https://api.buildkite.com/v2/organizations/{org.slug}/pipelines" \
@@ -185,6 +299,7 @@ async function createBuildkitePipeline(
         repository: `git@github.com:${repo.name}.git`,
         visibility: repo.private ? "private" : "public",
         configuration: PIPELINE_STEPS + "\n",
+        branch_configuration: "!gh-pages",
       }),
     },
   )
@@ -192,7 +307,31 @@ async function createBuildkitePipeline(
   return await response.json()
 }
 
-function assessStatus(repo: GithubRepo, pipelines: BuildkitePipeline[]) {
+async function updateBuildkitePipeline(
+  props: SyncGithubProps["buildkite"],
+  pipeline: BuildkitePipeline,
+  updates: Partial<Pick<BuildkitePipeline, "branch_configuration" | "configuration">>
+) {
+  const response = await fetch(
+    `https://api.buildkite.com/v2/organizations/${props.orgName}/pipelines/${pipeline.slug}`,
+    {
+      headers: {
+        Authorization: `Bearer ${props.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(`Failed to update pipeline ${pipeline.name}: ${response.status}`)
+  }
+
+  return await response.json()
+}
+
+function assessStatus(repo: GithubRepo, pipelines: BuildkitePipeline[], webhooks?: GithubWebhook[]) {
   const pipeline = pipelines.find((p) => {
     const pipelineRepo = p.repository.replace(/\.git$/, "").split(":")[1]
     return pipelineRepo === repo.name
@@ -211,16 +350,15 @@ function assessStatus(repo: GithubRepo, pipelines: BuildkitePipeline[]) {
     }
   }
 
-  const pipelineTags = new Set(pipeline.tags)
-  const repoTopics = new Set(repo.topics)
-
-  const differences = pipelineTags.difference(repoTopics)
   const discrepancies = []
 
-  // if (differences.size > 0) {
+  // Pipeline tags/topics comparison code removed for now
+  // const pipelineTags = new Set(pipeline.tags)
+  // const repoTopics = new Set(repo.topics)
+  // if (pipelineTags.difference(repoTopics).size > 0) {
   //   discrepancies.push({
-  //     code: "tags-mismatch",
-  //     message: `Pipeline tags (${[...pipelineTags].join(", ")}) do not match repo topics (${[...repoTopics].join(", ")})`,
+  //     code: "tags-mismatch", 
+  //     message: `Pipeline tags do not match repo topics`,
   //   })
   // }
 
@@ -240,6 +378,24 @@ function assessStatus(repo: GithubRepo, pipelines: BuildkitePipeline[]) {
       code: "undeclared-configuration",
       message:
         "Pipeline configuration is missing declaration of managed or custom.",
+    })
+  }
+
+  if (webhooks) {
+    const hasWebhook = hasWebhookForPipeline(webhooks, pipeline)
+    if (!hasWebhook) {
+      discrepancies.push({
+        code: "no-webhook",
+        message: "No corresponding webhook found for the Buildkite pipeline.",
+      })
+    }
+  }
+
+  // Check branch configuration
+  if (!pipeline.branch_configuration || !pipeline.branch_configuration.includes("!gh-pages")) {
+    discrepancies.push({
+      code: "branch-configuration-missing",
+      message: "Pipeline branch configuration is missing or does not exclude gh-pages branch.",
     })
   }
 
@@ -300,6 +456,8 @@ if (import.meta.main) {
     string: ["bk-key", "bk-org", "gh-key", "gh-orgs"],
   })
 
+  console.log("Parsed arguments:", args)
+
   const command = args._[0] as string
   const validCommands = ["list-repos", "list-pipelines", "sync"]
 
@@ -333,6 +491,7 @@ if (import.meta.main) {
       break
     }
     case "list-pipelines": {
+      console.log("Listing Buildkite pipelines...")
       requiredArgs(["bk-key", "bk-org"], args)
       const pipelines = await listBuildkitePipelines(
         props.buildkite as Required<SyncGithubProps["buildkite"]>,
@@ -359,6 +518,8 @@ type SyncStatus = {
     code: string
     message: string
   }>
+  repo?: GithubRepo
+  pipeline?: BuildkitePipeline
 }
 
 function prettyPrintSyncResults(results: SyncStatus[]) {
@@ -418,21 +579,24 @@ function getDiscrepancyIcon(code: string): string {
       return "🔄"
     case "undeclared-configuration":
       return "⚠️"
+    case "no-webhook":
+      return "🔗"
+    case "branch-configuration-missing":
+      return "🌿"
     default:
       return "❓"
   }
 }
 
 export default async function syncGithub(props: SyncGithubProps) {
+  const githubProps = props.github as Required<SyncGithubProps["github"]>
+  const buildkiteProps = props.buildkite as Required<SyncGithubProps["buildkite"]>
+
   console.log("🔍 Getting pipelines...")
-  const pipelines = await listBuildkitePipelines(
-    props.buildkite as Required<SyncGithubProps["buildkite"]>,
-  )
+  const pipelines = await listBuildkitePipelines(buildkiteProps)
 
   console.log("🔍 Getting repos...")
-  const allRepos = await listGithubRepos(
-    props.github as Required<SyncGithubProps["github"]>,
-  )
+  const allRepos = await listGithubRepos(githubProps)
   const repos = allRepos.filter((repo) => {
     return repo.name.includes("lang-") || repo.name.includes("keyboard-")
   })
@@ -441,10 +605,15 @@ export default async function syncGithub(props: SyncGithubProps) {
   const results: SyncStatus[] = []
 
   for (const repo of repos) {
-    const status = assessStatus(repo, pipelines)
-    // if (status.discrepancies.find(x => x.code === "no-pipeline")) {
-    //   continue;
-    // }
+    console.log(`🔍 Checking webhooks for ${repo.name}...`)
+    let webhooks: GithubWebhook[] = []
+    try {
+      webhooks = await listGithubWebhooks(githubProps, repo.name)
+    } catch (error) {
+      console.warn(`⚠️ Could not fetch webhooks for ${repo.name}: ${error}`)
+    }
+
+    const status = assessStatus(repo, pipelines, webhooks)
     results.push(status)
   }
 
@@ -457,9 +626,56 @@ export default async function syncGithub(props: SyncGithubProps) {
   for (const result of noPipelines) {
     console.log(`🚀 Creating pipeline for ${result.repoName}...`)
     const newPipeline = await createBuildkitePipeline(
-      props.buildkite,
+      buildkiteProps,
       result.repo,
     )
     console.log(`✅ Created pipeline: ${newPipeline.name} (${newPipeline.url})`)
+  }
+
+  const noWebhooks = results.filter((r) =>
+    r.discrepancies.some((d) => d.code === "no-webhook") && r.pipeline
+  )
+
+  for (const result of noWebhooks) {
+    if (!result.pipeline) continue
+    
+    console.log(`🔗 Creating webhook for ${result.repoName}...`)
+    try {
+      const webhook = await createBuildkiteWebhook(
+        githubProps,
+        result.repoName,
+        result.pipeline,
+      )
+      console.log(`✅ Created webhook: ${webhook.config.url}`)
+    } catch (error) {
+      console.error(`❌ Failed to create webhook for ${result.repoName}: ${error}`)
+    }
+  }
+
+  const noBranchConfig = results.filter((r) =>
+    r.discrepancies.some((d) => d.code === "branch-configuration-missing") && r.pipeline
+  )
+
+  for (const result of noBranchConfig) {
+    if (!result.pipeline) continue
+    
+    console.log(`🌿 Updating branch configuration for ${result.repoName}...`)
+    try {
+      let newBranchConfig = "!gh-pages"
+      
+      // If there's an existing branch configuration, append to it
+      if (result.pipeline.branch_configuration && result.pipeline.branch_configuration.trim()) {
+        newBranchConfig = `${result.pipeline.branch_configuration} !gh-pages`
+      }
+      
+      await updateBuildkitePipeline(
+        buildkiteProps,
+        result.pipeline,
+        { branch_configuration: newBranchConfig }
+      )
+      console.log(`✅ Updated branch configuration: ${newBranchConfig}`)
+    } catch (error) {
+      console.error(`❌ Failed to update branch configuration for ${result.repoName}: ${error}`)
+    }
   }
 }

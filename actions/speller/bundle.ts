@@ -28,6 +28,13 @@ export type Output = {
   payloadPath: string
 }
 
+async function renameFile(filePath: string, newName: string) {
+  const dir = path.dirname(filePath)
+  const newPath = path.join(dir, newName)
+  await Deno.rename(filePath, newPath)
+  return newPath
+}
+
 export default async function spellerBundle({
   spellerType,
   manifest,
@@ -41,6 +48,9 @@ export default async function spellerBundle({
 
   // TODO: allow release builds
   const version = await versionAsNightly(manifest.spellerversion)
+  console.log /*logger.debug*/(
+    `Speller bundle for ${spellerType} with version ${version} and langTag ${langTag}`,
+  )
 
   if (spellerType == SpellerType.Mobile) {
     const bhfstPaths = []
@@ -54,11 +64,13 @@ export default async function spellerBundle({
       bhfstPaths.push(langTagBhfst)
     }
 
-    payloadPath = path.resolve(`./${packageId}_${version}_mobile.txz`)
+    const txzPath = path.resolve(`./${packageId}_${version}_mobile.txz`)
     console.log /*logger.debug*/(
-      `Creating txz from [${bhfstPaths.join(", ")}] at ${payloadPath}`,
+      `Creating txz from [${bhfstPaths.join(", ")}] at ${txzPath}`,
     )
+    payloadPath = await renameFile(txzPath, `${packageId}_${version}_mobile.txz`)
     await Tar.createFlatTxz(bhfstPaths, payloadPath)
+    console.log /*logger.debug*/(`Created txz at ${payloadPath}`)
   } else if (spellerType == SpellerType.Windows) {
     console.log(manifest.windows)
     if (manifest.windows.system_product_code == null) {
@@ -143,12 +155,13 @@ export default async function spellerBundle({
     // console.log /*logger.debug*/("generated install.iss:")
     // console.log /*logger.debug*/(innoBuilder.build())
 
-    payloadPath = await makeInstaller(".\\install.iss")
+    const installerPath = await makeInstaller(".\\install.iss")
+    payloadPath = await renameFile(installerPath, `${packageId}_${version}_windows.exe`)
     console.log /*logger.debug*/(`Installer created at ${payloadPath}`)
   } else if (spellerType == SpellerType.MacOS) {
     const zhfstFile = spellerPaths.desktop[langTag]
     console.log("zhfstFile", zhfstFile, spellerPaths)
-    payloadPath = await createInstaller({
+    const pkgPath = await createInstaller({
       packageId,
       bcp47code: langTag,
       version,
@@ -160,6 +173,8 @@ export default async function spellerBundle({
       appCodeSignId:
         "Developer ID Application: The University of Tromso (2K5J2584NX)",
     })
+    payloadPath = await renameFile(pkgPath, `${packageId}_${version}_macos.pkg`)
+    console.log /*logger.debug*/(`Installer created at ${payloadPath}`)
   } else {
     throw new Error(`Unsupported speller type: ${spellerType}`)
   }
