@@ -13,7 +13,12 @@ import {
 import logger from "~/util/log.ts"
 import { pipelineDivvunspell } from "./pipelines/divvunspell/mod.ts"
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
-import { pipelineLang, runLang, runLangBundle, runLangDeploy } from "./pipelines/lang/mod.ts"
+import {
+  pipelineLang,
+  runLang,
+  runLangBundle,
+  runLangDeploy,
+} from "./pipelines/lang/mod.ts"
 import sign from "./services/windows-codesign.ts"
 
 enum Command {

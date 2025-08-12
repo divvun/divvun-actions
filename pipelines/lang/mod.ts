@@ -1,7 +1,7 @@
 import * as fs from "@std/fs"
 import * as toml from "@std/toml"
 import * as yaml from "@std/yaml"
-import langBuild, { Props } from "~/actions/lang/build.ts"
+import langBuild from "~/actions/lang/build.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
@@ -20,11 +20,30 @@ function command(input: CommandStep): CommandStep {
   }
 }
 
+export type BuildProps = {
+  "requires-desktop-as-mobile-workaround": boolean
+  "fst": string[]
+  "generators": boolean
+  "spellers": boolean
+  "hyphenators": boolean
+  "analysers": boolean
+  "grammar-checkers": boolean
+  "hyperminimalisation": boolean
+  "reversed-intersect": boolean
+  "two-step-intersect": boolean
+  "speller-optimisation": boolean
+  "backend-format": string | null
+  "minimised-spellers": boolean
+  "force-all-tools": boolean
+}
+
 export async function runLang() {
   const yml = await Deno.readTextFile(".build-config.yml")
-  const config = (await yaml.parse(yml) as any)?.build as Props
+  const config = await yaml.parse(yml) as any
+  const buildConfig = config?.build as BuildProps
+  const checkConfig = config?.check as BuildProps
 
-  console.log(await langBuild(config))
+  console.log(await langBuild(buildConfig, checkConfig))
 }
 
 export async function runLangBundle(
@@ -57,7 +76,6 @@ export async function runLangBundle(
     spellerPaths,
   })
 }
-
 
 async function globOneFile(pattern: string): Promise<string | null> {
   const files = await fs.expandGlob(pattern)
@@ -98,7 +116,7 @@ export async function runLangDeploy() {
   if (!windowsFiles || !macosFiles || !mobileFiles) {
     throw new Error("Missing required files for deployment")
   }
-  
+
   await spellerDeploy({
     spellerType: SpellerType.Windows,
     manifestPath: "./manifest.toml",
@@ -167,7 +185,7 @@ export function pipelineLang() {
               queue: "macos",
             },
           }),
-        ]
+        ],
       },
       command({
         label: "Deploy",

@@ -1,4 +1,4 @@
-import * as builder from "~/builder.ts";
+import * as builder from "~/builder.ts"
 
 export enum SpellerType {
   MacOS = "speller-macos",
@@ -49,15 +49,15 @@ export function deriveLangTag(force3: boolean) {
     "nob": "nb", // Norwegian Bokmål
     "swe": "sv", // Swedish
     "fao": "fo", // Faroese
-    
+
     // Sami languages
     "sme": "se", // Northern Sami
-    
+
     // Finno-Ugric languages
     "fin": "fi", // Finnish
     "est": "et", // Estonian
     "hun": "hu", // Hungarian
-    
+
     // Celtic languages
     "gle": "ga", // Irish
     "gla": "gd", // Scottish Gaelic
@@ -65,7 +65,7 @@ export function deriveLangTag(force3: boolean) {
     "bre": "br", // Breton
     "cor": "kw", // Cornish
     "glv": "gv", // Manx
-    
+
     // Romance languages
     "spa": "es", // Spanish
     "fra": "fr", // French
@@ -73,7 +73,7 @@ export function deriveLangTag(force3: boolean) {
     "por": "pt", // Portuguese
     "ron": "ro", // Romanian
     "cat": "ca", // Catalan
-    
+
     // Slavic languages
     "rus": "ru", // Russian
     "pol": "pl", // Polish
@@ -87,20 +87,20 @@ export function deriveLangTag(force3: boolean) {
     "slv": "sl", // Slovenian
     "bos": "bs", // Bosnian
     "mkd": "mk", // Macedonian
-    
+
     // Baltic languages
     "lit": "lt", // Lithuanian
     "lav": "lv", // Latvian
-    
+
     // Other European languages
     "ell": "el", // Greek
     "alb": "sq", // Albanian
     "eus": "eu", // Basque
     "mlt": "mt", // Maltese
-    
+
     // Greenlandic
     "kal": "kl", // Kalaallisut (Greenlandic)
-    
+
     // Asian languages
     "zho": "zh", // Chinese
     "jpn": "ja", // Japanese
@@ -126,7 +126,7 @@ export function deriveLangTag(force3: boolean) {
     "lao": "lo", // Lao
     "mon": "mn", // Mongolian
     "tib": "bo", // Tibetan
-    
+
     // Middle Eastern languages
     "ara": "ar", // Arabic
     "heb": "he", // Hebrew
@@ -142,7 +142,7 @@ export function deriveLangTag(force3: boolean) {
     "bak": "ba", // Bashkir
     "chv": "cv", // Chuvash
     "sah": "sa", // Yakut
-    
+
     // African languages
     "swa": "sw", // Swahili
     "hau": "ha", // Hausa
@@ -163,21 +163,21 @@ export function deriveLangTag(force3: boolean) {
     "ven": "ve", // Venda
     "xho": "xh", // Xhosa
     "zul": "zu", // Zulu
-    
+
     // American languages
     "que": "qu", // Quechua
     "grn": "gn", // Guarani
     "aym": "ay", // Aymara
-    
+
     // Pacific languages
     "mao": "mi", // Māori
     "fij": "fj", // Fijian
     "ton": "to", // Tongan
     "haw": "hh", // Hawaiian (non-standard, but sometimes used)
-    
+
     // Constructed languages
     "epo": "eo", // Esperanto
-    
+
     // Additional languages that might be relevant
     "ido": "io", // Ido
     "ina": "ia", // Interlingua

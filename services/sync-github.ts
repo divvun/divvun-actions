@@ -141,7 +141,7 @@ async function listBuildkitePipelines(
         },
       },
     )
-    
+
     nextUrl = parseNextLinkHeader(response.headers.get("link"))
     const data = await response.json()
     responses = [...responses, ...data]
@@ -182,7 +182,7 @@ async function listGithubWebhooks(
   repoName: string,
 ): Promise<GithubWebhook[]> {
   const [owner, repo] = repoName.split("/")
-  
+
   const response = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/hooks`,
     {
@@ -198,7 +198,9 @@ async function listGithubWebhooks(
     if (response.status === 404) {
       return []
     }
-    throw new Error(`Failed to list webhooks for ${repoName}: ${response.status}`)
+    throw new Error(
+      `Failed to list webhooks for ${repoName}: ${response.status}`,
+    )
   }
 
   const data = await response.json()
@@ -217,7 +219,7 @@ function hasWebhookForPipeline(
   webhooks: GithubWebhook[],
   pipeline: BuildkitePipeline,
 ): boolean {
-  return webhooks.some(webhook =>
+  return webhooks.some((webhook) =>
     webhook.name === "web" &&
     webhook.active &&
     webhook.config.url === pipeline.webhook_url
@@ -230,7 +232,7 @@ async function createBuildkiteWebhook(
   pipeline: BuildkitePipeline,
 ): Promise<GithubWebhook> {
   const [owner, repo] = repoName.split("/")
-  
+
   const payload = {
     name: "web",
     active: true,
@@ -257,7 +259,9 @@ async function createBuildkiteWebhook(
   )
 
   if (!response.ok) {
-    throw new Error(`Failed to create webhook for ${repoName}: ${response.status}`)
+    throw new Error(
+      `Failed to create webhook for ${repoName}: ${response.status}`,
+    )
   }
 
   const data = await response.json()
@@ -310,7 +314,9 @@ async function createBuildkitePipeline(
 async function updateBuildkitePipeline(
   props: SyncGithubProps["buildkite"],
   pipeline: BuildkitePipeline,
-  updates: Partial<Pick<BuildkitePipeline, "branch_configuration" | "configuration">>
+  updates: Partial<
+    Pick<BuildkitePipeline, "branch_configuration" | "configuration">
+  >,
 ) {
   const response = await fetch(
     `https://api.buildkite.com/v2/organizations/${props.orgName}/pipelines/${pipeline.slug}`,
@@ -325,13 +331,19 @@ async function updateBuildkitePipeline(
   )
 
   if (!response.ok) {
-    throw new Error(`Failed to update pipeline ${pipeline.name}: ${response.status}`)
+    throw new Error(
+      `Failed to update pipeline ${pipeline.name}: ${response.status}`,
+    )
   }
 
   return await response.json()
 }
 
-function assessStatus(repo: GithubRepo, pipelines: BuildkitePipeline[], webhooks?: GithubWebhook[]) {
+function assessStatus(
+  repo: GithubRepo,
+  pipelines: BuildkitePipeline[],
+  webhooks?: GithubWebhook[],
+) {
   const pipeline = pipelines.find((p) => {
     const pipelineRepo = p.repository.replace(/\.git$/, "").split(":")[1]
     return pipelineRepo === repo.name
@@ -357,7 +369,7 @@ function assessStatus(repo: GithubRepo, pipelines: BuildkitePipeline[], webhooks
   // const repoTopics = new Set(repo.topics)
   // if (pipelineTags.difference(repoTopics).size > 0) {
   //   discrepancies.push({
-  //     code: "tags-mismatch", 
+  //     code: "tags-mismatch",
   //     message: `Pipeline tags do not match repo topics`,
   //   })
   // }
@@ -392,10 +404,14 @@ function assessStatus(repo: GithubRepo, pipelines: BuildkitePipeline[], webhooks
   }
 
   // Check branch configuration
-  if (!pipeline.branch_configuration || !pipeline.branch_configuration.includes("!gh-pages")) {
+  if (
+    !pipeline.branch_configuration ||
+    !pipeline.branch_configuration.includes("!gh-pages")
+  ) {
     discrepancies.push({
       code: "branch-configuration-missing",
-      message: "Pipeline branch configuration is missing or does not exclude gh-pages branch.",
+      message:
+        "Pipeline branch configuration is missing or does not exclude gh-pages branch.",
     })
   }
 
@@ -590,7 +606,9 @@ function getDiscrepancyIcon(code: string): string {
 
 export default async function syncGithub(props: SyncGithubProps) {
   const githubProps = props.github as Required<SyncGithubProps["github"]>
-  const buildkiteProps = props.buildkite as Required<SyncGithubProps["buildkite"]>
+  const buildkiteProps = props.buildkite as Required<
+    SyncGithubProps["buildkite"]
+  >
 
   console.log("🔍 Getting pipelines...")
   const pipelines = await listBuildkitePipelines(buildkiteProps)
@@ -638,7 +656,7 @@ export default async function syncGithub(props: SyncGithubProps) {
 
   for (const result of noWebhooks) {
     if (!result.pipeline) continue
-    
+
     console.log(`🔗 Creating webhook for ${result.repoName}...`)
     try {
       const webhook = await createBuildkiteWebhook(
@@ -648,34 +666,42 @@ export default async function syncGithub(props: SyncGithubProps) {
       )
       console.log(`✅ Created webhook: ${webhook.config.url}`)
     } catch (error) {
-      console.error(`❌ Failed to create webhook for ${result.repoName}: ${error}`)
+      console.error(
+        `❌ Failed to create webhook for ${result.repoName}: ${error}`,
+      )
     }
   }
 
   const noBranchConfig = results.filter((r) =>
-    r.discrepancies.some((d) => d.code === "branch-configuration-missing") && r.pipeline
+    r.discrepancies.some((d) => d.code === "branch-configuration-missing") &&
+    r.pipeline
   )
 
   for (const result of noBranchConfig) {
     if (!result.pipeline) continue
-    
+
     console.log(`🌿 Updating branch configuration for ${result.repoName}...`)
     try {
       let newBranchConfig = "!gh-pages"
-      
+
       // If there's an existing branch configuration, append to it
-      if (result.pipeline.branch_configuration && result.pipeline.branch_configuration.trim()) {
+      if (
+        result.pipeline.branch_configuration &&
+        result.pipeline.branch_configuration.trim()
+      ) {
         newBranchConfig = `${result.pipeline.branch_configuration} !gh-pages`
       }
-      
+
       await updateBuildkitePipeline(
         buildkiteProps,
         result.pipeline,
-        { branch_configuration: newBranchConfig }
+        { branch_configuration: newBranchConfig },
       )
       console.log(`✅ Updated branch configuration: ${newBranchConfig}`)
     } catch (error) {
-      console.error(`❌ Failed to update branch configuration for ${result.repoName}: ${error}`)
+      console.error(
+        `❌ Failed to update branch configuration for ${result.repoName}: ${error}`,
+      )
     }
   }
 }
