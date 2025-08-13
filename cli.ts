@@ -8,7 +8,8 @@ import {
   pipelineDivvunKeyboard,
   runDesktopKeyboardMacOS,
   runDesktopKeyboardWindows,
-  runDivvunKeyboard,
+  runDivvunKeyboardAndroid,
+  runDivvunKeyboardIOS,
 } from "~/pipelines/keyboard/divvun-keyboard.ts"
 import logger from "~/util/log.ts"
 import { pipelineDivvunspell } from "./pipelines/divvunspell/mod.ts"
@@ -145,6 +146,12 @@ async function runSign(args) {
   await sign(inputFile)
 }
 
+function kbdgenBundlePathMobile(): string {
+  return builder.env.repoName === "divvun-dev-keyboard"
+    ? "divvun-dev.kbdgen"
+    : "divvun.kbdgen";
+}
+
 async function runPipeline(args) {
   const pipeline = args._[0]
 
@@ -153,10 +160,11 @@ async function runPipeline(args) {
       // await build()
       break
     case "divvun-keyboard-ios": {
-      const kbdgenBundlePath = builder.env.repoName === "divvun-dev-keyboard"
-        ? "divvun-dev.kbdgen"
-        : "divvun.kbdgen"
-      await runDivvunKeyboard(kbdgenBundlePath)
+      await runDivvunKeyboardIOS(kbdgenBundlePathMobile())
+      break
+    }
+    case "divvun-keyboard-android": {
+      await runDivvunKeyboardAndroid(kbdgenBundlePathMobile())
       break
     }
     case "divvun-keyboard-windows": {
