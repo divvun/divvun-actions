@@ -918,6 +918,7 @@ export class Kbdgen {
     // await Bash.runScript("brew install imagemagick")
 
     logger.debug(`ANDROID_HOME: ${Deno.env.get("ANDROID_HOME")}`)
+    logger.debug(`ANDROID_HOME: ${Deno.env.get("ANDROID_NDK_HOME")}`)
 
     await Bash.runScript(
       `kbdgen target --output-path output --bundle-path ${abs} android build`,
