@@ -9,7 +9,7 @@ import logger from "~/util/log.ts"
 import keyboardDeploy from "../../actions/keyboard/deploy.ts"
 import { sentryUploadIOSDebugFiles } from "../../actions/sentry/upload-debug-files.ts"
 
-export async function runDivvunKeyboard(kbdgenBundlePath: string) {
+export async function runDivvunKeyboardIOS(kbdgenBundlePath: string) {
   const secrets = await builder.secrets()
   // await builder.group("Initializing Pahkat", async () => {
   //   await pahkatInit({
@@ -46,6 +46,15 @@ export async function runDivvunKeyboard(kbdgenBundlePath: string) {
       authToken: secrets.get("sentry/token"),
       projectId: projectId,
       dsymSearchPath: "output",
+    })
+  })
+}
+
+export async function runDivvunKeyboardAndroid(kbdgenBundlePath: string) {
+  await builder.group("Building Divvun Keyboard for Android", async () => {
+    await keyboardBuildMeta({
+      keyboardType: KeyboardType.Android,
+      bundlePath: kbdgenBundlePath,
     })
   })
 }
@@ -107,6 +116,13 @@ export function pipelineDivvunKeyboard() {
         command: "divvun-actions run divvun-keyboard-ios",
         agents: {
           queue: "macos",
+        },
+      }),
+      command({
+        label: "Build Divvun Keyboard for Android",
+        command: "divvun-actions run divvun-keyboard-android",
+        agents: {
+          queue: "linux",
         },
       }),
     ],
