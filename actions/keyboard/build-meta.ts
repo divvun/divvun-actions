@@ -1,6 +1,7 @@
 import * as builder from "~/builder.ts"
 import { Kbdgen } from "~/util/shared.ts"
 import { KeyboardType } from "./types.ts"
+import logger from "../../util/log.ts"
 
 export type Props = {
   keyboardType: KeyboardType
@@ -42,6 +43,7 @@ export default async function keyboardBuildMeta({
 
   if (keyboardType === KeyboardType.Android) {
     await Kbdgen.setBuildNumber(bundlePath, "android", buildStart)
+    logger.info("Building Android")
     payloadPath = await Kbdgen.buildAndroid(bundlePath, {
       githubUsername: secrets.get("github/username"),
       githubToken: secrets.get("github/token"),
