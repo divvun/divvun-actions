@@ -48,6 +48,11 @@ RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/pahkat-uploader?platform
     tar -xf pahkat-uploader.txz -C /usr/local && \
     rm pahkat-uploader.txz
 
+# Install kbdgen
+RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/kbdgen?platform=linux&channel=nightly' -o kbdgen.txz && \
+    tar -xf kbdgen.txz -C /usr/local && \
+    rm kbdgen.txz
+
 # Install thfst-tools
 RUN curl -fsSL 'https://pahkat.uit.no/artifacts/thfst-tools_1.0.0-alpha.2_linux_amd64.txz' -o thfst-tools.txz && \
     tar -xf thfst-tools.txz -C /usr/local && \
