@@ -44,21 +44,16 @@ export default async function keyboardBuildMeta({
   if (keyboardType === KeyboardType.Android) {
     await Kbdgen.setBuildNumber(bundlePath, "android", buildStart)
     logger.info("Building Android")
+    const repo = builder.env.repoName
     payloadPath = await Kbdgen.buildAndroid(bundlePath, {
       githubUsername: secrets.get("github/username"),
       githubToken: secrets.get("github/token"),
-      keyStore: "fixme",
-      keyAlias: "fixme",
-      storePassword: "fixme",
-      keyPassword: "fixme",
-      playStoreP12: "fixme",
-      playStoreAccount: "fixme",
-      // keyStore: secrets.get("android/keyStore"),
-      // keyAlias: secrets.get("android/keyAlias"),
-      // storePassword: secrets.get("android/keyStorePassword"),
-      // keyPassword: secrets.get("android/keyPassword"),
-      // playStoreP12: secrets.get("android/playStoreP12"),
-      // playStoreAccount: secrets.get("android/playStoreAccount"),
+      keyStore: secrets.get(`android/divvun/${repo}/keyStore`),
+      keyAlias: secrets.get(`android/divvun/${repo}/keyAlias`),
+      storePassword: secrets.get(`android/divvun/${repo}/keyStorePassword`),
+      keyPassword: secrets.get(`android/divvun/${repo}/keyPassword`),
+      playStoreP12: secrets.get("android/divvun/playStoreP12"),
+      playStoreAccount: secrets.get("android/divvun/playStoreAccount"),
     })
   } else if (keyboardType === KeyboardType.iOS) {
     await Kbdgen.setBuildNumber(bundlePath, "ios", buildStart)
