@@ -942,9 +942,9 @@ export class Kbdgen {
     )
 
     logger.debug("Output from kbdgen build: " + output[0])
-    for (const i in output) {
-      logger.debug(`Output line ${i}: ${output[i]}`)
-    }
+    // for (const i in output) {
+    //   logger.debug(`Output line ${i}: ${output[i]}`)
+    // }
 
     return await Kbdgen.resolveOutput(
       path.join(
