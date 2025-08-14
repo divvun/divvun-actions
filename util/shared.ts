@@ -920,7 +920,7 @@ export class Kbdgen {
     logger.setLogLevel("debug")
 
     logger.debug(`ANDROID_HOME: ${Deno.env.get("ANDROID_HOME")}`)
-    logger.info(`ANDROID_HOME: ${Deno.env.get("ANDROID_NDK_HOME")}`)
+    logger.debug(`ANDROID_HOME: ${Deno.env.get("ANDROID_NDK_HOME")}`)
 
     await Bash.runScript(
       `kbdgen target --output-path output --bundle-path ${abs} android build`,
