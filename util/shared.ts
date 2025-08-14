@@ -929,7 +929,7 @@ export class Kbdgen {
     logger.debug(`ANDROID_HOME: ${Deno.env.get("ANDROID_HOME")}`)
     logger.debug(`ANDROID_HOME: ${Deno.env.get("ANDROID_NDK_HOME")}`)
 
-    await Bash.runScript(
+    const output = await Bash.runScript(
       `kbdgen target --output-path output --bundle-path ${abs} android build`,
       {
         cwd,
@@ -947,6 +947,11 @@ export class Kbdgen {
         },
       },
     )
+
+    logger.debug("Output from kbdgen build: " + output[0])
+    for (const i in output) {
+      logger.debug(`Output line ${i}: ${output[i]}`)
+    }
 
     return await Kbdgen.resolveOutput(
       path.join(
