@@ -937,7 +937,7 @@ export class Kbdgen {
           GITHUB_USERNAME: secrets.githubUsername,
           GITHUB_TOKEN: secrets.githubToken,
           NDK_HOME: Deno.env.get("ANDROID_NDK_HOME")!,
-          ANDROID_KEYSTORE: await base64AsFile(secrets.keyStore),
+          ANDROID_KEYSTORE: secrets.keyStore,
           ANDROID_KEYALIAS: secrets.keyAlias,
           STORE_PW: secrets.storePassword,
           KEY_PW: secrets.keyPassword,
