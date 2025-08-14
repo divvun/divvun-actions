@@ -941,7 +941,7 @@ export class Kbdgen {
           ANDROID_KEYALIAS: secrets.keyAlias,
           STORE_PW: secrets.storePassword,
           KEY_PW: secrets.keyPassword,
-          PLAY_STORE_P12: await base64AsFile(secrets.playStoreP12),
+          PLAY_STORE_P12: secrets.playStoreP12,
           PLAY_STORE_ACCOUNT: secrets.playStoreAccount,
           RUST_LOG: "debug",
         },
