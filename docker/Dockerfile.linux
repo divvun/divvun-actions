@@ -69,7 +69,7 @@ RUN mkdir -p $BUILDKITE_PLUGIN_FS_CACHE_FOLDER
 RUN curl -fsSL https://apertium.projectjj.com/apt/install-nightly.sh | bash
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive \
-    apt install -y \
+    apt-get install -y \
     libssl-dev \
     imagemagick \
     apertium-all-dev \
@@ -82,7 +82,8 @@ RUN apt-get update && \
     libicu-dev \
     bc \
     flex \
-    bison
+    bison \
+    python3-gtgramtools
 
 # Update Docker
 RUN apt-get update && \
