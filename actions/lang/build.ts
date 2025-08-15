@@ -3,6 +3,7 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
+import { ExpectedError } from "../../util/error.ts"
 
 class Autotools {
   private directory: string
@@ -55,6 +56,10 @@ class Autotools {
 
     const status = await proc.status
     if (status.code !== 0) {
+      if (isTest) {
+        throw ExpectedError.create(`Tests failed with code ${status.code}`)
+      }
+
       throw new Error(`Failed to run make: ${status.code}`)
     }
   }

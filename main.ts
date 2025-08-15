@@ -7,6 +7,7 @@ import runCli from "./cli.ts"
 
 import * as target from "~/target.ts"
 import logger from "~/util/log.ts"
+import { ExpectedError } from "./util/error.ts"
 
 function prettyPlatform() {
   switch (Deno.build.os) {
@@ -331,7 +332,11 @@ main()
   })
   .catch((e) => {
     logger.error("Build failed with error:")
-    logger.error(e)
+    if (e instanceof ExpectedError) {
+      logger.error(e.message)
+    } else {
+      logger.error(e)
+    }
 
     Deno.exit(1)
   })
