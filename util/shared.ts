@@ -941,8 +941,8 @@ export class Kbdgen {
     logger.debug("Output from kbdgen build: " + output[0])
 
     logger.debug("cwd: " + cwd)
-    logger.debug("ls :" + Bash.runScript(`ls`))
-    logger.debug("output :" + Bash.runScript(`ls output`))
+    logger.debug("ls :" + await Bash.runScript(`ls`))
+    logger.debug("output :" + await Bash.runScript(`ls output`))
 
     return await Kbdgen.resolveOutput(
       path.join(
