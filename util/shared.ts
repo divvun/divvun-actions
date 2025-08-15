@@ -943,6 +943,8 @@ export class Kbdgen {
     logger.debug("cwd: " + cwd)
     logger.debug("ls :" + await Bash.runScript(`ls`))
     logger.debug("output :" + await Bash.runScript(`ls output`))
+    logger.debug("output :" + await Bash.runScript(`ls output/repo/app/build/outputs`))
+    logger.debug("output :" + await Bash.runScript(`ls output/repo/app/build/outputs/apk/release`))
 
     return await Kbdgen.resolveOutput(
       path.join(
