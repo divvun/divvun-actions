@@ -83,7 +83,10 @@ RUN apt-get update && \
     bc \
     flex \
     bison \
-    python3-gtgramtools
+    pipx \
+    python3-gtgramtools \
+    python3-gtmorphtest \
+    python3-gtltlextools
 
 # Update Docker
 RUN apt-get update && \
