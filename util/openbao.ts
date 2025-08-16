@@ -131,7 +131,7 @@ export class SecretsStore {
   }
 
   base64ByteArray(key: string) {
-    const value = this.#map.get(key)
+    const value = this.#map.get(key)?.trim()?.replace(/\n/g, "")
     if (value == null) {
       throw new Error(`Secret '${key}' not found`)
     }
