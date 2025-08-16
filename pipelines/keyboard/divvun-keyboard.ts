@@ -57,6 +57,14 @@ export async function runDivvunKeyboardAndroid(kbdgenBundlePath: string) {
       bundlePath: kbdgenBundlePath,
     })
   })
+
+  // if (builder.env.branch === "main") {
+  await builder.group("Publishing APK to Google Play Console", async () => {
+    await builder.exec("./gradlew", ["publishApk"], { cwd: "output/repo" })
+  })
+  // } else {
+  //   logger.info("Not main branch; skipping upload")
+  // }
 }
 
 export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
