@@ -48,11 +48,11 @@ export default async function keyboardBuildMeta({
     payloadPath = await Kbdgen.buildAndroid(bundlePath, {
       githubUsername: secrets.get("github/username"),
       githubToken: secrets.get("github/token"),
-      keyStore: secrets.get(`android/divvun/${repo}/keystore`),
+      keyStore: secrets.base64ByteArray(`android/divvun/${repo}/keystore`),
       keyAlias: secrets.get(`android/divvun/${repo}/keyalias`),
       storePassword: secrets.get(`android/divvun/${repo}/storePassword`),
       keyPassword: secrets.get(`android/divvun/${repo}/keyPassword`),
-      playStoreP12: secrets.get("android/divvun/playStoreP12"),
+      playStoreP12: secrets.base64ByteArray("android/divvun/playStoreP12"),
       playStoreAccount: secrets.get("android/divvun/playStoreAccount"),
     })
   } else if (keyboardType === KeyboardType.iOS) {
