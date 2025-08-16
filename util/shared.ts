@@ -905,11 +905,11 @@ export class Kbdgen {
     secrets: {
       githubUsername: string
       githubToken: string
-      keyStore: Uint8Array<ArrayBuffer>
+      keyStore: string
       keyAlias: string
       storePassword: string
       keyPassword: string
-      playStoreP12: Uint8Array<ArrayBuffer>
+      playStoreP12: string
       playStoreAccount: string
     },
   ): Promise<string> {
@@ -921,8 +921,8 @@ export class Kbdgen {
 
     const keyStorePath = Deno.makeTempFileSync({ suffix: ".jks" })
     const p12Path = Deno.makeTempFileSync({ suffix: ".p12" })
-    await Deno.writeFile(keyStorePath, secrets.keyStore)
-    await Deno.writeFile(p12Path, secrets.playStoreP12)
+    await Deno.writeTextFile(keyStorePath, secrets.keyStore)
+    await Deno.writeTextFile(p12Path, secrets.playStoreP12)
 
     const output = await Bash.runScript(
       `kbdgen target --output-path output --bundle-path ${abs} android build`,
