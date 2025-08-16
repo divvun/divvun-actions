@@ -919,6 +919,11 @@ export class Kbdgen {
 
     logger.setLogLevel("debug")
 
+    const keyStorePath = Deno.makeTempFileSync({ suffix: ".jks" })
+    const p12Path = Deno.makeTempFileSync({ suffix: ".p12" })
+    await Deno.writeTextFile(keyStorePath, secrets.keyStore)
+    await Deno.writeTextFile(p12Path, secrets.playStoreP12)
+
     const output = await Bash.runScript(
       `kbdgen target --output-path output --bundle-path ${abs} android build`,
       {
@@ -927,11 +932,11 @@ export class Kbdgen {
           GITHUB_USERNAME: secrets.githubUsername,
           GITHUB_TOKEN: secrets.githubToken,
           NDK_HOME: Deno.env.get("ANDROID_NDK_HOME")!,
-          ANDROID_KEYSTORE: secrets.keyStore,
+          ANDROID_KEYSTORE: keyStorePath,
           ANDROID_KEYALIAS: secrets.keyAlias,
           STORE_PW: secrets.storePassword,
           KEY_PW: secrets.keyPassword,
-          PLAY_STORE_P12: secrets.playStoreP12,
+          PLAY_STORE_P12: p12Path,
           PLAY_STORE_ACCOUNT: secrets.playStoreAccount,
           RUST_LOG: "debug",
         },
@@ -943,7 +948,10 @@ export class Kbdgen {
     logger.debug("cwd: " + cwd)
     logger.debug("ls :" + await Bash.runScript(`ls -R`))
     logger.debug("output :" + await Bash.runScript(`ls output`))
-    logger.debug("release dir :" + await Bash.runScript(`ls output/repo/app/build/outputs/apk/release`))
+    logger.debug(
+      "release dir :" +
+        await Bash.runScript(`ls output/repo/app/build/outputs/apk/release`),
+    )
 
     return await Kbdgen.resolveOutput(
       path.join(
