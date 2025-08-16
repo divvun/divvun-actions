@@ -15,7 +15,7 @@ export type Output = {
 export default async function keyboardBuildMeta({
   keyboardType,
   bundlePath,
-}: Props) {
+}: Props): Promise<Output> {
   if (
     keyboardType !== KeyboardType.iOS &&
     keyboardType !== KeyboardType.Android
