@@ -60,7 +60,15 @@ export async function runDivvunKeyboardAndroid(kbdgenBundlePath: string) {
 
   // if (builder.env.branch === "main") {
   await builder.group("Publishing APK to Google Play Console", async () => {
-    await builder.exec("./gradlew", ["publishApk"], { cwd: "output/repo" })
+    const secrets = await builder.secrets()
+    await builder.exec("./gradlew", ["publishApk"], {
+      cwd: "output/repo",
+      env: {
+        "ANDROID_PUBLISHER_CREDENTIALS": secrets.get(
+          "android/divvun/googleServiceAccountJson",
+        ),
+      },
+    })
   })
   // } else {
   //   logger.info("Not main branch; skipping upload")
