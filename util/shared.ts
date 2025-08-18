@@ -924,8 +924,6 @@ export class Kbdgen {
     const cwd = path.dirname(abs)
     // await Bash.runScript("brew install imagemagick")
 
-    logger.setLogLevel("debug")
-
     const keyStorePath = Deno.makeTempFileSync({ suffix: ".jks" })
     const p12Path = Deno.makeTempFileSync({ suffix: ".p12" })
     await Deno.writeFile(keyStorePath, secrets.keyStore)
@@ -950,16 +948,7 @@ export class Kbdgen {
       },
     )
 
-    logger.debug("Output from kbdgen build: " + output[0])
-
-    logger.debug("cwd: " + cwd)
-    logger.debug("output :" + await Bash.runScript(`ls output`))
-    logger.debug("repo :" + await Bash.runScript(`ls output/repo`))
-    logger.debug("app :" + await Bash.runScript(`ls output/repo/app`))
-    logger.debug(
-      "release dir :" +
-      await Bash.runScript(`ls output/repo/app/build/outputs/apk/release`),
-    )
+    logger.info("kbdgen output: " + output[0])
 
     return await Kbdgen.resolveOutput(
       path.join(
