@@ -929,34 +929,44 @@ export class Kbdgen {
     await Deno.writeFile(keyStorePath, secrets.keyStore)
     await Deno.writeFile(p12Path, secrets.playStoreP12)
 
-    const output = await Bash.runScript(
-      `kbdgen target --output-path output --bundle-path ${abs} android build`,
-      {
-        cwd,
-        env: {
-          GITHUB_USERNAME: secrets.githubUsername,
-          GITHUB_TOKEN: secrets.githubToken,
-          NDK_HOME: Deno.env.get("ANDROID_NDK_HOME")!,
-          ANDROID_KEYSTORE: keyStorePath,
-          ANDROID_KEYALIAS: secrets.keyAlias,
-          STORE_PW: secrets.storePassword,
-          KEY_PW: secrets.keyPassword,
-          PLAY_STORE_P12: p12Path,
-          PLAY_STORE_ACCOUNT: secrets.playStoreAccount,
-          RUST_LOG: "debug",
-        },
-      },
-    )
+    const env = {
+      GITHUB_USERNAME: secrets.githubUsername,
+      GITHUB_TOKEN: secrets.githubToken,
+      NDK_HOME: Deno.env.get("ANDROID_NDK_HOME")!,
+      ANDROID_KEYSTORE: keyStorePath,
+      ANDROID_KEYALIAS: secrets.keyAlias,
+      STORE_PW: secrets.storePassword,
+      KEY_PW: secrets.keyPassword,
+      PLAY_STORE_P12: p12Path,
+      PLAY_STORE_ACCOUNT: secrets.playStoreAccount,
+      RUST_LOG: "debug",
+    }
 
-    logger.info("kbdgen output: " + output[0])
-
-    return await Kbdgen.resolveOutput(
-      path.join(
+    try {
+      await builder.exec("kbdgen", [
+        "target",
+        "--output-path",
+        "output",
+        "--bundle-path",
+        abs,
+        "android",
+        "build",
+      ], {
         cwd,
-        "output/repo/app/build/outputs/apk/release",
-        `*-release.apk`,
-      ),
-    )
+        env,
+      })
+
+      return await Kbdgen.resolveOutput(
+        path.join(
+          cwd,
+          "output/repo/app/build/outputs/apk/release",
+          `*-release.apk`,
+        ),
+      )
+    } finally {
+      await Deno.remove(keyStorePath)
+      await Deno.remove(p12Path)
+    }
   }
 
   static async buildMacOS(bundlePath: string): Promise<string> {
