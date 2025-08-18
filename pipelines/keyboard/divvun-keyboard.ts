@@ -61,11 +61,6 @@ export async function runDivvunKeyboardAndroid(kbdgenBundlePath: string) {
   if (builder.env.branch === "main") {
     await builder.group("Publishing APK to Google Play Console", async () => {
       const secrets = await builder.secrets()
-      const keyStorePath = Deno.makeTempFileSync({ suffix: ".jks" })
-      const p12Path = Deno.makeTempFileSync({ suffix: ".p12" })
-      await Deno.writeFile(keyStorePath, secrets.keyStore)
-      await Deno.writeFile(p12Path, secrets.playStoreP12)
-
       await builder.exec("./gradlew", ["publishApk"], {
         cwd: "output/repo",
         env: {
@@ -75,9 +70,6 @@ export async function runDivvunKeyboardAndroid(kbdgenBundlePath: string) {
         },
       })
     })
-
-    await Deno.remove(keyStorePath)
-    await Deno.remove(p12Path)
   } else {
     logger.info("Not main branch; skipping upload")
   }
