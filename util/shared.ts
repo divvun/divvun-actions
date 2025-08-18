@@ -942,26 +942,31 @@ export class Kbdgen {
       RUST_LOG: "debug",
     }
 
-    await builder.exec("kbdgen", [
-      "target",
-      "--output-path",
-      "output",
-      "--bundle-path",
-      abs,
-      "android",
-      "build",
-    ], {
-      cwd,
-      env,
-    })
-
-    return await Kbdgen.resolveOutput(
-      path.join(
+    try {
+      await builder.exec("kbdgen", [
+        "target",
+        "--output-path",
+        "output",
+        "--bundle-path",
+        abs,
+        "android",
+        "build",
+      ], {
         cwd,
-        "output/repo/app/build/outputs/apk/release",
-        `*-release.apk`,
-      ),
-    )
+        env,
+      })
+
+      return await Kbdgen.resolveOutput(
+        path.join(
+          cwd,
+          "output/repo/app/build/outputs/apk/release",
+          `*-release.apk`,
+        ),
+      )
+    } finally {
+      await Deno.remove(keyStorePath)
+      await Deno.remove(p12Path)
+    }
   }
 
   static async buildMacOS(bundlePath: string): Promise<string> {
