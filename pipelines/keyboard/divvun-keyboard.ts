@@ -58,21 +58,21 @@ export async function runDivvunKeyboardAndroid(kbdgenBundlePath: string) {
     })
   })
 
-  // if (builder.env.branch === "main") {
-  await builder.group("Publishing APK to Google Play Console", async () => {
-    const secrets = await builder.secrets()
-    await builder.exec("./gradlew", ["publishApk"], {
-      cwd: "output/repo",
-      env: {
-        "ANDROID_PUBLISHER_CREDENTIALS": secrets.get(
-          "android/divvun/googleServiceAccountJson",
-        ),
-      },
+  if (builder.env.branch === "main") {
+    await builder.group("Publishing APK to Google Play Console", async () => {
+      const secrets = await builder.secrets()
+      await builder.exec("./gradlew", ["publishApk"], {
+        cwd: "output/repo",
+        env: {
+          "ANDROID_PUBLISHER_CREDENTIALS": secrets.get(
+            "android/divvun/googleServiceAccountJson",
+          ),
+        },
+      })
     })
-  })
-  // } else {
-  //   logger.info("Not main branch; skipping upload")
-  // }
+  } else {
+    logger.info("Not main branch; skipping upload")
+  }
 }
 
 export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
