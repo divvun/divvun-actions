@@ -933,11 +933,11 @@ export class Kbdgen {
       GITHUB_USERNAME: secrets.githubUsername,
       GITHUB_TOKEN: secrets.githubToken,
       NDK_HOME: Deno.env.get("ANDROID_NDK_HOME")!,
-      // ANDROID_KEYSTORE: keyStorePath,
+      ANDROID_KEYSTORE: keyStorePath,
       ANDROID_KEYALIAS: secrets.keyAlias,
       STORE_PW: secrets.storePassword,
       KEY_PW: secrets.keyPassword,
-      // PLAY_STORE_P12: p12Path,
+      PLAY_STORE_P12: p12Path,
       PLAY_STORE_ACCOUNT: secrets.playStoreAccount,
       RUST_LOG: "debug",
     }
