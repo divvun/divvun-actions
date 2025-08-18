@@ -912,11 +912,11 @@ export class Kbdgen {
     secrets: {
       githubUsername: string
       githubToken: string
-      keyStore: Uint8Array<ArrayBuffer>
+      // keyStore: Uint8Array<ArrayBuffer>
       keyAlias: string
       storePassword: string
       keyPassword: string
-      playStoreP12: Uint8Array<ArrayBuffer>
+      // playStoreP12: Uint8Array<ArrayBuffer>
       playStoreAccount: string
     },
   ): Promise<string> {
@@ -924,10 +924,10 @@ export class Kbdgen {
     const cwd = path.dirname(abs)
     // await Bash.runScript("brew install imagemagick")
 
-    const keyStorePath = Deno.makeTempFileSync({ suffix: ".jks" })
-    const p12Path = Deno.makeTempFileSync({ suffix: ".p12" })
-    await Deno.writeFile(keyStorePath, secrets.keyStore)
-    await Deno.writeFile(p12Path, secrets.playStoreP12)
+    // const keyStorePath = Deno.makeTempFileSync({ suffix: ".jks" })
+    // const p12Path = Deno.makeTempFileSync({ suffix: ".p12" })
+    // await Deno.writeFile(keyStorePath, secrets.keyStore)
+    // await Deno.writeFile(p12Path, secrets.playStoreP12)
 
     const env = {
       GITHUB_USERNAME: secrets.githubUsername,

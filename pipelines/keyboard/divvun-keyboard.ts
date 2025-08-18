@@ -63,8 +63,15 @@ export async function runDivvunKeyboardAndroid(kbdgenBundlePath: string) {
       const secrets = await builder.secrets()
       const keyStorePath = Deno.makeTempFileSync({ suffix: ".jks" })
       const p12Path = Deno.makeTempFileSync({ suffix: ".p12" })
-      await Deno.writeFile(keyStorePath, secrets.keyStore)
-      await Deno.writeFile(p12Path, secrets.playStoreP12)
+      const repo = builder.env.repoName
+      await Deno.writeFile(
+        keyStorePath,
+        secrets.base64ByteArray(`android/divvun/${repo}/keystore`),
+      )
+      await Deno.writeFile(
+        p12Path,
+        secrets.base64ByteArray("android/divvun/playStoreP12"),
+      )
 
       await builder.exec("./gradlew", ["publishApk"], {
         cwd: "output/repo",
@@ -72,6 +79,8 @@ export async function runDivvunKeyboardAndroid(kbdgenBundlePath: string) {
           "ANDROID_PUBLISHER_CREDENTIALS": secrets.get(
             "android/divvun/googleServiceAccountJson",
           ),
+          "ANDROID_KEYSTORE": keyStorePath,
+          "PLAY_STORE_P12": p12Path,
         },
       })
     })
