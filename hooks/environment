@@ -17,5 +17,9 @@ if [[ "$(uname)" == "Darwin" ]]; then
   export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
 fi
 
+# Set tmpdir to something we control
+export TMPDIR=$(mktemp -d -t build.${BUILDKITE_PIPELINE_NAME}.${BUILDKITE_BUILD_NUMBER}.XXXXXXXXXX)
+echo "Using temporary directory: $TMPDIR"
+
 echo "Bash"
 echo $PATH

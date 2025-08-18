@@ -1,9 +1,9 @@
 import * as fs from "@std/fs"
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import { ExpectedError } from "~/util/error.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
-import { ExpectedError } from "../../util/error.ts"
 
 class Autotools {
   private directory: string

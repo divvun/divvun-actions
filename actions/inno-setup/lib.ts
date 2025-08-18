@@ -1,10 +1,11 @@
 import * as path from "@std/path"
 import * as target from "~/target.ts"
+import { makeTempDir } from "../../util/temp.ts"
 
 export async function makeInstaller(
   issPath: string,
 ): Promise<string> {
-  const installerOutput = await Deno.makeTempDir()
+  const installerOutput = await makeTempDir()
   const scriptPath = `${target.projectPath}\\bin\\divvun-actions.bat`
 
   const proc = new Deno.Command(

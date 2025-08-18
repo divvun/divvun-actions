@@ -9,15 +9,12 @@ import * as builder from "~/builder.ts"
 import { download } from "~/util/download.ts"
 import logger from "~/util/log.ts"
 import { Security } from "./security.ts"
+import { makeTempDir, makeTempDirSync, makeTempFile } from "./temp.ts"
 
 // export const WINDOWS_SIGNING_HASH_ALGORITHM = "sha256"
 export const RFC3161_URL = "http://ts.ssl.com"
 const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(() => resolve(), ms))
-
-export function tmpDir() {
-  return Deno.makeTempDirSync()
-}
 
 export function randomString64() {
   return encodeBase64(crypto.getRandomValues(new Uint8Array(48)))
@@ -210,7 +207,7 @@ export class Tar {
 
     console.log("Extracting", filePath)
     if (platform === "linux" || platform === "darwin") {
-      const dir = outputDir || tmpDir()
+      const dir = outputDir || makeTempDirSync()
       const proc = new Deno.Command("tar", {
         args: ["xf", filePath],
         cwd: dir,
@@ -223,7 +220,7 @@ export class Tar {
 
       return dir
     } else if (platform === "windows") {
-      const dir = outputDir || tmpDir()
+      const dir = outputDir || makeTempDirSync()
       const proc = new Deno.Command("bsdtar", {
         args: ["-xvf", filePath, "-C", dir],
       }).spawn()
@@ -238,7 +235,7 @@ export class Tar {
   }
 
   static async createFlatTxz(paths: string[], outputPath: string) {
-    const tmpDir = await Deno.makeTempDir()
+    const tmpDir = await makeTempDir()
     const stagingDir = path.join(tmpDir, "staging")
     await Deno.mkdir(stagingDir)
 
@@ -284,7 +281,7 @@ export class PahkatPrefix {
 
   static get path(): string {
     if (_pahkatPrefixPath == null) {
-      _pahkatPrefixPath = path.join(tmpDir(), "pahkat-prefix")
+      _pahkatPrefixPath = path.join(makeTempDirSync(), "pahkat-prefix")
     }
     return _pahkatPrefixPath
   }
@@ -729,7 +726,7 @@ wget -q https://apertium.projectjj.com/apt/install-nightly.sh -O install-nightly
 
 async function base64AsFile(input: string) {
   const buffer = decodeBase64(input)
-  const tmp = await Deno.makeTempFile()
+  const tmp = await makeTempFile()
   await Deno.writeFile(tmp, buffer)
   return tmp
 }
@@ -859,7 +856,7 @@ export class Kbdgen {
     // await Bash.runScript("brew install imagemagick")
     await Security.unlockKeychain("login", secrets.adminPassword)
 
-    const appStoreKeyJsonPath = Deno.makeTempFileSync({ suffix: ".json" })
+    using appStoreKeyJsonPath = await makeTempFile({ suffix: ".json" })
     const env = {
       GITHUB_USERNAME: secrets.githubUsername,
       GITHUB_TOKEN: secrets.githubToken,

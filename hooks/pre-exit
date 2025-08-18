@@ -1,0 +1,5 @@
+#!/bin/bash
+set -ueo pipefail
+
+echo "Cleaning up temporary directory ($TMPDIR)..."
+rm -rf $TMPDIR

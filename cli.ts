@@ -20,6 +20,7 @@ import {
   runLangDeploy,
 } from "./pipelines/lang/mod.ts"
 import sign from "./services/windows-codesign.ts"
+import { makeTempFile } from "./util/temp.ts"
 
 enum Command {
   Run = "run",
@@ -215,7 +216,7 @@ async function runCi(args) {
   }
 
   const input = yaml.stringify(pipeline)
-  const pipelinePath = await Deno.makeTempFile({ suffix: ".yml" })
+  using pipelinePath = await makeTempFile({ suffix: ".yml" })
 
   try {
     Deno.writeTextFileSync(pipelinePath, input)

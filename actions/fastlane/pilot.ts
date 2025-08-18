@@ -1,4 +1,5 @@
 import { exec } from "~/builder.ts"
+import { makeTempFile } from "~/util/temp.ts"
 
 export type FastlanePilotUploadApiKey = {
   key_id: string
@@ -14,7 +15,7 @@ export type FastlanePilotUploadOptions = {
 }
 
 export async function fastlanePilotUpload(options: FastlanePilotUploadOptions) {
-  const apiKeyPath = await Deno.makeTempFile({ suffix: "json" })
+  const apiKeyPath = await makeTempFile({ suffix: "json" })
 
   try {
     await Deno.writeTextFile(apiKeyPath, JSON.stringify(options.apiKey))

@@ -5,10 +5,10 @@ import langBuild from "~/actions/lang/build.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
+import { versionAsNightly } from "~/util/shared.ts"
 import spellerBundle from "../../actions/speller/bundle.ts"
 import spellerDeploy from "../../actions/speller/deploy.ts"
 import { SpellerManifest, SpellerType } from "../../actions/speller/manifest.ts"
-import { versionAsNightly } from "../../util/shared.ts"
 
 function command(input: CommandStep): CommandStep {
   return {

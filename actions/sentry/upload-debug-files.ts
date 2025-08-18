@@ -1,5 +1,5 @@
 import { exec } from "~/builder.ts"
-import logger from "../../util/log.ts"
+import logger from "~/util/log.ts"
 
 export type SentryUploadIOSDebugFilesOptions = {
   authToken: string

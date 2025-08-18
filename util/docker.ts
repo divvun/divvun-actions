@@ -5,6 +5,7 @@ import { exec } from "~/builder.ts"
 import type { CommandStep } from "~/builder/pipeline.ts"
 import logger from "~/util/log.ts"
 import { Powershell } from "./shared.ts"
+import { makeTempDirSync } from "./temp.ts"
 
 export default class Docker {
   static readonly DIVVUN_ACTIONS_PATH = path.resolve(
@@ -143,7 +144,7 @@ export default class Docker {
   static async enterWorkspace() {
     const id = crypto.randomUUID()
     const volName = `workspace-${id}`
-    const tmpDir = Deno.makeTempDirSync()
+    const tmpDir = makeTempDirSync()
     const imagePath = path.join(tmpDir, volName)
 
     await Deno.mkdir(imagePath)

@@ -2,6 +2,7 @@ import * as fs from "@std/fs"
 import * as path from "@std/path"
 import logger from "~/util/log.ts"
 import { Tar } from "~/util/shared.ts"
+import { makeTempFile } from "../util/temp.ts"
 
 export type Props = {
   filesPath: string
@@ -18,7 +19,7 @@ export default async function createTxz({ filesPath }: Props): Promise<Output> {
     includeDirs: true,
   })
 
-  const outputTxz = await Deno.makeTempFile({
+  const outputTxz = await makeTempFile({
     suffix: ".txz",
   })
 
