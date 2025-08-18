@@ -1,4 +1,4 @@
-import * as builder from "~/builder/builder.ts"
+import * as builder from "~/builder.ts"
 
 const originalMakeTempFile = Deno.makeTempFile
 const originalMakeTempDir = Deno.makeTempDir
