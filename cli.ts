@@ -218,10 +218,6 @@ async function runCi(args) {
   const input = yaml.stringify(pipeline)
   using pipelinePath = await makeTempFile({ suffix: ".yml" })
 
-  try {
-    Deno.writeTextFileSync(pipelinePath, input)
-    await builder.exec("buildkite-agent", ["pipeline", "upload", pipelinePath])
-  } finally {
-    await Deno.remove(pipelinePath)
-  }
+  Deno.writeTextFileSync(pipelinePath, input)
+  await builder.exec("buildkite-agent", ["pipeline", "upload", pipelinePath])
 }
