@@ -921,8 +921,8 @@ export class Kbdgen {
     const cwd = path.dirname(abs)
     // await Bash.runScript("brew install imagemagick")
 
-    const keyStorePath = makeTempFileSync({ suffix: ".jks" })
-    const p12Path = makeTempFileSync({ suffix: ".p12" })
+    using keyStorePath = makeTempFileSync({ suffix: ".jks" })
+    using p12Path = makeTempFileSync({ suffix: ".p12" })
     await Deno.writeFile(keyStorePath, secrets.keyStore)
     await Deno.writeFile(p12Path, secrets.playStoreP12)
 
