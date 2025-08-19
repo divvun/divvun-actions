@@ -6,7 +6,7 @@ export async function download(url: string, options: {
   path?: string
 } = {}): Promise<string> {
   const downloadPath = path.resolve(
-    options.path ?? makeTempDirSync(),
+    options.path ?? makeTempDirSync().path,
     options.fileName ?? path.basename(url),
   )
 

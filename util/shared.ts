@@ -212,7 +212,7 @@ export class Tar {
 
     console.log("Extracting", filePath)
     if (platform === "linux" || platform === "darwin") {
-      const dir = outputDir || makeTempDirSync()
+      const dir = outputDir || makeTempDirSync().path
       const proc = new Deno.Command("tar", {
         args: ["xf", filePath],
         cwd: dir,
@@ -225,7 +225,7 @@ export class Tar {
 
       return dir
     } else if (platform === "windows") {
-      const dir = outputDir || makeTempDirSync()
+      const dir = outputDir || makeTempDirSync().path
       const proc = new Deno.Command("bsdtar", {
         args: ["-xvf", filePath, "-C", dir],
       }).spawn()
@@ -241,7 +241,7 @@ export class Tar {
 
   static async createFlatTxz(paths: string[], outputPath: string) {
     const tmpDir = await makeTempDir()
-    const stagingDir = path.join(tmpDir, "staging")
+    const stagingDir = path.join(tmpDir.path, "staging")
     await Deno.mkdir(stagingDir)
 
     logger.debug(`Created tmp dir: ${tmpDir}`)
@@ -259,7 +259,7 @@ export class Tar {
     await Bash.runScript(`xz -9 ../file.tar`, { cwd: stagingDir })
 
     logger.debug("Copying file.tar.xz to " + outputPath)
-    await Deno.copyFile(path.join(tmpDir, "file.tar.xz"), outputPath)
+    await Deno.copyFile(path.join(tmpDir.path, "file.tar.xz"), outputPath)
   }
 }
 
@@ -286,7 +286,7 @@ export class PahkatPrefix {
 
   static get path(): string {
     if (_pahkatPrefixPath == null) {
-      _pahkatPrefixPath = path.join(makeTempDirSync(), "pahkat-prefix")
+      _pahkatPrefixPath = path.join(makeTempDirSync().path, "pahkat-prefix")
     }
     return _pahkatPrefixPath
   }
@@ -732,7 +732,7 @@ wget -q https://apertium.projectjj.com/apt/install-nightly.sh -O install-nightly
 async function base64AsFile(input: string) {
   const buffer = decodeBase64(input)
   const tmp = await makeTempFile()
-  await Deno.writeFile(tmp, buffer)
+  await Deno.writeFile(tmp.path, buffer)
   return tmp
 }
 
@@ -861,7 +861,7 @@ export class Kbdgen {
     // await Bash.runScript("brew install imagemagick")
     await Security.unlockKeychain("login", secrets.adminPassword)
 
-    const appStoreKeyJsonPath = await makeTempFile({ suffix: ".json" })
+    using appStoreKeyJsonPath = await makeTempFile({ suffix: ".json" })
     const env = {
       GITHUB_USERNAME: secrets.githubUsername,
       GITHUB_TOKEN: secrets.githubToken,
@@ -870,7 +870,7 @@ export class Kbdgen {
       FASTLANE_USER: secrets.fastlaneUser,
       PRODUCE_USERNAME: secrets.fastlaneUser,
       FASTLANE_PASSWORD: secrets.fastlanePassword,
-      APP_STORE_KEY_JSON: appStoreKeyJsonPath,
+      APP_STORE_KEY_JSON: appStoreKeyJsonPath.path,
       MATCH_KEYCHAIN_NAME: "login.keychain",
       MATCH_KEYCHAIN_PASSWORD: secrets.adminPassword,
       LANG: "C.UTF-8",
@@ -878,7 +878,7 @@ export class Kbdgen {
     }
 
     // Do the build
-    await Deno.writeTextFile(appStoreKeyJsonPath, secrets.appStoreKeyJson)
+    await Deno.writeTextFile(appStoreKeyJsonPath.path, secrets.appStoreKeyJson)
 
     await builder.exec("kbdgen", [
       "target",
@@ -923,8 +923,8 @@ export class Kbdgen {
 
     using keyStorePath = makeTempFileSync({ suffix: ".jks" })
     using p12Path = makeTempFileSync({ suffix: ".p12" })
-    await Deno.writeFile(keyStorePath, secrets.keyStore)
-    await Deno.writeFile(p12Path, secrets.playStoreP12)
+    await Deno.writeFile(keyStorePath.path, secrets.keyStore)
+    await Deno.writeFile(p12Path.path, secrets.playStoreP12)
 
     const env = {
       GITHUB_USERNAME: secrets.githubUsername,

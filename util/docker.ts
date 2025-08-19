@@ -145,7 +145,7 @@ export default class Docker {
     const id = crypto.randomUUID()
     const volName = `workspace-${id}`
     const tmpDir = makeTempDirSync()
-    const imagePath = path.join(tmpDir, volName)
+    const imagePath = path.join(tmpDir.path, volName)
 
     await Deno.mkdir(imagePath)
 

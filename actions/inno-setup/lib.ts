@@ -15,7 +15,7 @@ export async function makeInstaller(
         "/C",
         path.join(import.meta.dirname ?? "", "build.cmd"),
         scriptPath,
-        installerOutput,
+        installerOutput.path,
         issPath,
       ],
     },
@@ -29,5 +29,5 @@ export async function makeInstaller(
     throw new Error(`Process exited with code ${code}`)
   }
 
-  return path.join(installerOutput, "install.exe")
+  return path.join(installerOutput.path, "install.exe")
 }

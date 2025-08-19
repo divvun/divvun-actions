@@ -4,39 +4,35 @@ const originalMakeTempDir = Deno.makeTempDir
 const originalMakeTempFileSync = Deno.makeTempFileSync
 const originalMakeTempDirSync = Deno.makeTempDirSync
 
-const isDisposedSymbol = Symbol("isDisposed")
+export class DisposablePath {
+  #isDisposed: boolean = false;
+  readonly path: string;
 
-export type DisposablePath = string & {
-  [Symbol.asyncDispose](): Promise<void>
-  [Symbol.dispose](): void
-  [isDisposedSymbol]?: boolean
+  constructor(tempPath: string) {
+    this.path = tempPath;
+  }
+
+  [Symbol.dispose]() {
+    if (this.#isDisposed) {
+      Deno.removeSync(this.toString(), { recursive: true })
+      this.#isDisposed = true
+    }
+  }
+
+  async [Symbol.asyncDispose](): Promise<void> {
+    if (this.#isDisposed) {
+      await Deno.remove(this.toString(), { recursive: true })
+      this.#isDisposed = true
+    }
+  }
+
+  get [Symbol.toStringTag]() {
+    return "DisposablePath"
+  }
 }
 
 function assignDispose(dir: string) {
-  const tempDir = new String(dir) as string & {
-    [isDisposedSymbol]?: boolean
-  }
-
-  Object.defineProperties(tempDir, {
-    [Symbol.dispose]: {
-      value: () => {
-        if (!tempDir[isDisposedSymbol]) {
-          Deno.removeSync(tempDir as string, { recursive: true })
-          tempDir[isDisposedSymbol] = true
-        }
-      },
-    },
-    [Symbol.asyncDispose]: {
-      value: async () => {
-        if (!tempDir[isDisposedSymbol]) {
-          await Deno.remove(tempDir as string, { recursive: true })
-          tempDir[isDisposedSymbol] = true
-        }
-      },
-    },
-  })
-
-  return tempDir as DisposablePath
+  return new DisposablePath(dir);
 }
 
 export async function makeTempFile(
