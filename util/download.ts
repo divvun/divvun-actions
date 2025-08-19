@@ -5,9 +5,14 @@ export async function download(url: string, options: {
   fileName?: string
   path?: string
 } = {}): Promise<string> {
+  const p = options.path ?? makeTempDirSync().path
+  const filename = options.fileName ?? path.basename(url)
+
+  console.log("Downloading", url, "to", p, "as", filename)
+
   const downloadPath = path.resolve(
-    options.path ?? makeTempDirSync().path,
-    options.fileName ?? path.basename(url),
+    p,
+    filename,
   )
 
   if (Deno.build.os === "windows") {

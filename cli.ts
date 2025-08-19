@@ -149,7 +149,7 @@ async function runSign(args) {
 function kbdgenBundlePathMobile(): string {
   return builder.env.repoName === "divvun-dev-keyboard"
     ? "divvun-dev.kbdgen"
-    : "divvun.kbdgen";
+    : "divvun.kbdgen"
 }
 
 async function runPipeline(args) {
@@ -227,5 +227,9 @@ async function runCi(args) {
   using pipelinePath = await makeTempFile({ suffix: ".yml" })
 
   Deno.writeTextFileSync(pipelinePath.path, input)
-  await builder.exec("buildkite-agent", ["pipeline", "upload", pipelinePath.path])
+  await builder.exec("buildkite-agent", [
+    "pipeline",
+    "upload",
+    pipelinePath.path,
+  ])
 }

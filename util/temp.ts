@@ -1,15 +1,14 @@
-
 const originalMakeTempFile = Deno.makeTempFile
 const originalMakeTempDir = Deno.makeTempDir
 const originalMakeTempFileSync = Deno.makeTempFileSync
 const originalMakeTempDirSync = Deno.makeTempDirSync
 
 export class DisposablePath {
-  #isDisposed: boolean = false;
-  readonly path: string;
+  #isDisposed: boolean = false
+  readonly path: string
 
   constructor(tempPath: string) {
-    this.path = tempPath;
+    this.path = tempPath
   }
 
   [Symbol.dispose]() {
@@ -32,7 +31,7 @@ export class DisposablePath {
 }
 
 function assignDispose(dir: string) {
-  return new DisposablePath(dir);
+  return new DisposablePath(dir)
 }
 
 export async function makeTempFile(
