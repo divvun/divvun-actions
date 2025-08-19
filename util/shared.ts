@@ -850,7 +850,6 @@ export class Kbdgen {
     appStoreKeyJson: string
     adminPassword: string
   }): Promise<string> {
-    console.log("...")
     const abs = path.resolve(bundlePath)
     const cwd = path.dirname(abs)
 
@@ -858,7 +857,6 @@ export class Kbdgen {
     await Security.unlockKeychain("login", secrets.adminPassword)
 
     using appStoreKeyJsonPath = await makeTempFile({ suffix: ".json" })
-    console.log("Using appStoreKeyJsonPath:", appStoreKeyJsonPath)
     const env = {
       GITHUB_USERNAME: secrets.githubUsername,
       GITHUB_TOKEN: secrets.githubToken,
@@ -875,31 +873,27 @@ export class Kbdgen {
     }
 
     // Do the build
-    try {
-      await Deno.writeTextFile(appStoreKeyJsonPath, secrets.appStoreKeyJson)
+    await Deno.writeTextFile(appStoreKeyJsonPath, secrets.appStoreKeyJson)
 
-      await builder.exec("kbdgen", [
-        "target",
-        "--output-path",
-        "output",
-        "--bundle-path",
-        abs,
-        "ios",
-        "build",
-      ], {
-        cwd,
-        env,
-      })
+    await builder.exec("kbdgen", [
+      "target",
+      "--output-path",
+      "output",
+      "--bundle-path",
+      abs,
+      "ios",
+      "build",
+    ], {
+      cwd,
+      env,
+    })
 
-      const files = await fs.expandGlob(
-        path.resolve(abs, "../output/ipa/*.ipa"),
-      )
+    const files = await fs.expandGlob(
+      path.resolve(abs, "../output/ipa/*.ipa"),
+    )
 
-      for await (const file of files) {
-        return file.path
-      }
-    } finally {
-      await Deno.remove(appStoreKeyJsonPath)
+    for await (const file of files) {
+      return file.path
     }
 
     throw new Error("No output found for build.")
