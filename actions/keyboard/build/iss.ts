@@ -25,7 +25,7 @@ export async function generateKbdInnoFromBundle(
   const project = await Kbdgen.loadProjectBundle(bundlePath)
   const layouts = await Kbdgen.loadLayouts(bundlePath)
 
-  const builder = new InnoSetupBuilder()
+  const builder = new InnoSetupBuilder(Deno.cwd())
 
   builder
     .name(bundle.appName)
