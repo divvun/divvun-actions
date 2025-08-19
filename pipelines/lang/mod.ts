@@ -148,7 +148,16 @@ export async function runLangDeploy() {
   })
 }
 
+// Anything using more than like 20gb of RAM is considered large
+const LARGE_BUILDS = [
+  "lang-kal",
+  "lang-sme",
+]
+
 export function pipelineLang() {
+  const extra: Record<string, string> =
+    LARGE_BUILDS.includes(builder.env.repoName) ? { size: "large" } : {}
+
   const pipeline: BuildkitePipeline = {
     steps: [
       command({
@@ -157,6 +166,7 @@ export function pipelineLang() {
         command: "divvun-actions run lang",
         agents: {
           queue: "linux",
+          ...extra,
         },
       }),
       {
