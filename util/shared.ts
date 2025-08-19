@@ -9,7 +9,12 @@ import * as builder from "~/builder.ts"
 import { download } from "~/util/download.ts"
 import logger from "~/util/log.ts"
 import { Security } from "./security.ts"
-import { makeTempDir, makeTempDirSync, makeTempFile } from "./temp.ts"
+import {
+  makeTempDir,
+  makeTempDirSync,
+  makeTempFile,
+  makeTempFileSync,
+} from "./temp.ts"
 
 // export const WINDOWS_SIGNING_HASH_ALGORITHM = "sha256"
 export const RFC3161_URL = "http://ts.ssl.com"
@@ -917,8 +922,8 @@ export class Kbdgen {
     const cwd = path.dirname(abs)
     // await Bash.runScript("brew install imagemagick")
 
-    const keyStorePath = await makeTempFile({ suffix: ".jks" })
-    const p12Path = await makeTempFile({ suffix: ".p12" })
+    const keyStorePath = makeTempFileSync({ suffix: ".jks" })
+    const p12Path = makeTempFileSync({ suffix: ".p12" })
     await Deno.writeFile(keyStorePath, secrets.keyStore)
     await Deno.writeFile(p12Path, secrets.playStoreP12)
 
