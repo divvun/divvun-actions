@@ -168,6 +168,7 @@ export function pipelineLang() {
           queue: "linux",
           ...extra,
         },
+        priority: extra.size ? 10 : undefined,
       }),
       {
         group: "Bundle",

@@ -383,6 +383,8 @@ export type CommandStep = BaseStep & {
   skip?: boolean | string
   /** Whether to continue running when the command fails. Can be a boolean or a list of exit status codes to handle as soft failures */
   soft_fail?: boolean | SoftFailConfig[]
+  /** The higher the priority, the higher the priority. */
+  priority?: number
 }
 
 /**
