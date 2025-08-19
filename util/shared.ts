@@ -861,7 +861,7 @@ export class Kbdgen {
     // await Bash.runScript("brew install imagemagick")
     await Security.unlockKeychain("login", secrets.adminPassword)
 
-    using appStoreKeyJsonPath = await makeTempFile({ suffix: ".json" })
+    const appStoreKeyJsonPath = await makeTempFile({ suffix: ".json" })
     const env = {
       GITHUB_USERNAME: secrets.githubUsername,
       GITHUB_TOKEN: secrets.githubToken,
