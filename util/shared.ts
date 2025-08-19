@@ -857,6 +857,7 @@ export class Kbdgen {
     await Security.unlockKeychain("login", secrets.adminPassword)
 
     using appStoreKeyJsonPath = await makeTempFile({ suffix: ".json" })
+    console.log("Using appStoreKeyJsonPath:", appStoreKeyJsonPath)
     const env = {
       GITHUB_USERNAME: secrets.githubUsername,
       GITHUB_TOKEN: secrets.githubToken,

@@ -1,4 +1,3 @@
-import * as builder from "~/builder.ts"
 
 const originalMakeTempFile = Deno.makeTempFile
 const originalMakeTempDir = Deno.makeTempDir
@@ -38,21 +37,6 @@ function assignDispose(dir: string) {
   })
 
   return tempDir as DisposablePath
-}
-
-const TEMP_DIR = Deno.env.get("TMPDIR") ||
-  Deno.env.get("TEMP") ||
-  Deno.env.get("TMP") ||
-  "/tmp"
-
-function augmentOptions(
-  options: Deno.MakeTempOptions = {},
-): Deno.MakeTempOptions {
-  if (builder.mode === "buildkite") {
-    return { ...options, dir: "" }
-  }
-
-  return options
 }
 
 export async function makeTempFile(
