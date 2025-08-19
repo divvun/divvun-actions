@@ -900,7 +900,6 @@ export class Kbdgen {
     for await (const file of files) {
       return file.path
     }
-
     throw new Error("No output found for build.")
   }
 
