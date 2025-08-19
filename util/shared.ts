@@ -850,6 +850,7 @@ export class Kbdgen {
     appStoreKeyJson: string
     adminPassword: string
   }): Promise<string> {
+    console.log("...")
     const abs = path.resolve(bundlePath)
     const cwd = path.dirname(abs)
 
