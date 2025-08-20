@@ -158,18 +158,23 @@ export function pipelineLang() {
   const extra: Record<string, string> =
     LARGE_BUILDS.includes(builder.env.repoName) ? { size: "large" } : {}
 
+  const first = command({
+    key: "build",
+    label: "Build",
+    command: "divvun-actions run lang",
+    agents: {
+      queue: "linux",
+      ...extra,
+    },
+  })
+
+  if (extra.size === "large") {
+    first.priority = 10
+  }
+
   const pipeline: BuildkitePipeline = {
     steps: [
-      command({
-        key: "build",
-        label: "Build",
-        command: "divvun-actions run lang",
-        agents: {
-          queue: "linux",
-          ...extra,
-        },
-        priority: extra.size ? 10 : undefined,
-      }),
+      first,
       {
         group: "Bundle",
         key: "bundle",
