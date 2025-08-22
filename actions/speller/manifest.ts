@@ -27,7 +27,7 @@ export type SpellerManifest = {
 
 export function deriveLangTag() {
   console.log("repoName", builder.env.repoName)
-  const lang = builder.env.repoName.split("lang-")[1]
+  const lang = builder.env.repoName.split("lang-")[1]?.split("-")[0]
   console.log("lang", lang)
 
   // Map ISO 639-3 codes to ISO 639-1 codes where they exist
