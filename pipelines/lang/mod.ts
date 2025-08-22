@@ -9,6 +9,7 @@ import { versionAsNightly } from "~/util/shared.ts"
 import spellerBundle from "../../actions/speller/bundle.ts"
 import spellerDeploy from "../../actions/speller/deploy.ts"
 import { SpellerManifest, SpellerType } from "../../actions/speller/manifest.ts"
+import logger from "../../util/log.ts"
 
 function command(input: CommandStep): CommandStep {
   return {
@@ -52,9 +53,15 @@ export async function runLangBundle(
   await builder.downloadArtifacts("build/tools/spellcheckers/*.zhfst", ".")
 
   const spellerPaths = JSON.parse(await builder.metadata("speller-paths"))
-  const manifest = toml.parse(
-    await Deno.readTextFile("./manifest.toml"),
-  ) as SpellerManifest
+  let manifest
+  try {
+    manifest = toml.parse(
+      await Deno.readTextFile("./manifest.toml"),
+    ) as SpellerManifest
+  } catch (e) {
+    logger.error("Failed to read manifest.toml:", e)
+    throw e
+  }
 
   let spellerType: SpellerType
 
@@ -88,9 +95,15 @@ async function globOneFile(pattern: string): Promise<string | null> {
 }
 
 export async function runLangDeploy() {
-  const manifest = toml.parse(
-    await Deno.readTextFile("./manifest.toml"),
-  ) as SpellerManifest
+  let manifest
+  try {
+    manifest = toml.parse(
+      await Deno.readTextFile("./manifest.toml"),
+    ) as SpellerManifest
+  } catch (e) {
+    logger.error("Failed to read manifest.toml:", e)
+    throw e
+  }
   const version = await versionAsNightly(manifest.spellerversion)
   const allSecrets = await builder.secrets()
 
