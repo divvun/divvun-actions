@@ -40,7 +40,7 @@ export default async function spellerBundle({
 }: Props): Promise<Output> {
   const { spellername } = manifest
   const packageId = derivePackageId(spellerType)
-  const langTag = deriveLangTag(false)
+  const langTag = deriveLangTag()
 
   let payloadPath: string
 
@@ -161,7 +161,13 @@ export default async function spellerBundle({
     console.log /*logger.debug*/(`Installer created at ${payloadPath}`)
   } else if (spellerType == SpellerType.MacOS) {
     const zhfstFile = spellerPaths.desktop[langTag]
-    console.log("zhfstFile", zhfstFile, spellerPaths)
+    console.log /*logger.debug*/("Getting desktop zhfst file", zhfstFile, "for", langTag)
+    console.log /*logger.debug*/("Speller paths", spellerPaths)
+
+    if (!zhfstFile) {
+      throw new Error(`Missing zhfst file for langTag ${langTag}`)
+    }
+
     const pkgPath = await createInstaller({
       packageId,
       bcp47code: langTag,
