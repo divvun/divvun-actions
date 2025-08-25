@@ -70,7 +70,7 @@ schtasks /Create `
     /TR $command `
     /SC MINUTE `
     /MO 1 `
-    /RU "NT AUTHORITY\SYSTEM" `
+    /RU "Administrator" `
     /RL HIGHEST `
     /F
 
