@@ -51,7 +51,7 @@ $taskName = "DockerContainerUpdate"
 
 # Remove existing task if it exists
 Write-Host "Checking for existing task..."
-$null = schtasks /Query /TN $taskName 2>&1
+& schtasks.exe /Query /TN $taskName 2&>1
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Existing task found. Removing..."
     schtasks /Delete /TN $taskName /F | Out-Null
