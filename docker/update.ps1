@@ -82,9 +82,9 @@ if ($Force) {
 
 # Function to update a single container
 function Update-Container {
-    param([int]$N)
+    param([int]$N, [string]$ContainerPrefix, [string]$QueueTags, [string]$ImageName, [string]$Token)
     
-    $CONTAINER_NAME = "$CONTAINER_PREFIX$N"
+    $CONTAINER_NAME = "$ContainerPrefix$N"
     Write-Host "[$N] Starting update process for $CONTAINER_NAME..."
     
     # Stop if exists
@@ -117,10 +117,10 @@ function Update-Container {
         -v "D:\buildkite\hooks:C:\buildkite-agent\hooks:ro" `
         --name $CONTAINER_NAME `
         --restart=unless-stopped `
-        $IMAGE_NAME `
+        $ImageName `
         buildkite-agent start `
-        --token "$env:BUILDKITE_AGENT_TOKEN" `
-        --tags-from-host --tags $QUEUE_TAGS `
+        --token "$Token" `
+        --tags-from-host --tags $QueueTags `
         --shell="pwsh -Command"
         
     if ($LASTEXITCODE -eq 0) {
@@ -136,7 +136,7 @@ Write-Host ""
 
 $jobs = @()
 for ($N = 1; $N -le $INSTANCE_COUNT; $N++) {
-    $job = Start-Job -ScriptBlock ${function:Update-Container} -ArgumentList $N
+    $job = Start-Job -ScriptBlock ${function:Update-Container} -ArgumentList $N,$CONTAINER_PREFIX,$QUEUE_TAGS,$IMAGE_NAME,$env:BUILDKITE_AGENT_TOKEN
     $jobs += $job
 }
 
