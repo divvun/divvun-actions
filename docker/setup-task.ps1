@@ -62,7 +62,7 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 # Build the command - pass token as parameter to avoid environment variable issues
-$command = "pwsh.exe -NoProfile -ExecutionPolicy Bypass -File `"$CRON_SCRIPT`" -Token `"$($env:BUILDKITE_AGENT_TOKEN)`""
+$command = "`"C:\Program Files\PowerShell\7\pwsh.exe`" -NoProfile -ExecutionPolicy Bypass -File `"$CRON_SCRIPT`" -Token `"$($env:BUILDKITE_AGENT_TOKEN)`""
 
 Write-Host "Creating new scheduled task..."
 schtasks /Create `
