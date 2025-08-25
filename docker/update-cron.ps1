@@ -28,9 +28,23 @@ if (-not (Test-Path $logDir)) {
     New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 }
 
-# Ensure log file exists
+# Ensure log file exists and manage size
 if (-not (Test-Path $LOG_FILE)) {
     New-Item -ItemType File -Path $LOG_FILE -Force | Out-Null
+} else {
+    # Check log file size and rotate if too large (10MB limit)
+    $logSize = (Get-Item $LOG_FILE).Length
+    if ($logSize -gt 10MB) {
+        $backupFile = "$LOG_FILE.old"
+        # Remove old backup if exists
+        if (Test-Path $backupFile) {
+            Remove-Item $backupFile -Force
+        }
+        # Move current log to backup
+        Move-Item $LOG_FILE $backupFile -Force
+        # Create new empty log
+        New-Item -ItemType File -Path $LOG_FILE -Force | Out-Null
+    }
 }
 
 # Function to log with timestamp
