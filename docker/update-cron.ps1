@@ -60,12 +60,12 @@ try {
     }
 
     # Load configuration file if it exists
-    if (Test-Path $CONFIG_FILE) {
-        Write-Log "Loading configuration from $CONFIG_FILE"
-        cat $CONFIG_FILE | Invoke-Expression
-    } else {
-        Write-Log "WARNING: Configuration file not found at $CONFIG_FILE, using defaults"
-    }
+    # if (Test-Path $CONFIG_FILE) {
+    #     Write-Log "Loading configuration from $CONFIG_FILE"
+    #     cat $CONFIG_FILE | Invoke-Expression
+    # } else {
+    #     Write-Log "WARNING: Configuration file not found at $CONFIG_FILE, using defaults"
+    # }
 
     # Check for lock file to prevent concurrent runs
     if (Test-Path $LOCK_FILE) {
