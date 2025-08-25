@@ -72,6 +72,7 @@ schtasks /Create `
     /MO 1 `
     /RU "Administrator" `
     /RL HIGHEST `
+    /NP `
     /F
 
 if ($LASTEXITCODE -eq 0) {
