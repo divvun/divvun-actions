@@ -24,9 +24,9 @@ if ($Help) {
 }
 
 # Configuration with defaults
-$INSTANCE_COUNT = $env:INSTANCE_COUNT ?? 2
-$CONTAINER_PREFIX = $env:CONTAINER_PREFIX ?? "builder-"
-$QUEUE_TAGS = $env:QUEUE_TAGS ?? "queue=windows"
+$INSTANCE_COUNT = if ($env:INSTANCE_COUNT) { $env:INSTANCE_COUNT } else { 2 }
+$CONTAINER_PREFIX = if ($env:CONTAINER_PREFIX) { $env:CONTAINER_PREFIX } else { "builder-" }
+$QUEUE_TAGS = if ($env:QUEUE_TAGS) { $env:QUEUE_TAGS } else { "queue=windows" }
 $IMAGE_NAME = "ghcr.io/divvun/divvun-actions:windows-latest"
 
 # Check required environment variables
