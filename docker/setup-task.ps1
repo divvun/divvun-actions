@@ -48,47 +48,36 @@ Write-Host "Setting up Windows Task Scheduler job for Docker container updates..
 Write-Host "Script location: $CRON_SCRIPT"
 
 $taskName = "DockerContainerUpdate"
-$taskDescription = "Automatically update Docker containers when new images are available"
 
 # Remove existing task if it exists
-$existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-if ($existingTask) {
+Write-Host "Checking for existing task..."
+$checkResult = schtasks /Query /TN $taskName 2>$null
+if ($LASTEXITCODE -eq 0) {
     Write-Host "Existing task found. Removing..."
-    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+    schtasks /Delete /TN $taskName /F | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Failed to delete existing task"
+        exit 1
+    }
 }
 
-# Create task action
-$action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$CRON_SCRIPT`""
+# Build the command with environment variable
+$command = "cmd /c `"set BUILDKITE_AGENT_TOKEN=$($env:BUILDKITE_AGENT_TOKEN) && pwsh.exe -NoProfile -ExecutionPolicy Bypass -File \`"$CRON_SCRIPT\`"`""
 
-# Create task trigger (every minute)
-$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration ([TimeSpan]::MaxValue)
+Write-Host "Creating new scheduled task..."
+schtasks /Create `
+    /TN $taskName `
+    /TR $command `
+    /SC MINUTE `
+    /MO 1 `
+    /RU "NT AUTHORITY\SYSTEM" `
+    /RL HIGHEST `
+    /F
 
-# Create task settings
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RunOnlyIfNetworkAvailable
-
-# Create task principal (run as SYSTEM)
-$principal = New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\SYSTEM" -LogonType ServiceAccount -RunLevel Highest
-
-# Set environment variables for the task
-$envVars = @{
-    "BUILDKITE_AGENT_TOKEN" = $env:BUILDKITE_AGENT_TOKEN
-}
-
-# Build environment variable string for task action
-$envString = ""
-foreach ($key in $envVars.Keys) {
-    $envString += "`$env:$key = '$($envVars[$key])'; "
-}
-
-# Update action with environment variables
-$action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -Command `"$envString & '$CRON_SCRIPT'`""
-
-# Register the task
-try {
-    Register-ScheduledTask -TaskName $taskName -Description $taskDescription -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
+if ($LASTEXITCODE -eq 0) {
     Write-Host "Task scheduled successfully!"
-} catch {
-    Write-Error "Failed to register scheduled task: $($_.Exception.Message)"
+} else {
+    Write-Error "Failed to create scheduled task"
     exit 1
 }
 
@@ -97,14 +86,9 @@ Write-Host "Windows Task Scheduler job '$taskName' has been created."
 Write-Host "The update script will now run every minute to check for new Docker images."
 Write-Host ""
 Write-Host "To view logs: Get-Content C:\logs\docker-update.log -Tail 50 -Wait"
-Write-Host "To remove task: Unregister-ScheduledTask -TaskName '$taskName' -Confirm:`$false"
+Write-Host "To remove task: schtasks /Delete /TN '$taskName' /F"
 Write-Host ""
 
 # Show task information
-try {
-    $task = Get-ScheduledTask -TaskName $taskName
-    Write-Host "Task Status: $($task.State)"
-    Write-Host "Next Run Time: $((Get-ScheduledTask -TaskName $taskName | Get-ScheduledTaskInfo).NextRunTime)"
-} catch {
-    Write-Warning "Could not retrieve task information"
-}
+Write-Host "Querying task status..."
+schtasks /Query /TN $taskName /FO LIST | Select-String "Status|Next Run Time"
