@@ -52,6 +52,14 @@ function Cleanup {
 # Register cleanup on exit
 Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Cleanup } | Out-Null
 
+# Trap any unhandled errors
+trap {
+    Write-Log "TRAP ERROR: $($_.Exception.Message)"
+    Write-Log "TRAP STACK TRACE: $($_.ScriptStackTrace)"
+    Cleanup
+    exit 1
+}
+
 try {
     # Check if update script exists
     if (-not (Test-Path $UPDATE_SCRIPT)) {
@@ -120,6 +128,15 @@ try {
         $content = Get-Content $LOG_FILE | Select-Object -Last 1000
         $content | Out-File $LOG_FILE -Encoding utf8
     }
+} catch {
+    Write-Log "CATCH ERROR: $($_.Exception.Message)"
+    Write-Log "CATCH ERROR DETAILS: $($_.Exception.ToString())"
+    Write-Log "CATCH STACK TRACE: $($_.ScriptStackTrace)"
+    if ($_.InvocationInfo) {
+        Write-Log "CATCH ERROR LOCATION: Line $($_.InvocationInfo.ScriptLineNumber) - $($_.InvocationInfo.Line.Trim())"
+    }
+    Cleanup
+    exit 1
 } finally {
     Cleanup
 }
