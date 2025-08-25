@@ -149,5 +149,23 @@ RUN if (!(Test-Path -Path $PROFILE)) { \
         New-Item -ItemType Directory -Path (Split-Path -Parent $PROFILE) -Force \
     }
 
-# Default shell
-CMD ["pwsh", "-NoLogo"]
+# Create entrypoint script for graceful shutdown
+RUN @' > C:\entrypoint.ps1 ; \
+    # Handle console control events for graceful shutdown ; \
+    $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { ; \
+        Write-Host "Received termination signal, stopping buildkite-agent gracefully..." ; \
+        if (Get-Command buildkite-agent -ErrorAction SilentlyContinue) { ; \
+            buildkite-agent stop ; \
+        } ; \
+    } ; \
+    ; \
+    # Execute the command passed to the container ; \
+    if ($args.Count -gt 0) { ; \
+        & $args[0] @args[1..$($args.Count-1)] ; \
+    } else { ; \
+        pwsh -NoLogo ; \
+    } ; \
+'@
+
+# Default entrypoint with graceful shutdown
+ENTRYPOINT ["pwsh", "-File", "C:\\entrypoint.ps1"]
