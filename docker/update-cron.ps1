@@ -1,7 +1,8 @@
 #!/usr/bin/env pwsh
 
 param(
-    [string]$ConfigFile = ""
+    [string]$ConfigFile = "",
+    [string]$Token = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -85,9 +86,14 @@ try {
     # Create lock file
     $PID | Out-File -FilePath $LOCK_FILE -Encoding ascii
 
+    # Set BUILDKITE_AGENT_TOKEN from parameter or environment
+    if ($Token) {
+        $env:BUILDKITE_AGENT_TOKEN = $Token
+    }
+    
     # Check if BUILDKITE_AGENT_TOKEN is set
     if (-not $env:BUILDKITE_AGENT_TOKEN) {
-        Write-Log "ERROR: BUILDKITE_AGENT_TOKEN environment variable is required"
+        Write-Log "ERROR: BUILDKITE_AGENT_TOKEN environment variable or -Token parameter is required"
         exit 1
     }
 
