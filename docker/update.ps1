@@ -118,7 +118,7 @@ function Update-Container {
         --name $CONTAINER_NAME `
         --restart=unless-stopped `
         $IMAGE_NAME `
-        buildkite-agent start --token "$env:BUILDKITE_AGENT_TOKEN" --tags-from-host --tags $QUEUE_TAGS --shell=`"pwsh -Command`"
+        buildkite-agent start --token "$env:BUILDKITE_AGENT_TOKEN" --tags-from-host --tags $QUEUE_TAGS '--shell=pwsh -Command'
         
     if ($LASTEXITCODE -eq 0) {
         Write-Host "[$N] ✓ $CONTAINER_NAME updated successfully!"
