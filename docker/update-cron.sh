@@ -5,6 +5,7 @@ set -euo pipefail
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UPDATE_SCRIPT="$SCRIPT_DIR/update.sh"
+CONFIG_FILE="${CONFIG_FILE:-$SCRIPT_DIR/config-standard.env}"
 LOCK_FILE="/tmp/docker-update.lock"
 LOG_FILE="/var/log/docker-update.log"
 
@@ -33,6 +34,14 @@ if [[ ! -f "$UPDATE_SCRIPT" ]]; then
     exit 1
 fi
 
+# Load configuration file if it exists
+if [[ -f "$CONFIG_FILE" ]]; then
+    log "Loading configuration from $CONFIG_FILE"
+    source "$CONFIG_FILE"
+else
+    log "WARNING: Configuration file not found at $CONFIG_FILE, using defaults"
+fi
+
 # Check for lock file to prevent concurrent runs
 if [[ -f "$LOCK_FILE" ]]; then
     # Check if the process is still running
@@ -59,6 +68,8 @@ log "Starting Docker update check..."
 # Export environment variables for the update script
 export BUILDKITE_AGENT_TOKEN
 export INSTANCE_COUNT="${INSTANCE_COUNT:-4}"
+export CONTAINER_PREFIX="${CONTAINER_PREFIX:-builder-}"
+export QUEUE_TAGS="${QUEUE_TAGS:-queue=linux}"
 export MEMORY_RESERVATION="${MEMORY_RESERVATION:-6g}"
 export MEMORY_LIMIT="${MEMORY_LIMIT:-24g}"
 

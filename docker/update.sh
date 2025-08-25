@@ -20,6 +20,8 @@ while [[ $# -gt 0 ]]; do
             echo "Environment Variables:"
             echo "  BUILDKITE_AGENT_TOKEN    Required: Buildkite agent token"
             echo "  INSTANCE_COUNT           Number of builder instances (default: 4)"
+            echo "  CONTAINER_PREFIX         Container name prefix (default: 'builder-')"
+            echo "  QUEUE_TAGS               Buildkite queue tags (default: 'queue=linux')"
             echo "  MEMORY_RESERVATION       Memory reservation per container (default: 6g)"
             echo "  MEMORY_LIMIT             Memory limit per container (default: 24g)"
             exit 0
@@ -36,6 +38,8 @@ done
 INSTANCE_COUNT=${INSTANCE_COUNT:-4}
 MEMORY_RESERVATION=${MEMORY_RESERVATION:-6g}
 MEMORY_LIMIT=${MEMORY_LIMIT:-24g}
+CONTAINER_PREFIX=${CONTAINER_PREFIX:-"builder-"}
+QUEUE_TAGS=${QUEUE_TAGS:-"queue=linux"}
 IMAGE_NAME="ghcr.io/divvun/divvun-actions:ubuntu-latest"
 
 # Check required environment variables
@@ -46,6 +50,8 @@ fi
 
 echo "Configuration:"
 echo "  Instance Count: $INSTANCE_COUNT"
+echo "  Container Prefix: $CONTAINER_PREFIX"
+echo "  Queue Tags: $QUEUE_TAGS"
 echo "  Memory Reservation: $MEMORY_RESERVATION"
 echo "  Memory Limit: $MEMORY_LIMIT"
 echo "  Image: $IMAGE_NAME"
@@ -82,23 +88,24 @@ fi
 # Function to update a single container
 update_container() {
     local N=$1
-    echo "[$N] Starting update process for builder-$N..."
+    local CONTAINER_NAME="${CONTAINER_PREFIX}$N"
+    echo "[$N] Starting update process for $CONTAINER_NAME..."
     
     # Stop if exists
-    if docker ps -q --filter "name=builder-$N" | grep -q .; then
-        echo "[$N] Stopping builder-$N (gracefully, may take up to 30+ minutes for running builds)..."
-        docker stop --timeout=-1 "builder-$N" || echo "[$N] Failed to stop builder-$N (may not exist)"
-        echo "[$N] builder-$N stopped successfully"
+    if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+        echo "[$N] Stopping $CONTAINER_NAME (gracefully, may take up to 30+ minutes for running builds)..."
+        docker stop --timeout=-1 "$CONTAINER_NAME" || echo "[$N] Failed to stop $CONTAINER_NAME (may not exist)"
+        echo "[$N] $CONTAINER_NAME stopped successfully"
     else
-        echo "[$N] builder-$N is not running, skipping stop"
+        echo "[$N] $CONTAINER_NAME is not running, skipping stop"
     fi
     
     # Remove
-    echo "[$N] Removing builder-$N..."
-    docker rm "builder-$N" 2>/dev/null || echo "[$N] Container builder-$N already removed or doesn't exist"
+    echo "[$N] Removing $CONTAINER_NAME..."
+    docker rm "$CONTAINER_NAME" 2>/dev/null || echo "[$N] Container $CONTAINER_NAME already removed or doesn't exist"
     
     # Recreate
-    echo "[$N] Creating new builder-$N..."
+    echo "[$N] Creating new $CONTAINER_NAME..."
     docker run \
         -v "/var/lib/buildkite/hooks:/buildkite/hooks" \
         -v "/var/lib/buildkite-secrets:/buildkite-secrets:ro" \
@@ -106,11 +113,11 @@ update_container() {
         -v "/var/run/docker.sock:/var/run/docker.sock" \
         --memory-reservation "$MEMORY_RESERVATION" \
         -m "$MEMORY_LIMIT" \
-        -d -t --name "builder-$N" \
+        -d -t --name "$CONTAINER_NAME" \
         "$IMAGE_NAME" \
-        buildkite-agent start --tags-from-host --tags queue=linux
+        buildkite-agent start --tags-from-host --tags "$QUEUE_TAGS"
         
-    echo "[$N] ✓ builder-$N updated successfully!"
+    echo "[$N] ✓ $CONTAINER_NAME updated successfully!"
 }
 
 # Update all containers in parallel
@@ -127,7 +134,7 @@ echo "All container updates completed!"
 
 echo "Update completed successfully!"
 echo "Active containers:"
-docker ps --filter "name=builder-" --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
+docker ps --filter "name=${CONTAINER_PREFIX}" --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
 
 echo ""
 echo "Cleaning up unused Docker resources..."
