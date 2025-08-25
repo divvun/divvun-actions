@@ -92,3 +92,11 @@ echo "All container updates completed!"
 echo "Update completed successfully!"
 echo "Active containers:"
 docker ps --filter "name=builder-" --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
+
+echo ""
+echo "Cleaning up unused Docker resources..."
+docker container prune -f
+docker image prune -f
+docker volume prune -f
+docker network prune -f
+echo "Docker cleanup completed!"
