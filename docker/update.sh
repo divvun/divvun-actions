@@ -2,6 +2,36 @@
 
 set -euo pipefail
 
+# Parse command line arguments
+FORCE_UPDATE=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -f|--force)
+            FORCE_UPDATE=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  -f, --force    Force update even if image hasn't changed"
+            echo "  -h, --help     Show this help message"
+            echo ""
+            echo "Environment Variables:"
+            echo "  BUILDKITE_AGENT_TOKEN    Required: Buildkite agent token"
+            echo "  INSTANCE_COUNT           Number of builder instances (default: 4)"
+            echo "  MEMORY_RESERVATION       Memory reservation per container (default: 6g)"
+            echo "  MEMORY_LIMIT             Memory limit per container (default: 24g)"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
 # Configuration with defaults
 INSTANCE_COUNT=${INSTANCE_COUNT:-4}
 MEMORY_RESERVATION=${MEMORY_RESERVATION:-6g}
@@ -19,6 +49,7 @@ echo "  Instance Count: $INSTANCE_COUNT"
 echo "  Memory Reservation: $MEMORY_RESERVATION"
 echo "  Memory Limit: $MEMORY_LIMIT"
 echo "  Image: $IMAGE_NAME"
+echo "  Force Update: $FORCE_UPDATE"
 echo ""
 
 # Get current image ID
@@ -35,13 +66,18 @@ docker pull "$IMAGE_NAME"
 # Get new image ID
 NEW_IMAGE_ID=$(docker image inspect "$IMAGE_NAME" --format '{{.Id}}')
 
-# Check if image has changed
-if [[ "$CURRENT_IMAGE_ID" == "$NEW_IMAGE_ID" && -n "$CURRENT_IMAGE_ID" ]]; then
+# Check if image has changed or force update is requested
+if [[ "$CURRENT_IMAGE_ID" == "$NEW_IMAGE_ID" && -n "$CURRENT_IMAGE_ID" && "$FORCE_UPDATE" == "false" ]]; then
     echo "Image has not changed. No update needed."
+    echo "Use --force to update anyway."
     exit 0
 fi
 
-echo "Image has changed. Updating containers..."
+if [[ "$FORCE_UPDATE" == "true" ]]; then
+    echo "Force update requested. Updating containers..."
+else
+    echo "Image has changed. Updating containers..."
+fi
 
 # Function to update a single container
 update_container() {
