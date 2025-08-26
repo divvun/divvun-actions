@@ -102,9 +102,24 @@ export const env: Env = getEnv()
 
 let redactedSecrets: SecretsStore | undefined
 
+// Fire-and-forget token renewal
+async function renewTokenInBackground(
+  token: string,
+  endpoint: string,
+): Promise<void> {
+  return Promise.reject("Not implemented")
+}
+
 export async function secrets(): Promise<SecretsStore> {
   if (redactedSecrets != null) {
     return redactedSecrets
+  }
+
+  // Check if there's a service token to renew
+  const serviceToken = Deno.env.get("DIVVUN_ACTIONS_OPENBAO_SERVICE_TOKEN")
+  if (serviceToken) {
+    // Fire off renewal check in background
+    renewTokenInBackground(serviceToken, "https://vault.giellalt.org")
   }
 
   const vaultRoleId = Deno.env.get("DIVVUN_ACTIONS_VAULT_ROLE_ID")

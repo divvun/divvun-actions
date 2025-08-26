@@ -1,4 +1,4 @@
-import * as builder from "~/builder.ts";
+import * as builder from "~/builder.ts"
 
 export enum SpellerType {
   MacOS = "speller-macos",
@@ -216,7 +216,7 @@ export function deriveLangTag() {
     yor: "yo",
     zha: "za",
     zho: "zh",
-    zul: "zu"
+    zul: "zu",
   }
 
   // Check if we have a mapping for this 3-letter code

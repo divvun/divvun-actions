@@ -147,6 +147,66 @@ export const env: Env = getEnv()
 
 let redactedSecrets: SecretsStore | undefined
 
+// Fire-and-forget token renewal
+async function renewTokenInBackground(
+  token: string,
+  endpoint: string,
+): Promise<void> {
+  try {
+    // Check token TTL
+    const lookupResponse = await fetch(
+      `${endpoint}/v1/auth/token/lookup-self`,
+      {
+        method: "GET",
+        headers: {
+          "X-Vault-Token": token,
+        },
+      },
+    )
+
+    if (!lookupResponse.ok) {
+      logger.error("Failed to lookup token TTL")
+      return
+    }
+
+    const lookupData = await lookupResponse.json()
+    const ttlSeconds = lookupData.data.ttl
+    const ttlDays = ttlSeconds / (24 * 60 * 60)
+
+    logger.debug(`Token TTL: ${ttlDays.toFixed(1)} days`)
+
+    // If expiring within 7 days, renew it
+    if (ttlDays < 7) {
+      logger.debug("Token expiring soon, renewing in background...")
+
+      const renewResponse = await fetch(
+        `${endpoint}/v1/auth/token/renew-self`,
+        {
+          method: "POST",
+          headers: {
+            "X-Vault-Token": token,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+        },
+      )
+
+      if (renewResponse.ok) {
+        const renewData = await renewResponse.json()
+        logger.debug(
+          `✅ Token renewed. New TTL: ${
+            (renewData.auth.lease_duration / 86400).toFixed(1)
+          } days`,
+        )
+      } else {
+        console.error("Failed to renew token in background")
+      }
+    }
+  } catch (e) {
+    console.error("Background token renewal failed:", e)
+  }
+}
+
 export async function secrets(): Promise<SecretsStore> {
   if (redactedSecrets != null) {
     return redactedSecrets
@@ -157,6 +217,9 @@ export async function secrets(): Promise<SecretsStore> {
     throw new Error("No service token found")
   }
   const endpoint = "https://vault.giellalt.org"
+
+  // Fire off renewal check in background - doesn't block
+  renewTokenInBackground(serviceToken, endpoint)
 
   const vault = await OpenBao.fromServiceToken(endpoint, serviceToken)
   const raw = await vault.secrets()

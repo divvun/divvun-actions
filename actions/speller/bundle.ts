@@ -161,7 +161,12 @@ export default async function spellerBundle({
     console.log /*logger.debug*/(`Installer created at ${payloadPath}`)
   } else if (spellerType == SpellerType.MacOS) {
     const zhfstFile = spellerPaths.desktop[langTag]
-    console.log /*logger.debug*/("Getting desktop zhfst file", zhfstFile, "for", langTag)
+    console.log /*logger.debug*/(
+      "Getting desktop zhfst file",
+      zhfstFile,
+      "for",
+      langTag,
+    )
     console.log /*logger.debug*/("Speller paths", spellerPaths)
 
     if (!zhfstFile) {
