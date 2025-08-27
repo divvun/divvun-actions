@@ -1,10 +1,4 @@
 // Re-export types
-import type {
-  Context,
-  ExecListeners,
-  ExecOptions,
-  InputOptions,
-} from "./builder/types.ts"
 
 const isBuildkite = Deno.env.get("BUILDKITE")
 
@@ -23,7 +17,6 @@ if (isBuildkite) {
 // Re-export everything with proper typing
 export const {
   exec,
-  spawn,
   output,
   addPath,
   redactSecret,
@@ -35,6 +28,3 @@ export const {
   secrets,
   group,
 } = selectedBuilder
-
-// Re-export types
-export type { Context, ExecListeners, ExecOptions, InputOptions }

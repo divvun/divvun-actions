@@ -1,4 +1,4 @@
-import * as yaml from "@std/yaml"
+// deno-lint-ignore-file no-console
 import {
   type Agents,
   type BlockStep,
@@ -195,39 +195,3 @@ async function enterEnvironment(
     }
   }
 }
-
-export function generatePipeline<
-  T extends "yaml" | "json" | undefined = undefined,
->(
-  name: PipelineName,
-  options: Record<string, any>,
-  format?: T,
-): T extends "yaml" | "json" ? string : BuildkitePipeline {
-  let pipeline: BuildkitePipeline
-
-  switch (name) {
-    case "divvunspell":
-      // pipeline = divvunspellPipeline(options as any)
-      break
-    default:
-      throw new Error(`Unknown pipeline: ${name}`)
-  }
-
-  let output: T extends "yaml" | "json" ? string : BuildkitePipeline
-
-  switch (format) {
-    case "yaml":
-      output = yaml.stringify(pipeline, { indent: 2 }) as typeof output
-      break
-    case "json":
-      output = JSON.stringify(pipeline, null, 2) as typeof output
-      break
-    default:
-      output = pipeline as typeof output
-      break
-  }
-
-  return output
-}
-
-export default generatePipeline

@@ -1,107 +1,98 @@
 // deno-lint-ignore-file no-explicit-any no-console
 // Buildkite implementation of the builder interface
 
-import type { ExecOptions } from "~/builder/types.ts"
 import { buildkite as getEnv, Env } from "~/util/env.ts"
 import logger from "~/util/log.ts"
 import { OpenBao, SecretsStore } from "~/util/openbao.ts"
 
-export async function spawn(
-  commandLine: string,
-  args?: string[],
-  options?: ExecOptions,
-): Promise<Deno.ChildProcess> {
-  const stdio: "inherit" | "piped" | "null" =
-    options?.listeners?.stdout || options?.listeners?.stderr
-      ? "piped"
-      : options?.silent
-      ? "null"
-      : "inherit"
+const decoder = new TextDecoder()
+const encoder = new TextEncoder()
 
-  const command = new Deno.Command(commandLine, {
-    args: args || [],
-    cwd: options?.cwd,
-    env: options?.env,
-    stdin: options?.input ? "piped" : "inherit",
-    stdout: stdio,
-    stderr: stdio,
-  })
-
-  const process = command.spawn()
-
-  if (options?.input != null) {
-    const encoder = new TextEncoder()
-    const writer = process.stdin.getWriter()
-    await writer.write(encoder.encode(options.input))
-    await writer.close()
-  }
-
-  if (options?.listeners?.stdout && process.stdout) {
-    ;(async () => {
-      for await (const chunk of process.stdout) {
-        options?.listeners?.stdout?.(chunk)
-      }
-    })()
-  }
-
-  if (options?.listeners?.stderr && process.stderr) {
-    ;(async () => {
-      for await (const chunk of process.stderr) {
-        options?.listeners?.stderr?.(chunk)
-      }
-    })()
-  }
-
-  return process
+export type CommandOptions = Omit<Deno.CommandOptions, "args"> & {
+  input?: string | Uint8Array
 }
 
 export async function exec(
   commandLine: string,
-  args?: string[],
-  options?: ExecOptions,
-): Promise<number> {
-  const proc = await spawn(commandLine, args, options)
+  args: string[],
+  options?: CommandOptions,
+): Promise<void>
+export async function exec(
+  commandLine: string,
+  options?: CommandOptions,
+): Promise<void>
+export async function exec(
+  commandLine: string,
+  arg1?: string[] | CommandOptions,
+  arg2?: CommandOptions,
+): Promise<void> {
+  const args = Array.isArray(arg1) ? arg1 : []
+  const options = arg2 ?? (Array.isArray(arg1) ? undefined : arg1)
+
+  const proc = new Deno.Command(commandLine, { ...options, args }).spawn()
   const status = await proc.status
 
-  if (status.code !== 0 && !options?.ignoreReturnCode) {
+  if (status.code !== 0) {
     throw new Error(
       `Process '${commandLine} ${
         JSON.stringify(args)
       }' exited with code ${status.code}`,
     )
   }
-
-  return status.code
 }
 
 export async function output(
   commandLine: string,
-  args?: string[],
-  options?: ExecOptions,
+  args: string[],
+  options?: CommandOptions,
+): Promise<{ stdout: string; stderr: string; status: Deno.CommandStatus }>
+export async function output(
+  commandLine: string,
+  options?: CommandOptions,
+): Promise<{ stdout: string; stderr: string; status: Deno.CommandStatus }>
+export async function output(
+  commandLine: string,
+  arg1?: string[] | CommandOptions,
+  arg2?: CommandOptions,
 ): Promise<{ stdout: string; stderr: string; status: Deno.CommandStatus }> {
-  let stdout = new Uint8Array()
-  let stderr = new Uint8Array()
+  const args = Array.isArray(arg1) ? arg1 : []
+  const options = arg2 ?? (Array.isArray(arg1) ? undefined : arg1)
 
-  const proc = await spawn(commandLine, args, {
+  let input: string | Uint8Array | undefined
+  if (options?.input) {
+    input = options.input
+    delete options.input
+  }
+
+  const proc = await new Deno.Command(commandLine, {
     ...options,
-    listeners: {
-      ...options?.listeners,
-      stdout: (chunk) => {
-        stdout = new Uint8Array([...stdout, ...chunk])
-      },
-      stderr: (chunk) => {
-        stderr = new Uint8Array([...stderr, ...chunk])
-      },
-    },
-  })
+    stdin: input ? "piped" : "null",
+    stdout: "piped",
+    stderr: "piped",
+    args,
+  }).spawn()
+  ;(async () => {
+    if (input) {
+      const writer = proc.stdin.getWriter()
+      if (typeof input === "string") {
+        await writer.write(encoder.encode(input))
+      } else {
+        await writer.write(input)
+      }
+      await writer.close()
+    }
+  })()
 
-  const status = await proc.status
-  const decoder = new TextDecoder()
+  const output = await proc.output()
 
   return {
-    stdout: decoder.decode(stdout),
-    stderr: decoder.decode(stderr),
-    status,
+    stdout: decoder.decode(output.stdout),
+    stderr: decoder.decode(output.stderr),
+    status: {
+      code: output.code,
+      success: output.success,
+      signal: output.signal,
+    },
   }
 }
 
