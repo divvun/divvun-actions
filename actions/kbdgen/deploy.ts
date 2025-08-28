@@ -97,9 +97,6 @@ export default async function kbdgenDeploy({
       "./metadata.toml",
       repoPackageUrl,
       secrets,
-      {
-        packageType: "executable",
-      },
     )
   } catch (error: any) {
     logger.error(error.message)
