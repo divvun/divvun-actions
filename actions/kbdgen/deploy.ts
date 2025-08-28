@@ -76,13 +76,20 @@ export default async function kbdgenDeploy({
       architecture = "unknown"
     }
 
-    // Create .txz file containing the binary
+    // Create dist/bin directory structure to be consistent with old taskcluster system
+    const distDir = path.join(path.dirname(payloadPath), "dist")
+    const binDir = path.join(distDir, "bin")
+    await Deno.mkdir(binDir, { recursive: true })
+
+    const binaryName = path.basename(payloadPath)
+    const distBinaryPath = path.join(binDir, binaryName)
+    await Deno.copyFile(payloadPath, distBinaryPath)
+
     const pathItems = [packageId, version, platform, architecture]
     const txzFileName = `${pathItems.join("_")}.txz`
     const txzPath = path.join(path.dirname(payloadPath), txzFileName)
 
-    // Create .txz archive containing the binary
-    await Tar.createFlatTxz([payloadPath], txzPath)
+    await Tar.createFlatTxz([distDir], txzPath)
 
     const artifactUrl = `${PahkatUploader.ARTIFACTS_URL}${
       path.basename(txzPath)
