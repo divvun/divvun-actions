@@ -136,7 +136,7 @@ export async function runKbdgenDeploy() {
   }
 
   try {
-    await builder.downloadArtifacts("target\\*/release\\kbdgen.exe", ".")
+    await builder.downloadArtifacts("target\\*\\release\\kbdgen.exe", ".")
     windowsDownloaded = true
     logger.info(
       "Successfully downloaded Windows-style kbdgen.exe artifacts (backslash)",
@@ -193,7 +193,7 @@ export async function runKbdgenDeploy() {
         } else if (rustTarget.includes("linux")) {
           platform = "linux"
         } else {
-          logger.warn(`Unknown platform for target ${rustTarget}, skipping`)
+          logger.warning(`Unknown platform for target ${rustTarget}, skipping`)
           continue
         }
 
@@ -202,7 +202,7 @@ export async function runKbdgenDeploy() {
         )
         kbdgenFiles.push({ path: entry.path, platform })
       } else {
-        logger.warn(`Could not extract target from path: ${entry.path}`)
+        logger.warning(`Could not extract target from path: ${entry.path}`)
       }
     }
   }
