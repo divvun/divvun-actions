@@ -11,6 +11,7 @@ import {
   Tar,
   versionAsNightly,
 } from "~/util/shared.ts"
+import { makeTempDir } from "~/util/temp.ts"
 
 // Constants
 const CONSTANTS = {
@@ -57,10 +58,13 @@ function determinePlatform(rustTarget: string): string | null {
 }
 
 /**
- * Creates dist/bin directory structure and copies binary
+ * Creates a dist/bin directory structure and copies binary within the temp directory
  */
-async function createDistDirectory(payloadPath: string): Promise<string> {
-  const distDir = path.join(path.dirname(payloadPath), "dist")
+async function createDistDirectory(
+  payloadPath: string,
+  tempDirPath: string,
+): Promise<string> {
+  const distDir = path.join(tempDirPath, "dist")
   const binDir = path.join(distDir, "bin")
   await Deno.mkdir(binDir, { recursive: true })
 
@@ -113,6 +117,8 @@ export default async function kbdgenDeploy({
   packageId,
   secrets,
 }: Props) {
+  using tempDir = await makeTempDir()
+
   try {
     const repoPackageUrl = `${pahkatRepo}packages/${packageId}`
 
@@ -120,12 +126,13 @@ export default async function kbdgenDeploy({
     const rustTarget = path.basename(path.dirname(path.dirname(payloadPath)))
     const architecture = extractArchitecture(rustTarget)
 
-    // Create dist/bin directory structure and copy binary
-    const distDir = await createDistDirectory(payloadPath)
+    // Create dist/bin directory structure and copy binary in temp location
+    const distDir = await createDistDirectory(payloadPath, tempDir.path)
 
+    // Create .txz file in temp location
     const pathItems = [packageId, version, platform, architecture]
     const txzFileName = `${pathItems.join("_")}.txz`
-    const txzPath = path.join(path.dirname(payloadPath), txzFileName)
+    const txzPath = path.join(tempDir.path, txzFileName)
 
     await Tar.createFlatTxz([distDir], txzPath)
 
@@ -183,10 +190,18 @@ export async function runKbdgenDeploy() {
   const pahkatRepo = "https://pahkat.uit.no/devtools/"
   const channel = "nightly"
 
-  await builder.downloadArtifacts("target/*/release/kbdgen", ".")
-  await builder.downloadArtifacts("target\\*\\release\\kbdgen.exe", ".")
+  using artifactsDir = await makeTempDir()
+
+  await builder.downloadArtifacts("target/*/release/kbdgen", artifactsDir.path)
+  await builder.downloadArtifacts(
+    "target\\*\\release\\kbdgen.exe",
+    artifactsDir.path,
+  )
   try {
-    await builder.downloadArtifacts("target/*/release/kbdgen.exe", ".")
+    await builder.downloadArtifacts(
+      "target/*/release/kbdgen.exe",
+      artifactsDir.path,
+    )
   } catch (_e) {
     logger.info("Forward slash Windows pattern not needed (already downloaded)")
   }
@@ -194,7 +209,11 @@ export async function runKbdgenDeploy() {
   const kbdgenFiles: { path: string; platform: string }[] = []
 
   // Find Unix binaries (no extension)
-  for await (const file of fs.expandGlob("target/*/release/kbdgen")) {
+  for await (
+    const file of fs.expandGlob("target/*/release/kbdgen", {
+      root: artifactsDir.path,
+    })
+  ) {
     if (file.isFile) {
       const rustTarget = path.basename(path.dirname(path.dirname(file.path)))
       const platform = determinePlatform(rustTarget)
@@ -212,7 +231,11 @@ export async function runKbdgenDeploy() {
   }
 
   // Find Windows binaries (.exe extension)
-  for await (const file of fs.expandGlob("target/*/release/kbdgen.exe")) {
+  for await (
+    const file of fs.expandGlob("target/*/release/kbdgen.exe", {
+      root: artifactsDir.path,
+    })
+  ) {
     if (file.isFile) {
       const rustTarget = path.basename(path.dirname(path.dirname(file.path)))
       const platform = determinePlatform(rustTarget)
