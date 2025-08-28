@@ -58,13 +58,19 @@ function determinePlatform(rustTarget: string): string | null {
 }
 
 /**
- * Creates a dist/bin directory structure and copies binary within the temp directory
+ * Creates a .txz tarball package from binary payload
  */
-async function createDistDirectory(
+async function createTarball(
   payloadPath: string,
-  tempDirPath: string,
+  packageId: string,
+  version: string,
+  platform: string,
+  architecture: string,
 ): Promise<string> {
-  const distDir = path.join(tempDirPath, "dist")
+  using tempDir = await makeTempDir()
+
+  // Create dist/bin directory structure and copy binary
+  const distDir = path.join(tempDir.path, "dist")
   const binDir = path.join(distDir, "bin")
   await Deno.mkdir(binDir, { recursive: true })
 
@@ -72,7 +78,14 @@ async function createDistDirectory(
   const distBinaryPath = path.join(binDir, binaryName)
   await Deno.copyFile(payloadPath, distBinaryPath)
 
-  return distDir
+  // Create .txz file in temp directory
+  const pathItems = [packageId, version, platform, architecture]
+  const txzFileName = `${pathItems.join("_")}.txz`
+  const txzPath = path.join(tempDir.path, txzFileName)
+
+  await Tar.createFlatTxz([distDir], txzPath)
+
+  return txzPath
 }
 
 function releaseReq(
@@ -117,8 +130,6 @@ export default async function kbdgenDeploy({
   packageId,
   secrets,
 }: Props) {
-  using tempDir = await makeTempDir()
-
   try {
     const repoPackageUrl = `${pahkatRepo}packages/${packageId}`
 
@@ -126,15 +137,14 @@ export default async function kbdgenDeploy({
     const rustTarget = path.basename(path.dirname(path.dirname(payloadPath)))
     const architecture = extractArchitecture(rustTarget)
 
-    // Create dist/bin directory structure and copy binary in temp location
-    const distDir = await createDistDirectory(payloadPath, tempDir.path)
-
-    // Create .txz file in temp location
-    const pathItems = [packageId, version, platform, architecture]
-    const txzFileName = `${pathItems.join("_")}.txz`
-    const txzPath = path.join(tempDir.path, txzFileName)
-
-    await Tar.createFlatTxz([distDir], txzPath)
+    // Create .txz tarball package
+    const txzPath = await createTarball(
+      payloadPath,
+      packageId,
+      version,
+      platform,
+      architecture,
+    )
 
     const artifactUrl = `${PahkatUploader.ARTIFACTS_URL}${
       path.basename(txzPath)
