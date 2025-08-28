@@ -126,7 +126,11 @@ export async function runKbdgenDeploy() {
   // Download all platform artifacts using simple patterns like lang deployment
   await builder.downloadArtifacts("target/*/release/kbdgen", ".")
   await builder.downloadArtifacts("target\\*\\release\\kbdgen.exe", ".")
-  await builder.downloadArtifacts("target/*/release/kbdgen.exe", ".")
+  try {
+    await builder.downloadArtifacts("target/*/release/kbdgen.exe", ".")
+  } catch (e) {
+    logger.info("Forward slash Windows pattern not needed (already downloaded)")
+  }
 
   // Use fs.expandGlob to find all kbdgen files like lang deployment does
   const kbdgenFiles: { path: string; platform: string }[] = []
