@@ -123,86 +123,48 @@ export async function runKbdgenDeploy() {
   const pahkatRepo = "https://pahkat.uit.no/main/"
   const channel = "nightly"
 
-  // Download all platform artifacts - try both path separators
-  let unixDownloaded = false
-  let windowsDownloaded = false
+  // Download all platform artifacts using simple patterns like lang deployment
+  await builder.downloadArtifacts("target/*/release/kbdgen", ".")
+  await builder.downloadArtifacts("target\\*\\release\\kbdgen.exe", ".")
+  await builder.downloadArtifacts("target/*/release/kbdgen.exe", ".")
 
-  try {
-    await builder.downloadArtifacts("target/*/release/kbdgen", ".")
-    unixDownloaded = true
-    logger.info("Successfully downloaded Unix-style kbdgen artifacts")
-  } catch (e) {
-    logger.info("No Unix-style kbdgen artifacts found:", e.message)
-  }
+  // Use fs.expandGlob to find all kbdgen files like lang deployment does
+  const kbdgenFiles: { path: string; platform: string }[] = []
 
-  try {
-    await builder.downloadArtifacts("target\\*\\release\\kbdgen.exe", ".")
-    windowsDownloaded = true
-    logger.info(
-      "Successfully downloaded Windows-style kbdgen.exe artifacts (backslash)",
-    )
-  } catch (e) {
-    logger.info("Failed backslash pattern, trying forward slash:", e.message)
-    // Try forward slash version as fallback
-    try {
-      await builder.downloadArtifacts("target/*/release/kbdgen.exe", ".")
-      windowsDownloaded = true
-      logger.info(
-        "Successfully downloaded Windows-style kbdgen.exe artifacts (forward slash)",
-      )
-    } catch (e2) {
-      logger.info("No Windows-style kbdgen.exe artifacts found:", e2.message)
+  // Find Unix binaries (no extension)
+  for await (const file of fs.expandGlob("target/*/release/kbdgen")) {
+    if (file.isFile) {
+      const rustTarget = path.basename(path.dirname(path.dirname(file.path)))
+      let platform: string
+
+      if (rustTarget.includes("darwin") || rustTarget.includes("apple")) {
+        platform = "macos"
+      } else if (rustTarget.includes("linux")) {
+        platform = "linux"
+      } else {
+        logger.warning(
+          `Unknown Unix platform for target ${rustTarget}, skipping`,
+        )
+        continue
+      }
+
+      logger.info(`Found ${platform} binary: ${file.path}`)
+      kbdgenFiles.push({ path: file.path, platform })
     }
   }
 
-  if (!unixDownloaded && !windowsDownloaded) {
-    throw new Error("Failed to download any kbdgen artifacts")
-  }
+  // Find Windows binaries (.exe extension)
+  for await (const file of fs.expandGlob("target/*/release/kbdgen.exe")) {
+    if (file.isFile) {
+      const rustTarget = path.basename(path.dirname(path.dirname(file.path)))
 
-  // Find all kbdgen binary files
-  const kbdgenFiles: { path: string; platform: string }[] = []
-
-  logger.info("Searching for kbdgen binary files...")
-
-  for await (
-    const entry of fs.walk(".", { includeFiles: true, includeDirs: false })
-  ) {
-    if (entry.name === "kbdgen" || entry.name === "kbdgen.exe") {
-      logger.info(`Found potential kbdgen file: ${entry.path}`)
-
-      // Extract platform from path like target/x86_64-pc-windows-msvc/release/kbdgen.exe
-      const normalizedPath = path.normalize(entry.path)
-      const pathParts = normalizedPath.split(path.SEP)
-      const targetIndex = pathParts.indexOf("target")
-
-      logger.debug(`Normalized path: ${normalizedPath}`)
-      logger.debug(`Path parts: ${JSON.stringify(pathParts)}`)
-      logger.debug(`Target index: ${targetIndex}`)
-
-      if (targetIndex >= 0 && targetIndex + 1 < pathParts.length) {
-        const rustTarget = pathParts[targetIndex + 1]
-        logger.info(`Rust target: ${rustTarget}`)
-        let platform: string
-
-        if (rustTarget.includes("windows")) {
-          platform = "windows"
-        } else if (
-          rustTarget.includes("darwin") || rustTarget.includes("apple")
-        ) {
-          platform = "macos"
-        } else if (rustTarget.includes("linux")) {
-          platform = "linux"
-        } else {
-          logger.warning(`Unknown platform for target ${rustTarget}, skipping`)
-          continue
-        }
-
-        logger.info(
-          `Adding file for deployment - Platform: ${platform}, Path: ${entry.path}`,
-        )
-        kbdgenFiles.push({ path: entry.path, platform })
+      if (rustTarget.includes("windows")) {
+        logger.info(`Found windows binary: ${file.path}`)
+        kbdgenFiles.push({ path: file.path, platform: "windows" })
       } else {
-        logger.warning(`Could not extract target from path: ${entry.path}`)
+        logger.warning(
+          `Unknown Windows platform for target ${rustTarget}, skipping`,
+        )
       }
     }
   }
