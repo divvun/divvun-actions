@@ -26,10 +26,12 @@ function releaseReq(
   version: string,
   platform: string,
   channel: string | null,
+  architecture: string,
 ): ReleaseRequest {
   const req: ReleaseRequest = {
     version,
     platform,
+    arch: architecture,
   }
 
   if (channel) {
@@ -89,7 +91,7 @@ export default async function kbdgenDeploy({
     const artifactSize = getArtifactSize(txzPath)
 
     const payloadMetadata = await PahkatUploader.release.tarballPackage(
-      releaseReq(version, platform, channel),
+      releaseReq(version, platform, channel, architecture),
       artifactUrl,
       1,
       artifactSize,
@@ -187,9 +189,9 @@ export async function runKbdgenDeploy() {
     throw new Error("No kbdgen binary files found for deployment")
   }
 
-  console.log("Deploying kbdgen binaries:")
+  logger.info("Deploying kbdgen binaries:")
   for (const file of kbdgenFiles) {
-    console.log(`- ${file.platform}: ${file.path}`)
+    logger.info(`- ${file.platform}: ${file.path}`)
   }
 
   // Deploy each platform binary
