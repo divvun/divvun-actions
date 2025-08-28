@@ -8,8 +8,10 @@ import {
   nonUndefinedProxy,
   PahkatUploader,
   ReleaseRequest,
+  Tar,
   versionAsNightly,
 } from "~/util/shared.ts"
+import { makeTempDir } from "~/util/temp.ts"
 
 export function derivePackageId() {
   return "kbdgen"
@@ -63,16 +65,28 @@ export default async function kbdgenDeploy({
   try {
     const repoPackageUrl = `${pahkatRepo}packages/${packageId}`
 
-    const ext = path.extname(payloadPath)
-    const pathItems = [packageId, version, platform]
-    const artifactPath = path.join(
-      path.dirname(payloadPath),
-      `${pathItems.join("_")}${ext}`,
-    )
+    const rustTarget = path.basename(path.dirname(path.dirname(payloadPath)))
+    let architecture: string
+    if (rustTarget.includes("x86_64")) {
+      architecture = "x86_64"
+    } else if (rustTarget.includes("aarch64")) {
+      architecture = "aarch64"
+    } else {
+      architecture = "unknown"
+    }
+
+    // Create .txz file containing the binary
+    const pathItems = [packageId, version, platform, architecture]
+    const txzFileName = `${pathItems.join("_")}.txz`
+    const txzPath = path.join(path.dirname(payloadPath), txzFileName)
+
+    // Create .txz archive containing the binary
+    await Tar.createFlatTxz([payloadPath], txzPath)
+
     const artifactUrl = `${PahkatUploader.ARTIFACTS_URL}${
-      path.basename(artifactPath)
+      path.basename(txzPath)
     }`
-    const artifactSize = getArtifactSize(payloadPath)
+    const artifactSize = getArtifactSize(txzPath)
 
     const payloadMetadata = await PahkatUploader.release.tarballPackage(
       releaseReq(version, platform, channel),
@@ -88,11 +102,10 @@ export default async function kbdgenDeploy({
 
     await Deno.writeTextFile("./metadata.toml", payloadMetadata)
 
-    logger.debug(`Renaming from ${payloadPath} to ${artifactPath}`)
-    await Deno.rename(payloadPath, artifactPath)
+    logger.info(`Created .txz package: ${txzPath}`)
 
     await PahkatUploader.upload(
-      artifactPath,
+      txzPath,
       artifactUrl,
       "./metadata.toml",
       repoPackageUrl,
