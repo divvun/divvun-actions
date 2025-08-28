@@ -12,13 +12,63 @@ import {
   versionAsNightly,
 } from "~/util/shared.ts"
 
-export function derivePackageId() {
-  return "kbdgen"
-}
+// Constants
+const CONSTANTS = {
+  PLATFORMS: {
+    MACOS: "macos",
+    LINUX: "linux",
+    WINDOWS: "windows",
+  },
+  ARCHITECTURES: {
+    X86_64: "x86_64",
+    AARCH64: "aarch64",
+  },
+} as const
 
 async function loadCargoToml(): Promise<any> {
   const cargoString = await Deno.readTextFile("./Cargo.toml")
   return nonUndefinedProxy(toml.parse(cargoString), true)
+}
+
+/**
+ * Extracts architecture from a Rust target string
+ */
+function extractArchitecture(rustTarget: string): string {
+  if (rustTarget.includes(CONSTANTS.ARCHITECTURES.X86_64)) {
+    return CONSTANTS.ARCHITECTURES.X86_64
+  } else if (rustTarget.includes(CONSTANTS.ARCHITECTURES.AARCH64)) {
+    return CONSTANTS.ARCHITECTURES.AARCH64
+  }
+  return "unknown"
+}
+
+/**
+ * Determines platform from Rust target string
+ */
+function determinePlatform(rustTarget: string): string | null {
+  if (rustTarget.includes("windows")) {
+    return CONSTANTS.PLATFORMS.WINDOWS
+  } else if (rustTarget.includes("darwin") || rustTarget.includes("apple")) {
+    return CONSTANTS.PLATFORMS.MACOS
+  } else if (rustTarget.includes("linux")) {
+    return CONSTANTS.PLATFORMS.LINUX
+  }
+  return null
+}
+
+/**
+ * Creates dist/bin directory structure and copies binary
+ */
+async function createDistDirectory(payloadPath: string): Promise<string> {
+  const distDir = path.join(path.dirname(payloadPath), "dist")
+  const binDir = path.join(distDir, "bin")
+  await Deno.mkdir(binDir, { recursive: true })
+
+  const binaryName = path.basename(payloadPath)
+  const distBinaryPath = path.join(binDir, binaryName)
+  await Deno.copyFile(payloadPath, distBinaryPath)
+
+  return distDir
 }
 
 function releaseReq(
@@ -66,23 +116,12 @@ export default async function kbdgenDeploy({
   try {
     const repoPackageUrl = `${pahkatRepo}packages/${packageId}`
 
+    // Extract architecture from the payload path
     const rustTarget = path.basename(path.dirname(path.dirname(payloadPath)))
-    let architecture: string
-    if (rustTarget.includes("x86_64")) {
-      architecture = "x86_64"
-    } else if (rustTarget.includes("aarch64")) {
-      architecture = "aarch64"
-    } else {
-      architecture = "unknown"
-    }
+    const architecture = extractArchitecture(rustTarget)
 
-    const distDir = path.join(path.dirname(payloadPath), "dist")
-    const binDir = path.join(distDir, "bin")
-    await Deno.mkdir(binDir, { recursive: true })
-
-    const binaryName = path.basename(payloadPath)
-    const distBinaryPath = path.join(binDir, binaryName)
-    await Deno.copyFile(payloadPath, distBinaryPath)
+    // Create dist/bin directory structure and copy binary
+    const distDir = await createDistDirectory(payloadPath)
 
     const pathItems = [packageId, version, platform, architecture]
     const txzFileName = `${pathItems.join("_")}.txz`
@@ -140,7 +179,7 @@ export async function runKbdgenDeploy() {
     awsSecretAccessKey: allSecrets.get("s3/secretAccessKey"),
   }
 
-  const packageId = derivePackageId()
+  const packageId = "kbdgen"
   const pahkatRepo = "https://pahkat.uit.no/devtools/"
   const channel = "nightly"
 
@@ -158,13 +197,9 @@ export async function runKbdgenDeploy() {
   for await (const file of fs.expandGlob("target/*/release/kbdgen")) {
     if (file.isFile) {
       const rustTarget = path.basename(path.dirname(path.dirname(file.path)))
-      let platform: string
+      const platform = determinePlatform(rustTarget)
 
-      if (rustTarget.includes("darwin") || rustTarget.includes("apple")) {
-        platform = "macos"
-      } else if (rustTarget.includes("linux")) {
-        platform = "linux"
-      } else {
+      if (!platform) {
         logger.warning(
           `Unknown Unix platform for target ${rustTarget}, skipping`,
         )
@@ -180,15 +215,17 @@ export async function runKbdgenDeploy() {
   for await (const file of fs.expandGlob("target/*/release/kbdgen.exe")) {
     if (file.isFile) {
       const rustTarget = path.basename(path.dirname(path.dirname(file.path)))
+      const platform = determinePlatform(rustTarget)
 
-      if (rustTarget.includes("windows")) {
-        logger.info(`Found windows binary: ${file.path}`)
-        kbdgenFiles.push({ path: file.path, platform: "windows" })
-      } else {
+      if (platform !== CONSTANTS.PLATFORMS.WINDOWS) {
         logger.warning(
-          `Unknown Windows platform for target ${rustTarget}, skipping`,
+          `Expected Windows platform but got ${platform} for target ${rustTarget}, skipping`,
         )
+        continue
       }
+
+      logger.info(`Found ${platform} binary: ${file.path}`)
+      kbdgenFiles.push({ path: file.path, platform })
     }
   }
 
