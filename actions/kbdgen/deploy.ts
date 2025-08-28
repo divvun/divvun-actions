@@ -14,17 +14,11 @@ import {
 import { makeTempDir } from "~/util/temp.ts"
 
 // Constants
-const CONSTANTS = {
-  PLATFORMS: {
-    MACOS: "macos",
-    LINUX: "linux",
-    WINDOWS: "windows",
-  },
-  ARCHITECTURES: {
-    X86_64: "x86_64",
-    AARCH64: "aarch64",
-  },
-} as const
+const MACOS = "macos"
+const LINUX = "linux"
+const WINDOWS = "windows"
+const X86_64 = "x86_64"
+const AARCH64 = "aarch64"
 
 async function loadCargoToml(): Promise<any> {
   const cargoString = await Deno.readTextFile("./Cargo.toml")
@@ -35,10 +29,10 @@ async function loadCargoToml(): Promise<any> {
  * Extracts architecture from a Rust target string
  */
 function extractArchitecture(rustTarget: string): string {
-  if (rustTarget.includes(CONSTANTS.ARCHITECTURES.X86_64)) {
-    return CONSTANTS.ARCHITECTURES.X86_64
-  } else if (rustTarget.includes(CONSTANTS.ARCHITECTURES.AARCH64)) {
-    return CONSTANTS.ARCHITECTURES.AARCH64
+  if (rustTarget.includes(X86_64)) {
+    return X86_64
+  } else if (rustTarget.includes(AARCH64)) {
+    return AARCH64
   }
   return "unknown"
 }
@@ -48,11 +42,11 @@ function extractArchitecture(rustTarget: string): string {
  */
 function determinePlatform(rustTarget: string): string | null {
   if (rustTarget.includes("windows")) {
-    return CONSTANTS.PLATFORMS.WINDOWS
+    return WINDOWS
   } else if (rustTarget.includes("darwin") || rustTarget.includes("apple")) {
-    return CONSTANTS.PLATFORMS.MACOS
+    return MACOS
   } else if (rustTarget.includes("linux")) {
-    return CONSTANTS.PLATFORMS.LINUX
+    return LINUX
   }
   return null
 }
@@ -250,7 +244,7 @@ export async function runKbdgenDeploy() {
       const rustTarget = path.basename(path.dirname(path.dirname(file.path)))
       const platform = determinePlatform(rustTarget)
 
-      if (platform !== CONSTANTS.PLATFORMS.WINDOWS) {
+      if (platform !== WINDOWS) {
         logger.warning(
           `Expected Windows platform but got ${platform} for target ${rustTarget}, skipping`,
         )
