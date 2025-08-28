@@ -123,9 +123,26 @@ export async function runKbdgenDeploy() {
   const pahkatRepo = "https://pahkat.uit.no/main/"
   const channel = "nightly"
 
-  // Download all platform artifacts
-  await builder.downloadArtifacts("target/*/release/kbdgen", ".")
-  await builder.downloadArtifacts("target/*/release/kbdgen.exe", ".")
+  // Download all platform artifacts - try both path separators
+  try {
+    await builder.downloadArtifacts("target/*/release/kbdgen", ".")
+  } catch (e) {
+    logger.debug("Failed to download Unix-style kbdgen artifacts:", e.message)
+  }
+
+  try {
+    await builder.downloadArtifacts("target\\*/release\\kbdgen.exe", ".")
+  } catch (e) {
+    // Try forward slash version as fallback
+    try {
+      await builder.downloadArtifacts("target/*/release/kbdgen.exe", ".")
+    } catch (e2) {
+      logger.debug(
+        "Failed to download Windows-style kbdgen.exe artifacts:",
+        e2.message,
+      )
+    }
+  }
 
   // Find all kbdgen binary files
   const kbdgenFiles: { path: string; platform: string }[] = []
@@ -135,8 +152,10 @@ export async function runKbdgenDeploy() {
   ) {
     if (entry.name === "kbdgen" || entry.name === "kbdgen.exe") {
       // Extract platform from path like target/x86_64-pc-windows-msvc/release/kbdgen.exe
-      const pathParts = entry.path.split(path.SEP)
+      const normalizedPath = path.normalize(entry.path)
+      const pathParts = normalizedPath.split(path.SEP)
       const targetIndex = pathParts.indexOf("target")
+
       if (targetIndex >= 0 && targetIndex + 1 < pathParts.length) {
         const rustTarget = pathParts[targetIndex + 1]
         let platform: string
@@ -181,4 +200,3 @@ export async function runKbdgenDeploy() {
     })
   }
 }
-
