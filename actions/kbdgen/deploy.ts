@@ -11,7 +11,6 @@ import {
   Tar,
   versionAsNightly,
 } from "~/util/shared.ts"
-import { makeTempDir } from "~/util/temp.ts"
 
 export function derivePackageId() {
   return "kbdgen"
@@ -105,6 +104,10 @@ export default async function kbdgenDeploy({
     await Deno.writeTextFile("./metadata.toml", payloadMetadata)
 
     logger.info(`Created .txz package: ${txzPath}`)
+    logger.info(`Generated metadata.toml:`)
+    logger.info(payloadMetadata)
+    logger.info(`Repository URL: ${repoPackageUrl}`)
+    logger.info(`Artifact URL: ${artifactUrl}`)
 
     await PahkatUploader.upload(
       txzPath,
@@ -132,7 +135,7 @@ export async function runKbdgenDeploy() {
   }
 
   const packageId = derivePackageId()
-  const pahkatRepo = "https://pahkat.uit.no/main/"
+  const pahkatRepo = "https://pahkat.uit.no/devtools/"
   const channel = "nightly"
 
   // Download all platform artifacts using simple patterns like lang deployment
