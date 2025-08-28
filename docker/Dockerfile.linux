@@ -138,7 +138,7 @@ wait $!
 XXXX
 EOF
 
-ENV LD_LIBRARY_PATH "/opt/libtorch/lib"
+ENV LD_LIBRARY_PATH="/opt/libtorch/lib"
 
 RUN chmod +x /entrypoint.sh
 
