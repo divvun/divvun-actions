@@ -102,7 +102,6 @@ export function pipelineKbdgen() {
     }
   }
 
-  // Add deploy step
   pipeline.steps.push(command({
     label: "Deploy",
     command: "divvun-actions run kbdgen-deploy",
