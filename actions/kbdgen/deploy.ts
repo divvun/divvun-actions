@@ -76,7 +76,6 @@ export default async function kbdgenDeploy({
       architecture = "unknown"
     }
 
-    // Create dist/bin directory structure to be consistent with old taskcluster system
     const distDir = path.join(path.dirname(payloadPath), "dist")
     const binDir = path.join(distDir, "bin")
     await Deno.mkdir(binDir, { recursive: true })
@@ -145,16 +144,14 @@ export async function runKbdgenDeploy() {
   const pahkatRepo = "https://pahkat.uit.no/devtools/"
   const channel = "nightly"
 
-  // Download all platform artifacts using simple patterns like lang deployment
   await builder.downloadArtifacts("target/*/release/kbdgen", ".")
   await builder.downloadArtifacts("target\\*\\release\\kbdgen.exe", ".")
   try {
     await builder.downloadArtifacts("target/*/release/kbdgen.exe", ".")
-  } catch (e) {
+  } catch (_e) {
     logger.info("Forward slash Windows pattern not needed (already downloaded)")
   }
 
-  // Use fs.expandGlob to find all kbdgen files like lang deployment does
   const kbdgenFiles: { path: string; platform: string }[] = []
 
   // Find Unix binaries (no extension)
@@ -204,7 +201,6 @@ export async function runKbdgenDeploy() {
     logger.info(`- ${file.platform}: ${file.path}`)
   }
 
-  // Deploy each platform binary
   for (const file of kbdgenFiles) {
     await kbdgenDeploy({
       payloadPath: file.path,
