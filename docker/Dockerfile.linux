@@ -116,7 +116,8 @@ RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # Create entrypoint script for graceful shutdown
-RUN cat > /entrypoint.sh << 'EOF'
+RUN <<EOF
+cat > /entrypoint.sh <<XXXX
 #!/bin/bash
 
 # Handle termination signals gracefully
@@ -134,6 +135,7 @@ trap shutdown SIGTERM SIGINT
 # Execute the command passed to the container
 exec "$@" &
 wait $!
+XXXX
 EOF
 
 RUN chmod +x /entrypoint.sh
