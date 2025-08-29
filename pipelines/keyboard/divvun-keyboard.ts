@@ -11,6 +11,7 @@ import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import keyboardDeploy from "../../actions/keyboard/deploy.ts"
 import { sentryUploadIOSDebugFiles } from "../../actions/sentry/upload-debug-files.ts"
+import { Kbdgen } from "../../util/shared.ts"
 
 export async function runDivvunKeyboardIOS(kbdgenBundlePath: string) {
   const secrets = await builder.secrets()
