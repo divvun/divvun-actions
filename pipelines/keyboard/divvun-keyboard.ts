@@ -11,7 +11,7 @@ import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import keyboardDeploy from "../../actions/keyboard/deploy.ts"
 import { sentryUploadIOSDebugFiles } from "../../actions/sentry/upload-debug-files.ts"
-import { Kbdgen } from "../../util/shared.ts"
+import { Kbdgen, versionAsNightly } from "../../util/shared.ts"
 
 export async function runDivvunKeyboardIOS(kbdgenBundlePath: string) {
   const secrets = await builder.secrets()
@@ -83,12 +83,16 @@ async function createWindowsPackage(
   payloadPath: string,
   packageId: string,
   bundlePath: string,
+  channel: string | null,
 ): Promise<string> {
   using tempDir = await makeTempDir()
 
-  // Get version from kbdgen bundle (after setNightlyVersion has been called)
+  // Get version from kbdgen bundle
   const target = await Kbdgen.loadTarget(bundlePath, "windows")
-  const version = target.version as string
+  const baseVersion = target.version as string
+
+  // Apply channel and timestamp if this is a nightly build
+  const version = channel ? await versionAsNightly(baseVersion) : baseVersion
 
   const pathItems = [packageId, version, "windows"]
   const packageFileName = `${pathItems.join("_")}.exe`
@@ -110,6 +114,7 @@ export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
       payloadPath,
       builder.env.repoName,
       kbdgenBundlePath,
+      channel,
     )
 
     // Upload artifact for later deployment
@@ -127,12 +132,16 @@ async function createMacosPackage(
   payloadPath: string,
   packageId: string,
   bundlePath: string,
+  channel: string | null,
 ): Promise<string> {
   using tempDir = await makeTempDir()
 
-  // Get version from kbdgen bundle (after setNightlyVersion has been called)
+  // Get version from kbdgen bundle
   const target = await Kbdgen.loadTarget(bundlePath, "macos")
-  const version = target.version as string
+  const baseVersion = target.version as string
+
+  // Apply channel and timestamp if this is a nightly build
+  const version = channel ? await versionAsNightly(baseVersion) : baseVersion
 
   // Create properly named package
   const pathItems = [packageId, version, "macos"]
@@ -157,6 +166,7 @@ export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
       payloadPath,
       builder.env.repoName,
       kbdgenBundlePath,
+      channel,
     )
 
     // Upload artifact for later deployment
