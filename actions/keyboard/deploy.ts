@@ -98,17 +98,9 @@ export default async function keyboardDeploy({
     version = target.version as string
     platform = "macos"
 
-    const ext = path.extname(payloadPath)
-    const pathItems = [packageId, version, platform]
-    artifactPath = path.join(
-      path.dirname(payloadPath),
-      `${pathItems.join("_")}${ext}`,
-    )
-    artifactUrl = `${PahkatUploader.ARTIFACTS_URL}${
-      path.basename(
-        artifactPath,
-      )
-    }`
+    // Use the original artifact path and filename (preserves nightly timestamps)
+    artifactPath = payloadPath
+    artifactUrl = `${PahkatUploader.ARTIFACTS_URL}${path.basename(payloadPath)}`
     artifactSize = getArtifactSize(payloadPath)
 
     payloadMetadata = await PahkatUploader.release.macosPackage(
@@ -130,17 +122,9 @@ export default async function keyboardDeploy({
     version = target.version as string
     platform = "windows"
 
-    const ext = path.extname(payloadPath)
-    const pathItems = [packageId, version, platform]
-    artifactPath = path.join(
-      path.dirname(payloadPath),
-      `${pathItems.join("_")}${ext}`,
-    )
-    artifactUrl = `${PahkatUploader.ARTIFACTS_URL}${
-      path.basename(
-        artifactPath,
-      )
-    }`
+    // Use the original artifact path and filename (preserves nightly timestamps)
+    artifactPath = payloadPath
+    artifactUrl = `${PahkatUploader.ARTIFACTS_URL}${path.basename(payloadPath)}`
     artifactSize = getArtifactSize(payloadPath)
 
     payloadMetadata = await PahkatUploader.release.windowsExecutable(
@@ -181,8 +165,7 @@ export default async function keyboardDeploy({
 
   const metadataJsonPath = await writeMetadataJson(bundlePath)
 
-  logger.debug(`Renaming from ${payloadPath} to ${artifactPath}`)
-  await Deno.rename(payloadPath, artifactPath)
+  logger.debug(`Using artifact path: ${artifactPath}`)
 
   await PahkatUploader.upload(
     artifactPath,
