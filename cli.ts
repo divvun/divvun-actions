@@ -20,6 +20,7 @@ import {
   runLangBundle,
   runLangDeploy,
 } from "./pipelines/lang/mod.ts"
+import { runKbdgenDeploy } from "./actions/kbdgen/deploy.ts"
 import sign from "./services/windows-codesign.ts"
 import { makeTempFile } from "./util/temp.ts"
 
@@ -187,6 +188,10 @@ async function runPipeline(args) {
     }
     case "lang-deploy": {
       await runLangDeploy()
+      break
+    }
+    case "kbdgen-deploy": {
+      await runKbdgenDeploy()
       break
     }
     default: {

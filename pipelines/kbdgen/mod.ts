@@ -29,13 +29,18 @@ export function pipelineKbdgen() {
     steps: [],
   }
 
+  const buildStepKeys: string[] = []
+
   for (const [os, archs] of Object.entries(platforms)) {
     for (const arch of archs) {
       const ext = os === "windows" ? ".exe" : ""
       const steps = []
+      const buildKey = `build-${os}-${arch}`
+      buildStepKeys.push(buildKey)
 
       if (os === "windows") {
         steps.push(command({
+          key: buildKey,
           agents: {
             queue: os,
           },
@@ -65,6 +70,7 @@ export function pipelineKbdgen() {
           : "rustup update && CROSS_CONTAINER_IN_CONTAINER=1 cross"
 
         steps.push(command({
+          key: buildKey,
           agents: {
             queue: os,
           },
@@ -95,6 +101,15 @@ export function pipelineKbdgen() {
       })
     }
   }
+
+  pipeline.steps.push(command({
+    label: "Deploy",
+    command: "divvun-actions run kbdgen-deploy",
+    depends_on: buildStepKeys,
+    agents: {
+      queue: "linux",
+    },
+  }))
 
   return pipeline
 }
