@@ -95,22 +95,36 @@ export default async function keyboardBuild({
     await Deno.copyFile(kbdi_path, kbdiDestPath)
     await Deno.copyFile(kbdi_x64_path, kbdiX64DestPath)
 
-    console.log("Listing files in outputPath:", outputPath)
-    try {
-      for await (const entry of Deno.readDir(outputPath)) {
-        console.log(`  ${entry.isDirectory ? 'DIR' : 'FILE'}: ${entry.name}`)
-        if (entry.isDirectory) {
-          try {
-            for await (const subEntry of Deno.readDir(path.join(outputPath, entry.name))) {
-              console.log(`    ${subEntry.isDirectory ? 'DIR' : 'FILE'}: ${subEntry.name}`)
+    console.log("Creating old-style directory structure for Inno Setup")
+    // Create symlinks/copies to match what the old CI expected
+    const dirMappings = [
+      { from: "x86", to: "i386" },
+      { from: "x64", to: "amd64" }, 
+      { from: "x86", to: "wow64" }  // x86 files also used for wow64
+    ]
+    
+    for (const mapping of dirMappings) {
+      const fromDir = path.join(outputPath, mapping.from)
+      const toDir = path.join(outputPath, mapping.to)
+      try {
+        // Check if source directory exists
+        const stat = await Deno.stat(fromDir)
+        if (stat.isDirectory) {
+          console.log(`Copying ${fromDir} to ${toDir}`)
+          await Deno.mkdir(toDir, { recursive: true })
+          // Copy all files from source to destination
+          for await (const entry of Deno.readDir(fromDir)) {
+            if (entry.isFile) {
+              await Deno.copyFile(
+                path.join(fromDir, entry.name), 
+                path.join(toDir, entry.name)
+              )
             }
-          } catch (e) {
-            console.log(`    Error reading ${entry.name}: ${e.message}`)
           }
         }
+      } catch (e) {
+        console.log(`Warning: Could not process ${mapping.from} -> ${mapping.to}: ${e.message}`)
       }
-    } catch (e) {
-      console.log("Error listing directory:", e.message)
     }
     
     console.log("Generating Inno")
