@@ -7,6 +7,7 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import logger from "~/util/log.ts"
+import { makeTempDir } from "~/util/temp.ts"
 import keyboardDeploy from "../../actions/keyboard/deploy.ts"
 import { sentryUploadIOSDebugFiles } from "../../actions/sentry/upload-debug-files.ts"
 
@@ -125,16 +126,19 @@ export async function runDesktopKeyboardDeploy() {
     pahkatApiKey: allSecrets.get("pahkat/apiKey"),
   }
 
-  // Download all artifacts from build steps
-  await builder.downloadArtifacts("*.exe", ".")
-  await builder.downloadArtifacts("*.pkg", ".")
+  // Use temp directory for downloading artifacts
+  using tempDir = await makeTempDir()
+  
+  // Download all artifacts from build steps to temp directory
+  await builder.downloadArtifacts("*.exe", tempDir.path)
+  await builder.downloadArtifacts("*.pkg", tempDir.path)
   
   // Get metadata from build steps
   const bundlePath = await builder.metadata("bundle-path")
   
-  // Find downloaded artifacts using glob patterns
+  // Find downloaded artifacts using glob patterns in temp directory
   async function globOneFile(pattern: string): Promise<string | null> {
-    const files = await fs.expandGlob(pattern)
+    const files = await fs.expandGlob(pattern, { root: tempDir.path })
     for await (const file of files) {
       if (file.isFile) {
         return file.path
