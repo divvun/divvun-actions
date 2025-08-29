@@ -84,7 +84,7 @@ export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
     })
 
     // Upload artifact for later deployment
-    await builder.uploadArtifact(payloadPath)
+    await builder.uploadArtifacts(payloadPath)
     
     // Store metadata for deployment
     await builder.setMetadata("windows-payload-path", payloadPath)
@@ -105,7 +105,7 @@ export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
     })
 
     // Upload artifact for later deployment
-    await builder.uploadArtifact(payloadPath)
+    await builder.uploadArtifacts(payloadPath)
     
     // Store metadata for deployment
     await builder.setMetadata("macos-payload-path", payloadPath)
