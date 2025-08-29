@@ -1,4 +1,5 @@
 import * as fs from "@std/fs"
+import * as path from "@std/path"
 import { fastlanePilotUpload } from "~/actions/fastlane/pilot.ts"
 import keyboardBuildMeta from "~/actions/keyboard/build-meta.ts"
 import keyboardBuild from "~/actions/keyboard/build/mod.ts"
@@ -77,6 +78,25 @@ export async function runDivvunKeyboardAndroid(kbdgenBundlePath: string) {
   }
 }
 
+async function createWindowsPackage(
+  payloadPath: string,
+  packageId: string,
+  bundlePath: string,
+): Promise<string> {
+  using tempDir = await makeTempDir()
+
+  // Get version from kbdgen bundle (after setNightlyVersion has been called)
+  const target = await Kbdgen.loadTarget(bundlePath, "windows")
+  const version = target.version as string
+
+  const pathItems = [packageId, version, "windows"]
+  const packageFileName = `${pathItems.join("_")}.exe`
+  const packagePath = path.join(tempDir.path, packageFileName)
+
+  await Deno.copyFile(payloadPath, packagePath)
+  return packagePath
+}
+
 export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
   await builder.group("Building Divvun Keyboard for Windows", async () => {
     const { payloadPath, channel } = await keyboardBuild({
@@ -85,16 +105,41 @@ export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
       bundlePath: kbdgenBundlePath,
     })
 
+    const artifactPath = await createWindowsPackage(
+      payloadPath,
+      builder.env.repoName,
+      kbdgenBundlePath,
+    )
+
     // Upload artifact for later deployment
-    await builder.uploadArtifacts(payloadPath)
-    
+    await builder.uploadArtifacts(artifactPath)
+
     // Store metadata for deployment
-    await builder.setMetadata("windows-payload-path", payloadPath)
     await builder.setMetadata("windows-channel", channel || "")
     await builder.setMetadata("bundle-path", kbdgenBundlePath)
-    
+
     logger.info("Windows keyboard built and artifact uploaded")
   })
+}
+
+async function createMacosPackage(
+  payloadPath: string,
+  packageId: string,
+  bundlePath: string,
+): Promise<string> {
+  using tempDir = await makeTempDir()
+
+  // Get version from kbdgen bundle (after setNightlyVersion has been called)
+  const target = await Kbdgen.loadTarget(bundlePath, "macos")
+  const version = target.version as string
+
+  // Create properly named package
+  const pathItems = [packageId, version, "macos"]
+  const packageFileName = `${pathItems.join("_")}.pkg`
+  const packagePath = path.join(tempDir.path, packageFileName)
+
+  await Deno.copyFile(payloadPath, packagePath)
+  return packagePath
 }
 
 export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
@@ -106,14 +151,20 @@ export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
       bundlePath: kbdgenBundlePath,
     })
 
+    // Create properly named package
+    const artifactPath = await createMacosPackage(
+      payloadPath,
+      builder.env.repoName,
+      kbdgenBundlePath,
+    )
+
     // Upload artifact for later deployment
-    await builder.uploadArtifacts(payloadPath)
-    
+    await builder.uploadArtifacts(artifactPath)
+
     // Store metadata for deployment
-    await builder.setMetadata("macos-payload-path", payloadPath)
     await builder.setMetadata("macos-channel", channel || "")
     await builder.setMetadata("bundle-path", kbdgenBundlePath)
-    
+
     logger.info("macOS keyboard built and artifact uploaded")
   })
 }
@@ -122,20 +173,20 @@ export async function runDesktopKeyboardDeploy() {
   const allSecrets = await builder.secrets()
   const secrets = {
     awsAccessKeyId: allSecrets.get("s3/accessKeyId"),
-    awsSecretAccessKey: allSecrets.get("s3/secretAccessKey"),  
+    awsSecretAccessKey: allSecrets.get("s3/secretAccessKey"),
     pahkatApiKey: allSecrets.get("pahkat/apiKey"),
   }
 
   // Use temp directory for downloading artifacts
   using tempDir = await makeTempDir()
-  
+
   // Download all artifacts from build steps to temp directory
   await builder.downloadArtifacts("*.exe", tempDir.path)
   await builder.downloadArtifacts("*.pkg", tempDir.path)
-  
+
   // Get metadata from build steps
   const bundlePath = await builder.metadata("bundle-path")
-  
+
   // Find downloaded artifacts using glob patterns in temp directory
   async function globOneFile(pattern: string): Promise<string | null> {
     const files = await fs.expandGlob(pattern, { root: tempDir.path })
@@ -182,7 +233,7 @@ export async function runDesktopKeyboardDeploy() {
       secrets,
     })
   }
-  
+
   logger.info("Keyboard deployment completed")
 }
 
