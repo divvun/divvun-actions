@@ -13,7 +13,6 @@ import {
 } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
-// Constants
 const MACOS = "macos"
 const LINUX = "linux"
 const WINDOWS = "windows"
@@ -25,9 +24,6 @@ async function loadCargoToml(): Promise<any> {
   return nonUndefinedProxy(toml.parse(cargoString), true)
 }
 
-/**
- * Extracts architecture from a Rust target string
- */
 function extractArchitecture(rustTarget: string): string {
   if (rustTarget.includes(X86_64)) {
     return X86_64
@@ -37,9 +33,6 @@ function extractArchitecture(rustTarget: string): string {
   return "unknown"
 }
 
-/**
- * Determines platform from Rust target string
- */
 function determinePlatform(rustTarget: string): string | null {
   if (rustTarget.includes("windows")) {
     return WINDOWS
@@ -51,9 +44,6 @@ function determinePlatform(rustTarget: string): string | null {
   return null
 }
 
-/**
- * Creates a .txz tarball package from binary payload
- */
 async function createTarball(
   payloadPath: string,
   packageId: string,
@@ -127,11 +117,9 @@ export default async function kbdgenDeploy({
   try {
     const repoPackageUrl = `${pahkatRepo}packages/${packageId}`
 
-    // Extract architecture from the payload path
     const rustTarget = path.basename(path.dirname(path.dirname(payloadPath)))
     const architecture = extractArchitecture(rustTarget)
 
-    // Create .txz tarball package
     const txzPath = await createTarball(
       payloadPath,
       packageId,
