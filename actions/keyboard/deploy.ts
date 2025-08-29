@@ -60,6 +60,7 @@ export type Props = {
   channel: string | null
   pahkatRepo: string
   packageId: string
+  version: string
   secrets: {
     pahkatApiKey: string
     awsAccessKeyId: string
@@ -74,13 +75,13 @@ export default async function keyboardDeploy({
   channel,
   pahkatRepo,
   packageId,
+  version,
   secrets,
 }: Props) {
   const repoPackageUrl = `${pahkatRepo}packages/${packageId}`
 
   let payloadMetadata: string | null = null
   let platform: string | null = null
-  let version: string | null = null
   let artifactPath: string | null = null
   let artifactUrl: string | null = null
   let artifactSize: number | null = null
@@ -95,7 +96,6 @@ export default async function keyboardDeploy({
     // `keyboardLayout.%lang%` part (it adds it itself), we have to "fix"
     // the published ID here.
     pkgId = `${pkgId}.keyboardlayout.${lang}`
-    version = target.version as string
     platform = "macos"
 
     // Use the original artifact path and filename (preserves nightly timestamps)
@@ -119,7 +119,6 @@ export default async function keyboardDeploy({
       WindowsExecutableKind.Inno,
       target.uuid,
     )
-    version = target.version as string
     platform = "windows"
 
     // Use the original artifact path and filename (preserves nightly timestamps)

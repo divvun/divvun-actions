@@ -120,8 +120,16 @@ export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
     // Upload artifact for later deployment
     await builder.uploadArtifacts(artifactPath)
 
+    // Get the full version (including nightly timestamp) from the artifact
+    const target = await Kbdgen.loadTarget(kbdgenBundlePath, "windows")
+    const baseVersion = target.version as string
+    const fullVersion = channel
+      ? await versionAsNightly(baseVersion)
+      : baseVersion
+
     // Store metadata for deployment
     await builder.setMetadata("windows-channel", channel || "")
+    await builder.setMetadata("windows-version", fullVersion)
     await builder.setMetadata("bundle-path", kbdgenBundlePath)
 
     logger.info("Windows keyboard built and artifact uploaded")
@@ -172,8 +180,16 @@ export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
     // Upload artifact for later deployment
     await builder.uploadArtifacts(artifactPath)
 
+    // Get the full version (including nightly timestamp) from the artifact
+    const target = await Kbdgen.loadTarget(kbdgenBundlePath, "macos")
+    const baseVersion = target.version as string
+    const fullVersion = channel
+      ? await versionAsNightly(baseVersion)
+      : baseVersion
+
     // Store metadata for deployment
     await builder.setMetadata("macos-channel", channel || "")
+    await builder.setMetadata("macos-version", fullVersion)
     await builder.setMetadata("bundle-path", kbdgenBundlePath)
 
     logger.info("macOS keyboard built and artifact uploaded")
@@ -220,11 +236,13 @@ export async function runDesktopKeyboardDeploy() {
   // Deploy Windows keyboard if available
   if (windowsFiles) {
     const windowsChannel = await builder.metadata("windows-channel")
+    const windowsVersion = await builder.metadata("windows-version")
     await keyboardDeploy({
       packageId: builder.env.repoName,
       keyboardType: KeyboardType.Windows,
       bundlePath,
       channel: windowsChannel || null,
+      version: windowsVersion,
       pahkatRepo: "https://pahkat.uit.no/main/",
       payloadPath: windowsFiles,
       secrets,
@@ -234,11 +252,13 @@ export async function runDesktopKeyboardDeploy() {
   // Deploy macOS keyboard if available
   if (macosFiles) {
     const macosChannel = await builder.metadata("macos-channel")
+    const macosVersion = await builder.metadata("macos-version")
     await keyboardDeploy({
       packageId: builder.env.repoName,
       keyboardType: KeyboardType.MacOS,
       bundlePath,
       channel: macosChannel || null,
+      version: macosVersion,
       pahkatRepo: "https://pahkat.uit.no/main/",
       payloadPath: macosFiles,
       secrets,
