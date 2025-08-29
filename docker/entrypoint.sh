@@ -3,8 +3,16 @@
 # Handle termination signals gracefully
 shutdown() {
     echo "Received termination signal, stopping buildkite-agent gracefully..."
-    killall -SIGTERM buildkite-agent
-    exit 0
+    pkill buildkite-agent
+    
+    # Wait for agents to stop
+    while true; do
+        if ! pgrep buildkite-agent > /dev/null; then
+            echo "No buildkite-agent processes detected, exiting..."
+            exit 0
+        fi
+        sleep 1
+    done
 }
 
 # Trap SIGTERM and SIGINT signals
