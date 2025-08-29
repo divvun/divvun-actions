@@ -98,19 +98,36 @@ export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
         pahkatApiKey: secrets.get("pahkat/apiKey"),
       },
     })
-    console.log(payloadPath, channel)
+    logger.info(payloadPath, channel)
+    logger.info("Done building and deploying Divvun Keyboard for macOS")
   })
 }
 
 export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
   await builder.group("Building Divvun Keyboard for macOS", async () => {
-    console.log("Building Divvun Keyboard for macOS")
-    await keyboardBuild({
+    logger.info("Building Divvun Keyboard for macOS")
+    const { payloadPath, channel } = await keyboardBuild({
       keyboardType: KeyboardType.MacOS,
       nightlyChannel: "nightly",
       bundlePath: kbdgenBundlePath,
     })
-    console.log("Done building Divvun Keyboard for macOS")
+
+    const secrets = await builder.secrets()
+
+    await keyboardDeploy({
+      packageId: builder.env.repoName,
+      keyboardType: KeyboardType.MacOS,
+      bundlePath: kbdgenBundlePath,
+      channel,
+      pahkatRepo: "https://pahkat.uit.no/main/",
+      payloadPath,
+      secrets: {
+        awsAccessKeyId: secrets.get("s3/accessKeyId"),
+        awsSecretAccessKey: secrets.get("s3/secretAccessKey"),
+        pahkatApiKey: secrets.get("pahkat/apiKey"),
+      },
+    })
+    logger.info("Done building and deploying Divvun Keyboard for macOS")
   })
 }
 
@@ -151,14 +168,14 @@ export function pipelineDesktopKeyboard() {
   const pipeline: BuildkitePipeline = {
     steps: [
       command({
-        label: "Build Divvun Keyboard for Windows",
+        label: "Build & deploy Divvun Keyboard for Windows",
         command: "divvun-actions run divvun-keyboard-windows",
         agents: {
           queue: "windows",
         },
       }),
       command({
-        label: "Build Divvun Keyboard for macOS",
+        label: "Build & deploy Divvun Keyboard for macOS",
         command: "divvun-actions run divvun-keyboard-macos",
         agents: {
           queue: "macos",
