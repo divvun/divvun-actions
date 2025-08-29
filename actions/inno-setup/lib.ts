@@ -1,6 +1,7 @@
 import * as path from "@std/path"
 import * as target from "~/target.ts"
 import { makeTempDir } from "../../util/temp.ts"
+import logger from "../../util/log.ts"
 
 export async function makeInstaller(
   issPath: string,
@@ -23,9 +24,9 @@ export async function makeInstaller(
 
   const code = (await proc.status).code
   if (code !== 0) {
-    console.log("=== Inno setup file ===")
-    console.log(await Deno.readTextFile(issPath))
-    console.log("=/= === =/=")
+    logger.debug("=== Inno setup file ===")
+    logger.debug(await Deno.readTextFile(issPath))
+    logger.debug("=/= === =/=")
     throw new Error(`Process exited with code ${code}`)
   }
 
