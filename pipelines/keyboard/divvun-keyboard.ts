@@ -147,8 +147,8 @@ export async function runDesktopKeyboardDeploy() {
     return null
   }
 
-  const windowsFiles = await globOneFile("*.exe")
-  const macosFiles = await globOneFile("*.pkg")
+  const windowsFiles = await globOneFile("**/*.exe")
+  const macosFiles = await globOneFile("**/*.pkg")
 
   console.log("Deploying keyboard files:")
   console.log(`- Windows: ${windowsFiles}`)
