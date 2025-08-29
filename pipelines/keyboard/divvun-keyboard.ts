@@ -110,9 +110,7 @@ export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
     // Store metadata for deployment
     await builder.setMetadata("macos-payload-path", payloadPath)
     await builder.setMetadata("macos-channel", channel || "")
-    if (!await builder.metadata("bundle-path")) {
-      await builder.setMetadata("bundle-path", kbdgenBundlePath)
-    }
+    await builder.setMetadata("bundle-path", kbdgenBundlePath)
     
     logger.info("macOS keyboard built and artifact uploaded")
   })
