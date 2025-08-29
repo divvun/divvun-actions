@@ -85,15 +85,8 @@ export default async function keyboardBuild({
     console.log("Building Windows")
     const outputPath = await Kbdgen.buildWindows(bundlePath)
     console.log("Built")
-    console.log("outputPath:", outputPath)
-    console.log("kbdi_path:", kbdi_path)
-    console.log("kbdi_x64_path:", kbdi_x64_path)
-    const kbdiDestPath = path.resolve(outputPath, "kbdi.exe")
-    const kbdiX64DestPath = path.resolve(outputPath, "kbdi-x64.exe")
-    console.log("Copying to:", kbdiDestPath)
-    console.log("Copying to:", kbdiX64DestPath)
-    await Deno.copyFile(kbdi_path, kbdiDestPath)
-    await Deno.copyFile(kbdi_x64_path, kbdiX64DestPath)
+    await Deno.copyFile(kbdi_path, path.resolve(outputPath, "kbdi.exe"))
+    await Deno.copyFile(kbdi_x64_path, path.resolve(outputPath, "kbdi-x64.exe"))
 
     console.log("Creating old-style directory structure for Inno Setup")
     // Create symlinks/copies to match what the old CI expected

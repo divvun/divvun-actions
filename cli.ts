@@ -6,6 +6,7 @@ import { BuildkitePipeline } from "~/builder/pipeline.ts"
 import {
   pipelineDesktopKeyboard,
   pipelineDivvunKeyboard,
+  runDesktopKeyboardDeploy,
   runDesktopKeyboardMacOS,
   runDesktopKeyboardWindows,
   runDivvunKeyboardAndroid,
@@ -192,6 +193,10 @@ async function runPipeline(args) {
     }
     case "kbdgen-deploy": {
       await runKbdgenDeploy()
+      break
+    }
+    case "divvun-keyboard-deploy": {
+      await runDesktopKeyboardDeploy()
       break
     }
     default: {
