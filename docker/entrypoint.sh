@@ -3,9 +3,7 @@
 # Handle termination signals gracefully
 shutdown() {
     echo "Received termination signal, stopping buildkite-agent gracefully..."
-    if command -v buildkite-agent &> /dev/null; then
-        buildkite-agent stop
-    fi
+    killall -SIGTERM buildkite-agent
     exit 0
 }
 
