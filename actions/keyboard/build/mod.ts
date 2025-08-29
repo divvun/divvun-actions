@@ -95,6 +95,24 @@ export default async function keyboardBuild({
     await Deno.copyFile(kbdi_path, kbdiDestPath)
     await Deno.copyFile(kbdi_x64_path, kbdiX64DestPath)
 
+    console.log("Listing files in outputPath:", outputPath)
+    try {
+      for await (const entry of Deno.readDir(outputPath)) {
+        console.log(`  ${entry.isDirectory ? 'DIR' : 'FILE'}: ${entry.name}`)
+        if (entry.isDirectory) {
+          try {
+            for await (const subEntry of Deno.readDir(path.join(outputPath, entry.name))) {
+              console.log(`    ${subEntry.isDirectory ? 'DIR' : 'FILE'}: ${subEntry.name}`)
+            }
+          } catch (e) {
+            console.log(`    Error reading ${entry.name}: ${e.message}`)
+          }
+        }
+      }
+    } catch (e) {
+      console.log("Error listing directory:", e.message)
+    }
+    
     console.log("Generating Inno")
     const issPath = await generateKbdInnoFromBundle(bundlePath, outputPath)
     console.log("Inno generated")
