@@ -168,14 +168,14 @@ export function pipelineDesktopKeyboard() {
   const pipeline: BuildkitePipeline = {
     steps: [
       command({
-        label: "Build & deploy Divvun Keyboard for Windows",
+        label: "Build & Deploy Divvun Keyboard for Windows",
         command: "divvun-actions run divvun-keyboard-windows",
         agents: {
           queue: "windows",
         },
       }),
       command({
-        label: "Build & deploy Divvun Keyboard for macOS",
+        label: "Build & Deploy Divvun Keyboard for macOS",
         command: "divvun-actions run divvun-keyboard-macos",
         agents: {
           queue: "macos",
