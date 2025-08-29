@@ -341,7 +341,20 @@ export class PahkatPrefix {
     logger.info(`Initializing pahkat prefix at ${PahkatPrefix.path}`)
 
     console.log("Running pahkat-prefix init")
-    await DefaultShell.runScript(`pahkat-prefix init -c ${PahkatPrefix.path}`)
+    if (Deno.build.os === "windows") {
+      const { status } = await builder.output("pwsh", [
+        "-c",
+        `pahkat-prefix init -c ${PahkatPrefix.path}`,
+      ])
+      console.log(`Process exited with exit code ${status.code}.`)
+    } else {
+      const { status } = await builder.output("bash", [
+        "-c",
+        `pahkat-prefix init -c ${PahkatPrefix.path}`,
+      ])
+      console.log(`Process exited with exit code ${status.code}.`)
+    }
+    logger.debug(`repos: ${repos}`)
     for (const repo of repos) {
       await PahkatPrefix.addRepo(repo, channel)
     }
