@@ -1,3 +1,4 @@
+import * as fs from "@std/fs"
 import { fastlanePilotUpload } from "~/actions/fastlane/pilot.ts"
 import keyboardBuildMeta from "~/actions/keyboard/build-meta.ts"
 import keyboardBuild from "~/actions/keyboard/build/mod.ts"
@@ -131,21 +132,19 @@ export async function runDesktopKeyboardDeploy() {
   // Get metadata from build steps
   const bundlePath = await builder.metadata("bundle-path")
   
-  // Find and deploy Windows installer
-  const windowsFiles = []
-  for await (const entry of Deno.readDir(".")) {
-    if (entry.isFile && entry.name.endsWith(".exe")) {
-      windowsFiles.push(entry.name)
+  // Find downloaded artifacts using glob patterns
+  async function globOneFile(pattern: string): Promise<string | null> {
+    const files = await fs.expandGlob(pattern)
+    for await (const file of files) {
+      if (file.isFile) {
+        return file.path
+      }
     }
+    return null
   }
-  
-  // Find and deploy macOS installer  
-  const macosFiles = []
-  for await (const entry of Deno.readDir(".")) {
-    if (entry.isFile && entry.name.endsWith(".pkg")) {
-      macosFiles.push(entry.name)
-    }
-  }
+
+  const windowsFiles = await globOneFile("*.exe")
+  const macosFiles = await globOneFile("*.pkg")
 
   console.log("Deploying keyboard files:")
   console.log(`- Windows: ${windowsFiles}`)
@@ -153,7 +152,7 @@ export async function runDesktopKeyboardDeploy() {
   console.log(`- Bundle path: ${bundlePath}`)
 
   // Deploy Windows keyboard if available
-  if (windowsFiles.length > 0) {
+  if (windowsFiles) {
     const windowsChannel = await builder.metadata("windows-channel")
     await keyboardDeploy({
       packageId: builder.env.repoName,
@@ -161,13 +160,13 @@ export async function runDesktopKeyboardDeploy() {
       bundlePath,
       channel: windowsChannel || null,
       pahkatRepo: "https://pahkat.uit.no/main/",
-      payloadPath: windowsFiles[0],
+      payloadPath: windowsFiles,
       secrets,
     })
   }
 
   // Deploy macOS keyboard if available
-  if (macosFiles.length > 0) {
+  if (macosFiles) {
     const macosChannel = await builder.metadata("macos-channel")
     await keyboardDeploy({
       packageId: builder.env.repoName,
@@ -175,7 +174,7 @@ export async function runDesktopKeyboardDeploy() {
       bundlePath,
       channel: macosChannel || null,
       pahkatRepo: "https://pahkat.uit.no/main/",
-      payloadPath: macosFiles[0],
+      payloadPath: macosFiles,
       secrets,
     })
   }
