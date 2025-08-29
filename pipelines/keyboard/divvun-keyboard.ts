@@ -83,23 +83,15 @@ export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
       bundlePath: kbdgenBundlePath,
     })
 
-    const secrets = await builder.secrets()
-
-    await keyboardDeploy({
-      packageId: builder.env.repoName,
-      keyboardType: KeyboardType.Windows,
-      bundlePath: kbdgenBundlePath,
-      channel,
-      pahkatRepo: "https://pahkat.uit.no/main/",
-      payloadPath,
-      secrets: {
-        awsAccessKeyId: secrets.get("s3/accessKeyId"),
-        awsSecretAccessKey: secrets.get("s3/secretAccessKey"),
-        pahkatApiKey: secrets.get("pahkat/apiKey"),
-      },
-    })
-    logger.info(payloadPath, channel)
-    logger.info("Done building and deploying Divvun Keyboard for macOS")
+    // Upload artifact for later deployment
+    await builder.uploadArtifact(payloadPath)
+    
+    // Store metadata for deployment
+    await builder.setMetadata("windows-payload-path", payloadPath)
+    await builder.setMetadata("windows-channel", channel || "")
+    await builder.setMetadata("bundle-path", kbdgenBundlePath)
+    
+    logger.info("Windows keyboard built and artifact uploaded")
   })
 }
 
@@ -112,23 +104,85 @@ export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
       bundlePath: kbdgenBundlePath,
     })
 
-    const secrets = await builder.secrets()
+    // Upload artifact for later deployment
+    await builder.uploadArtifact(payloadPath)
+    
+    // Store metadata for deployment
+    await builder.setMetadata("macos-payload-path", payloadPath)
+    await builder.setMetadata("macos-channel", channel || "")
+    if (!await builder.metadata("bundle-path")) {
+      await builder.setMetadata("bundle-path", kbdgenBundlePath)
+    }
+    
+    logger.info("macOS keyboard built and artifact uploaded")
+  })
+}
 
+export async function runDesktopKeyboardDeploy() {
+  const allSecrets = await builder.secrets()
+  const secrets = {
+    awsAccessKeyId: allSecrets.get("s3/accessKeyId"),
+    awsSecretAccessKey: allSecrets.get("s3/secretAccessKey"),  
+    pahkatApiKey: allSecrets.get("pahkat/apiKey"),
+  }
+
+  // Download all artifacts from build steps
+  await builder.downloadArtifacts("*.exe", ".")
+  await builder.downloadArtifacts("*.pkg", ".")
+  
+  // Get metadata from build steps
+  const bundlePath = await builder.metadata("bundle-path")
+  
+  // Find and deploy Windows installer
+  const windowsFiles = []
+  for await (const entry of Deno.readDir(".")) {
+    if (entry.isFile && entry.name.endsWith(".exe")) {
+      windowsFiles.push(entry.name)
+    }
+  }
+  
+  // Find and deploy macOS installer  
+  const macosFiles = []
+  for await (const entry of Deno.readDir(".")) {
+    if (entry.isFile && entry.name.endsWith(".pkg")) {
+      macosFiles.push(entry.name)
+    }
+  }
+
+  console.log("Deploying keyboard files:")
+  console.log(`- Windows: ${windowsFiles}`)
+  console.log(`- macOS: ${macosFiles}`)
+  console.log(`- Bundle path: ${bundlePath}`)
+
+  // Deploy Windows keyboard if available
+  if (windowsFiles.length > 0) {
+    const windowsChannel = await builder.metadata("windows-channel")
+    await keyboardDeploy({
+      packageId: builder.env.repoName,
+      keyboardType: KeyboardType.Windows,
+      bundlePath,
+      channel: windowsChannel || null,
+      pahkatRepo: "https://pahkat.uit.no/main/",
+      payloadPath: windowsFiles[0],
+      secrets,
+    })
+  }
+
+  // Deploy macOS keyboard if available
+  if (macosFiles.length > 0) {
+    const macosChannel = await builder.metadata("macos-channel")
     await keyboardDeploy({
       packageId: builder.env.repoName,
       keyboardType: KeyboardType.MacOS,
-      bundlePath: kbdgenBundlePath,
-      channel,
+      bundlePath,
+      channel: macosChannel || null,
       pahkatRepo: "https://pahkat.uit.no/main/",
-      payloadPath,
-      secrets: {
-        awsAccessKeyId: secrets.get("s3/accessKeyId"),
-        awsSecretAccessKey: secrets.get("s3/secretAccessKey"),
-        pahkatApiKey: secrets.get("pahkat/apiKey"),
-      },
+      payloadPath: macosFiles[0],
+      secrets,
     })
-    logger.info("Done building and deploying Divvun Keyboard for macOS")
-  })
+  }
+  
+  logger.info("Keyboard deployment completed")
 }
 
 function command(input: CommandStep): CommandStep {
@@ -167,18 +221,32 @@ export function pipelineDivvunKeyboard() {
 export function pipelineDesktopKeyboard() {
   const pipeline: BuildkitePipeline = {
     steps: [
+      {
+        group: "Build",
+        key: "build",
+        steps: [
+          command({
+            label: "Build Divvun Keyboard for Windows",
+            command: "divvun-actions run divvun-keyboard-windows",
+            agents: {
+              queue: "windows",
+            },
+          }),
+          command({
+            label: "Build Divvun Keyboard for macOS",
+            command: "divvun-actions run divvun-keyboard-macos",
+            agents: {
+              queue: "macos",
+            },
+          }),
+        ],
+      },
       command({
-        label: "Build & Deploy Divvun Keyboard for Windows",
-        command: "divvun-actions run divvun-keyboard-windows",
+        label: "Deploy",
+        command: "divvun-actions run divvun-keyboard-deploy",
+        depends_on: "build",
         agents: {
-          queue: "windows",
-        },
-      }),
-      command({
-        label: "Build & Deploy Divvun Keyboard for macOS",
-        command: "divvun-actions run divvun-keyboard-macos",
-        agents: {
-          queue: "macos",
+          queue: "linux",
         },
       }),
     ],
