@@ -25,6 +25,15 @@ export default async function keyboardBuild({
   nightlyChannel,
   bundlePath,
 }: Props): Promise<Output> {
+  if (
+    keyboardType !== KeyboardType.Windows &&
+    keyboardType !== KeyboardType.MacOS
+  ) {
+    throw new Error(
+      `Unsupported keyboard type for non-meta build: ${keyboardType}`,
+    )
+  }
+
   // Testing how to get name and description fields
   const project = await Kbdgen.loadProjectBundle(bundlePath)
   const locales = project.locales
@@ -32,15 +41,6 @@ export default async function keyboardBuild({
   for (const locale in locales) {
     logger.debug(`  ${locales[locale].name}`)
     logger.debug(`  ${locales[locale].description}`)
-  }
-
-  if (
-    keyboardType === KeyboardType.iOS ||
-    keyboardType === KeyboardType.Android
-  ) {
-    throw new Error(
-      `Unsupported keyboard type for non-meta build: ${keyboardType}`,
-    )
   }
 
   let payloadPath
