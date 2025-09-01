@@ -107,7 +107,6 @@ export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
 
   const { payloadPath, channel } = await keyboardBuild({
     keyboardType: KeyboardType.Windows,
-    nightlyChannel: "nightly",
     bundlePath: kbdgenBundlePath,
   })
 
@@ -164,7 +163,6 @@ export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
 
   const { payloadPath, channel } = await keyboardBuild({
     keyboardType: KeyboardType.MacOS,
-    nightlyChannel: "nightly",
     bundlePath: kbdgenBundlePath,
   })
 
@@ -176,7 +174,6 @@ export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
     channel,
   )
 
-  // Upload artifact for later deployment
   await builder.uploadArtifacts(artifactPath)
 
   // Get the full version (including nightly timestamp) from the artifact
@@ -202,7 +199,6 @@ export async function runDesktopKeyboardDeploy(keyboardType: KeyboardType) {
     pahkatApiKey: allSecrets.get("pahkat/apiKey"),
   }
 
-  // Use temp directory for downloading artifacts
   using tempDir = await makeTempDir()
 
   // Download artifacts from build step to temp directory based on platform
@@ -212,7 +208,6 @@ export async function runDesktopKeyboardDeploy(keyboardType: KeyboardType) {
     await builder.downloadArtifacts("*.pkg", tempDir.path)
   }
 
-  // Get metadata from build steps
   const bundlePath = await builder.metadata("bundle-path")
 
   // Find downloaded artifacts using glob patterns in temp directory

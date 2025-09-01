@@ -44,7 +44,7 @@ export async function runLang() {
   const buildConfig = config?.build as BuildProps
   const checkConfig = config?.check as BuildProps
 
-  console.log(await langBuild(buildConfig, checkConfig))
+  logger.debug(await langBuild(buildConfig, checkConfig))
 }
 
 export async function runLangBundle(

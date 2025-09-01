@@ -83,7 +83,7 @@ export type Props = {
   instaStable?: boolean
 }
 
-const NIGHTLY_CHANNEL = "nightly"
+export const NIGHTLY_CHANNEL = "nightly"
 
 // async function run() {
 //   const isXcode = (await builder.getInput("xcode")) || null
