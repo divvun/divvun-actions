@@ -12,7 +12,7 @@ import {
   runDivvunKeyboardAndroid,
   runDivvunKeyboardIOS,
 } from "~/pipelines/keyboard/divvun-keyboard.ts"
-import { KeyboardType } from "~/actions/keyboard/mod.ts"
+import { KeyboardType } from "~/actions/keyboard/types.ts"
 import logger from "~/util/log.ts"
 import { pipelineDivvunspell } from "./pipelines/divvunspell/mod.ts"
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
