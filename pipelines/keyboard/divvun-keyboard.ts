@@ -103,37 +103,37 @@ async function createWindowsPackage(
 }
 
 export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
-  await builder.group("Building Divvun Keyboard for Windows", async () => {
-    const { payloadPath, channel } = await keyboardBuild({
-      keyboardType: KeyboardType.Windows,
-      nightlyChannel: "nightly",
-      bundlePath: kbdgenBundlePath,
-    })
+  logger.info("Building Divvun Keyboard for Windows")
 
-    const artifactPath = await createWindowsPackage(
-      payloadPath,
-      builder.env.repoName,
-      kbdgenBundlePath,
-      channel,
-    )
-
-    // Upload artifact for later deployment
-    await builder.uploadArtifacts(artifactPath)
-
-    // Get the full version (including nightly timestamp) from the artifact
-    const target = await Kbdgen.loadTarget(kbdgenBundlePath, "windows")
-    const baseVersion = target.version as string
-    const fullVersion = channel
-      ? await versionAsNightly(baseVersion)
-      : baseVersion
-
-    // Store metadata for deployment
-    await builder.setMetadata("windows-channel", channel || "")
-    await builder.setMetadata("windows-version", fullVersion)
-    await builder.setMetadata("bundle-path", kbdgenBundlePath)
-
-    logger.info("Windows keyboard built and artifact uploaded")
+  const { payloadPath, channel } = await keyboardBuild({
+    keyboardType: KeyboardType.Windows,
+    nightlyChannel: "nightly",
+    bundlePath: kbdgenBundlePath,
   })
+
+  const artifactPath = await createWindowsPackage(
+    payloadPath,
+    builder.env.repoName,
+    kbdgenBundlePath,
+    channel,
+  )
+
+  // Upload artifact for later deployment
+  await builder.uploadArtifacts(artifactPath)
+
+  // Get the full version (including nightly timestamp) from the artifact
+  const target = await Kbdgen.loadTarget(kbdgenBundlePath, "windows")
+  const baseVersion = target.version as string
+  const fullVersion = channel
+    ? await versionAsNightly(baseVersion)
+    : baseVersion
+
+  // Store metadata for deployment
+  await builder.setMetadata("windows-channel", channel || "")
+  await builder.setMetadata("windows-version", fullVersion)
+  await builder.setMetadata("bundle-path", kbdgenBundlePath)
+
+  logger.info("Windows keyboard built and artifact uploaded")
 }
 
 async function createMacosPackage(
@@ -161,39 +161,38 @@ async function createMacosPackage(
 }
 
 export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
-  await builder.group("Building Divvun Keyboard for macOS", async () => {
-    logger.info("Building Divvun Keyboard for macOS")
-    const { payloadPath, channel } = await keyboardBuild({
-      keyboardType: KeyboardType.MacOS,
-      nightlyChannel: "nightly",
-      bundlePath: kbdgenBundlePath,
-    })
+  logger.info("Building Divvun Keyboard for macOS")
 
-    // Create properly named package
-    const artifactPath = await createMacosPackage(
-      payloadPath,
-      builder.env.repoName,
-      kbdgenBundlePath,
-      channel,
-    )
-
-    // Upload artifact for later deployment
-    await builder.uploadArtifacts(artifactPath)
-
-    // Get the full version (including nightly timestamp) from the artifact
-    const target = await Kbdgen.loadTarget(kbdgenBundlePath, "macos")
-    const baseVersion = target.version as string
-    const fullVersion = channel
-      ? await versionAsNightly(baseVersion)
-      : baseVersion
-
-    // Store metadata for deployment
-    await builder.setMetadata("macos-channel", channel || "")
-    await builder.setMetadata("macos-version", fullVersion)
-    await builder.setMetadata("bundle-path", kbdgenBundlePath)
-
-    logger.info("macOS keyboard built and artifact uploaded")
+  const { payloadPath, channel } = await keyboardBuild({
+    keyboardType: KeyboardType.MacOS,
+    nightlyChannel: "nightly",
+    bundlePath: kbdgenBundlePath,
   })
+
+  // Create properly named package
+  const artifactPath = await createMacosPackage(
+    payloadPath,
+    builder.env.repoName,
+    kbdgenBundlePath,
+    channel,
+  )
+
+  // Upload artifact for later deployment
+  await builder.uploadArtifacts(artifactPath)
+
+  // Get the full version (including nightly timestamp) from the artifact
+  const target = await Kbdgen.loadTarget(kbdgenBundlePath, "macos")
+  const baseVersion = target.version as string
+  const fullVersion = channel
+    ? await versionAsNightly(baseVersion)
+    : baseVersion
+
+  // Store metadata for deployment
+  await builder.setMetadata("macos-channel", channel || "")
+  await builder.setMetadata("macos-version", fullVersion)
+  await builder.setMetadata("bundle-path", kbdgenBundlePath)
+
+  logger.info("macOS keyboard built and artifact uploaded")
 }
 
 export async function runDesktopKeyboardDeploy() {
