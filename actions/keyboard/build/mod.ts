@@ -64,9 +64,9 @@ export default async function keyboardBuild({
       await Kbdgen.setNightlyVersion(bundlePath, "windows")
     }
     await PahkatPrefix.bootstrap(["devtools"], "nightly")
-    console.log("Installing kbdi")
+    logger.debug("Installing kbdi")
     await PahkatPrefix.install(["kbdi", "kbdgen"])
-    console.log("Installed kbdi")
+    logger.debug("Installed kbdi")
     const kbdi_path = path.join(
       PahkatPrefix.path,
       "pkg",
@@ -82,20 +82,20 @@ export default async function keyboardBuild({
       "kbdi-x64.exe",
     )
 
-    console.log("Building Windows")
+    logger.debug("Building Windows")
     const outputPath = await Kbdgen.buildWindows(bundlePath)
-    console.log("Built")
+    logger.debug("Built")
     await Deno.copyFile(kbdi_path, path.resolve(outputPath, "kbdi.exe"))
     await Deno.copyFile(kbdi_x64_path, path.resolve(outputPath, "kbdi-x64.exe"))
 
-    console.log("Creating old-style directory structure for Inno Setup")
+    logger.debug("Creating old-style directory structure for Inno Setup")
     // Create symlinks/copies to match what the old CI expected
     const dirMappings = [
       { from: "x86", to: "i386" },
-      { from: "x64", to: "amd64" }, 
-      { from: "x86", to: "wow64" }  // x86 files also used for wow64
+      { from: "x64", to: "amd64" },
+      { from: "x86", to: "wow64" }, // x86 files also used for wow64
     ]
-    
+
     for (const mapping of dirMappings) {
       const fromDir = path.join(outputPath, mapping.from)
       const toDir = path.join(outputPath, mapping.to)
@@ -103,28 +103,30 @@ export default async function keyboardBuild({
         // Check if source directory exists
         const stat = await Deno.stat(fromDir)
         if (stat.isDirectory) {
-          console.log(`Copying ${fromDir} to ${toDir}`)
+          logger.debug(`Copying ${fromDir} to ${toDir}`)
           await Deno.mkdir(toDir, { recursive: true })
           // Copy all files from source to destination
           for await (const entry of Deno.readDir(fromDir)) {
             if (entry.isFile) {
               await Deno.copyFile(
-                path.join(fromDir, entry.name), 
-                path.join(toDir, entry.name)
+                path.join(fromDir, entry.name),
+                path.join(toDir, entry.name),
               )
             }
           }
         }
       } catch (e) {
-        console.log(`Warning: Could not process ${mapping.from} -> ${mapping.to}: ${e.message}`)
+        logger.debug(
+          `Warning: Could not process ${mapping.from} -> ${mapping.to}: ${e.message}`,
+        )
       }
     }
-    
-    console.log("Generating Inno")
+
+    logger.debug("Generating Inno")
     const issPath = await generateKbdInnoFromBundle(bundlePath, outputPath)
-    console.log("Inno generated")
+    logger.debug("Inno generated")
     payloadPath = await makeInstaller(issPath)
-    console.log("Installer made")
+    logger.debug("Installer made")
   } else {
     throw new Error(`Unhandled keyboard type: ${keyboardType}`)
   }

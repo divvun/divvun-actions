@@ -151,7 +151,6 @@ async function createMacosPackage(
   // Apply channel and timestamp if this is a nightly build
   const version = channel ? await versionAsNightly(baseVersion) : baseVersion
 
-  // Create properly named package
   const pathItems = [packageId, version, "macos"]
   const packageFileName = `${pathItems.join("_")}.pkg`
   const packagePath = path.join(tempDir.path, packageFileName)
