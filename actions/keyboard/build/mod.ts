@@ -136,25 +136,3 @@ export default async function keyboardBuild({
     channel,
   }
 }
-
-// async function run() {
-//   const keyboardType = (await builder.getInput("keyboard-type", {
-//     required: true,
-//   })) as KeyboardType
-//   const nightlyChannel = await builder.getInput("nightly-channel", {
-//     required: true,
-//   })
-//   const override = await builder.getInput("bundle-path")
-//   const bundlePath = await getBundle(override)
-
-//   const output = await keyboardBuild({
-//     keyboardType,
-//     nightlyChannel,
-//     bundlePath,
-//   })
-
-//   if (output.channel != null) {
-//     await builder.setOutput("channel", output.channel)
-//   }
-//   await builder.setOutput("payload-path", output.payloadPath)
-// }
