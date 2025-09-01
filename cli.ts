@@ -12,6 +12,7 @@ import {
   runDivvunKeyboardAndroid,
   runDivvunKeyboardIOS,
 } from "~/pipelines/keyboard/divvun-keyboard.ts"
+import { KeyboardType } from "~/actions/keyboard/mod.ts"
 import logger from "~/util/log.ts"
 import { pipelineDivvunspell } from "./pipelines/divvunspell/mod.ts"
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
@@ -195,8 +196,12 @@ async function runPipeline(args) {
       await runKbdgenDeploy()
       break
     }
-    case "divvun-keyboard-deploy": {
-      await runDesktopKeyboardDeploy()
+    case "divvun-keyboard-deploy-windows": {
+      await runDesktopKeyboardDeploy(KeyboardType.Windows)
+      break
+    }
+    case "divvun-keyboard-deploy-macos": {
+      await runDesktopKeyboardDeploy(KeyboardType.MacOS)
       break
     }
     default: {
