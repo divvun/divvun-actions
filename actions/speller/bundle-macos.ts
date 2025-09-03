@@ -233,7 +233,7 @@ async function signBundle(
     "/Users/admin/Library/Keychains/login.keychain-db",
   ])
 
-  const code = await builder.exec("timeout", [
+  const result = await builder.output("timeout", [
     "60s",
     "codesign",
     "-f",
@@ -245,8 +245,10 @@ async function signBundle(
     cwd: outputDir,
   })
 
-  if (code !== 0) {
-    throw new Error(`bundle signing failed: error code${code}`)
+  if (result.status.code !== 0) {
+    throw new Error(
+      `bundle signing failed: ${result.stderr}\nexit code: ${result.status.code}`,
+    )
   }
 }
 
