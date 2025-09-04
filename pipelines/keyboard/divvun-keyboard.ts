@@ -303,28 +303,31 @@ export function pipelineDivvunKeyboard() {
 export function pipelineDesktopKeyboard() {
   const pipeline: BuildkitePipeline = {
     steps: [
-      command({
-        label: "Build Divvun Keyboard for Windows",
-        key: "build-windows",
-        command: "divvun-actions run divvun-keyboard-windows",
-        agents: {
-          queue: "windows",
-        },
-      }),
+      // TODO: 2025-09-04 re-enable this once windows bundling components are updated.
+      // This is turned off for now because it currently creates an installer that appears
+      // to work, but does not actually install a keyboard on Win10/Win11.
+      // command({
+      //   label: "Build Divvun Keyboard for Windows",
+      //   key: "build-windows",
+      //   command: "divvun-actions run divvun-keyboard-windows",
+      //   agents: {
+      //     queue: "windows",
+      //   },
+      // }),
+      // command({
+      //   label: "Deploy Windows",
+      //   command: "divvun-actions run divvun-keyboard-deploy-windows",
+      //   depends_on: "build-windows",
+      //   agents: {
+      //     queue: "linux",
+      //   },
+      // }),
       command({
         label: "Build Divvun Keyboard for macOS",
         key: "build-macos",
         command: "divvun-actions run divvun-keyboard-macos",
         agents: {
           queue: "macos",
-        },
-      }),
-      command({
-        label: "Deploy Windows",
-        command: "divvun-actions run divvun-keyboard-deploy-windows",
-        depends_on: "build-windows",
-        agents: {
-          queue: "linux",
         },
       }),
       command({
