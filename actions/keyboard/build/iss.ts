@@ -36,32 +36,32 @@ export async function generateKbdInnoFromBundle(
     .defaultDirName("{pf}\\" + bundle.appName)
     .files((builder) => {
       builder.add(
-        `${buildDir}\\kbdi.exe`,
+        `kbdi.exe`,
         "{app}",
         ["restartreplace", "uninsrestartdelete", "ignoreversion"],
         "not Is64BitInstallMode",
       )
       builder.add(
-        `${buildDir}\\kbdi-x64.exe`,
+        `kbdi-x64.exe`,
         "{app}",
         ["restartreplace", "uninsrestartdelete", "ignoreversion"],
         "Is64BitInstallMode",
         "kbdi.exe",
       )
       builder.add(
-        `${buildDir}\\i386\\*`,
+        `i386\\*`,
         "{sys}",
         ["restartreplace", "uninsrestartdelete", "ignoreversion"],
         "not Is64BitInstallMode",
       )
       builder.add(
-        `${buildDir}\\amd64\\*`,
+        `amd64\\*`,
         "{sys}",
         ["restartreplace", "uninsrestartdelete", "ignoreversion"],
         "Is64BitInstallMode",
       )
       builder.add(
-        `${buildDir}\\wow64\\*`,
+        `wow64\\*`,
         "{syswow64}",
         ["restartreplace", "uninsrestartdelete", "ignoreversion"],
         "Is64BitInstallMode",
