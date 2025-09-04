@@ -515,7 +515,7 @@ export class PahkatUploader {
             }),
           },
         )
-        logger.info("Upload successful")
+        logger.info("Artifact upload successful")
         break
       } catch (err) {
         logger.info(err)
