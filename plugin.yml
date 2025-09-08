@@ -4,4 +4,7 @@ author: https://github.com/divvun
 requirements: []
 configuration:
   properties:
+    config:
+      type: [string, object]
+      additionalProperties: true
   additionalProperties: false

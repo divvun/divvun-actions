@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any no-console
 import { parseArgs, ParseOptions } from "@std/cli/parse-args"
 import * as yaml from "@std/yaml"
+import { KeyboardType } from "~/actions/keyboard/types.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline } from "~/builder/pipeline.ts"
 import {
@@ -12,8 +13,8 @@ import {
   runDivvunKeyboardAndroid,
   runDivvunKeyboardIOS,
 } from "~/pipelines/keyboard/divvun-keyboard.ts"
-import { KeyboardType } from "~/actions/keyboard/types.ts"
 import logger from "~/util/log.ts"
+import { runKbdgenDeploy } from "./actions/kbdgen/deploy.ts"
 import { pipelineDivvunspell } from "./pipelines/divvunspell/mod.ts"
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
 import {
@@ -22,7 +23,6 @@ import {
   runLangBundle,
   runLangDeploy,
 } from "./pipelines/lang/mod.ts"
-import { runKbdgenDeploy } from "./actions/kbdgen/deploy.ts"
 import sign from "./services/windows-codesign.ts"
 import { makeTempFile } from "./util/temp.ts"
 
@@ -202,6 +202,11 @@ async function runPipeline(args) {
     }
     case "divvun-keyboard-deploy-macos": {
       await runDesktopKeyboardDeploy(KeyboardType.MacOS)
+      break
+    }
+    case "debug": {
+      console.log("Environment:")
+      console.log(JSON.stringify(builder.env, null, 2))
       break
     }
     default: {

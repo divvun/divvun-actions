@@ -1,4 +1,6 @@
 import { memoize } from "@std/cache"
+import * as toml from "@std/toml"
+import * as yaml from "@std/yaml"
 
 function metadata(prefix: string): Record<string, string> {
   const env: Record<string, string> = {}
@@ -22,6 +24,39 @@ function parseBuildkiteUrl(url: string) {
   return new URL(url)
 }
 
+const PLUGIN_PREFIX = "BUILDKITE_PLUGIN_DIVVUN_ACTIONS_GIT"
+
+function parseConfigFromEnv() {
+  const configType: string | undefined = Deno.env.get(`${PLUGIN_PREFIX}_TYPE`)
+  const config = Deno.env.get(`${PLUGIN_PREFIX}_CONFIG`)
+
+  if (config == null) {
+    return null
+  }
+
+  try {
+    if (configType === "json" || configType == null) {
+      return JSON.parse(config) as Record<string, unknown>
+    }
+
+    if (configType === "yaml" || configType === "yml") {
+      return yaml.parse(config) as Record<string, unknown>
+    }
+
+    if (configType === "toml") {
+      const tomlData = toml.parse(config) as Record<string, unknown>
+      return tomlData
+    }
+  } catch (e: unknown) {
+    if (e instanceof Error) {
+      return e
+    }
+    return new Error("Unknown error parsing config", { cause: e })
+  }
+
+  return null
+}
+
 const env = (prefix: string): Env => {
   const repo = Deno.env.get(`${prefix}_REPO`) ?? ""
   const repoUrl = parseBuildkiteUrl(repo)
@@ -29,6 +64,7 @@ const env = (prefix: string): Env => {
   const repoHost = repoUrl.host
   const repoPath = repoUrl.pathname.replace(/^\//, "")
   const repoName = repoPath.split("/").pop()!
+  const config = parseConfigFromEnv()
 
   return {
     jobId: Deno.env.get(`${prefix}_JOB_ID`),
@@ -63,6 +99,7 @@ const env = (prefix: string): Env => {
       `${prefix}_PULL_REQUEST_BASE_BRANCH`,
     ),
     pullRequestRepo: Deno.env.get(`${prefix}_PULL_REQUEST_REPO`),
+    config,
   }
 }
 
@@ -93,6 +130,7 @@ export type Env = {
   pullRequest: string | undefined
   pullRequestBaseBranch: string | undefined
   pullRequestRepo: string | undefined
+  config: Record<string, unknown> | Error | null
 }
 
 export const buildkite = memoize(() => env("BUILDKITE"))

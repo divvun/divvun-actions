@@ -46,7 +46,7 @@
     "@std/streams": "jsr:@std/streams@^1.0.8",
     "@std/toml": "jsr:@std/toml@^1.0.2",
     "@std/uuid": "jsr:@std/uuid@^1.0.4",
-    "@std/yaml": "jsr:@std/yaml@^1.0.5",
+    "@std/yaml": "jsr:@std/yaml@^1.0.9",
     "ajv": "npm:ajv@^8.17.1",
     "case": "https://deno.land/x/case@2.2.0/mod.ts",
     "emoji": "https://deno.land/x/emoji@0.3.1/mod.ts",
