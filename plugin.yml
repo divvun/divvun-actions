@@ -4,7 +4,10 @@ author: https://github.com/divvun
 requirements: []
 configuration:
   properties:
-    config:
+    type:
+      type: string
+      enum: [yaml, toml, json]
+    setup:
       type: [string, object]
       additionalProperties: true
   additionalProperties: false

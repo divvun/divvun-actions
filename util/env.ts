@@ -1,6 +1,4 @@
 import { memoize } from "@std/cache"
-import * as toml from "@std/toml"
-import * as yaml from "@std/yaml"
 
 function metadata(prefix: string): Record<string, string> {
   const env: Record<string, string> = {}
@@ -24,34 +22,21 @@ function parseBuildkiteUrl(url: string) {
   return new URL(url)
 }
 
-const PLUGIN_PREFIX = "BUILDKITE_PLUGIN_DIVVUN_ACTIONS_GIT"
-
 function parseConfigFromEnv() {
-  const configType: string | undefined = Deno.env.get(`${PLUGIN_PREFIX}_TYPE`)
-  const config = Deno.env.get(`${PLUGIN_PREFIX}_CONFIG`)
+  const raw = Deno.env.get(`BUILDKITE_PLUGINS`)
 
-  if (config == null) {
+  if (raw == null) {
     return null
   }
 
-  try {
-    if (configType === "json" || configType == null) {
-      return JSON.parse(config) as Record<string, unknown>
-    }
+  const parsed = JSON.parse(raw) as Array<Record<string, { config?: unknown }>>
 
-    if (configType === "yaml" || configType === "yml") {
-      return yaml.parse(config) as Record<string, unknown>
+  for (const plugin of parsed) {
+    for (const key in plugin) {
+      if (key.startsWith("ssh://git@github.com/divvun/divvun-actions.git")) {
+        return plugin[key].config as Record<string, unknown> ?? null
+      }
     }
-
-    if (configType === "toml") {
-      const tomlData = toml.parse(config) as Record<string, unknown>
-      return tomlData
-    }
-  } catch (e: unknown) {
-    if (e instanceof Error) {
-      return e
-    }
-    return new Error("Unknown error parsing config", { cause: e })
   }
 
   return null
