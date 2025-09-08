@@ -5,6 +5,7 @@ PLUGIN_DIR=$(realpath $(dirname "${BASH_SOURCE[0]}")/..)
 
 # Ensure main isn't kept stale
 if [[ "$PLUGIN_DIR" == *-main ]]; then
+  git -C $PLUGIN_DIR clean -fdxqq
   git -C $PLUGIN_DIR checkout main
   git -C $PLUGIN_DIR pull
 fi
