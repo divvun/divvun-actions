@@ -99,9 +99,13 @@ RUN apt-get update && \
     bison \
     just \
     pipx \
+    git-lfs \
     python3-gtgramtools \
     python3-gtmorphtest \
     python3-gtltlextools
+
+# Configure git-lfs
+RUN git lfs install
 
 # Update Docker
 RUN apt-get update && \
