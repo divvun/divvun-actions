@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Handle termination signals gracefully
-shutdown() {
+shutdown () {
     echo "Received termination signal, stopping buildkite-agent gracefully..."
     pkill buildkite-agent
     
@@ -14,6 +14,19 @@ shutdown() {
         sleep 1
     done
 }
+
+check_docker_is_alive () {
+  while (! docker stats --no-stream &>>/dev/null ); do
+    # Docker takes a few seconds to initialize.
+    sleep 1
+  done
+}
+export -f check_docker_is_alive
+
+sudo dockerd -H tcp://0.0.0.0:2375 -H unix:///var/run/docker.sock &>>/dev/null &
+
+ # Time out after 1m to avoid waiting on docker forever.
+timeout 60s bash -c check_docker_is_alive 
 
 # Trap SIGTERM and SIGINT signals
 trap shutdown SIGTERM SIGINT

@@ -157,10 +157,10 @@ RUN systemctl mask systemd-udevd.service \
                    e2scrub_all.timer
 
 # Make use of stopsignal (instead of sigterm) to stop systemd containers.
-STOPSIGNAL SIGRTMIN+3
+# STOPSIGNAL SIGRTMIN+3
 
-# COPY entrypoint.sh /entrypoint.sh
-# RUN chmod +x /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-ENTRYPOINT [ "/sbin/init", "--log-level=err" ]
-# ENTRYPOINT ["/entrypoint.sh"]
+# ENTRYPOINT [ "/sbin/init", "--log-level=err" ]
+ENTRYPOINT ["/entrypoint.sh"]
