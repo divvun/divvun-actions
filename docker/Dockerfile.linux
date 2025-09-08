@@ -2,12 +2,46 @@ FROM buildkite/agent:3-ubuntu-24.04
 
 SHELL ["bash", "-lic"]
 
+ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="/var/cache/buildkite"
+RUN mkdir -p $BUILDKITE_PLUGIN_FS_CACHE_FOLDER
+
 # Replace archive.ubuntu.com with Finnish mirror
 RUN sed -i 's/archive\.ubuntu/fi\.archive\.ubuntu/g' /etc/apt/sources.list.d/ubuntu.sources && \
-    sed -i 's/security\.ubuntu/fi\.archive\.ubuntu/g' /etc/apt/sources.list.d/ubuntu.sources
+    sed -i 's/security\.ubuntu/fi\.archive\.ubuntu/g' /etc/apt/sources.list.d/ubuntu.sources && \
+    curl -fsSL https://apertium.projectjj.com/apt/install-nightly.sh | bash
+
+RUN apt-get update && \
+    install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
+    chmod a+r /etc/apt/keyrings/docker.asc && \
+    echo \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+        $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
+        tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    rm -rf /var/lib/apt/lists/* && apt-get clean
+
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive \
     apt-get install -y \
+    libssl-dev \
+    imagemagick \
+    apertium-all-dev \
+    divvun-gramcheck \
+    patchelf \
+    libsqlite3-dev \
+    libboost-all-dev \
+    libc++-dev \
+    libc++abi-dev \
+    libicu-dev \
+    bc \
+    flex \
+    bison \
+    just \
+    pipx \
+    git-lfs \
+    python3-gtgramtools \
+    python3-gtmorphtest \
+    python3-gtltlextools \
     build-essential \
     cmake \
     pkg-config \
@@ -15,29 +49,15 @@ RUN apt-get update && \
     rsync \
     curl \
     ca-certificates \
-    openjdk-17-jdk
+    openjdk-17-jdk \
+    docker-ce \
+    docker-ce-cli \
+    containerd.io \
+    docker-buildx-plugin \
+    docker-compose-plugin && \
+    rm -rf /var/lib/apt/lists/* && apt-get clean
 
-RUN curl -fsSL https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-2.8.0%2Bcpu.zip -o libtorch.zip && \
-    unzip libtorch.zip && \
-    cp -r libtorch/* /usr/ && \
-    rm -rf libtorch && \
-    rm libtorch.zip
-
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
-RUN ~/.cargo/bin/cargo install cross --git https://github.com/cross-rs/cross
-
-RUN curl -fsSL https://deno.land/install.sh | bash -s -- -y
-
-RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.2.1/bao_2.2.1_linux_amd64.deb -o bao.deb && \
-    dpkg -i bao.deb && \
-    rm bao.deb
-
-RUN ~/.cargo/bin/cargo install cargo-ndk --git https://github.com/bbqsrc/cargo-ndk
-RUN ~/.cargo/bin/rustup target add \
-    aarch64-linux-android \
-    armv7-linux-androideabi \
-    x86_64-linux-android
-
+# Install Android command line tools
 RUN curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip -o commandlinetools.zip && \
     mkdir -p ~/Android/sdk/cmdline-tools && \
     unzip commandlinetools.zip -d ~/Android/sdk/cmdline-tools && \
@@ -45,6 +65,7 @@ RUN curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-1
     mv ~/Android/sdk/cmdline-tools/cmdline-tools ~/Android/sdk/cmdline-tools/latest
 
 ENV ANDROID_HOME="/root/Android/sdk/"
+ENV ANDROID_NDK_HOME="/root/Android/sdk/ndk/28.2.13676358"
 
 RUN yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses && \
     $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
@@ -53,7 +74,31 @@ RUN yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses && \
     "build-tools;35.0.1" \
     "ndk;28.2.13676358"
 
-ENV ANDROID_NDK_HOME="/root/Android/sdk/ndk/28.2.13676358"
+# Install Rust and tools
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+
+RUN ~/.cargo/bin/rustup target add \
+    aarch64-linux-android \
+    armv7-linux-androideabi \
+    x86_64-linux-android
+
+RUN ~/.cargo/bin/cargo install cross --git https://github.com/cross-rs/cross
+RUN ~/.cargo/bin/cargo install cargo-binstall
+RUN ~/.cargo/bin/cargo binstall -y just
+RUN ~/.cargo/bin/cargo binstall -y cargo-ndk --git https://github.com/bbqsrc/cargo-ndk
+
+# Install Deno
+RUN curl -fsSL https://deno.land/install.sh | bash -s -- -y
+
+RUN curl -fsSL https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-2.8.0%2Bcpu.zip -o libtorch.zip && \
+    unzip libtorch.zip && \
+    cp -r libtorch/* /usr/ && \
+    rm -rf libtorch && \
+    rm libtorch.zip
+
+RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.2.1/bao_2.2.1_linux_amd64.deb -o bao.deb && \
+    dpkg -i bao.deb && \
+    rm bao.deb
 
 # Install pahkat-uploader
 RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/pahkat-uploader?platform=linux&channel=nightly' -o pahkat-uploader.txz && \
@@ -76,54 +121,10 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
     ./aws/install && \
     rm awscliv2.zip
 
-ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="/var/cache/buildkite"
-RUN mkdir -p $BUILDKITE_PLUGIN_FS_CACHE_FOLDER
-
-# Install build deps
-RUN curl -fsSL https://apertium.projectjj.com/apt/install-nightly.sh | bash
-RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive \
-    apt-get install -y \
-    libssl-dev \
-    imagemagick \
-    apertium-all-dev \
-    divvun-gramcheck \
-    patchelf \
-    libsqlite3-dev \
-    libboost-all-dev \
-    libc++-dev \
-    libc++abi-dev \
-    libicu-dev \
-    bc \
-    flex \
-    bison \
-    just \
-    pipx \
-    git-lfs \
-    python3-gtgramtools \
-    python3-gtmorphtest \
-    python3-gtltlextools
-
 # Configure git-lfs
 RUN git lfs install
-
-# Update Docker
-RUN apt-get update && \
-    install -m 0755 -d /etc/apt/keyrings && \
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
-    chmod a+r /etc/apt/keyrings/docker.asc && \
-    echo \
-        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-        $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
-        tee /etc/apt/sources.list.d/docker.list > /dev/null && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-RUN ~/.cargo/bin/cargo install cargo-binstall
-RUN ~/.cargo/bin/cargo binstall -y just
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# ENTRYPOINT [ "/sbin/init", "--log-level=err" ]
 ENTRYPOINT ["/entrypoint.sh"]
