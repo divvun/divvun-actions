@@ -110,7 +110,6 @@ update_container() {
         -v "/var/lib/buildkite/hooks:/buildkite/hooks" \
         -v "/var/lib/buildkite-secrets:/buildkite-secrets:ro" \
         -e BUILDKITE_AGENT_TOKEN="$BUILDKITE_AGENT_TOKEN" \
-        -v "/var/run/docker.sock:/var/run/docker.sock" \
         --memory-reservation "$MEMORY_RESERVATION" \
         -m "$MEMORY_LIMIT" \
         -d -t --name "$CONTAINER_NAME" \
