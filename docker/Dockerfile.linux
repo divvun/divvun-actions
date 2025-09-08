@@ -119,6 +119,9 @@ RUN apt-get update && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
+RUN ~/.cargo/bin/cargo install cargo-binstall
+RUN ~/.cargo/bin/cargo binstall -y just
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
