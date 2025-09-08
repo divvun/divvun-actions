@@ -156,7 +156,7 @@ RUN systemctl mask systemd-udevd.service \
                    e2scrub_reap.service \
                    e2scrub_all.timer
 
-RUN systemctl enable buildkite-agent
+RUN systemctl --root=/ enable buildkite-agent
 
 # Make use of stopsignal (instead of sigterm) to stop systemd containers.
 STOPSIGNAL SIGRTMIN+3
