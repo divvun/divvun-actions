@@ -111,7 +111,7 @@ export async function pipelineDivvunRuntime() {
                     queue: "linux",
                 },
                 depends_on: ["build"],
-                if: `build.tag =~ /${SEMVER_REGEX}/`,
+                if: `build.tag =~ /^v\d+\./`,
             })
         ]
     }
