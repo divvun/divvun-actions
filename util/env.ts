@@ -34,7 +34,7 @@ function parseConfigFromEnv() {
   for (const plugin of parsed) {
     for (const key in plugin) {
       if (key.startsWith("ssh://git@github.com/divvun/divvun-actions.git")) {
-        return plugin[key].config as Record<string, unknown> ?? null
+        return plugin[key]?.config as Record<string, unknown> ?? null
       }
     }
   }
