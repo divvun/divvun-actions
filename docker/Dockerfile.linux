@@ -57,6 +57,11 @@ RUN apt-get update && \
     docker-compose-plugin && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
+RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.78.0/gh_2.78.0_linux_amd64.deb -o gh.deb && \
+    dpkg -i gh.deb && \
+    rm gh.deb && \
+    rm -rf /var/lib/apt/lists/* && apt-get clean
+
 # Install Android command line tools
 RUN curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip -o commandlinetools.zip && \
     mkdir -p ~/Android/sdk/cmdline-tools && \

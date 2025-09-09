@@ -135,6 +135,11 @@ RUN Invoke-WebRequest -Uri "https://download.docker.com/win/static/stable/x86_64
     Remove-Item -Force docker.zip ; \
     setx /M PATH $($Env:PATH + ';' + $Env:ProgramFiles + '\Docker')
 
+# Install gh (GitHub CLI)
+RUN Invoke-WebRequest -Uri "https://github.com/cli/cli/releases/download/v2.78.0/gh_2.78.0_windows_amd64.zip" -OutFile gh.zip ; \
+    Expand-Archive gh.zip -DestinationPath C:\bin ; \
+    Remove-Item -Force gh.zip
+
 # Create cache folder
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="C:\\buildkite-cache"
 RUN New-Item -ItemType Directory -Path $env:BUILDKITE_PLUGIN_FS_CACHE_FOLDER -Force
