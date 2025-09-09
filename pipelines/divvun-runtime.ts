@@ -157,7 +157,7 @@ export async function runDivvunRuntimePublish() {
 
     const stagingDir = `divvun-runtime-${target}-${builder.env.tag!}`
     await Deno.mkdir(`divvun-runtime-${target}-${builder.env.tag!}`)
-    await Deno.rename(inputPath, `${stagingDir}/divvun-runtime${
+    await Deno.copyFile(inputPath, `${stagingDir}/divvun-runtime${
       target.includes("windows") ? ".exe" : ""
     }`)
 
