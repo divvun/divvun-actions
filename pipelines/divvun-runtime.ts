@@ -52,10 +52,6 @@ async function config() {
             throw new Error("Invalid or missing 'targets' array in config")
         }
 
-        if (!(unknown.buildCommand && typeof unknown.buildCommand === "string")) {
-            throw new Error("Invalid or missing 'buildCommand' in config")
-        }
-
         return unknown as Config
     }
 
