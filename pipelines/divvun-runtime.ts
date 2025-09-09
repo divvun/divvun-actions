@@ -106,8 +106,8 @@ export async function pipelineDivvunRuntime() {
                 agents: {
                     queue: "linux",
                 },
-                depends_on: ["build"],
-                if: `build.tag =~ /^v\d+\./`,
+                depends_on: "build",
+                if: `build.tag =~ /^v/`,
             })
         ]
     }
