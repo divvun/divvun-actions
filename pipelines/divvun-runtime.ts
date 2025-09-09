@@ -70,11 +70,6 @@ function os(target: string): string {
     throw new Error(`Unknown OS for target: ${target}`)
 }
 
-const SEMVER_REGEX = "^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)" + 
-    "(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)" + 
-    "(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?" + 
-    "(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$"
-
 export async function pipelineDivvunRuntime() {
     const cfg = await config()
     await builder.setMetadata("divvun-runtime:config", JSON.stringify(cfg))
@@ -86,7 +81,7 @@ export async function pipelineDivvunRuntime() {
         const step = command({
             label: `${target}`,
             command: [
-                `just build target=${target}`,
+                `just build ${target}`,
                 `buildkite-agent artifact upload ${targetFile} ${target}`,
             ],
             agents: {
