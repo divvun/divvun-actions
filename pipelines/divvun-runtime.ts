@@ -155,10 +155,16 @@ export async function runDivvunRuntimePublish() {
       await Deno.chmod(inputPath, 0o755)
     }
 
+    const stagingDir = `divvun-runtime-${target}-${builder.env.tag!}`
+    await Deno.mkdir(`divvun-runtime-${target}-${builder.env.tag!}`)
+    await Deno.rename(inputPath, `${stagingDir}/divvun-runtime${
+      target.includes("windows") ? ".exe" : ""
+    }`)
+
     if (target.includes("windows")) {
-      await Zip.create([inputPath], outPath)
+      await Zip.create([stagingDir], outPath)
     } else {
-      await Tar.createFlatTgz([inputPath], outPath)
+      await Tar.createFlatTgz([stagingDir], outPath)
     }
   }
 
