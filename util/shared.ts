@@ -206,6 +206,46 @@ export class Bash {
   }
 }
 
+export class Zip {
+  static async create(paths: string[], outputPath?: string): Promise<string> {
+    const platform = Deno.build.os
+    const filePath = outputPath || makeTempFileSync({ suffix: ".zip" }).path
+
+    using tmpDir = await makeTempDir()
+    const stagingDir = path.join(tmpDir.path, "staging")
+    await Deno.mkdir(stagingDir)
+
+    logger.debug(`Created tmp dir: ${tmpDir}`)
+
+    for (const p of paths) {
+      logger.debug(`Copying ${p} into ${stagingDir}`)
+      await Bash.runScript(`cp -r ${p} ${stagingDir}`)
+    }
+
+    let proc
+    if (platform === "windows") {
+      proc = new Deno.Command("bash", {
+        args: ["-c", ["bsdtar", "-a", "-cf", filePath, "*"].join(" ")],
+        cwd: stagingDir,
+      }).spawn()
+
+      return filePath
+    } else {
+      proc = new Deno.Command("bash", {
+        args: ["-c", ["zip", "-r9", filePath, "*"].join(" ")],
+        cwd: stagingDir,
+      }).spawn()
+    }
+
+    const code = (await proc.status).code
+    if (code !== 0) {
+      throw new Error(`Process exited with code ${code}`)
+    }
+
+    return filePath
+  }
+}
+
 export class Tar {
   static async extractTxz(filePath: string, outputDir?: string) {
     const platform = Deno.build.os
@@ -239,6 +279,28 @@ export class Tar {
     }
   }
 
+  static async createFlatTgz(paths: string[], outputPath: string) {
+    const tmpDir = await makeTempDir()
+    const stagingDir = path.join(tmpDir.path, "staging")
+    await Deno.mkdir(stagingDir)
+
+    logger.debug(`Created tmp dir: ${tmpDir}`)
+
+    for (const p of paths) {
+      logger.debug(`Copying ${p} into ${stagingDir}`)
+      await Bash.runScript(`cp -r ${p} ${stagingDir}`)
+    }
+
+    logger.debug(`Tarring`)
+    await Bash.runScript(`tar cf ../file.tar *`, { cwd: stagingDir })
+
+    logger.debug("gzip -9'ing")
+    await Bash.runScript(`gz -9 ../file.tar`, { cwd: stagingDir })
+
+    logger.debug("Copying file.tar.gz to " + outputPath)
+    await Deno.copyFile(path.join(tmpDir.path, "file.tar.gz"), outputPath)
+  }
+
   static async createFlatTxz(paths: string[], outputPath: string) {
     const tmpDir = await makeTempDir()
     const stagingDir = path.join(tmpDir.path, "staging")
@@ -248,7 +310,6 @@ export class Tar {
 
     for (const p of paths) {
       logger.debug(`Copying ${p} into ${stagingDir}`)
-      // TODO: check this actually works
       await Bash.runScript(`cp -r ${p} ${stagingDir}`)
     }
 
