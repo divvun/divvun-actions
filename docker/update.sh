@@ -107,6 +107,7 @@ update_container() {
     # Recreate
     echo "[$N] Creating new $CONTAINER_NAME..."
     docker run \
+        --runtime sysbox-runc \
         -v "/var/lib/buildkite/hooks:/buildkite/hooks" \
         -v "/var/lib/buildkite-secrets:/buildkite-secrets:ro" \
         -e BUILDKITE_AGENT_TOKEN="$BUILDKITE_AGENT_TOKEN" \
