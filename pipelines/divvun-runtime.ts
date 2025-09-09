@@ -147,7 +147,7 @@ export async function runDivvunRuntimePublish() {
     const ext = target.includes("windows") ? "zip" : "tgz"
     const outPath = `${archivePath.path}/divvun-runtime-${target}-${builder.env
       .tag!}.${ext}`
-    const inputPath = `${tempDir.path}/divvun-runtime${
+    const inputPath = `${tempDir.path}/divvun-runtime-${target}${
       target.includes("windows") ? ".exe" : ""
     }`
 
