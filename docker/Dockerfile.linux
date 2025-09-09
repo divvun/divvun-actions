@@ -33,7 +33,7 @@ RUN apt-get update && \
     libc++-dev \
     libc++abi-dev \
     libicu-dev \
-    libicu76 \
+    libicu72 \
     bc \
     flex \
     bison \
