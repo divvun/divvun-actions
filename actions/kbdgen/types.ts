@@ -20,4 +20,3 @@ export type KbdgenArtifact = {
   platform: KbdgenPlatform
   rustTarget: string
 }
-

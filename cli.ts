@@ -15,7 +15,10 @@ import {
 } from "~/pipelines/keyboard/divvun-keyboard.ts"
 import logger from "~/util/log.ts"
 import { runKbdgenDeploy } from "./actions/kbdgen/deploy.ts"
-import { pipelineDivvunRuntime, runDivvunRuntimePublish } from "./pipelines/divvun-runtime.ts"
+import {
+  pipelineDivvunRuntime,
+  runDivvunRuntimePublish,
+} from "./pipelines/divvun-runtime.ts"
 import { pipelineDivvunspell } from "./pipelines/divvunspell/mod.ts"
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
 import {
