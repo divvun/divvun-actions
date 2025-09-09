@@ -77,12 +77,13 @@ export async function pipelineDivvunRuntime() {
     const buildSteps: CommandStep[] = []
 
     for (const target of cfg.targets) {
-        const targetFile = `target/${target}/release/divvun-runtime${target.includes("windows") ? ".exe" : ""}`
+        const artifactName = `divvun-runtime${target.includes("windows") ? ".exe" : ""}`
+        const targetFile = `target/${target}/release/${artifactName}`
         const step = command({
             label: `${target}`,
             command: [
                 `just build ${target}`,
-                `buildkite-agent artifact upload ${targetFile} ${target}`,
+                `mv ${targetFile} . && buildkite-agent artifact upload ${artifactName}`,
             ],
             agents: {
                 queue: os(target),
