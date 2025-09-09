@@ -83,7 +83,7 @@ export async function pipelineDivvunRuntime() {
             label: `${target}`,
             command: [
                 `just build ${target}`,
-                `mv ${targetFile} . && buildkite-agent artifact upload ${artifactName}`,
+                `mv ${targetFile} ./${artifactName}-${target} && buildkite-agent artifact upload ${artifactName}`,
             ],
             agents: {
                 queue: os(target),
@@ -126,7 +126,7 @@ export async function runDivvunRuntimePublish() {
 
     const cfg = await config()
     using tempDir = await makeTempDir()
-    await Promise.all(cfg.targets.map(target => builder.downloadArtifacts(target, tempDir.path)))
+    await Promise.all(cfg.targets.map(target => builder.downloadArtifacts(`divvun-runtime-${target}`, tempDir.path)))
 
     using archivePath = await makeTempDir({ prefix: "divvun-runtime-" })
 
