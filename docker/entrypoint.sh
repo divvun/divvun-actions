@@ -24,7 +24,7 @@ check_docker_is_alive () {
 export -f check_docker_is_alive
 
 echo Launching docker daemon...
-sudo dockerd -H tcp://0.0.0.0:2375 -H unix:///var/run/docker.sock &>>/dev/null &
+dockerd -H tcp://0.0.0.0:2375 -H unix:///var/run/docker.sock &>>/dev/null &
 
  # Time out after 1m to avoid waiting on docker forever.
 timeout 60s bash -c check_docker_is_alive 
