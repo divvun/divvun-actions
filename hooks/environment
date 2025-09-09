@@ -5,9 +5,10 @@ PLUGIN_DIR=$(realpath $(dirname "${BASH_SOURCE[0]}")/..)
 
 # Ensure main isn't kept stale
 if [[ "$PLUGIN_DIR" == *-main ]]; then
-  git -C $PLUGIN_DIR clean -fdxqq
-  git -C $PLUGIN_DIR checkout main
-  git -C $PLUGIN_DIR pull
+  git -C $PLUGIN_DIR clean -ffxdq
+  git -C $PLUGIN_DIR fetch -v --prune -- origin main
+  git -C $PLUGIN_DIR checkout -f FETCH_HEAD
+  git -C $PLUGIN_DIR clean -ffxdq
 fi
 
 export DIVVUN_ACTIONS_PLUGIN_DIR=$PLUGIN_DIR
