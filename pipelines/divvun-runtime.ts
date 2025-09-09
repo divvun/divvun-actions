@@ -83,7 +83,7 @@ export async function pipelineDivvunRuntime() {
             label: `${target}`,
             command: [
                 `just build ${target}`,
-                `mv ${targetFile} ./${artifactName}-${target} && buildkite-agent artifact upload ${artifactName}`,
+                `mv ${targetFile} ./${artifactName}-${target} && buildkite-agent artifact upload ${artifactName}-${target}`,
             ],
             agents: {
                 queue: os(target),
