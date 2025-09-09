@@ -295,7 +295,7 @@ export class Tar {
     await Bash.runScript(`tar cf ../file.tar *`, { cwd: stagingDir })
 
     logger.debug("gzip -9'ing")
-    await Bash.runScript(`gz -9 ../file.tar`, { cwd: stagingDir })
+    await Bash.runScript(`gzip -9 ../file.tar`, { cwd: stagingDir })
 
     logger.debug("Copying file.tar.gz to " + outputPath)
     await Deno.copyFile(path.join(tmpDir.path, "file.tar.gz"), outputPath)
