@@ -32,7 +32,7 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
         "ndk",
         "-t",
         "armeabi-v7a",
-        "-t", 
+        "-t",
         "arm64-v8a",
         "-o",
         "./lib",
@@ -158,20 +158,24 @@ export function pipelineDivvunspell() {
   }
 
   const pipeline: BuildkitePipeline = {
-    steps: [{
-      group: "binaries",
-      steps: binSteps,
-    }, {
-      group: "libraries",
-      steps: libSteps,
-    }, command({
-      label: "Deploy Android",
-      command: "divvun-actions run divvunspell-deploy",
-      depends_on: libStepKeys.filter(key => key.includes("android")),
-      agents: {
-        queue: "linux",
+    steps: [
+      {
+        group: "binaries",
+        steps: binSteps,
       },
-    })],
+      {
+        group: "libraries",
+        steps: libSteps,
+      },
+      command({
+        label: "Deploy Android",
+        command: "divvun-actions run divvunspell-deploy",
+        depends_on: libStepKeys.filter((key) => key.includes("android")),
+        agents: {
+          queue: "linux",
+        },
+      }),
+    ],
   }
 
   return pipeline
