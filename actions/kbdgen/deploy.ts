@@ -53,9 +53,8 @@ async function createTarball(
 ): Promise<string> {
   using tempDir = await makeTempDir()
 
-  // Create dist/bin directory structure and copy binary
-  const distDir = path.join(tempDir.path, "dist")
-  const binDir = path.join(distDir, "bin")
+  // Create bin directory and copy binary
+  const binDir = path.join(tempDir.path, "bin")
   await Deno.mkdir(binDir, { recursive: true })
 
   const binaryName = path.basename(payloadPath)
@@ -67,7 +66,7 @@ async function createTarball(
   const txzFileName = `${pathItems.join("_")}.txz`
   const txzPath = path.join(tempDir.path, txzFileName)
 
-  await Tar.createFlatTxz([distDir], txzPath)
+  await Tar.createFlatTxz([binDir], txzPath)
 
   return txzPath
 }
