@@ -30,13 +30,18 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
       cmd: "cargo",
       args: [
         "ndk",
-        "--bindgen",
-        "--target",
-        arch,
+        "-t",
+        "armeabi-v7a",
+        "-t", 
+        "arm64-v8a",
+        "-o",
+        "./lib",
         "build",
+        "-vv",
         "--lib",
         "--release",
-        "-v",
+        "--features",
+        "internal_ffi",
       ],
     }
   }
@@ -75,6 +80,7 @@ function command(input: CommandStep): CommandStep {
 export function pipelineDivvunspell() {
   const binSteps = []
   const libSteps = []
+  const libStepKeys: string[] = []
 
   for (const [os, archs] of Object.entries(binPlatforms)) {
     for (const arch of archs) {
@@ -107,9 +113,25 @@ export function pipelineDivvunspell() {
   for (const [os, archs] of Object.entries(libPlatforms)) {
     for (const arch of archs) {
       const { cmd, args } = buildLib(arch)
+      const buildKey = `build-lib-${os}-${arch}`
+      libStepKeys.push(buildKey)
 
-      if (os === "windows") {
+      if (arch.includes("android")) {
+        // Android build step with artifact upload
         libSteps.push(command({
+          key: buildKey,
+          agents: {
+            queue: os,
+          },
+          label: arch,
+          command: [
+            `${cmd} ${args.join(" ")}`,
+            `buildkite-agent artifact upload "lib/**/*"`,
+          ],
+        }))
+      } else if (os === "windows") {
+        libSteps.push(command({
+          key: buildKey,
           agents: {
             queue: os,
           },
@@ -120,6 +142,7 @@ export function pipelineDivvunspell() {
         }))
       } else {
         libSteps.push(command({
+          key: buildKey,
           agents: {
             queue: os,
           },
@@ -139,7 +162,14 @@ export function pipelineDivvunspell() {
     }, {
       group: "libraries",
       steps: libSteps,
-    }],
+    }, command({
+      label: "Deploy Android",
+      command: "divvun-actions run divvunspell-deploy",
+      depends_on: libStepKeys.filter(key => key.includes("android")),
+      agents: {
+        queue: "linux",
+      },
+    })],
   }
 
   return pipeline

@@ -15,6 +15,7 @@ import {
 } from "~/pipelines/keyboard/divvun-keyboard.ts"
 import logger from "~/util/log.ts"
 import { runKbdgenDeploy } from "./actions/kbdgen/deploy.ts"
+import { runDivvunspellDeploy } from "./actions/divvunspell/deploy.ts"
 import {
   pipelineDivvunRuntime,
   runDivvunRuntimePublish,
@@ -198,6 +199,10 @@ async function runPipeline(args) {
     }
     case "kbdgen-deploy": {
       await runKbdgenDeploy()
+      break
+    }
+    case "divvunspell-deploy": {
+      await runDivvunspellDeploy()
       break
     }
     case "divvun-keyboard-deploy-windows": {
