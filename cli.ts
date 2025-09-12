@@ -16,11 +16,13 @@ import {
 import logger from "~/util/log.ts"
 import { runKbdgenDeploy } from "./actions/kbdgen/deploy.ts"
 import { runDivvunspellDeploy } from "./actions/divvunspell/deploy.ts"
+import { runPahkatClientDeploy } from "./actions/pahkat-client/deploy.ts"
 import {
   pipelineDivvunRuntime,
   runDivvunRuntimePublish,
 } from "./pipelines/divvun-runtime.ts"
 import { pipelineDivvunspell } from "./pipelines/divvunspell/mod.ts"
+import { pipelinePahkatClient } from "./pipelines/pahkat-client/mod.ts"
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
 import {
   pipelineLang,
@@ -205,6 +207,10 @@ async function runPipeline(args) {
       await runDivvunspellDeploy()
       break
     }
+    case "pahkat-client-deploy": {
+      await runPahkatClientDeploy()
+      break
+    }
     case "divvun-keyboard-deploy-windows": {
       await runDesktopKeyboardDeploy(KeyboardType.Windows)
       break
@@ -235,6 +241,9 @@ async function runCi(args) {
   switch (builder.env.repoName) {
     case "divvunspell":
       pipeline = pipelineDivvunspell()
+      break
+    case "pahkat-client-core":
+      pipeline = pipelinePahkatClient()
       break
     case "divvun-keyboard":
     case "divvun-dev-keyboard": {
