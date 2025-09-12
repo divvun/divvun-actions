@@ -257,8 +257,12 @@ async function runCi(args) {
       pipeline = await pipelineDivvunRuntime()
       break
     }
-    case "libpahkat": {
-      pipeline = await pipelineLibpahkat()
+    case "pahkat": {
+      if (builder.env.pipelineSlug === "libpahkat") {
+        pipeline = await pipelineLibpahkat()
+      } else {
+        throw new Error(`Unknown pipeline slug: ${builder.env.pipelineSlug}`)
+      }
       break
     }
     default: {
