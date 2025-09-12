@@ -244,7 +244,7 @@ export async function runLibdivvunspellPublish() {
 
       const ext = os === "windows" ? "zip" : "tgz"
       const outPath =
-        `${archivePath.path}/libdivvunspell-${target}-v${version}.${ext}`
+        `${archivePath.path}/libdivvunspell-${target}-${version}.${ext}`
 
       if (ext === "zip") {
         await Zip.create([libPath], outPath)
