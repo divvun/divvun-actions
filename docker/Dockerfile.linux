@@ -91,7 +91,14 @@ RUN ~/.cargo/bin/rustup target add \
 RUN ~/.cargo/bin/cargo install cross --git https://github.com/cross-rs/cross
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
 RUN ~/.cargo/bin/cargo binstall -y just
+<<<<<<< HEAD
 RUN ~/.cargo/bin/cargo binstall -y cargo-ndk@3.5.4
+||||||| parent of ce1fcd9 (Add pahkat pipeline)
+RUN ~/.cargo/bin/cargo binstall -y cargo-ndk --git https://github.com/bbqsrc/cargo-ndk
+=======
+RUN ~/.cargo/bin/cargo binstall -y cargo-ndk --git https://github.com/bbqsrc/cargo-ndk
+#RUN ~/.cargo/bin/cargo binstall -y divvun-runtime-cli --git https://github.com/divvun/divvun-runtime
+>>>>>>> ce1fcd9 (Add pahkat pipeline)
 
 # Install Deno
 RUN curl -fsSL https://deno.land/install.sh | bash -s -- -y

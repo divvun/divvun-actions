@@ -1,9 +1,9 @@
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
-import logger from "../util/log.ts"
-import { Tar, Zip } from "../util/shared.ts"
-import { makeTempDir } from "../util/temp.ts"
+import { GitHub } from "~/util/github.ts"
+import { Tar, Zip } from "~/util/shared.ts"
+import { makeTempDir } from "~/util/temp.ts"
 
 type Config = {
   targets: string[]
@@ -18,15 +18,6 @@ function command(input: CommandStep): CommandStep {
     ],
   }
 }
-
-// function interpolate(template: string, vars: Record<string, string>): string {
-//     return template.replace(/{\s*(\w+)\s*}/g, (_, key) => {
-//         if (key in vars) {
-//             return vars[key]
-//         }
-//         throw new Error(`Unknown variable: ${key}`)
-//     })
-// }
 
 async function config() {
   let unknown = builder.env.config
@@ -157,9 +148,10 @@ export async function runDivvunRuntimePublish() {
 
     const stagingDir = `divvun-runtime-${target}-${builder.env.tag!}`
     await Deno.mkdir(`divvun-runtime-${target}-${builder.env.tag!}`)
-    await Deno.copyFile(inputPath, `${stagingDir}/divvun-runtime${
-      target.includes("windows") ? ".exe" : ""
-    }`)
+    await Deno.copyFile(
+      inputPath,
+      `${stagingDir}/divvun-runtime${target.includes("windows") ? ".exe" : ""}`,
+    )
 
     if (target.includes("windows")) {
       await Zip.create([stagingDir], outPath)
@@ -173,50 +165,4 @@ export async function runDivvunRuntimePublish() {
     builder.env.tag!,
     [`${archivePath.path}/*`],
   )
-}
-
-class GitHub {
-  #repo: string
-
-  constructor(repo: string) {
-    this.#repo = repo
-  }
-
-  async createRelease(
-    tag: string,
-    artifacts: string[],
-    draft = false,
-    prerelease = false,
-  ) {
-    const args = [
-      "release",
-      "create",
-      tag,
-      "--verify-tag",
-      "--generate-notes",
-      "--repo",
-      this.#repo,
-      ...artifacts,
-    ]
-
-    if (draft) {
-      args.push("--draft")
-    }
-
-    if (prerelease) {
-      args.push("--prerelease")
-    }
-
-    logger.info(
-      `Creating GitHub release: gh ${args.map((a) => `"${a}"`).join(" ")}`,
-    )
-    const proc = new Deno.Command("gh", {
-      args,
-    }).spawn()
-
-    const { code } = await proc.output()
-    if (code !== 0) {
-      throw new Error(`Failed to create GitHub release: exit code ${code}`)
-    }
-  }
 }

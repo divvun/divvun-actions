@@ -27,6 +27,7 @@ import {
   runLangBundle,
   runLangDeploy,
 } from "./pipelines/lang/mod.ts"
+import pipelineLibpahkat, { runLibpahkatAndroid, runLibpahkatIos, runLibpahkatPublish } from "./pipelines/pahkat/libpahkat.ts"
 import sign from "./services/windows-codesign.ts"
 import { makeTempFile } from "./util/temp.ts"
 
@@ -212,6 +213,18 @@ async function runPipeline(args) {
       await runDivvunRuntimePublish()
       break
     }
+    case "libpahkat-android": {
+      await runLibpahkatAndroid()
+      break
+    }
+    case "libpahkat-ios": {
+      await runLibpahkatIos()
+      break
+    }
+    case "libpahkat-publish": {
+      await runLibpahkatPublish()
+      break
+    }
     case "debug": {
       console.log("Environment:")
       console.log(JSON.stringify(builder.env, null, 2))
@@ -242,6 +255,10 @@ async function runCi(args) {
     }
     case "divvun-runtime": {
       pipeline = await pipelineDivvunRuntime()
+      break
+    }
+    case "libpahkat": {
+      pipeline = await pipelineLibpahkat()
       break
     }
     default: {
