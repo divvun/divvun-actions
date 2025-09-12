@@ -164,14 +164,14 @@ export default function pipelineLibpahkat() {
   }
 
   if (isReleaseTag) {
-    pipeline.steps.push({
+    pipeline.steps.push(command({
       label: "Publish",
       command: "divvun-actions run libpahkat-publish",
       agents: {
         queue: "linux",
       },
       depends_on: "build",
-    })
+    }))
   }
 
   return pipeline
