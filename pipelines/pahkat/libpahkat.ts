@@ -42,13 +42,13 @@ export async function runLibpahkatAndroid() {
   const proc = new Deno.Command("cargo", {
     args: [
       "ndk",
-      "build",
       "-o",
       "jniLibs",
       "--target",
       "armv7-linux-androideabi",
       "--target",
       "aarch64-linux-android",
+      "build",
       "--release",
       "--features",
       "prefix,ffi",
