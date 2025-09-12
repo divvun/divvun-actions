@@ -147,8 +147,8 @@ export function pipelineDivvunspell() {
           label: arch,
           command: [
             `${cmd} ${args.join(" ")}`,
-            `mv target/${arch}/release/libdivvunspell.dll libdivvunspell-${arch}.dll`,
-            `buildkite-agent artifact upload libdivvunspell-${arch}.dll`,
+            `mv target/${arch}/release/divvunspell.dll divvunspell-${arch}.dll`,
+            `buildkite-agent artifact upload divvunspell-${arch}.dll`,
           ],
         }))
       } else {
@@ -228,10 +228,12 @@ export async function runLibdivvunspellPublish() {
     for (const target of targets) {
       const libExt = os === "linux" ? "so" : os === "macos" ? "dylib" : "dll"
       const libFileName = os === "windows"
-        ? `libdivvunspell.dll`
+        ? `divvunspell.dll`
         : `libdivvunspell.${libExt}`
 
-      const artifactName = `libdivvunspell-${target}.${libExt}`
+      const artifactName = `${
+        os === "windows" ? "" : "lib"
+      }divvunspell-${target}.${libExt}`
       const inputPath = `${tempDir.path}/${artifactName}`
 
       const archiveFilePath = tempDir.path + "/" + target
