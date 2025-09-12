@@ -46,7 +46,7 @@ export async function runLibpahkatAndroid() {
     args: [
       "ndk",
       "-o",
-      "jniLibs",
+      "lib",
       "--target",
       "armv7-linux-androideabi",
       "--target",
@@ -68,7 +68,7 @@ export async function runLibpahkatAndroid() {
   }
 
   // Strip libpahkat_client.so files and remove non-libpahkat .so files
-  const jniLibsPath = "pahkat-client-core/jniLibs"
+  const jniLibsPath = "pahkat-client-core/lib"
   const ndkHome = Deno.env.get("ANDROID_NDK_HOME")
 
   if (!ndkHome) {

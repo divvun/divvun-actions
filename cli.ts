@@ -19,7 +19,7 @@ import {
   pipelineDivvunRuntime,
   runDivvunRuntimePublish,
 } from "./pipelines/divvun-runtime.ts"
-import { pipelineDivvunspell } from "./pipelines/divvunspell/mod.ts"
+import { pipelineDivvunspell, runLibdivvunspellPublish } from "./pipelines/divvunspell/mod.ts"
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
 import {
   pipelineLang,
@@ -227,6 +227,10 @@ async function runPipeline(args) {
     }
     case "libpahkat-publish": {
       await runLibpahkatPublish()
+      break
+    }
+    case "libdivvunspell-publish": {
+      await runLibdivvunspellPublish()
       break
     }
     case "debug": {
