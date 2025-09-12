@@ -77,9 +77,7 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
 
 function buildBin(arch: string): { cmd: string; args: string[] } {
   const args = ["build", "--bin", "divvunspell", "--release", "--target", arch]
-  const cmd = arch === "aarch64-unknown-linux-gnu"
-    ? "cross"
-    : "cargo"
+  const cmd = arch === "aarch64-unknown-linux-gnu" ? "cross" : "cargo"
   return { cmd, args }
 }
 
@@ -154,9 +152,8 @@ export function pipelineDivvunspell() {
           ],
         }))
       } else {
-        const libName = `libdivvunspell-${arch}.${
-          os === "linux" ? "so" : "dylib"
-        }`
+        const ext = os === "linux" ? "so" : "dylib"
+        const libName = `libdivvunspell-${arch}.${ext}`
         libSteps.push(command({
           agents: {
             queue: os,
@@ -164,7 +161,7 @@ export function pipelineDivvunspell() {
           label: arch,
           command: [
             `${cmd} ${args.join(" ")}`,
-            `mv target/${arch}/release/libdivvunspell.dylib ${libName}`,
+            `mv target/${arch}/release/libdivvunspell.${ext} ${libName}`,
             `buildkite-agent artifact upload ${libName}`,
           ],
         }))
