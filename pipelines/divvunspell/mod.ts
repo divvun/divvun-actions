@@ -126,8 +126,6 @@ export function pipelineDivvunspell() {
           label: arch,
           command: [
             `${cmd} ${args.join(" ")}`,
-            // Remove everything but libdivvunspell.so
-            `find lib -name "*.so" ! -name "libdivvunspell.so" -delete`,
             `buildkite-agent artifact upload "lib/**/*"`,
           ],
         }))
