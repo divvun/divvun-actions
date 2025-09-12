@@ -154,16 +154,32 @@ export function pipelineDivvunspell() {
       } else {
         const ext = os === "linux" ? "so" : "dylib"
         const libName = `libdivvunspell-${arch}.${ext}`
+
+        let stripCmd
+        if (arch.includes("android")) {
+          const ndkHome = Deno.env.get("ANDROID_NDK_HOME")
+
+          if (!ndkHome) {
+            throw new Error("ANDROID_NDK_HOME not set")
+          }
+
+          stripCmd =
+            `${ndkHome}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip`
+        }
+
+        const commands = [
+          `${cmd} ${args.join(" ")}`,
+          `mv target/${arch}/release/libdivvunspell.${ext} ${libName}`,
+          stripCmd ? `${stripCmd} ${libName}` : undefined,
+          `buildkite-agent artifact upload ${libName}`,
+        ].filter((c) => c !== undefined) as string[]
+
         libSteps.push(command({
           agents: {
             queue: os,
           },
           label: arch,
-          command: [
-            `${cmd} ${args.join(" ")}`,
-            `mv target/${arch}/release/libdivvunspell.${ext} ${libName}`,
-            `buildkite-agent artifact upload ${libName}`,
-          ],
+          command: commands,
         }))
       }
     }
