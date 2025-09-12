@@ -218,6 +218,7 @@ export async function runLibdivvunspellPublish() {
 
   using tempDir = await makeTempDir()
   await builder.downloadArtifacts(`libdivvunspell-*`, tempDir.path)
+  await builder.downloadArtifacts(`divvunspell-*`, tempDir.path)
 
   using archivePath = await makeTempDir({ prefix: "libdivvunspell-" })
   const [_tag, version] = builder.env.tag.split("/")
