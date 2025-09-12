@@ -128,11 +128,12 @@ export default function pipelineLibpahkat() {
         "steps": [
           command({
             label: "Android",
-            command: "divvun-action run libpahkat-android",
+            command: "divvun-actions run libpahkat-android",
           }),
           command({
             label: "iOS",
-            command: "divvun-action run libpahkat-ios",
+            command: "divvun-actions run libpahkat-ios",
+            agents: { queue: "macos" },
           }),
         ],
       },
