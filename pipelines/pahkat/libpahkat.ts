@@ -1,6 +1,9 @@
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
+import { GitHub } from "~/util/github.ts"
+import { Tar } from "~/util/shared.ts"
+import { makeTempDir } from "~/util/temp.ts"
 
 function command(input: CommandStep): CommandStep {
   return {
@@ -63,6 +66,47 @@ export async function runLibpahkatAndroid() {
       `Failed to build libpahkat-android: exit code ${output.code}`,
     )
   }
+
+  // Strip libpahkat_client.so files and remove non-libpahkat .so files
+  const jniLibsPath = "pahkat-client-core/jniLibs"
+  const ndkHome = Deno.env.get("ANDROID_NDK_HOME")
+
+  if (!ndkHome) {
+    throw new Error("ANDROID_NDK_HOME not set")
+  }
+
+  const stripCmd =
+    `${ndkHome}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip`
+
+  for await (const archDir of Deno.readDir(jniLibsPath)) {
+    if (archDir.isDirectory) {
+      const archPath = `${jniLibsPath}/${archDir.name}`
+
+      for await (const file of Deno.readDir(archPath)) {
+        if (file.name.endsWith(".so")) {
+          const filePath = `${archPath}/${file.name}`
+
+          if (file.name === "libpahkat_client.so") {
+            // Strip the libpahkat_client.so file
+            await builder.exec(stripCmd, [filePath])
+            console.log(`Stripped ${filePath}`)
+          } else if (!file.name.startsWith("libpahkat")) {
+            // Remove non-libpahkat .so files
+            await Deno.remove(filePath)
+            console.log(`Removed ${filePath}`)
+          }
+        }
+      }
+    }
+  }
+
+  // Create tarball of jniLibs directory
+  const tarPath = "libpahkat-android.tar.gz"
+  await Tar.createFlatTgz([jniLibsPath], tarPath)
+  console.log(`Created tarball: ${tarPath}`)
+
+  // Upload tarball as artifact
+  await builder.uploadArtifacts(tarPath)
 }
 
 export async function runLibpahkatPublish() {
@@ -75,46 +119,25 @@ export async function runLibpahkatPublish() {
   }
 
   // const cfg = await config()
-  // using tempDir = await makeTempDir()
-  // await Promise.all(
-  //   cfg.targets.map((target) =>
-  //     builder.downloadArtifacts(`libpahkat-${target}`, tempDir.path)
-  //   ),
-  // )
+  using tempDir = await makeTempDir()
+  await Promise.all([
+    // builder.downloadArtifacts(`libpahkat-ios`, tempDir.path),
+    builder.downloadArtifacts(`libpahkat-android.tar.gz`, tempDir.path),
+  ])
 
-  // using archivePath = await makeTempDir({ prefix: "divvun-runtime-" })
+  using archivePath = await makeTempDir({ prefix: "libpahkat-" })
 
-  // for (const target of cfg.targets) {
-  //   const ext = target.includes("windows") ? "zip" : "tgz"
-  //   const outPath = `${archivePath.path}/divvun-runtime-${target}-${builder.env
-  //     .tag!}.${ext}`
-  //   const inputPath = `${tempDir.path}/divvun-runtime-${target}${
-  //     target.includes("windows") ? ".exe" : ""
-  //   }`
+  const [_tag, version] = builder.env.tag.split("/")
+  await Deno.rename(
+    `${tempDir.path}/libpahkat-android.tar.gz`,
+    `${archivePath.path}/libpahkat-android-${version}.tgz`,
+  )
 
-  //   if (!target.includes("windows")) {
-  //     await Deno.chmod(inputPath, 0o755)
-  //   }
-
-  //   const stagingDir = `divvun-runtime-${target}-${builder.env.tag!}`
-  //   await Deno.mkdir(`divvun-runtime-${target}-${builder.env.tag!}`)
-  //   await Deno.copyFile(
-  //     inputPath,
-  //     `${stagingDir}/divvun-runtime${target.includes("windows") ? ".exe" : ""}`,
-  //   )
-
-  //   if (target.includes("windows")) {
-  //     await Zip.create([stagingDir], outPath)
-  //   } else {
-  //     await Tar.createFlatTgz([stagingDir], outPath)
-  //   }
-  // }
-
-  // const gh = new GitHub(builder.env.repo)
-  // await gh.createRelease(
-  //   builder.env.tag!,
-  //   [`${archivePath.path}/*`],
-  // )
+  const gh = new GitHub(builder.env.repo)
+  await gh.createRelease(
+    builder.env.tag!,
+    [`${archivePath.path}/*`],
+  )
 }
 
 export default function pipelineLibpahkat() {

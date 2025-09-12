@@ -27,7 +27,11 @@ import {
   runLangBundle,
   runLangDeploy,
 } from "./pipelines/lang/mod.ts"
-import pipelineLibpahkat, { runLibpahkatAndroid, runLibpahkatIos, runLibpahkatPublish } from "./pipelines/pahkat/libpahkat.ts"
+import pipelineLibpahkat, {
+  runLibpahkatAndroid,
+  runLibpahkatIos,
+  runLibpahkatPublish,
+} from "./pipelines/pahkat/libpahkat.ts"
 import sign from "./services/windows-codesign.ts"
 import { makeTempFile } from "./util/temp.ts"
 
