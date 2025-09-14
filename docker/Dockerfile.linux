@@ -23,39 +23,46 @@ RUN apt-get update && \
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive \
     apt-get install -y \
-    libssl-dev \
-    imagemagick \
     apertium-all-dev \
+    bc \
+    bison \
+    build-essential \
+    ca-certificates \
+    cmake \
+    containerd.io \
+    curl \
     divvun-gramcheck \
-    patchelf \
-    libsqlite3-dev \
+    docker-buildx-plugin \
+    docker-ce \
+    docker-ce-cli \
+    docker-compose-plugin \
+    flex \
+    git-lfs \
+    imagemagick \
+    just \
     libboost-all-dev \
     libc++-dev \
     libc++abi-dev \
     libicu-dev \
     libicu74 \
-    bc \
-    flex \
-    bison \
-    just \
-    pipx \
-    git-lfs \
-    python3-gtgramtools \
-    python3-gtmorphtest \
-    python3-gtltlextools \
-    build-essential \
-    cmake \
-    pkg-config \
-    unzip \
-    rsync \
-    curl \
-    ca-certificates \
+    libsqlite3-dev \
+    libssl-dev \
+    ntfs-3g && \
     openjdk-17-jdk \
-    docker-ce \
-    docker-ce-cli \
-    containerd.io \
-    docker-buildx-plugin \
-    docker-compose-plugin && \
+    ovmf \
+    parted \
+    patchelf \
+    pipx \
+    pkg-config \
+    python3-gtgramtools \
+    python3-gtltlextools \
+    python3-gtmorphtest \
+    qemu-system-x86 \
+    qemu-utils \
+    rsync \
+    socat \
+    tree \
+    unzip \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
 RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.78.0/gh_2.78.0_linux_amd64.deb -o gh.deb && \
