@@ -61,6 +61,7 @@ RUN apt-get update && \
     libboost-all-dev \
     libc++-dev \
     libc++abi-dev \
+    libhivex-bin \
     libicu-dev \
     libicu74 \
     libsqlite3-dev \
