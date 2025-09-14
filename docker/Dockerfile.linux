@@ -31,6 +31,7 @@ RUN apt-get update && \
     cmake \
     containerd.io \
     curl \
+    distrobuilder \
     divvun-gramcheck \
     docker-buildx-plugin \
     docker-ce \
@@ -39,6 +40,7 @@ RUN apt-get update && \
     flex \
     git-lfs \
     imagemagick \
+    incus \
     just \
     libboost-all-dev \
     libc++-dev \
@@ -62,7 +64,7 @@ RUN apt-get update && \
     rsync \
     socat \
     tree \
-    unzip \
+    unzip && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
 RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.78.0/gh_2.78.0_linux_amd64.deb -o gh.deb && \
