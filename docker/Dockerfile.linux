@@ -3,7 +3,8 @@ FROM buildkite/agent:3-ubuntu-24.04
 SHELL ["bash", "-lic"]
 
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="/var/cache/buildkite"
-RUN mkdir -p $BUILDKITE_PLUGIN_FS_CACHE_FOLDER
+ENV ANDROID_HOME="/root/Android/sdk"
+ENV ANDROID_NDK_HOME="/root/Android/sdk/ndk/28.2.13676358"
 
 # Replace archive.ubuntu.com with Finnish mirror
 RUN sed -i 's/archive\.ubuntu/fi\.archive\.ubuntu/g' /etc/apt/sources.list.d/ubuntu.sources && \
@@ -11,6 +12,7 @@ RUN sed -i 's/archive\.ubuntu/fi\.archive\.ubuntu/g' /etc/apt/sources.list.d/ubu
     curl -fsSL https://apertium.projectjj.com/apt/install-nightly.sh | bash
 
 RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y unzip && \
     install -m 0755 -d /etc/apt/keyrings && \
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
     chmod a+r /etc/apt/keyrings/docker.asc && \
@@ -19,6 +21,19 @@ RUN apt-get update && \
         $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
         tee /etc/apt/sources.list.d/docker.list > /dev/null && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
+
+# Install Android command line tools
+RUN curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip -o commandlinetools.zip && \
+    mkdir -p ~/Android/sdk/cmdline-tools && \
+    unzip commandlinetools.zip -d ~/Android/sdk/cmdline-tools && \
+    rm commandlinetools.zip && \
+    mv ~/Android/sdk/cmdline-tools/cmdline-tools ~/Android/sdk/cmdline-tools/latest && \
+    yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses && \
+    $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+    "platform-tools" \
+    "platforms;android-35" \
+    "build-tools;35.0.1" \
+    "ndk;28.2.13676358"
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive \
@@ -40,7 +55,6 @@ RUN apt-get update && \
     git-lfs \
     golang \
     imagemagick \
-    incus \
     just \
     libboost-all-dev \
     libc++-dev \
@@ -76,48 +90,34 @@ RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.78.0/gh_2.78.0_li
     rm gh.deb && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
-# Install Android command line tools
-RUN curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip -o commandlinetools.zip && \
-    mkdir -p ~/Android/sdk/cmdline-tools && \
-    unzip commandlinetools.zip -d ~/Android/sdk/cmdline-tools && \
-    rm commandlinetools.zip && \
-    mv ~/Android/sdk/cmdline-tools/cmdline-tools ~/Android/sdk/cmdline-tools/latest
-
-ENV ANDROID_HOME="/root/Android/sdk/"
-ENV ANDROID_NDK_HOME="/root/Android/sdk/ndk/28.2.13676358"
-
-RUN yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses && \
-    $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-    "platform-tools" \
-    "platforms;android-35" \
-    "build-tools;35.0.1" \
-    "ndk;28.2.13676358"
-
-# Install Rust and tools
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
-
-RUN ~/.cargo/bin/rustup target add \
+# Install Rust compiler and targets
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y && \
+    ~/.cargo/bin/rustup target add \
     aarch64-linux-android \
     armv7-linux-androideabi \
     x86_64-linux-android
 
-RUN ~/.cargo/bin/cargo install cross --git https://github.com/cross-rs/cross
-RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-RUN ~/.cargo/bin/cargo binstall -y just
-RUN ~/.cargo/bin/cargo binstall -y cargo-ndk
+# Install Rust things
+RUN ~/.cargo/bin/cargo install cross --git https://github.com/cross-rs/cross && \
+    curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash && \
+    ~/.cargo/bin/cargo binstall -y just && \
+    ~/.cargo/bin/cargo binstall -y cargo-ndk
 
 # Install Deno
 RUN curl -fsSL https://deno.land/install.sh | bash -s -- -y
 
+# Install libtorch
 RUN curl -fsSL https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-2.8.0%2Bcpu.zip -o libtorch.zip && \
     unzip libtorch.zip && \
     cp -r libtorch/* /usr/ && \
     rm -rf libtorch && \
     rm libtorch.zip
 
+# Install OpenBao
 RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.2.1/bao_2.2.1_linux_amd64.deb -o bao.deb && \
     dpkg -i bao.deb && \
-    rm bao.deb
+    rm bao.deb && \
+    rm -rf /var/lib/apt/lists/* && apt-get clean
 
 # Install pahkat-uploader
 RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/pahkat-uploader?platform=linux&channel=nightly' -o pahkat-uploader.txz && \
@@ -142,6 +142,8 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
 
 # Configure git-lfs
 RUN git lfs install
+
+RUN mkdir -p $BUILDKITE_PLUGIN_FS_CACHE_FOLDER
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

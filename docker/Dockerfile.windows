@@ -137,7 +137,7 @@ RUN Invoke-WebRequest -Uri "https://download.docker.com/win/static/stable/x86_64
 
 # Install gh (GitHub CLI)
 RUN Invoke-WebRequest -Uri "https://github.com/cli/cli/releases/download/v2.78.0/gh_2.78.0_windows_amd64.zip" -OutFile gh.zip ; \
-    Expand-Archive gh.zip -DestinationPath C:\bin ; \
+    Expand-Archive gh.zip -DestinationPath C:\bin -Force ; \
     Remove-Item -Force gh.zip
 
 # Create cache folder
