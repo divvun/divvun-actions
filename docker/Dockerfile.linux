@@ -47,7 +47,7 @@ RUN apt-get update && \
     libicu74 \
     libsqlite3-dev \
     libssl-dev \
-    ntfs-3g && \
+    ntfs-3g \
     openjdk-17-jdk \
     ovmf \
     parted \
