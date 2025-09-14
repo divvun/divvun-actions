@@ -31,7 +31,6 @@ RUN apt-get update && \
     cmake \
     containerd.io \
     curl \
-    distrobuilder \
     divvun-gramcheck \
     docker-buildx-plugin \
     docker-ce \
@@ -39,6 +38,7 @@ RUN apt-get update && \
     docker-compose-plugin \
     flex \
     git-lfs \
+    golang \
     imagemagick \
     incus \
     just \
@@ -66,6 +66,10 @@ RUN apt-get update && \
     tree \
     unzip && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
+
+# Install distrobuilder (needed for win11 images)
+RUN go install -v -x github.com/lxc/distrobuilder/distrobuilder@latest && \
+    mv /root/go/bin/distrobuilder /usr/local/bin
 
 RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.78.0/gh_2.78.0_linux_amd64.deb -o gh.deb && \
     dpkg -i gh.deb && \
