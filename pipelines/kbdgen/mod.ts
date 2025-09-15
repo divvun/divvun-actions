@@ -67,7 +67,7 @@ export function pipelineKbdgen() {
       } else {
         const cargoCmd = os !== "linux" || arch === "x86_64-unknown-linux-gnu"
           ? "cargo"
-          : "rustup update && CROSS_CONTAINER_OPTS='--rm --no-cache' cross"
+          : "rustup update && cross"
 
         steps.push(command({
           key: buildKey,
