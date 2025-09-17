@@ -185,9 +185,18 @@ export function pipelineLang() {
     first.priority = 10
   }
 
+  // We only deploy on main branch
+  const isDeploy = builder.env.branch === "main"
+
   const pipeline: BuildkitePipeline = {
     steps: [
       first,
+    ],
+  }
+
+  if (isDeploy) {
+    pipeline.steps = [
+      ...pipeline.steps,
       {
         group: "Bundle",
         key: "bundle",
@@ -224,7 +233,7 @@ export function pipelineLang() {
           queue: "linux",
         },
       }),
-    ],
+    ]
   }
 
   return pipeline
