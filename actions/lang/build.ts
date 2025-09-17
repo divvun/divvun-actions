@@ -223,8 +223,11 @@ export default async function langBuild(
   await autotoolsBuilder.build(flags)
 
   if (checkConfig) {
-    const checkFlags = deriveAutogenFlags(checkConfig)
-    await autotoolsBuilder.check(checkFlags)
+    // TODO: this just runs all the tests.
+    if (Object.values(checkConfig).some((v) => v === true)) {
+      const checkFlags = deriveAutogenFlags(checkConfig)
+      await autotoolsBuilder.check(checkFlags)
+    }
   }
 
   if (buildConfig.spellers) {
