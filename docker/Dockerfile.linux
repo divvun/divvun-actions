@@ -133,7 +133,8 @@ RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "aw
 
 # Install divvun-runtime
 RUN curl -fsSL "https://github.com/divvun/divvun-runtime/releases/download/v0.1.1/divvun-runtime-x86_64-unknown-linux-gnu-v0.1.1.tgz" -o "divvun-runtime.tgz" && \
-    tar -xzf divvun-runtime.tgz -C /usr/local/bin && \
+    tar -xzf divvun-runtime.tgz && \
+    cp divvun-runtime-x86_64*/divvun-runtime /usr/local/bin/divvun-runtime && \
     rm divvun-runtime.tgz
 
 # Configure git-lfs
