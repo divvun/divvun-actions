@@ -131,6 +131,11 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
     ./aws/install && \
     rm awscliv2.zip
 
+# Install divvun-runtime
+RUN curl "https://github.com/divvun/divvun-runtime/releases/download/v0.1.1/divvun-runtime-x86_64-unknown-linux-gnu-v0.1.1.tgz" -o "divvun-runtime.tgz" && \
+    tar -xzf divvun-runtime.tgz -C /usr/local/bin && \
+    rm divvun-runtime.tgz
+
 # Configure git-lfs
 RUN git lfs install
 
