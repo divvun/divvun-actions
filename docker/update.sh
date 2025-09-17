@@ -94,15 +94,34 @@ update_container() {
     # Stop if exists
     if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
         echo "[$N] Stopping $CONTAINER_NAME (gracefully, may take up to 30+ minutes for running builds)..."
-        docker stop --timeout=-1 "$CONTAINER_NAME" || echo "[$N] Failed to stop $CONTAINER_NAME (may not exist)"
-        echo "[$N] $CONTAINER_NAME stopped successfully"
+        for attempt in {1..5}; do
+            if docker stop --timeout=-1 "$CONTAINER_NAME"; then
+                echo "[$N] $CONTAINER_NAME stopped successfully"
+                break
+            else
+                echo "[$N] Failed to stop $CONTAINER_NAME (attempt $attempt/5)"
+                if [[ $attempt -lt 5 ]]; then
+                    sleep 1
+                fi
+            fi
+        done
     else
         echo "[$N] $CONTAINER_NAME is not running, skipping stop"
     fi
-    
+
     # Remove
     echo "[$N] Removing $CONTAINER_NAME..."
-    docker rm "$CONTAINER_NAME" 2>/dev/null || echo "[$N] Container $CONTAINER_NAME already removed or doesn't exist"
+    for attempt in {1..5}; do
+        if docker rm "$CONTAINER_NAME" 2>/dev/null; then
+            echo "[$N] $CONTAINER_NAME removed successfully"
+            break
+        else
+            echo "[$N] Failed to remove $CONTAINER_NAME (attempt $attempt/5)"
+            if [[ $attempt -lt 5 ]]; then
+                sleep 1
+            fi
+        fi
+    done
     
     # Recreate
     echo "[$N] Creating new $CONTAINER_NAME..."
