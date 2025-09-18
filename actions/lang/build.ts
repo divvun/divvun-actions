@@ -233,6 +233,7 @@ export default async function langBuild(
   if (buildConfig["grammar-checkers"]) {
     // Upload grammar files
     await builder.uploadArtifacts("build/tools/grammarcheckers/*.drb")
+    await builder.uploadArtifacts("build/tools/grammarcheckers/*.zcheck")
   }
 
   if (buildConfig.spellers) {
