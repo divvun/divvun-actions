@@ -230,6 +230,11 @@ export default async function langBuild(
     }
   }
 
+  if (buildConfig["grammar-checkers"]) {
+    // Upload grammar files
+    await builder.uploadArtifacts("build/tools/grammarcheckers/*.drb")
+  }
+
   if (buildConfig.spellers) {
     // Glob the zhfst files made available in the spellcheckers directory.
     // Associate their prefixes as their lang code.
