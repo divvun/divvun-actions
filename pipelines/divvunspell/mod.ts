@@ -272,6 +272,45 @@ export async function runLibdivvunspellPublish() {
     }
   }
 
+  // Create Android package with jniLibs structure
+  const androidArchs = ["aarch64-linux-android", "armv7-linux-androideabi"]
+  const androidPackageDir = tempDir.path + "/android-package"
+  const jniLibsDir = androidPackageDir + "/jniLibs"
+
+  // Check if we have Android artifacts
+  const hasAndroidArtifacts = androidArchs.every((arch) => {
+    const artifactName = `libdivvunspell-${arch}.so`
+    const inputPath = `${tempDir.path}/${artifactName}`
+    try {
+      Deno.statSync(inputPath)
+      return true
+    } catch {
+      return false
+    }
+  })
+
+  if (hasAndroidArtifacts) {
+    // Create jniLibs directory structure
+    await Deno.mkdir(`${jniLibsDir}/arm64-v8a`, { recursive: true })
+    await Deno.mkdir(`${jniLibsDir}/armeabi-v7a`, { recursive: true })
+
+    // Copy Android libraries to appropriate directories
+    await Deno.copyFile(
+      `${tempDir.path}/libdivvunspell-aarch64-linux-android.so`,
+      `${jniLibsDir}/arm64-v8a/libdivvunspell.so`,
+    )
+    await Deno.copyFile(
+      `${tempDir.path}/libdivvunspell-armv7-linux-androideabi.so`,
+      `${jniLibsDir}/armeabi-v7a/libdivvunspell.so`,
+    )
+
+    // Create Android package tgz
+    const androidPackagePath =
+      `${archivePath.path}/libdivvunspell-android-jniLibs-${version}.tgz`
+    await Tar.createFlatTgz([jniLibsDir], androidPackagePath)
+    artifacts.push(androidPackagePath)
+  }
+
   const gh = new GitHub(builder.env.repo)
   await gh.createRelease(builder.env.tag, artifacts, false, false)
 }
