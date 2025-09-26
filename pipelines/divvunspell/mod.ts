@@ -279,19 +279,6 @@ export async function runLibdivvunspellPublish() {
   const androidPackageDir = tempDir.path + "/android-package"
   const jniLibsDir = androidPackageDir + "/jniLibs"
 
-  logger.debug(`Looking for Android artifacts in: ${tempDir.path}`)
-
-  // List all files in temp directory for debugging
-  try {
-    const tempFiles = []
-    for await (const entry of Deno.readDir(tempDir.path)) {
-      tempFiles.push(entry.name)
-    }
-    logger.debug(`Available artifacts: ${tempFiles.join(", ")}`)
-  } catch (e) {
-    logger.error(`Error listing temp directory: ${e.message}`)
-  }
-
   // Check if we have Android artifacts (they will be in tgz packages)
   const androidArtifactStatus: string[] = []
   const androidPackagePaths: string[] = []
@@ -301,27 +288,24 @@ export async function runLibdivvunspellPublish() {
     const packagePath = `${archivePath.path}/${packageName}`
     try {
       const stat = Deno.statSync(packagePath)
-      logger.debug(`✓ Found ${packageName} (${stat.size} bytes)`)
+      logger.info(`✓ Found ${packageName} (${stat.size} bytes)`)
       androidArtifactStatus.push(`${arch}: found`)
       androidPackagePaths.push(packagePath)
       return true
     } catch {
-      logger.debug(`✗ Missing ${packageName}`)
+      logger.info(`✗ Missing ${packageName}`)
       androidArtifactStatus.push(`${arch}: missing`)
       return false
     }
   })
 
   logger.info(`Android artifact check: ${androidArtifactStatus.join(", ")}`)
-  logger.debug(`hasAndroidArtifacts: ${hasAndroidArtifacts}`)
 
   if (hasAndroidArtifacts) {
     logger.info("Creating Android jniLibs package...")
 
     // Create jniLibs directory structure
-    logger.debug(`Creating directory: ${jniLibsDir}/arm64-v8a`)
     await Deno.mkdir(`${jniLibsDir}/arm64-v8a`, { recursive: true })
-    logger.debug(`Creating directory: ${jniLibsDir}/armeabi-v7a`)
     await Deno.mkdir(`${jniLibsDir}/armeabi-v7a`, { recursive: true })
 
     // Extract libraries from existing tgz packages
@@ -331,7 +315,7 @@ export async function runLibdivvunspellPublish() {
       const arch = androidArchs[i]
       const packagePath = androidPackagePaths[i]
 
-      logger.debug(`Extracting ${packagePath}`)
+      logger.info(`Extracting ${packagePath}`)
       await Tar.extractTar(packagePath, tempExtractDir.path)
 
       const libPath = `${tempExtractDir.path}/lib/libdivvunspell.so`
@@ -340,12 +324,12 @@ export async function runLibdivvunspellPublish() {
         : "armeabi-v7a"
       const targetPath = `${jniLibsDir}/${targetDir}/libdivvunspell.so`
 
-      logger.debug(`Copying extracted lib: ${libPath} -> ${targetPath}`)
+      logger.info(`Copying extracted lib: ${libPath} -> ${targetPath}`)
       await Deno.copyFile(libPath, targetPath)
 
       // Verify copied file
       const stat = Deno.statSync(targetPath)
-      logger.debug(`Copied ${targetDir} lib: ${stat.size} bytes`)
+      logger.info(`Copied ${targetDir} lib: ${stat.size} bytes`)
 
       // Clean up extracted files for next iteration
       await Deno.remove(`${tempExtractDir.path}/lib`, { recursive: true })
@@ -362,9 +346,6 @@ export async function runLibdivvunspellPublish() {
     logger.info(`Android package created: ${packageStat.size} bytes`)
 
     artifacts.push(androidPackagePath)
-    logger.info(
-      `Added Android package to artifacts list. Total artifacts: ${artifacts.length}`,
-    )
   } else {
     logger.info(
       "Skipping Android jniLibs package creation - missing required artifacts",
