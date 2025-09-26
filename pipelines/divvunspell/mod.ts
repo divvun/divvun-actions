@@ -332,10 +332,12 @@ export async function runLibdivvunspellPublish() {
       const packagePath = androidPackagePaths[i]
 
       logger.debug(`Extracting ${packagePath}`)
-      await Tar.extractTgz(packagePath, tempExtractDir.path)
+      await Tar.extractTar(packagePath, tempExtractDir.path)
 
       const libPath = `${tempExtractDir.path}/lib/libdivvunspell.so`
-      const targetDir = arch === "aarch64-linux-android" ? "arm64-v8a" : "armeabi-v7a"
+      const targetDir = arch === "aarch64-linux-android"
+        ? "arm64-v8a"
+        : "armeabi-v7a"
       const targetPath = `${jniLibsDir}/${targetDir}/libdivvunspell.so`
 
       logger.debug(`Copying extracted lib: ${libPath} -> ${targetPath}`)

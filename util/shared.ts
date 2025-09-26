@@ -247,10 +247,10 @@ export class Zip {
 }
 
 export class Tar {
-  static async extractTxz(filePath: string, outputDir?: string) {
+  static async extractTar(filePath: string, outputDir?: string) {
     const platform = Deno.build.os
 
-    console.log("Extracting", filePath)
+    logger.debug("Extracting", filePath)
     if (platform === "linux" || platform === "darwin") {
       const dir = outputDir || makeTempDirSync().path
       const proc = new Deno.Command("tar", {
@@ -376,7 +376,7 @@ export class PahkatPrefix {
 
     console.log("Extracting", txz)
     // Extract the file
-    const outputPath = await Tar.extractTxz(txz)
+    const outputPath = await Tar.extractTar(txz)
     const binPath = path.resolve(outputPath, "bin")
     console.log("Extracted to", outputPath)
     logger.info(`Bin path: ${binPath}, platform: ${Deno.build.os}`)
