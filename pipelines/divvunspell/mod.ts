@@ -4,6 +4,7 @@ import * as target from "~/target.ts"
 import { GitHub } from "../../util/github.ts"
 import { Tar, Zip } from "../../util/shared.ts"
 import { makeTempDir } from "../../util/temp.ts"
+import logger from "../../util/log.ts"
 
 const binPlatforms = {
   macos: ["x86_64-apple-darwin", "aarch64-apple-darwin"],
@@ -273,44 +274,105 @@ export async function runLibdivvunspellPublish() {
   }
 
   // Create Android package with jniLibs structure
+  logger.info("Starting Android jniLibs package creation...")
   const androidArchs = ["aarch64-linux-android", "armv7-linux-androideabi"]
   const androidPackageDir = tempDir.path + "/android-package"
   const jniLibsDir = androidPackageDir + "/jniLibs"
 
+  logger.debug(`Looking for Android artifacts in: ${tempDir.path}`)
+
+  // List all files in temp directory for debugging
+  try {
+    const tempFiles = []
+    for await (const entry of Deno.readDir(tempDir.path)) {
+      tempFiles.push(entry.name)
+    }
+    logger.debug(`Available artifacts: ${tempFiles.join(", ")}`)
+  } catch (e) {
+    logger.error(`Error listing temp directory: ${e.message}`)
+  }
+
   // Check if we have Android artifacts
+  const androidArtifactStatus: string[] = []
   const hasAndroidArtifacts = androidArchs.every((arch) => {
     const artifactName = `libdivvunspell-${arch}.so`
     const inputPath = `${tempDir.path}/${artifactName}`
     try {
-      Deno.statSync(inputPath)
+      const stat = Deno.statSync(inputPath)
+      logger.debug(`✓ Found ${artifactName} (${stat.size} bytes)`)
+      androidArtifactStatus.push(`${arch}: found`)
       return true
     } catch {
+      logger.debug(`✗ Missing ${artifactName}`)
+      androidArtifactStatus.push(`${arch}: missing`)
       return false
     }
   })
 
+  logger.info(`Android artifact check: ${androidArtifactStatus.join(", ")}`)
+  logger.debug(`hasAndroidArtifacts: ${hasAndroidArtifacts}`)
+
   if (hasAndroidArtifacts) {
+    logger.info("Creating Android jniLibs package...")
+
     // Create jniLibs directory structure
+    logger.debug(`Creating directory: ${jniLibsDir}/arm64-v8a`)
     await Deno.mkdir(`${jniLibsDir}/arm64-v8a`, { recursive: true })
+    logger.debug(`Creating directory: ${jniLibsDir}/armeabi-v7a`)
     await Deno.mkdir(`${jniLibsDir}/armeabi-v7a`, { recursive: true })
 
     // Copy Android libraries to appropriate directories
-    await Deno.copyFile(
-      `${tempDir.path}/libdivvunspell-aarch64-linux-android.so`,
-      `${jniLibsDir}/arm64-v8a/libdivvunspell.so`,
-    )
-    await Deno.copyFile(
-      `${tempDir.path}/libdivvunspell-armv7-linux-androideabi.so`,
-      `${jniLibsDir}/armeabi-v7a/libdivvunspell.so`,
-    )
+    const aarch64Source =
+      `${tempDir.path}/libdivvunspell-aarch64-linux-android.so`
+    const aarch64Target = `${jniLibsDir}/arm64-v8a/libdivvunspell.so`
+    logger.debug(`Copying ${aarch64Source} -> ${aarch64Target}`)
+    await Deno.copyFile(aarch64Source, aarch64Target)
+
+    const armv7Source =
+      `${tempDir.path}/libdivvunspell-armv7-linux-androideabi.so`
+    const armv7Target = `${jniLibsDir}/armeabi-v7a/libdivvunspell.so`
+    logger.debug(`Copying ${armv7Source} -> ${armv7Target}`)
+    await Deno.copyFile(armv7Source, armv7Target)
+
+    // Verify copied files
+    const aarch64Stat = Deno.statSync(aarch64Target)
+    const armv7Stat = Deno.statSync(armv7Target)
+    logger.debug(`Copied arm64-v8a lib: ${aarch64Stat.size} bytes`)
+    logger.debug(`Copied armeabi-v7a lib: ${armv7Stat.size} bytes`)
 
     // Create Android package tgz
     const androidPackagePath =
       `${archivePath.path}/libdivvunspell-android-jniLibs-${version}.tgz`
+    logger.info(`Creating Android package: ${androidPackagePath}`)
     await Tar.createFlatTgz([jniLibsDir], androidPackagePath)
+
+    // Verify package was created
+    const packageStat = Deno.statSync(androidPackagePath)
+    logger.info(`Android package created: ${packageStat.size} bytes`)
+
     artifacts.push(androidPackagePath)
+    logger.info(
+      `Added Android package to artifacts list. Total artifacts: ${artifacts.length}`,
+    )
+  } else {
+    logger.info(
+      "Skipping Android jniLibs package creation - missing required artifacts",
+    )
   }
 
+  logger.info(`Final artifacts list (${artifacts.length} total):`)
+  artifacts.forEach((artifact, index) => {
+    const fileName = artifact.split("/").pop()
+    try {
+      const stat = Deno.statSync(artifact)
+      logger.info(`  ${index + 1}. ${fileName} (${stat.size} bytes)`)
+    } catch (e) {
+      logger.error(`  ${index + 1}. ${fileName} (ERROR: ${e.message})`)
+    }
+  })
+
+  logger.info("Creating GitHub release...")
   const gh = new GitHub(builder.env.repo)
   await gh.createRelease(builder.env.tag, artifacts, false, false)
+  logger.info("GitHub release completed")
 }
