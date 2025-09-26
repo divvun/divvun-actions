@@ -292,18 +292,21 @@ export async function runLibdivvunspellPublish() {
     logger.error(`Error listing temp directory: ${e.message}`)
   }
 
-  // Check if we have Android artifacts
+  // Check if we have Android artifacts (they will be in tgz packages)
   const androidArtifactStatus: string[] = []
+  const androidPackagePaths: string[] = []
   const hasAndroidArtifacts = androidArchs.every((arch) => {
-    const artifactName = `libdivvunspell-${arch}.so`
-    const inputPath = `${tempDir.path}/${artifactName}`
+    // Look for the packaged tgz instead of raw .so files
+    const packageName = `libdivvunspell-${arch}-${version}.tgz`
+    const packagePath = `${archivePath.path}/${packageName}`
     try {
-      const stat = Deno.statSync(inputPath)
-      logger.debug(`✓ Found ${artifactName} (${stat.size} bytes)`)
+      const stat = Deno.statSync(packagePath)
+      logger.debug(`✓ Found ${packageName} (${stat.size} bytes)`)
       androidArtifactStatus.push(`${arch}: found`)
+      androidPackagePaths.push(packagePath)
       return true
     } catch {
-      logger.debug(`✗ Missing ${artifactName}`)
+      logger.debug(`✗ Missing ${packageName}`)
       androidArtifactStatus.push(`${arch}: missing`)
       return false
     }
@@ -321,24 +324,30 @@ export async function runLibdivvunspellPublish() {
     logger.debug(`Creating directory: ${jniLibsDir}/armeabi-v7a`)
     await Deno.mkdir(`${jniLibsDir}/armeabi-v7a`, { recursive: true })
 
-    // Copy Android libraries to appropriate directories
-    const aarch64Source =
-      `${tempDir.path}/libdivvunspell-aarch64-linux-android.so`
-    const aarch64Target = `${jniLibsDir}/arm64-v8a/libdivvunspell.so`
-    logger.debug(`Copying ${aarch64Source} -> ${aarch64Target}`)
-    await Deno.copyFile(aarch64Source, aarch64Target)
+    // Extract libraries from existing tgz packages
+    using tempExtractDir = await makeTempDir({ prefix: "android-extract-" })
 
-    const armv7Source =
-      `${tempDir.path}/libdivvunspell-armv7-linux-androideabi.so`
-    const armv7Target = `${jniLibsDir}/armeabi-v7a/libdivvunspell.so`
-    logger.debug(`Copying ${armv7Source} -> ${armv7Target}`)
-    await Deno.copyFile(armv7Source, armv7Target)
+    for (let i = 0; i < androidArchs.length; i++) {
+      const arch = androidArchs[i]
+      const packagePath = androidPackagePaths[i]
 
-    // Verify copied files
-    const aarch64Stat = Deno.statSync(aarch64Target)
-    const armv7Stat = Deno.statSync(armv7Target)
-    logger.debug(`Copied arm64-v8a lib: ${aarch64Stat.size} bytes`)
-    logger.debug(`Copied armeabi-v7a lib: ${armv7Stat.size} bytes`)
+      logger.debug(`Extracting ${packagePath}`)
+      await Tar.extractTgz(packagePath, tempExtractDir.path)
+
+      const libPath = `${tempExtractDir.path}/lib/libdivvunspell.so`
+      const targetDir = arch === "aarch64-linux-android" ? "arm64-v8a" : "armeabi-v7a"
+      const targetPath = `${jniLibsDir}/${targetDir}/libdivvunspell.so`
+
+      logger.debug(`Copying extracted lib: ${libPath} -> ${targetPath}`)
+      await Deno.copyFile(libPath, targetPath)
+
+      // Verify copied file
+      const stat = Deno.statSync(targetPath)
+      logger.debug(`Copied ${targetDir} lib: ${stat.size} bytes`)
+
+      // Clean up extracted files for next iteration
+      await Deno.remove(`${tempExtractDir.path}/lib`, { recursive: true })
+    }
 
     // Create Android package tgz
     const androidPackagePath =
