@@ -48,7 +48,7 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
 
   if (arch === "aarch64-unknown-linux-gnu") {
     return {
-      cmd: "cargo",
+      cmd: "cross",
       args: [
         "build",
         "--lib",
@@ -77,7 +77,7 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
 
 function buildBin(arch: string): { cmd: string; args: string[] } {
   const args = ["build", "--bin", "divvunspell", "--release", "--target", arch]
-  const cmd = "cargo"
+  const cmd = arch === "aarch64-unknown-linux-gnu" ? "cross" : "cargo"
   return { cmd, args }
 }
 
