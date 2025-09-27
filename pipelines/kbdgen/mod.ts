@@ -1,5 +1,6 @@
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
+import * as builder from "~/builder.ts"
 
 const platforms = {
   macos: ["x86_64-apple-darwin", "aarch64-apple-darwin"],
@@ -102,14 +103,16 @@ export function pipelineKbdgen() {
     }
   }
 
-  pipeline.steps.push(command({
-    label: "Deploy",
-    command: "divvun-actions run kbdgen-deploy",
-    depends_on: buildStepKeys,
-    agents: {
-      queue: "linux",
-    },
-  }))
+  if (builder.env.branch === "main") {
+    pipeline.steps.push(command({
+      label: "Deploy",
+      command: "divvun-actions run kbdgen-deploy",
+      depends_on: buildStepKeys,
+      agents: {
+        queue: "linux",
+      },
+    }))
+  }
 
   return pipeline
 }
