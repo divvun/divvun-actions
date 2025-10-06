@@ -37,6 +37,7 @@ export class OpenBao {
       }).json()
 
     if (roleResponse?.errors != null) {
+      console.error(roleResponse)
       throw new Error(
         `OpenBao: ${roleResponse.errors.map((e) => e.message).join(", ")}`,
       )
