@@ -33,6 +33,8 @@ async function renameFile(filePath: string, newPath: string) {
   return newPath
 }
 
+const RELEASE_TAG = /^speller-(.*?)\/v\d+\.\d+\.\d+(-\S+)?/
+
 export default async function spellerBundle({
   spellerType,
   manifest,
@@ -45,7 +47,10 @@ export default async function spellerBundle({
   let payloadPath: string
 
   // TODO: allow release builds
-  const version = await versionAsNightly(manifest.spellerversion)
+  const isSpellerReleaseTag = RELEASE_TAG.test(builder.env.tag ?? "")
+  const version = isSpellerReleaseTag
+    ? manifest.spellerversion
+    : await versionAsNightly(manifest.spellerversion)
   console.log /*logger.debug*/(
     `Speller bundle for ${spellerType} with version ${version} and langTag ${langTag}`,
   )

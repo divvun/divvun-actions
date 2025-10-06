@@ -94,7 +94,11 @@ async function globOneFile(pattern: string): Promise<string | null> {
   return null
 }
 
+const RELEASE_TAG = /^speller-(.*?)\/v\d+\.\d+\.\d+(-\S+)?/
+
 export async function runLangDeploy() {
+  const isSpellerReleaseTag = RELEASE_TAG.test(builder.env.tag ?? "")
+
   let manifest
   try {
     manifest = toml.parse(
@@ -135,7 +139,7 @@ export async function runLangDeploy() {
     manifestPath: "./manifest.toml",
     payloadPath: windowsFiles,
     version,
-    channel: "nightly",
+    channel: isSpellerReleaseTag ? null : "nightly",
     pahkatRepo: "https://pahkat.uit.no/main/",
     secrets,
   })
@@ -145,7 +149,7 @@ export async function runLangDeploy() {
     manifestPath: "./manifest.toml",
     payloadPath: macosFiles,
     version,
-    channel: "nightly",
+    channel: isSpellerReleaseTag ? null : "nightly",
     pahkatRepo: "https://pahkat.uit.no/main/",
     secrets,
   })
@@ -155,7 +159,7 @@ export async function runLangDeploy() {
     manifestPath: "./manifest.toml",
     payloadPath: mobileFiles,
     version,
-    channel: "nightly",
+    channel: isSpellerReleaseTag ? null : "nightly",
     pahkatRepo: "https://pahkat.uit.no/main/",
     secrets,
   })
@@ -168,6 +172,8 @@ const LARGE_BUILDS = [
 ]
 
 export function pipelineLang() {
+  const isSpellerReleaseTag = RELEASE_TAG.test(builder.env.tag ?? "")
+
   const extra: Record<string, string> =
     LARGE_BUILDS.includes(builder.env.repoName) ? { size: "large" } : {}
 
@@ -226,7 +232,7 @@ export function pipelineLang() {
         ],
       },
       command({
-        label: "Deploy",
+        label: `Deploy (${isSpellerReleaseTag ? "Release" : "Nightly"})`,
         command: "divvun-actions run lang-deploy",
         depends_on: "bundle",
         agents: {
