@@ -192,7 +192,7 @@ export function pipelineLang() {
   }
 
   // We only deploy on main branch
-  const isDeploy = builder.env.branch === "main"
+  const isDeploy = isSpellerReleaseTag || builder.env.branch === "main"
 
   const pipeline: BuildkitePipeline = {
     steps: [
