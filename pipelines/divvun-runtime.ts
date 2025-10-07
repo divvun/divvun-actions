@@ -1,4 +1,3 @@
-import * as toml from "@std/toml"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
@@ -71,8 +70,9 @@ export async function pipelineDivvunRuntime() {
 
   // Load version from Cargo.toml
   const cargoTomlText = await Deno.readTextFile("Cargo.toml")
-  const cargoToml = toml.parse(cargoTomlText.trim())
-  const version = (cargoToml.package as any)?.version
+  // Grab the version with a regex because nothing in js land works.
+  const versionMatch = cargoTomlText.match(/version\s*=\s*"(.*?)"/)
+  const version = versionMatch?.[1]
   
   if (typeof version !== "string") {
     throw new Error("Could not determine version from Cargo.toml")
