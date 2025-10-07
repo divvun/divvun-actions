@@ -2,7 +2,11 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { DisposablePath, makeTempDir } from "../util/temp.ts"
 
-export default async function sign(inputFile: string, version: string, entitlementsPath?: string) {
+export default async function sign(
+  inputFile: string,
+  version: string,
+  entitlementsPath?: string,
+) {
   const secrets = await builder.secrets()
   const codeSignId = secrets.get("macos/appCodeSignId")
 

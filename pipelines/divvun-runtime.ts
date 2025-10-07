@@ -1,3 +1,5 @@
+import * as fs from "@std/fs"
+import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
@@ -167,8 +169,23 @@ export async function runDivvunRuntimePublish() {
   )
 
   await builder.downloadArtifacts("divvun-rt-playground-*", tempDir.path)
-
   using archivePath = await makeTempDir({ prefix: "divvun-runtime-" })
+
+  const glob = await fs.expandGlob("divvun-rt-playground-*", {
+    root: tempDir.path,
+  })
+  for await (const file of glob) {
+    if (file.isFile) {
+      await fs.move(
+        file.path,
+        path.join(
+          archivePath.path,
+          `${file.name}_${builder.env.tag!}.zip`,
+        ),
+        { overwrite: true },
+      )
+    }
+  }
 
   for (const target of cfg.targets) {
     const ext = target.includes("windows") ? "zip" : "tgz"
