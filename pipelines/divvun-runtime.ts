@@ -71,8 +71,7 @@ export async function pipelineDivvunRuntime() {
 
   // Load version from Cargo.toml
   const cargoTomlText = await Deno.readTextFile("Cargo.toml")
-  console.log(cargoTomlText)
-  const cargoToml = toml.parse(cargoTomlText)
+  const cargoToml = toml.parse(cargoTomlText.trim())
   const version = (cargoToml.package as any)?.version
   
   if (typeof version !== "string") {
