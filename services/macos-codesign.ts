@@ -2,7 +2,7 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { DisposablePath, makeTempDir } from "../util/temp.ts"
 
-export default async function sign(inputFile: string, version: string) {
+export default async function sign(inputFile: string, version: string, entitlementsPath?: string) {
   const secrets = await builder.secrets()
   const codeSignId = secrets.get("macos/appCodeSignId")
 
@@ -21,11 +21,21 @@ export default async function sign(inputFile: string, version: string) {
     path.join(inputFile, "Contents/Info.plist"),
   ])
 
+  const codeSignArgs = []
+
+  if (entitlementsPath) {
+    console.log("Using entitlements from:", entitlementsPath)
+    codeSignArgs.push("--entitlements", entitlementsPath)
+  } else {
+    console.log("No entitlements provided, skipping")
+  }
+
   const result = await builder.output("timeout", [
     "60s",
     "xcrun",
     "codesign",
     "--options=runtime",
+    ...codeSignArgs,
     "-f",
     "-s",
     codeSignId,
