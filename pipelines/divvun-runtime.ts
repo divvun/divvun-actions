@@ -70,7 +70,9 @@ export async function pipelineDivvunRuntime() {
   await builder.setMetadata("divvun-runtime:config", JSON.stringify(cfg))
 
   // Load version from Cargo.toml
-  const cargoToml = toml.parse(await Deno.readTextFile("Cargo.toml"))
+  const cargoTomlText = await Deno.readTextFile("Cargo.toml")
+  console.log(cargoTomlText)
+  const cargoToml = toml.parse(cargoTomlText)
   const version = (cargoToml.package as any)?.version
   
   if (typeof version !== "string") {
