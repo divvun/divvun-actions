@@ -100,7 +100,13 @@ export async function pipelineDivvunRuntime() {
     buildSteps.push(step)
   }
 
-  const uiBuildSteps: CommandStep[] = [
+  const uiBuildSteps: CommandStep[] = []
+
+  for (const target of cfg.targets) {
+    if (os(target) === "linux") {
+      continue
+    }
+    
     command({
       label: "Playground (macOS)",
       command: [
