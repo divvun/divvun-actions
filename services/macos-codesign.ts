@@ -15,13 +15,11 @@ export default async function sign(inputFile: string, version: string) {
   ])
 
   // Update the version to the one provided by the build system
-  await builder.exec("/usr/libexec/PlistBuddy", 
-    [
-      "-c",
-      `Set :CFBundleShortVersionString ${version}`,
-      path.join(inputFile, "Contents/Info.plist"),
-    ]
-  )
+  await builder.exec("/usr/libexec/PlistBuddy", [
+    "-c",
+    `Set :CFBundleShortVersionString ${version}`,
+    path.join(inputFile, "Contents/Info.plist"),
+  ])
 
   const result = await builder.output("timeout", [
     "60s",
@@ -41,10 +39,13 @@ export default async function sign(inputFile: string, version: string) {
   }
 
   console.log("Signed:", result.stdout)
-  
+
   using uploadDir = await makeTempDir()
-  const uploadPath = path.join(uploadDir.path, `divvun-rt-playground-${version}.app.zip`)
- 
+  const uploadPath = path.join(
+    uploadDir.path,
+    `divvun-rt-playground-${version}.app.zip`,
+  )
+
   await builder.exec("/usr/bin/ditto", [
     "-c",
     "-k",
@@ -96,7 +97,7 @@ async function notarize(inputFile: string) {
   } = JSON.parse(secrets.get("macos/appStoreKeyJson"))
 
   using notarytool = await NotaryTool.create(appStoreKey)
-  
+
   const submitResult = await notarytool.submit(inputFile)
   console.log("Notarization submitted:", submitResult)
 }
@@ -117,7 +118,11 @@ class NotaryTool {
     return new NotaryTool(keyJson.key_id, keyJson.issuer_id, tmpDir)
   }
 
-  private constructor(keyId: string, issuerId: string, keyPath: DisposablePath) {
+  private constructor(
+    keyId: string,
+    issuerId: string,
+    keyPath: DisposablePath,
+  ) {
     this.#keyId = keyId
     this.#issuerId = issuerId
     this.#keyPath = keyPath
@@ -139,7 +144,7 @@ class NotaryTool {
       path.join(this.#keyPath.path, "key.p8"),
       "-f",
       "json",
-      ...args
+      ...args,
     ])
   }
 

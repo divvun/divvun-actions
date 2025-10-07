@@ -73,7 +73,7 @@ export async function pipelineDivvunRuntime() {
   // Grab the version with a regex because nothing in js land works.
   const versionMatch = cargoTomlText.match(/version\s*=\s*"(.*?)"/)
   const version = versionMatch?.[1]
-  
+
   if (typeof version !== "string") {
     throw new Error("Could not determine version from Cargo.toml")
   }
@@ -85,7 +85,7 @@ export async function pipelineDivvunRuntime() {
       target.includes("windows") ? ".exe" : ""
     }`
     const targetFile = `target/${target}/release/${artifactName}`
-    // const uiTargetFile = 
+    // const uiTargetFile =
     const step = command({
       label: `${target}`,
       command: [
@@ -106,7 +106,7 @@ export async function pipelineDivvunRuntime() {
     if (os(target) === "linux") {
       continue
     }
-    
+
     command({
       label: "Playground (macOS)",
       command: [
@@ -116,9 +116,9 @@ export async function pipelineDivvunRuntime() {
         `ditto -c -k --keepParent Divvun\\ Runtime\\ Playground.app out.zip`,
         `mv out.zip divvun-rt-playground-${target}`,
         `buildkite-agent artifact upload divvun-rt-playground-${target}`,
-      ]
+      ],
     })
-  ]
+  }
 
   const pipeline: BuildkitePipeline = {
     steps: [

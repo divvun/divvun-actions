@@ -248,7 +248,7 @@ async function runPipeline(args) {
         throw new Error("No file provided to sign")
       }
       const version = args._[2] || "0.0.0"
-      
+
       await macosSign(file, version)
       break
     }
