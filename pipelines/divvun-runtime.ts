@@ -107,7 +107,7 @@ export async function pipelineDivvunRuntime() {
       continue
     }
 
-    command({
+    uiBuildSteps.push(command({
       label: "Playground (macOS)",
       command: [
         "just build-ui",
@@ -117,7 +117,7 @@ export async function pipelineDivvunRuntime() {
         `mv out.zip divvun-rt-playground-${target}`,
         `buildkite-agent artifact upload divvun-rt-playground-${target}`,
       ],
-    })
+    }))
   }
 
   const pipeline: BuildkitePipeline = {
