@@ -110,9 +110,11 @@ export async function pipelineDivvunRuntime() {
     uiBuildSteps.push(command({
       label: "Playground (macOS)",
       command: [
+        "echo '--- Building UI'",
         "just build-ui",
         "cp -r './playground/src-tauri/target/release/bundle/macos/Divvun Runtime Playground.app' .",
-        `divvun-actions macos-sign './Divvun Runtime Playground.app' ${version}`,
+        "echo '--- Signing'",
+        `divvun-actions run macos-sign './Divvun Runtime Playground.app' ${version}`,
         `ditto -c -k --keepParent './Divvun Runtime Playground.app' out.zip`,
         `mv out.zip divvun-rt-playground-${target}`,
         `buildkite-agent artifact upload divvun-rt-playground-${target}`,
