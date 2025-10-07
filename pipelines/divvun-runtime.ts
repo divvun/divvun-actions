@@ -117,6 +117,7 @@ export async function pipelineDivvunRuntime() {
         `mv out.zip divvun-rt-playground-${target}`,
         `buildkite-agent artifact upload divvun-rt-playground-${target}`,
       ],
+      agents: { queue: "macos" },
     }))
   }
 
