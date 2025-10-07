@@ -37,6 +37,7 @@ export default async function sign(inputFile: string, version: string, entitleme
     "--options=runtime",
     ...codeSignArgs,
     "-f",
+    "--deep",
     "-s",
     codeSignId,
     inputFile,
