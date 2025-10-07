@@ -35,6 +35,7 @@ import pipelineLibpahkat, {
   runLibpahkatIos,
   runLibpahkatPublish,
 } from "./pipelines/pahkat/libpahkat.ts"
+import macosSign from "./services/macos-codesign.ts"
 import sign from "./services/windows-codesign.ts"
 import { makeTempFile } from "./util/temp.ts"
 
@@ -239,6 +240,16 @@ async function runPipeline(args) {
     case "debug": {
       console.log("Environment:")
       console.log(JSON.stringify(builder.env, null, 2))
+      break
+    }
+    case "macos-sign": {
+      const file = args._[1]
+      if (!file) {
+        throw new Error("No file provided to sign")
+      }
+      const version = args._[2] || "0.0.0"
+      
+      await macosSign(file, version)
       break
     }
     default: {

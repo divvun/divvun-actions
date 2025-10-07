@@ -1,3 +1,4 @@
+import * as toml from "@std/toml"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
@@ -68,6 +69,14 @@ export async function pipelineDivvunRuntime() {
   const cfg = await config()
   await builder.setMetadata("divvun-runtime:config", JSON.stringify(cfg))
 
+  // Load version from Cargo.toml
+  const cargoToml = toml.parse(await Deno.readTextFile("Cargo.toml"))
+  const version = (cargoToml.package as any)?.version
+  
+  if (typeof version !== "string") {
+    throw new Error("Could not determine version from Cargo.toml")
+  }
+
   const buildSteps: CommandStep[] = []
 
   for (const target of cfg.targets) {
@@ -75,6 +84,7 @@ export async function pipelineDivvunRuntime() {
       target.includes("windows") ? ".exe" : ""
     }`
     const targetFile = `target/${target}/release/${artifactName}`
+    // const uiTargetFile = 
     const step = command({
       label: `${target}`,
       command: [
@@ -89,12 +99,26 @@ export async function pipelineDivvunRuntime() {
     buildSteps.push(step)
   }
 
+  const uiBuildSteps: CommandStep[] = [
+    command({
+      label: "Playground (macOS)",
+      command: [
+        "just build-ui",
+        "cp -r ./playground/src-tauri/target/release/bundle/macos/Divvun\ Runtime\ Playground.app .",
+        `divvun-actions macos-sign Divvun\\ Runtime\\ Playground.app ${version}`,
+        `ditto -c -k --keepParent Divvun\\ Runtime\\ Playground.app out.zip`,
+        `mv out.zip divvun-rt-playground-${target}`,
+        `buildkite-agent artifact upload divvun-rt-playground-${target}`,
+      ]
+    })
+  ]
+
   const pipeline: BuildkitePipeline = {
     steps: [
       {
         group: "Build",
         key: "build",
-        steps: buildSteps,
+        steps: [...buildSteps, ...uiBuildSteps],
       },
     ],
   }
@@ -131,6 +155,8 @@ export async function runDivvunRuntimePublish() {
       builder.downloadArtifacts(`divvun-runtime-${target}`, tempDir.path)
     ),
   )
+
+  await builder.downloadArtifacts("divvun-rt-playground-*", tempDir.path)
 
   using archivePath = await makeTempDir({ prefix: "divvun-runtime-" })
 
