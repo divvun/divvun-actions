@@ -191,6 +191,7 @@ class NotaryTool {
 
   async submit(inputFile: string): Promise<any> {
     const result = await this.#notarytool("submit", [
+      "--no-s3-acceleration",
       "--wait",
       inputFile,
     ])
