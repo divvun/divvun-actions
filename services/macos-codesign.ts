@@ -112,9 +112,23 @@ async function notarize(inputFile: string) {
   } = JSON.parse(secrets.get("macos/appStoreKeyJson"))
 
   using notarytool = await NotaryTool.create(appStoreKey)
+  // Retry up to 3 times
+  let lastError: Error | null = null
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const submitResult = await notarytool.submit(inputFile)
+      console.log("Notarization submitted:", submitResult)
+      return
+    } catch (error) {
+      lastError = error as Error
+      console.warn(`Notarization attempt ${attempt}/3 failed:`, error)
+      if (attempt < 3) {
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+    }
+  }
 
-  const submitResult = await notarytool.submit(inputFile)
-  console.log("Notarization submitted:", submitResult)
+  throw new Error(`Notarization failed after 3 attempts: ${lastError?.message}`)
 }
 
 class NotaryTool {
