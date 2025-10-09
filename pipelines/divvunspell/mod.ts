@@ -2,9 +2,9 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import { GitHub } from "../../util/github.ts"
+import logger from "../../util/log.ts"
 import { Tar, Zip } from "../../util/shared.ts"
 import { makeTempDir } from "../../util/temp.ts"
-import logger from "../../util/log.ts"
 
 const binPlatforms = {
   macos: ["x86_64-apple-darwin", "aarch64-apple-darwin"],
@@ -77,7 +77,7 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
 }
 
 function buildBin(arch: string): { cmd: string; args: string[] } {
-  const args = ["build", "--bin", "divvunspell", "--release", "--target", arch]
+  const args = ["build", "-p", "divvunspell-cli", "--bin", "divvunspell", "--release", "--target", arch]
   const cmd = arch === "aarch64-unknown-linux-gnu" ? "cross" : "cargo"
   return { cmd, args }
 }
