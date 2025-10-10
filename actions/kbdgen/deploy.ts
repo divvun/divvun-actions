@@ -61,6 +61,9 @@ async function createTarball(
   const distBinaryPath = path.join(binDir, binaryName)
   await Deno.copyFile(payloadPath, distBinaryPath)
 
+  // Ensure binary has execute permissions
+  await Deno.chmod(distBinaryPath, 0o755)
+
   // Create .txz file in temp directory
   const pathItems = [packageId, version, platform, architecture]
   const txzFileName = `${pathItems.join("_")}.txz`
