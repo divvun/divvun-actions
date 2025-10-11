@@ -42,6 +42,9 @@ export type BuildProps = {
   "force-all-tools": boolean
 }
 
+const SPELLER_RELEASE_TAG = /^speller-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
+const GRAMMAR_RELEASE_TAG = /^grammar-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
+
 function isConfigActive(config: BuildProps | undefined | null): boolean {
   if (!config) return false
   return Object.entries(config).some(([_key, value]) => {
@@ -59,8 +62,14 @@ export async function runLang() {
   const buildConfig = config?.build as BuildProps | undefined
   const checkConfig = config?.check as BuildProps | undefined
 
+  const tag = builder.env.tag ?? ""
+  const version = extractVersionFromTag(tag)
+  const isValidSemver = version !== null && semver.canParse(version)
+  const isReleaseTag = isValidSemver &&
+    (tag.startsWith("speller-") || tag.startsWith("grammar-"))
+
   const shouldBuild = isConfigActive(buildConfig)
-  const shouldCheck = isConfigActive(checkConfig)
+  const shouldCheck = !isReleaseTag && isConfigActive(checkConfig)
 
   if (!shouldBuild && !shouldCheck) {
     throw new Error("No build or check configuration found in .build-config.yml")
@@ -73,7 +82,7 @@ export async function runLang() {
   }
 
   if (shouldBuild) {
-    logger.debug(await langBuild(buildConfig!, shouldCheck ? checkConfig : undefined))
+    await langBuild(buildConfig!, shouldCheck ? checkConfig : undefined)
   }
 }
 
@@ -134,9 +143,6 @@ async function globFiles(pattern: string): Promise<string[]> {
   }
   return result
 }
-
-const SPELLER_RELEASE_TAG = /^speller-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
-const GRAMMAR_RELEASE_TAG = /^grammar-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 
 function extractVersionFromTag(tag: string): string | null {
   const match = tag.match(/\/v(\d+\.\d+\.\d+(?:-\S+)?)$/)
