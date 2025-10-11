@@ -117,7 +117,7 @@ async function notarize(inputFile: string) {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const submitResult = await notarytool.submit(inputFile)
-      console.log("Notarization submitted:", submitResult)
+      console.log("Notarization submitted")
       return
     } catch (error) {
       lastError = error as Error
@@ -190,19 +190,21 @@ class NotaryTool {
   }
 
   async submit(inputFile: string): Promise<any> {
-    const result = await this.#notarytool("submit", [
+    const proc = await builder.exec("xcrun", [
+      "notarytool",
+      "submit",
+      "--progress",
+      "--verbose",
+      "-d",
+      this.#keyId,
+      "-i",
+      this.#issuerId,
+      "-k",
+      path.join(this.#keyPath.path, "key.p8"),
       "--no-s3-acceleration",
       "--wait",
       inputFile,
     ])
-
-    if (result.status.code !== 0) {
-      throw new Error(
-        `notarytool submit failed: ${result.stderr}\nexit code: ${result.status.code}`,
-      )
-    }
-
-    return JSON.parse(result.stdout)
   }
 
   async info(uuid: string): Promise<any> {
