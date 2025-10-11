@@ -3,7 +3,6 @@ import * as semver from "@std/semver"
 import * as toml from "@std/toml"
 import * as yaml from "@std/yaml"
 import grammarBundle from "~/actions/grammar/bundle.ts"
-import grammarDeploy from "~/actions/grammar/deploy.ts"
 import langBuild from "~/actions/lang/build.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
@@ -288,35 +287,58 @@ export async function runLangGrammarBundle() {
 }
 
 export async function runLangGrammarDeploy() {
-  await builder.downloadArtifacts("*.txz", ".")
+  await builder.downloadArtifacts("*.drb", ".")
+  await builder.downloadArtifacts("*.zcheck", ".")
 
-  const bundleFile = await globOneFile("*_bundle.txz")
+  const drbFiles = await globFiles("build/tools/grammarcheckers/*.drb")
+  const zcheckFiles = await globFiles("build/tools/grammarcheckers/*.zcheck")
 
-  if (!bundleFile) {
-    throw new Error("Missing grammar bundle file for deployment")
+  if (drbFiles.length === 0) {
+    throw new Error("Missing .drb file for deployment")
   }
 
-  let manifest
-  try {
-    manifest = toml.parse(
-      await Deno.readTextFile("./manifest.toml"),
-    ) as any
-  } catch (e) {
-    logger.error("Failed to read manifest.toml:", e)
-    throw e
+  if (zcheckFiles.length === 0) {
+    throw new Error("Missing .zcheck file for deployment")
   }
 
-  const version = manifest.grammarversion || manifest.version || "0.0.0"
+  if (!builder.env.repo) {
+    throw new Error("No repository information available")
+  }
 
-  console.log("Deploying grammar checker:")
-  console.log(`- Bundle: ${bundleFile}`)
-  console.log(`- Version: ${version}`)
+  if (!builder.env.tag) {
+    throw new Error("No tag information available")
+  }
 
-  await grammarDeploy({
-    manifestPath: "./manifest.toml",
-    payloadPath: bundleFile,
-    version,
-  })
+  const tagVersion = extractVersionFromTag(builder.env.tag)
+  if (!tagVersion) {
+    throw new Error(`Could not extract version from tag: ${builder.env.tag}`)
+  }
+
+  const prerelease = isPrerelease(tagVersion)
+  const langTag = builder.env.repoName.split("lang-")[1]?.split("-")[0] || "unknown"
+
+  const drbFile = drbFiles[0]
+  const zcheckFile = zcheckFiles[0]
+
+  const versionedDrbFile = `grammar-${langTag}-${tagVersion}.drb`
+  const versionedZcheckFile = `grammar-${langTag}-${tagVersion}.zcheck`
+
+  await Deno.rename(drbFile, versionedDrbFile)
+  await Deno.rename(zcheckFile, versionedZcheckFile)
+
+  logger.info(`Creating GitHub release for grammar version ${tagVersion}`)
+  logger.info(`Pre-release: ${prerelease}`)
+  logger.info(`Artifacts: ${versionedDrbFile}, ${versionedZcheckFile}`)
+
+  const gh = new GitHub(builder.env.repo)
+  await gh.createRelease(
+    builder.env.tag,
+    [versionedDrbFile, versionedZcheckFile],
+    false,
+    prerelease,
+  )
+
+  logger.info("Grammar checker GitHub release created successfully")
 }
 
 // Anything using more than like 20gb of RAM is considered large
@@ -402,18 +424,9 @@ export function pipelineLang() {
     pipeline.steps = [
       ...pipeline.steps,
       command({
-        label: "Bundle Grammar Checker",
-        key: "grammar-bundle",
-        command: "divvun-actions run lang-grammar-bundle",
-        depends_on: "build",
-        agents: {
-          queue: "linux",
-        },
-      }),
-      command({
         label: "Deploy Grammar Checker",
         command: "divvun-actions run lang-grammar-deploy",
-        depends_on: "grammar-bundle",
+        depends_on: "build",
         agents: {
           queue: "linux",
         },
