@@ -29,6 +29,8 @@ import {
   runLang,
   runLangBundle,
   runLangDeploy,
+  runLangGrammarBundle,
+  runLangGrammarDeploy,
 } from "./pipelines/lang/mod.ts"
 import pipelineLibpahkat, {
   runLibpahkatAndroid,
@@ -203,6 +205,14 @@ async function runPipeline(args) {
     }
     case "lang-deploy": {
       await runLangDeploy()
+      break
+    }
+    case "lang-grammar-bundle": {
+      await runLangGrammarBundle()
+      break
+    }
+    case "lang-grammar-deploy": {
+      await runLangGrammarDeploy()
       break
     }
     case "kbdgen-deploy": {

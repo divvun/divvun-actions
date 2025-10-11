@@ -1,10 +1,14 @@
 import * as fs from "@std/fs"
+import * as semver from "@std/semver"
 import * as toml from "@std/toml"
 import * as yaml from "@std/yaml"
+import grammarBundle from "~/actions/grammar/bundle.ts"
+import grammarDeploy from "~/actions/grammar/deploy.ts"
 import langBuild from "~/actions/lang/build.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
+import { GitHub } from "~/util/github.ts"
 import { versionAsNightly } from "~/util/shared.ts"
 import spellerBundle from "../../actions/speller/bundle.ts"
 import spellerDeploy from "../../actions/speller/deploy.ts"
@@ -94,10 +98,36 @@ async function globOneFile(pattern: string): Promise<string | null> {
   return null
 }
 
-const RELEASE_TAG = /^speller-(.*?)\/v\d+\.\d+\.\d+(-\S+)?/
+async function globFiles(pattern: string): Promise<string[]> {
+  const files = await fs.expandGlob(pattern)
+  const result: string[] = []
+  for await (const file of files) {
+    if (file.isFile) {
+      result.push(file.path)
+    }
+  }
+  return result
+}
+
+const SPELLER_RELEASE_TAG = /^speller-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
+const GRAMMAR_RELEASE_TAG = /^grammar-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
+
+function extractVersionFromTag(tag: string): string | null {
+  const match = tag.match(/\/v(\d+\.\d+\.\d+(?:-\S+)?)$/)
+  return match ? match[1] : null
+}
+
+function isPrerelease(version: string): boolean {
+  try {
+    const parsed = semver.parse(version)
+    return (parsed.prerelease?.length ?? 0) > 0
+  } catch {
+    return false
+  }
+}
 
 export async function runLangDeploy() {
-  const isSpellerReleaseTag = RELEASE_TAG.test(builder.env.tag ?? "")
+  const isSpellerReleaseTag = SPELLER_RELEASE_TAG.test(builder.env.tag ?? "")
 
   let manifest
   try {
@@ -163,6 +193,98 @@ export async function runLangDeploy() {
     pahkatRepo: "https://pahkat.uit.no/main/",
     secrets,
   })
+
+  if (isSpellerReleaseTag) {
+    if (!builder.env.repo) {
+      throw new Error("No repository information available")
+    }
+
+    if (!builder.env.tag) {
+      throw new Error("No tag information available")
+    }
+
+    const tagVersion = extractVersionFromTag(builder.env.tag)
+    if (!tagVersion) {
+      throw new Error(`Could not extract version from tag: ${builder.env.tag}`)
+    }
+
+    const prerelease = isPrerelease(tagVersion)
+
+    logger.info(`Creating GitHub release for speller version ${tagVersion}`)
+    logger.info(`Pre-release: ${prerelease}`)
+    logger.info(`Artifacts: ${windowsFiles}, ${macosFiles}, ${mobileFiles}`)
+
+    const gh = new GitHub(builder.env.repo)
+    await gh.createRelease(
+      builder.env.tag,
+      [windowsFiles, macosFiles, mobileFiles],
+      false,
+      prerelease,
+    )
+
+    logger.info("Speller GitHub release created successfully")
+  }
+}
+
+export async function runLangGrammarBundle() {
+  await builder.downloadArtifacts("*.drb", ".")
+  await builder.downloadArtifacts("*.zcheck", ".")
+
+  const drbFiles = await globFiles("*.drb")
+  const zcheckFiles = await globFiles("*.zcheck")
+
+  let manifest
+  try {
+    manifest = toml.parse(
+      await Deno.readTextFile("./manifest.toml"),
+    ) as any
+  } catch (e) {
+    logger.error("Failed to read manifest.toml:", e)
+    throw e
+  }
+
+  const grammarManifest = {
+    name: manifest.grammarname || manifest.name || "unknown",
+    version: manifest.grammarversion || manifest.version || "0.0.0",
+  }
+
+  await grammarBundle({
+    manifest: grammarManifest,
+    drbPaths: drbFiles,
+    zcheckPaths: zcheckFiles,
+  })
+}
+
+export async function runLangGrammarDeploy() {
+  await builder.downloadArtifacts("*.txz", ".")
+
+  const bundleFile = await globOneFile("*_bundle.txz")
+
+  if (!bundleFile) {
+    throw new Error("Missing grammar bundle file for deployment")
+  }
+
+  let manifest
+  try {
+    manifest = toml.parse(
+      await Deno.readTextFile("./manifest.toml"),
+    ) as any
+  } catch (e) {
+    logger.error("Failed to read manifest.toml:", e)
+    throw e
+  }
+
+  const version = manifest.grammarversion || manifest.version || "0.0.0"
+
+  console.log("Deploying grammar checker:")
+  console.log(`- Bundle: ${bundleFile}`)
+  console.log(`- Version: ${version}`)
+
+  await grammarDeploy({
+    manifestPath: "./manifest.toml",
+    payloadPath: bundleFile,
+    version,
+  })
 }
 
 // Anything using more than like 20gb of RAM is considered large
@@ -172,7 +294,8 @@ const LARGE_BUILDS = [
 ]
 
 export function pipelineLang() {
-  const isSpellerReleaseTag = RELEASE_TAG.test(builder.env.tag ?? "")
+  const isSpellerReleaseTag = SPELLER_RELEASE_TAG.test(builder.env.tag ?? "")
+  const isGrammarReleaseTag = GRAMMAR_RELEASE_TAG.test(builder.env.tag ?? "")
 
   const extra: Record<string, string> =
     LARGE_BUILDS.includes(builder.env.repoName) ? { size: "large" } : {}
@@ -191,8 +314,9 @@ export function pipelineLang() {
     first.priority = 10
   }
 
-  // We only deploy on main branch
-  const isDeploy = isSpellerReleaseTag || builder.env.branch === "main"
+  // We only deploy on main branch or release tags
+  const isSpellerDeploy = isSpellerReleaseTag || builder.env.branch === "main"
+  const isGrammarDeploy = isGrammarReleaseTag
 
   const pipeline: BuildkitePipeline = {
     steps: [
@@ -200,7 +324,7 @@ export function pipelineLang() {
     ],
   }
 
-  if (isDeploy) {
+  if (isSpellerDeploy) {
     pipeline.steps = [
       ...pipeline.steps,
       {
@@ -235,6 +359,29 @@ export function pipelineLang() {
         label: `Deploy (${isSpellerReleaseTag ? "Release" : "Nightly"})`,
         command: "divvun-actions run lang-deploy",
         depends_on: "bundle",
+        agents: {
+          queue: "linux",
+        },
+      }),
+    ]
+  }
+
+  if (isGrammarDeploy) {
+    pipeline.steps = [
+      ...pipeline.steps,
+      command({
+        label: "Bundle Grammar Checker",
+        key: "grammar-bundle",
+        command: "divvun-actions run lang-grammar-bundle",
+        depends_on: "build",
+        agents: {
+          queue: "linux",
+        },
+      }),
+      command({
+        label: "Deploy Grammar Checker",
+        command: "divvun-actions run lang-grammar-deploy",
+        depends_on: "grammar-bundle",
         agents: {
           queue: "linux",
         },
