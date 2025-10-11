@@ -262,8 +262,8 @@ export async function runLangGrammarBundle() {
   await builder.downloadArtifacts("*.drb", ".")
   await builder.downloadArtifacts("*.zcheck", ".")
 
-  const drbFiles = await globFiles("*.drb")
-  const zcheckFiles = await globFiles("*.zcheck")
+  const drbFiles = await globFiles("build/tools/grammarcheckers/*.drb")
+  const zcheckFiles = await globFiles("build/tools/grammarcheckers/*.zcheck")
 
   let manifest
   try {
