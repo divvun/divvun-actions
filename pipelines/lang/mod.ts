@@ -42,13 +42,39 @@ export type BuildProps = {
   "force-all-tools": boolean
 }
 
+function isConfigActive(config: BuildProps | undefined | null): boolean {
+  if (!config) return false
+  return Object.entries(config).some(([_key, value]) => {
+    if (typeof value === "boolean") return value === true
+    if (Array.isArray(value)) return value.length > 0
+    if (typeof value === "string") return value.length > 0
+    return false
+  })
+}
+
 export async function runLang() {
   const yml = await Deno.readTextFile(".build-config.yml")
   const config = await yaml.parse(yml) as any
-  const buildConfig = config?.build as BuildProps
-  const checkConfig = config?.check as BuildProps
 
-  logger.debug(await langBuild(buildConfig, checkConfig))
+  const buildConfig = config?.build as BuildProps | undefined
+  const checkConfig = config?.check as BuildProps | undefined
+
+  const shouldBuild = isConfigActive(buildConfig)
+  const shouldCheck = isConfigActive(checkConfig)
+
+  if (!shouldBuild && !shouldCheck) {
+    throw new Error("No build or check configuration found in .build-config.yml")
+  }
+
+  if (shouldCheck && !shouldBuild) {
+    throw new Error(
+      "Cannot run tests without building. Add a 'build:' section.",
+    )
+  }
+
+  if (shouldBuild) {
+    logger.debug(await langBuild(buildConfig!, shouldCheck ? checkConfig : undefined))
+  }
 }
 
 export async function runLangBundle(
