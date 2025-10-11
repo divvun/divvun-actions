@@ -32,7 +32,7 @@ export default async function sign(
     console.log("No entitlements provided, skipping")
   }
 
-  const result = await builder.output("rcodesign", [
+  await builder.exec("rcodesign", [
     "sign",
     "--pem-file",
     pemFile,
@@ -40,14 +40,6 @@ export default async function sign(
     ...codeSignArgs,
     inputFile,
   ])
-
-  if (result.status.code !== 0) {
-    throw new Error(
-      `bundle signing failed: ${result.stderr}\nexit code: ${result.status.code}`,
-    )
-  }
-
-  console.log("Signed:", result.stdout)
 
   await notarize(inputFile, keyJson)
 
