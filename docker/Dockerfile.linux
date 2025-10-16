@@ -68,6 +68,7 @@ RUN apt-get update && \
     patchelf \
     pipx \
     pkg-config \
+    protobuf-compiler \
     python3-gtgramtools \
     python3-gtltlextools \
     python3-gtmorphtest \
