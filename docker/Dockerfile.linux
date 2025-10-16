@@ -64,7 +64,7 @@ RUN apt-get update && \
     libicu74 \
     libsqlite3-dev \
     libssl-dev \
-    ninja \
+    ninja-build \
     patchelf \
     pipx \
     pkg-config \
