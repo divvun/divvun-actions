@@ -140,6 +140,9 @@ RUN Invoke-WebRequest -Uri "https://github.com/cli/cli/releases/download/v2.78.0
     Expand-Archive gh.zip -DestinationPath C:\bin -Force ; \
     Remove-Item -Force gh.zip
 
+# Install uv
+RUN irm https://astral.sh/uv/install.ps1 | iex
+
 # Create cache folder
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="C:\\buildkite-cache"
 RUN New-Item -ItemType Directory -Path $env:BUILDKITE_PLUGIN_FS_CACHE_FOLDER -Force
