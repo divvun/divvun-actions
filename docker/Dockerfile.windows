@@ -151,6 +151,17 @@ RUN New-Item -ItemType Directory -Path $env:BUILDKITE_PLUGIN_FS_CACHE_FOLDER -Fo
 # Clear duplicates
 RUN $cleanPath = ($Env:PATH -split ';' | Select-Object -Unique) -join ';' ; \
     setx /M PATH $cleanPath
+
+# Install OpenSSH client (up to date, handles kex issues)
+RUN Invoke-WebRequest -Uri "https://github.com/PowerShell/Win32-OpenSSH/releases/download/v9.8.3.0p2-Preview/OpenSSH-Win64-v9.8.3.0.msi" -OutFile openssh.msi ; \
+    Start-Process -Wait msiexec -ArgumentList '/i', 'openssh.msi', 'ADDLOCAL=Client', '/quiet', '/norestart' ; \
+    Remove-Item -Force openssh.msi ; \
+    [Environment]::SetEnvironmentVariable("Path", \
+        ${Env:ProgramFiles} + '\OpenSSH' + \
+        ';' + \
+        [Environment]::GetEnvironmentVariable("Path",[System.EnvironmentVariableTarget]::Machine), \
+        [System.EnvironmentVariableTarget]::Machine \
+    )
     
 # Create powershell profile...
 RUN if (!(Test-Path -Path $PROFILE)) { \
