@@ -9,7 +9,8 @@ ENV ANDROID_NDK_HOME="/root/Android/sdk/ndk/28.2.13676358"
 # Replace archive.ubuntu.com with Finnish mirror
 RUN sed -i 's/archive\.ubuntu/fi\.archive\.ubuntu/g' /etc/apt/sources.list.d/ubuntu.sources && \
     sed -i 's/security\.ubuntu/fi\.archive\.ubuntu/g' /etc/apt/sources.list.d/ubuntu.sources && \
-    curl -fsSL https://apertium.projectjj.com/apt/install-nightly.sh | bash
+    curl -fsSL https://apertium.projectjj.com/apt/install-nightly.sh | bash && \
+    curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/llvm.gpg
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -75,6 +76,7 @@ RUN apt-get update && \
     socat \
     tree \
     unzip && \
+    clang-20 clang-tools-20 clang-20-doc libclang-common-20-dev libclang-20-dev libclang1-20 clang-format-20 python3-clang-20 clangd-20 clang-tidy-20 \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
 # Install uv
