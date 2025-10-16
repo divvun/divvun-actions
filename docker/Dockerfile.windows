@@ -142,8 +142,14 @@ RUN Invoke-WebRequest -Uri "https://github.com/cli/cli/releases/download/v2.78.0
 
 # Install uv
 RUN irm https://astral.sh/uv/install.ps1 | iex ; \
-    setx /M PATH $($Env:PATH + ';C:\Users\ContainerUser\.local\bin')
+    setx /M PATH $($Env:PATH + ';C:\Users\ContainerAdministrator\.local\bin')
 
+# Install OpenSSH client (up to date, handles kex issues)
+RUN Invoke-WebRequest -Uri "https://github.com/PowerShell/Win32-OpenSSH/releases/download/v9.8.3.0p2-Preview/OpenSSH-Win64-v9.8.3.0.msi" -OutFile openssh.msi ; \
+    Start-Process -Wait msiexec -ArgumentList '/i', 'openssh.msi', 'ADDLOCAL=Client', '/quiet', '/norestart' ; \
+    Remove-Item -Force openssh.msi ; \
+    setx /M PATH $($Env:ProgramFiles + '\OpenSSH' + ';' + $Env:PATH)
+    
 # Create cache folder
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="C:\\buildkite-cache"
 RUN New-Item -ItemType Directory -Path $env:BUILDKITE_PLUGIN_FS_CACHE_FOLDER -Force
@@ -152,17 +158,6 @@ RUN New-Item -ItemType Directory -Path $env:BUILDKITE_PLUGIN_FS_CACHE_FOLDER -Fo
 RUN $cleanPath = ($Env:PATH -split ';' | Select-Object -Unique) -join ';' ; \
     setx /M PATH $cleanPath
 
-# Install OpenSSH client (up to date, handles kex issues)
-RUN Invoke-WebRequest -Uri "https://github.com/PowerShell/Win32-OpenSSH/releases/download/v9.8.3.0p2-Preview/OpenSSH-Win64-v9.8.3.0.msi" -OutFile openssh.msi ; \
-    Start-Process -Wait msiexec -ArgumentList '/i', 'openssh.msi', 'ADDLOCAL=Client', '/quiet', '/norestart' ; \
-    Remove-Item -Force openssh.msi ; \
-    [Environment]::SetEnvironmentVariable("Path", \
-        ${Env:ProgramFiles} + '\OpenSSH' + \
-        ';' + \
-        [Environment]::GetEnvironmentVariable("Path",[System.EnvironmentVariableTarget]::Machine), \
-        [System.EnvironmentVariableTarget]::Machine \
-    )
-    
 # Create powershell profile...
 RUN if (!(Test-Path -Path $PROFILE)) { \
         New-Item -ItemType File -Path $PROFILE -Force ; \
