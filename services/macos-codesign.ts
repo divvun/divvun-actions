@@ -60,12 +60,24 @@ export default async function sign(
 }
 
 async function notarize(inputFile: string, keyJson: string) {
-  await builder.exec("rcodesign", [
+  const fileInfo = await Deno.stat(inputFile)
+  const shouldStaple = fileInfo.isDirectory
+
+  const args = [
     "notary-submit",
     "--api-key-file",
     keyJson,
     "--wait",
-    "--staple",
-    inputFile,
-  ])
+  ]
+
+  if (shouldStaple) {
+    console.log("Stapling notarization ticket (app bundle or package)")
+    args.push("--staple")
+  } else {
+    console.log("Skipping staple (plain binary - system will check online)")
+  }
+
+  args.push(inputFile)
+
+  await builder.exec("rcodesign", args)
 }

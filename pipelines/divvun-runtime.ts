@@ -87,19 +87,51 @@ export async function pipelineDivvunRuntime() {
       target.includes("windows") ? ".exe" : ""
     }`
     const targetFile = `target/${target}/release/${artifactName}`
-    // const uiTargetFile =
-    const step = command({
-      label: `${target}`,
-      command: [
-        `just build ${target}`,
-        `mv ${targetFile} ./${artifactName}-${target} && buildkite-agent artifact upload ${artifactName}-${target}`,
-      ],
-      agents: {
-        queue: os(target),
-      },
-    })
 
-    buildSteps.push(step)
+    if (target.includes("apple")) {
+      // macOS targets: Split into build and sign steps
+      buildSteps.push(command({
+        label: `${target} - Build`,
+        key: `cli-build-${target}`,
+        command: [
+          `just build ${target}`,
+          `mv ${targetFile} ./divvun-runtime-unsigned-${target}`,
+          `buildkite-agent artifact upload divvun-runtime-unsigned-${target}`,
+        ],
+        agents: {
+          queue: "macos",
+        },
+      }))
+
+      buildSteps.push(command({
+        label: `${target} - Sign`,
+        command: [
+          "echo '--- Downloading unsigned binary'",
+          `buildkite-agent artifact download divvun-runtime-unsigned-${target} .`,
+          "echo '--- Signing'",
+          `divvun-actions run macos-sign ./divvun-runtime-unsigned-${target}`,
+          "echo '--- Uploading signed binary'",
+          `mv ./divvun-runtime-unsigned-${target} ./divvun-runtime-${target}`,
+          `buildkite-agent artifact upload divvun-runtime-${target}`,
+        ],
+        agents: {
+          queue: "linux",
+        },
+        depends_on: `cli-build-${target}`,
+      }))
+    } else {
+      // Non-macOS targets: Build and upload directly
+      buildSteps.push(command({
+        label: `${target}`,
+        command: [
+          `just build ${target}`,
+          `mv ${targetFile} ./${artifactName}-${target} && buildkite-agent artifact upload ${artifactName}-${target}`,
+        ],
+        agents: {
+          queue: os(target),
+        },
+      }))
+    }
   }
 
   const uiBuildSteps: CommandStep[] = []
@@ -188,23 +220,25 @@ export async function runDivvunRuntimePublish() {
     ),
   )
 
-  await builder.downloadArtifacts("divvun-rt-playground-*", tempDir.path)
+  // Download signed playground artifacts for non-Linux targets
+  const playgroundTargets = cfg.targets.filter((t) => os(t) !== "linux")
+  await Promise.all(
+    playgroundTargets.map((target) =>
+      builder.downloadArtifacts(`divvun-rt-playground-${target}`, tempDir.path)
+    ),
+  )
+
   using archivePath = await makeTempDir({ prefix: "divvun-runtime-" })
 
-  const glob = await fs.expandGlob("divvun-rt-playground-*", {
-    root: tempDir.path,
-  })
-  for await (const file of glob) {
-    if (file.isFile) {
-      await fs.move(
-        file.path,
-        path.join(
-          archivePath.path,
-          `${file.name}_${builder.env.tag!}.zip`,
-        ),
-        { overwrite: true },
-      )
-    }
+  // Move playground artifacts to archive path with tag
+  for (const target of playgroundTargets) {
+    const artifactName = `divvun-rt-playground-${target}`
+    const sourcePath = path.join(tempDir.path, artifactName)
+    const destPath = path.join(
+      archivePath.path,
+      `${artifactName}_${builder.env.tag!}.tar.gz`,
+    )
+    await fs.move(sourcePath, destPath, { overwrite: true })
   }
 
   for (const target of cfg.targets) {
