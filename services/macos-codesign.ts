@@ -61,23 +61,39 @@ export default async function sign(
 
 async function notarize(inputFile: string, keyJson: string) {
   const fileInfo = await Deno.stat(inputFile)
-  const shouldStaple = fileInfo.isDirectory
+  const isDirectory = fileInfo.isDirectory
 
-  const args = [
-    "notary-submit",
-    "--api-key-file",
-    keyJson,
-    "--wait",
-  ]
-
-  if (shouldStaple) {
+  if (isDirectory) {
+    // .app bundle: notarize directly with stapling
     console.log("Stapling notarization ticket (app bundle or package)")
-    args.push("--staple")
+    await builder.exec("rcodesign", [
+      "notary-submit",
+      "--api-key-file",
+      keyJson,
+      "--wait",
+      "--staple",
+      inputFile,
+    ])
   } else {
-    console.log("Skipping staple (plain binary - system will check online)")
+    // Plain binary: zip it, notarize the zip, then delete the zip
+    console.log(
+      "Plain binary detected - zipping for notarization (system will check online)",
+    )
+    using tempDir = await makeTempDir({ prefix: "notarize-" })
+    const zipPath = path.join(tempDir.path, "binary.zip")
+
+    // Create zip containing the binary
+    await builder.exec("zip", ["-j", zipPath, inputFile])
+
+    // Notarize the zip (no stapling for zips)
+    await builder.exec("rcodesign", [
+      "notary-submit",
+      "--api-key-file",
+      keyJson,
+      "--wait",
+      zipPath,
+    ])
+
+    // Temp dir and zip are automatically cleaned up when using block exits
   }
-
-  args.push(inputFile)
-
-  await builder.exec("rcodesign", args)
 }
