@@ -33,7 +33,8 @@ export default async function grammarBundle({
   zcheckPaths,
 }: Props): Promise<Output> {
   const { name, version } = manifest
-  const langTag = builder.env.repoName.split("lang-")[1]?.split("-")[0] || "unknown"
+  const langTag = builder.env.repoName.split("lang-")[1]?.split("-")[0] ||
+    "unknown"
 
   logger.debug(
     `Grammar bundle for ${name} with version ${version} and langTag ${langTag}`,

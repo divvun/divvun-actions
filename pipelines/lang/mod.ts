@@ -71,7 +71,9 @@ export async function runLang() {
   const shouldCheck = !isReleaseTag && isConfigActive(checkConfig)
 
   if (!shouldBuild && !shouldCheck) {
-    throw new Error("No build or check configuration found in .build-config.yml")
+    throw new Error(
+      "No build or check configuration found in .build-config.yml",
+    )
   }
 
   if (shouldCheck && !shouldBuild) {
@@ -315,7 +317,8 @@ export async function runLangGrammarDeploy() {
   }
 
   const prerelease = isPrerelease(tagVersion)
-  const langTag = builder.env.repoName.split("lang-")[1]?.split("-")[0] || "unknown"
+  const langTag = builder.env.repoName.split("lang-")[1]?.split("-")[0] ||
+    "unknown"
 
   const drbFile = drbFiles[0]
   const zcheckFile = zcheckFiles[0]

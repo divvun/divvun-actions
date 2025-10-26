@@ -4,11 +4,11 @@ import { makeTempDir } from "../util/temp.ts"
 
 export default async function sign(
   inputFile: string,
-  version: string,
+  version?: string,
   entitlementsPath?: string,
 ) {
   using tempDir = await makeTempDir({ prefix: "rcodesign-" })
-  
+
   const pemFile = path.join(tempDir.path, "devid.pem")
   const keyJson = path.join(tempDir.path, "key.json")
 
@@ -16,12 +16,14 @@ export default async function sign(
   await Deno.writeTextFile(pemFile, secrets.get("macos/appPem"))
   await Deno.writeTextFile(keyJson, secrets.get("macos/rcodesignKeyJson"))
 
-  // Update the version to the one provided by the build system
-  await builder.exec("/usr/libexec/PlistBuddy", [
-    "-c",
-    `Set :CFBundleShortVersionString ${version}`,
-    path.join(inputFile, "Contents/Info.plist"),
-  ])
+  // Update the version to the one provided by the build system (if provided)
+  if (version) {
+    await builder.exec("/usr/libexec/PlistBuddy", [
+      "-c",
+      `Set :CFBundleShortVersionString ${version}`,
+      path.join(inputFile, "Contents/Info.plist"),
+    ])
+  }
 
   const codeSignArgs = []
 
@@ -43,19 +45,18 @@ export default async function sign(
 
   await notarize(inputFile, keyJson)
 
-  const assessResult = await builder.output("spctl", [
-    "--assess",
-    "-vv",
+  const assessResult = await builder.output("rcodesign", [
+    "print-signature-info",
     inputFile,
   ])
 
   if (assessResult.status.code !== 0) {
     throw new Error(
-      `spctl failed: ${assessResult.stderr}\nexit code: ${assessResult.status.code}`,
+      `rcodesign print-signature-info failed: ${assessResult.stderr}\nexit code: ${assessResult.status.code}`,
     )
   }
 
-  console.log("spctl:", assessResult.stdout)
+  console.log("rcodesign print-signature-info:", assessResult.stdout)
 }
 
 async function notarize(inputFile: string, keyJson: string) {

@@ -109,19 +109,39 @@ export async function pipelineDivvunRuntime() {
       continue
     }
 
+    // Step 1: Build on macOS and upload unsigned app
     uiBuildSteps.push(command({
-      label: "Playground (macOS)",
+      label: "Playground (macOS) - Build",
+      key: "playground-build",
       command: [
         "echo '--- Building UI'",
         "just build-ui",
         "cp -r './playground/src-tauri/target/release/bundle/macos/Divvun Runtime Playground.app' .",
-        "echo '--- Signing'",
-        `divvun-actions run macos-sign './Divvun Runtime Playground.app' ${version} ./playground/src-tauri/Entitlements.plist`,
-        `ditto -c -k --keepParent './Divvun Runtime Playground.app' out.zip`,
-        `mv out.zip divvun-rt-playground-${target}`,
-        `buildkite-agent artifact upload divvun-rt-playground-${target}`,
+        "echo '--- Updating version'",
+        `/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${version}" './Divvun Runtime Playground.app/Contents/Info.plist'`,
+        "echo '--- Zipping unsigned app'",
+        "ditto -c -k --keepParent './Divvun Runtime Playground.app' divvun-rt-playground-unsigned.zip",
+        "buildkite-agent artifact upload divvun-rt-playground-unsigned.zip",
       ],
       agents: { queue: "macos" },
+    }))
+
+    // Step 2: Sign on Linux and create final artifact
+    uiBuildSteps.push(command({
+      label: "Playground (macOS) - Sign",
+      command: [
+        "echo '--- Downloading unsigned app'",
+        "buildkite-agent artifact download divvun-rt-playground-unsigned.zip .",
+        "echo '--- Unzipping'",
+        "unzip -q divvun-rt-playground-unsigned.zip",
+        "echo '--- Signing'",
+        `divvun-actions run macos-sign './Divvun Runtime Playground.app' '' ./playground/src-tauri/Entitlements.plist`,
+        "echo '--- Creating final archive'",
+        `tar -czf divvun-rt-playground-${target} './Divvun Runtime Playground.app'`,
+        `buildkite-agent artifact upload divvun-rt-playground-${target}`,
+      ],
+      agents: { queue: "linux" },
+      depends_on: "playground-build",
     }))
   }
 

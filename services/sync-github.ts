@@ -108,6 +108,11 @@ type BuildkitePipeline = {
   visibility: string
   configuration: string
   branch_configuration: string | null
+  provider: {
+    settings: {
+      build_tags?: boolean
+    }
+  }
 }
 
 type GithubWebhook = {
@@ -162,6 +167,7 @@ async function listBuildkitePipelines(
     visibility: pipeline.visibility,
     configuration: pipeline.configuration,
     branch_configuration: pipeline.branch_configuration,
+    provider: pipeline.provider,
   }))
 }
 
@@ -314,9 +320,15 @@ async function createBuildkitePipeline(
 async function updateBuildkitePipeline(
   props: SyncGithubProps["buildkite"],
   pipeline: BuildkitePipeline,
-  updates: Partial<
-    Pick<BuildkitePipeline, "branch_configuration" | "configuration">
-  >,
+  updates:
+    & Partial<
+      Pick<BuildkitePipeline, "branch_configuration" | "configuration">
+    >
+    & {
+      provider_settings?: {
+        build_tags?: boolean
+      }
+    },
 ) {
   const response = await fetch(
     `https://api.buildkite.com/v2/organizations/${props.orgName}/pipelines/${pipeline.slug}`,
@@ -412,6 +424,14 @@ function assessStatus(
       code: "branch-configuration-missing",
       message:
         "Pipeline branch configuration is missing or does not exclude gh-pages branch.",
+    })
+  }
+
+  // Check if build_tags is enabled
+  if (pipeline.provider?.settings?.build_tags !== true) {
+    discrepancies.push({
+      code: "tags-not-enabled",
+      message: "Pipeline does not have build_tags enabled.",
     })
   }
 
@@ -599,6 +619,8 @@ function getDiscrepancyIcon(code: string): string {
       return "🔗"
     case "branch-configuration-missing":
       return "🌿"
+    case "tags-not-enabled":
+      return "🏷️"
     default:
       return "❓"
   }
@@ -701,6 +723,28 @@ export default async function syncGithub(props: SyncGithubProps) {
     } catch (error) {
       console.error(
         `❌ Failed to update branch configuration for ${result.repoName}: ${error}`,
+      )
+    }
+  }
+
+  const tagsNotEnabled = results.filter((r) =>
+    r.discrepancies.some((d) => d.code === "tags-not-enabled") && r.pipeline
+  )
+
+  for (const result of tagsNotEnabled) {
+    if (!result.pipeline) continue
+
+    console.log(`🏷️  Enabling build_tags for ${result.repoName}...`)
+    try {
+      await updateBuildkitePipeline(
+        buildkiteProps,
+        result.pipeline,
+        { provider_settings: { build_tags: true } },
+      )
+      console.log(`✅ Enabled build_tags for ${result.repoName}`)
+    } catch (error) {
+      console.error(
+        `❌ Failed to enable build_tags for ${result.repoName}: ${error}`,
       )
     }
   }

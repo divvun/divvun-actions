@@ -77,7 +77,16 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
 }
 
 function buildBin(arch: string): { cmd: string; args: string[] } {
-  const args = ["build", "-p", "divvunspell-cli", "--bin", "divvunspell", "--release", "--target", arch]
+  const args = [
+    "build",
+    "-p",
+    "divvunspell-cli",
+    "--bin",
+    "divvunspell",
+    "--release",
+    "--target",
+    arch,
+  ]
   const cmd = arch === "aarch64-unknown-linux-gnu" ? "cross" : "cargo"
   return { cmd, args }
 }
