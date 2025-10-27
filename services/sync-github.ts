@@ -174,6 +174,25 @@ async function listBuildkitePipelines(
 const V_REGEX = /^# v: (.*)$/
 const CUR_VERSION = 1
 
+function extractMaturityTag(topics: string[]): string | null {
+  const maturityTopic = topics.find((topic) => topic.startsWith("maturity-"))
+  if (!maturityTopic) {
+    return null
+  }
+
+  const maturityLevel = maturityTopic.split("-")[1]
+  return `:package: ${maturityLevel}`
+}
+
+function extractMaturityValue(tags: string[]): string | null {
+  const packageTag = tags.find((tag) => tag.startsWith(":package: "))
+  if (!packageTag) {
+    return null
+  }
+
+  return packageTag.split(" ")[1]
+}
+
 const PIPELINE_STEPS: string = `
 # Managed by Divvun Actions -- DO NOT EDIT
 # version: ${CUR_VERSION}
@@ -322,7 +341,7 @@ async function updateBuildkitePipeline(
   pipeline: BuildkitePipeline,
   updates:
     & Partial<
-      Pick<BuildkitePipeline, "branch_configuration" | "configuration">
+      Pick<BuildkitePipeline, "branch_configuration" | "configuration" | "tags">
     >
     & {
       provider_settings?: {
@@ -435,6 +454,29 @@ function assessStatus(
     })
   }
 
+  // Check maturity tag sync
+  const expectedMaturityTag = extractMaturityTag(repo.topics)
+  if (expectedMaturityTag) {
+    const pipelinePackageTags = pipeline.tags.filter((tag) =>
+      tag.startsWith(":package: ")
+    )
+    const hasCorrectMaturityTag = pipelinePackageTags.includes(
+      expectedMaturityTag,
+    )
+
+    if (!hasCorrectMaturityTag) {
+      discrepancies.push({
+        code: "maturity-tags-mismatch",
+        message:
+          `Pipeline maturity tag mismatch. Expected "${expectedMaturityTag}", found: ${
+            pipelinePackageTags.length > 0
+              ? pipelinePackageTags.join(", ")
+              : "none"
+          }`,
+      })
+    }
+  }
+
   return {
     repoName: repo.name,
     pipelineName: pipeline.name,
@@ -490,6 +532,7 @@ if (import.meta.main) {
   const { parseArgs } = await import("@std/cli/parse-args")
   const args = parseArgs(Deno.args, {
     string: ["bk-key", "bk-org", "gh-key", "gh-orgs"],
+    boolean: ["status"],
   })
 
   console.log("Parsed arguments:", args)
@@ -537,7 +580,7 @@ if (import.meta.main) {
     }
     case "sync": {
       requiredArgs(["bk-key", "bk-org", "gh-key", "gh-orgs"], args)
-      await syncGithub(props)
+      await syncGithub(props, args.status)
       break
     }
     default:
@@ -621,12 +664,17 @@ function getDiscrepancyIcon(code: string): string {
       return "🌿"
     case "tags-not-enabled":
       return "🏷️"
+    case "maturity-tags-mismatch":
+      return "📦"
     default:
       return "❓"
   }
 }
 
-export default async function syncGithub(props: SyncGithubProps) {
+export default async function syncGithub(
+  props: SyncGithubProps,
+  writeStatus = false,
+) {
   const githubProps = props.github as Required<SyncGithubProps["github"]>
   const buildkiteProps = props.buildkite as Required<
     SyncGithubProps["buildkite"]
@@ -746,6 +794,68 @@ export default async function syncGithub(props: SyncGithubProps) {
       console.error(
         `❌ Failed to enable build_tags for ${result.repoName}: ${error}`,
       )
+    }
+  }
+
+  const maturityTagsMismatch = results.filter((r) =>
+    r.discrepancies.some((d) => d.code === "maturity-tags-mismatch") &&
+    r.pipeline &&
+    r.repo
+  )
+
+  for (const result of maturityTagsMismatch) {
+    if (!result.pipeline || !result.repo) continue
+
+    const expectedMaturityTag = extractMaturityTag(result.repo.topics)
+    if (!expectedMaturityTag) continue
+
+    console.log(`📦 Updating maturity tag for ${result.repoName}...`)
+    try {
+      // Remove old :package: tags and add the new one
+      const otherTags = result.pipeline.tags.filter((tag) =>
+        !tag.startsWith(":package: ")
+      )
+      const newTags = [...otherTags, expectedMaturityTag]
+
+      await updateBuildkitePipeline(
+        buildkiteProps,
+        result.pipeline,
+        { tags: newTags },
+      )
+      console.log(
+        `✅ Updated maturity tag for ${result.repoName}: ${expectedMaturityTag}`,
+      )
+    } catch (error) {
+      console.error(
+        `❌ Failed to update maturity tag for ${result.repoName}: ${error}`,
+      )
+    }
+  }
+
+  // Write status.json if requested
+  if (writeStatus) {
+    console.log(`📝 Writing status.json...`)
+    const statusData: Record<string, { maturity: string }> = {}
+
+    for (const result of results) {
+      if (!result.pipeline) continue
+
+      const maturityValue = extractMaturityValue(result.pipeline.tags)
+      if (maturityValue) {
+        statusData[result.pipeline.slug] = { maturity: maturityValue }
+      }
+    }
+
+    try {
+      await Deno.writeTextFile(
+        "status.json",
+        JSON.stringify(statusData, null, 2),
+      )
+      console.log(
+        `✅ Wrote status for ${Object.keys(statusData).length} pipelines to status.json`,
+      )
+    } catch (error) {
+      console.error(`❌ Failed to write status.json: ${error}`)
     }
   }
 }
