@@ -92,7 +92,7 @@ export async function runPdfStringsPublish() {
 
   const args = ["publish", "*.whl"]
   if (dryRun) {
-    args.push("--repository", "testpypi", "--dry-run")
+    args.push("--publish-url", "https://test.pypi.org/legacy/", "--dry-run")
   }
   await builder.exec("uv", args, {
     env: {
