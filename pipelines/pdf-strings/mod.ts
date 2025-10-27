@@ -1,6 +1,6 @@
+import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
-import * as builder from "~/builder.ts"
 
 function command(input: CommandStep): CommandStep {
   return {
@@ -31,8 +31,8 @@ export function pipelinePdfStrings(): BuildkitePipeline {
         command: [
           "cd python",
           "uv build --wheel",
-          "cp dist/*.whl ../",
-          "buildkite-agent artifact upload ../*.whl",
+          "cp dist/*.whl .",
+          "buildkite-agent artifact upload *.whl",
         ],
       }),
       command({
@@ -44,8 +44,8 @@ export function pipelinePdfStrings(): BuildkitePipeline {
         command: [
           "cd python",
           "uv build --wheel",
-          "cp dist/*.whl ../",
-          "buildkite-agent artifact upload ../*.whl",
+          "cp dist/*.whl .",
+          "buildkite-agent artifact upload *.whl",
         ],
       }),
       command({
@@ -57,8 +57,8 @@ export function pipelinePdfStrings(): BuildkitePipeline {
         command: [
           "cd python",
           "uv build --wheel",
-          "copy dist\\*.whl ..\\",
-          "buildkite-agent artifact upload ..\\*.whl",
+          "copy dist\\*.whl .",
+          "buildkite-agent artifact upload *.whl",
         ],
       }),
     ],
