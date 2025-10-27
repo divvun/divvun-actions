@@ -109,6 +109,7 @@ export async function runPdfStringsPublish() {
   await builder.exec("uv", ["publish", "*.whl"], {
     env: {
       UV_PUBLISH_TOKEN: secrets.get("pypiToken"),
+      UV_PUBLISH_USERNAME: "__token__",
     },
   })
 }
