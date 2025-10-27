@@ -90,8 +90,6 @@ export async function runPdfStringsPublish() {
 
   await builder.downloadArtifacts("*.whl", ".")
 
-  await builder.exec("ls", ["-lah", "*.whl"])
-
   const args = ["publish", "*.whl"]
   if (dryRun) {
     args.push("--repository", "testpypi", "--dry-run")
