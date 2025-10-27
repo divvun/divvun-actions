@@ -65,19 +65,17 @@ export function pipelinePdfStrings(): BuildkitePipeline {
   })
 
   // If tagged with v*, run real publish to PyPI
-  if (builder.env.tag && builder.env.tag.match(/^v/)) {
-    pipeline.steps.push(
-      command({
-        label: ":package: Publish Wheels to PyPI",
-        key: "publish-pypi",
-        depends_on: "build-wheels",
-        agents: {
-          queue: "linux",
-        },
-        command: "divvun-actions run pdf-strings-publish",
-      }),
-    )
-  }
+  pipeline.steps.push(
+    command({
+      label: ":package: Publish Wheels to PyPI",
+      key: "publish-pypi",
+      depends_on: "build-wheels",
+      agents: {
+        queue: "linux",
+      },
+      command: "divvun-actions run pdf-strings-publish",
+    }),
+  )
 
   return pipeline
 }
