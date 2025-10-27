@@ -69,6 +69,11 @@ RUN Invoke-WebRequest -UseBasicParsing 'https://github.com/Kitware/CMake/release
 RUN New-Item -ItemType Directory -Path C:\bin ; \
     setx /M PATH $('C:\bin;' + $Env:PATH)
 
+# Install Ninja
+RUN Invoke-WebRequest -Uri 'https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-win.zip' -OutFile ninja.zip ; \
+    Expand-Archive ninja.zip -DestinationPath C:\bin ; \
+    Remove-Item -Force ninja.zip
+
 # Install OpenBao
 RUN Invoke-WebRequest -Uri https://github.com/openbao/openbao/releases/download/v2.2.1/bao_2.2.1_Windows_x86_64.zip -OutFile bao.zip ; \
     Expand-Archive bao.zip -DestinationPath C:\bin ; \
