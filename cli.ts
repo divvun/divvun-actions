@@ -37,6 +37,10 @@ import pipelineLibpahkat, {
   runLibpahkatIos,
   runLibpahkatPublish,
 } from "./pipelines/pahkat/libpahkat.ts"
+import {
+  pipelinePdfStrings,
+  runPdfStringsPublish,
+} from "./pipelines/pdf-strings/mod.ts"
 import macosSign from "./services/macos-codesign.ts"
 import sign from "./services/windows-codesign.ts"
 import { makeTempFile } from "./util/temp.ts"
@@ -247,6 +251,10 @@ async function runPipeline(args) {
       await runLibdivvunspellPublish()
       break
     }
+    case "pdf-strings-publish": {
+      await runPdfStringsPublish()
+      break
+    }
     case "debug": {
       console.log("Environment:")
       console.log(JSON.stringify(builder.env, null, 2))
@@ -296,6 +304,10 @@ async function runCi(args) {
       } else {
         throw new Error(`Unknown pipeline slug: ${builder.env.pipelineSlug}`)
       }
+      break
+    }
+    case "pdf-strings": {
+      pipeline = pipelinePdfStrings()
       break
     }
     default: {
