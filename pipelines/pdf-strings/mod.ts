@@ -64,23 +64,6 @@ export function pipelinePdfStrings(): BuildkitePipeline {
     ],
   })
 
-  // Always run dry-run publish to TestPyPI
-  pipeline.steps.push(
-    command({
-      label: ":package: Publish Wheels (Dry Run)",
-      key: "publish-dryrun",
-      depends_on: "build-wheels",
-      agents: {
-        queue: "linux",
-      },
-      command: [
-        "buildkite-agent artifact download '*.whl' .",
-        "ls -lah *.whl",
-        "uv publish --dry-run --publish-url https://test.pypi.org/legacy/ *.whl",
-      ],
-    }),
-  )
-
   // If tagged with v*, run real publish to PyPI
   if (builder.env.tag && builder.env.tag.match(/^v/)) {
     pipeline.steps.push(
@@ -102,14 +85,22 @@ export function pipelinePdfStrings(): BuildkitePipeline {
 export async function runPdfStringsPublish() {
   const secrets = await builder.secrets()
 
+  let dryRun = true
+  if (builder.env.tag && builder.env.tag.match(/^v/)) {
+    dryRun = false
+  }
+
   await builder.downloadArtifacts("*.whl", ".")
 
   await builder.exec("ls", ["-lah", "*.whl"])
 
-  await builder.exec("uv", ["publish", "*.whl"], {
+  const args = ["publish", "*.whl"]
+  if (dryRun) {
+    args.push("--repository", "testpypi", "--dry-run")
+  }
+  await builder.exec("uv", args, {
     env: {
       UV_PUBLISH_TOKEN: secrets.get("pypiToken"),
-      UV_PUBLISH_USERNAME: "__token__",
     },
   })
 }
