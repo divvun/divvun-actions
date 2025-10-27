@@ -109,7 +109,7 @@ export async function pipelineDivvunRuntime() {
           "echo '--- Downloading unsigned binary'",
           `buildkite-agent artifact download divvun-runtime-unsigned-${target} .`,
           "echo '--- Signing'",
-          `divvun-actions run macos-sign ./divvun-runtime-unsigned-${target}`,
+          `divvun-actions run macos-sign ./divvun-runtime-unsigned-${target} '' ./playground/src-tauri/Entitlements.plist`,
           "echo '--- Uploading signed binary'",
           `mv ./divvun-runtime-unsigned-${target} ./divvun-runtime-${target}`,
           `buildkite-agent artifact upload divvun-runtime-${target}`,
