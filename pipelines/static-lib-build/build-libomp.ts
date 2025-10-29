@@ -10,6 +10,13 @@ export interface BuildLibompOptions {
   buildType?: BuildType
   clean?: boolean
   verbose?: boolean
+  version?: string
+}
+
+function convertLibompVersionToTag(version: string): string {
+  // Convert v21.1.4 or 21.1.4 to llvmorg-21.1.4
+  const cleanVersion = version.replace(/^v/, "")
+  return `llvmorg-${cleanVersion}`
 }
 
 function detectPlatform(target: string): Platform {
@@ -29,6 +36,7 @@ export async function buildLibomp(options: BuildLibompOptions) {
     buildType = "Release",
     clean = true,
     verbose = false,
+    version = "21.1.4",
   } = options
 
   console.log("Building LLVM OpenMP Runtime (libomp)")
@@ -41,8 +49,7 @@ export async function buildLibomp(options: BuildLibompOptions) {
     )
   }
 
-  const scriptDir = path.dirname(import.meta.filename!)
-  const repoRoot = path.join(scriptDir, "../..")
+  const repoRoot = Deno.cwd()
   const llvmProjectDir = path.join(repoRoot, "llvm-project")
   const buildRoot = path.join(repoRoot, `target/${target}/build/openmp`)
   const installPrefix = path.join(repoRoot, `target/${target}/libomp`)
@@ -101,13 +108,14 @@ export async function buildLibomp(options: BuildLibompOptions) {
     // Ignore if doesn't exist
   }
 
-  console.log("Cloning LLVM project (tag llvmorg-21.1.4)...")
+  const llvmTag = convertLibompVersionToTag(version)
+  console.log(`Cloning LLVM project (tag ${llvmTag})...`)
   await builder.exec("git", [
     "clone",
     "--depth",
     "1",
     "--branch",
-    "llvmorg-21.1.4",
+    llvmTag,
     "https://github.com/llvm/llvm-project.git",
     llvmProjectDir,
   ])

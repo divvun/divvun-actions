@@ -11,6 +11,7 @@ export interface BuildIcu4cOptions {
   buildType?: BuildType
   clean?: boolean
   verbose?: boolean
+  version?: string
 }
 
 function detectPlatform(target: string): Platform {
@@ -35,19 +36,25 @@ function getIcuPlatform(platform: Platform): string {
   }
 }
 
+function convertIcuVersionToTag(version: string): string {
+  // Convert v77.1 or 77.1 to release-77-1
+  const cleanVersion = version.replace(/^v/, "")
+  return `release-${cleanVersion.replace(/\./g, "-")}`
+}
+
 export async function buildIcu4c(options: BuildIcu4cOptions) {
   const {
     target,
     buildType = "Release",
     clean = true,
     verbose = false,
+    version = "77.1",
   } = options
 
   console.log("Building ICU (International Components for Unicode)")
 
   const platform = detectPlatform(target)
-  const scriptDir = path.dirname(import.meta.filename!)
-  const repoRoot = path.join(scriptDir, "../..")
+  const repoRoot = Deno.cwd()
   const installPrefix = path.join(repoRoot, `target/${target}/icu4c`)
 
   // Windows uses vcpkg for ICU installation
@@ -159,13 +166,14 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     // Ignore if doesn't exist
   }
 
-  console.log("Cloning ICU from GitHub (tag release-77-1)...")
+  const icuTag = convertIcuVersionToTag(version)
+  console.log(`Cloning ICU from GitHub (tag ${icuTag})...`)
   await builder.exec("git", [
     "clone",
     "--depth",
     "1",
     "--branch",
-    "release-77-1",
+    icuTag,
     "https://github.com/unicode-org/icu.git",
     path.join(repoRoot, "icu"),
   ])

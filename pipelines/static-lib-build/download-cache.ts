@@ -1,12 +1,21 @@
 import * as builder from "~/builder.ts"
 
-const PYTORCH_VERSION = "v2.8.0"
-const PYTORCH_URL =
-  `https://github.com/divvun/pytorch-static-build/releases/download/pytorch%2F${PYTORCH_VERSION}/pytorch-${PYTORCH_VERSION}.src.tar.gz`
+const DEFAULT_PYTORCH_VERSION = "v2.8.0"
 const TARBALL = "pytorch.tar.gz"
 
-export async function downloadCache() {
-  console.log(`--- Downloading cached PyTorch ${PYTORCH_VERSION}`)
+function convertPytorchVersionToTag(version: string): string {
+  // Ensure version starts with 'v'
+  return version.startsWith("v") ? version : `v${version}`
+}
+
+export async function downloadCache(version?: string) {
+  const pytorchVersion = convertPytorchVersionToTag(
+    version || DEFAULT_PYTORCH_VERSION,
+  )
+  const pytorchUrl =
+    `https://github.com/divvun/pytorch-static-build/releases/download/pytorch%2F${pytorchVersion}/pytorch-${pytorchVersion}.src.tar.gz`
+
+  console.log(`--- Downloading cached PyTorch ${pytorchVersion}`)
 
   // Clean up any existing pytorch directory
   try {
@@ -16,7 +25,7 @@ export async function downloadCache() {
   }
 
   // Download tarball
-  await builder.exec("curl", ["-sSfL", PYTORCH_URL, "-o", TARBALL])
+  await builder.exec("curl", ["-sSfL", pytorchUrl, "-o", TARBALL])
 
   // Extract (use bsdtar on Windows because msys tar is broken)
   const isWindows = Deno.build.os === "windows"
@@ -29,5 +38,5 @@ export async function downloadCache() {
   // Clean up tarball
   await Deno.remove(TARBALL)
 
-  console.log(`PyTorch ${PYTORCH_VERSION} extracted successfully`)
+  console.log(`PyTorch ${pytorchVersion} extracted successfully`)
 }

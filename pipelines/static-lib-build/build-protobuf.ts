@@ -10,6 +10,12 @@ export interface BuildProtobufOptions {
   buildType?: BuildType
   clean?: boolean
   verbose?: boolean
+  version?: string
+}
+
+function convertProtobufVersionToTag(version: string): string {
+  // Ensure version starts with 'v'
+  return version.startsWith("v") ? version : `v${version}`
 }
 
 function detectPlatform(target: string): Platform {
@@ -29,14 +35,14 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
     buildType = "Release",
     clean = true,
     verbose = false,
+    version = "33.0",
   } = options
 
   console.log("Building Protocol Buffers (libprotobuf)")
 
   const platform = detectPlatform(target)
 
-  const scriptDir = path.dirname(import.meta.filename!)
-  const repoRoot = path.join(scriptDir, "../..")
+  const repoRoot = Deno.cwd()
   const protobufSourceDir = path.join(repoRoot, "protobuf")
   const buildRoot = path.join(repoRoot, `target/${target}/build/protobuf`)
   const installPrefix = path.join(repoRoot, `target/${target}/protobuf`)
@@ -95,13 +101,14 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
     // Ignore if doesn't exist
   }
 
-  console.log("Cloning Protocol Buffers from GitHub (tag v33.0)...")
+  const protobufTag = convertProtobufVersionToTag(version)
+  console.log(`Cloning Protocol Buffers from GitHub (tag ${protobufTag})...`)
   await builder.exec("git", [
     "clone",
     "--depth",
     "1",
     "--branch",
-    "v33.0",
+    protobufTag,
     "https://github.com/protocolbuffers/protobuf.git",
     protobufSourceDir,
   ])

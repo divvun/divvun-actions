@@ -1,8 +1,56 @@
 import * as path from "@std/path"
+import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 
 const PYTORCH_VERSION = "v2.8.0"
+
+type LibraryType = "icu4c" | "libomp" | "protobuf" | "pytorch"
+
+interface ReleaseTag {
+  library: LibraryType
+  version: string
+}
+
+function parseReleaseTag(tag: string): ReleaseTag | null {
+  // Match tags like: icu4c/v77.1, libomp/v21.1.4, protobuf/v33.0, pytorch/v2.8.0
+  const match = tag.match(/^(icu4c|libomp|protobuf|pytorch)\/v?(.+)$/)
+  if (!match) return null
+
+  return {
+    library: match[1] as LibraryType,
+    version: match[2],
+  }
+}
+
+function getLibraryPlatforms(library: LibraryType): string[] {
+  switch (library) {
+    case "icu4c":
+      return [
+        "aarch64-apple-darwin",
+        "aarch64-apple-ios",
+        "aarch64-linux-android",
+        "x86_64-unknown-linux-gnu",
+        "x86_64-pc-windows-msvc",
+      ]
+    case "libomp":
+      return ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"]
+    case "protobuf":
+      return [
+        "aarch64-apple-darwin",
+        "aarch64-apple-ios",
+        "aarch64-linux-android",
+        "x86_64-unknown-linux-gnu",
+      ]
+    case "pytorch":
+      return [
+        "aarch64-apple-darwin",
+        "aarch64-apple-ios",
+        "aarch64-linux-android",
+        "x86_64-unknown-linux-gnu",
+      ]
+  }
+}
 
 function command(input: CommandStep): CommandStep {
   return {
@@ -19,7 +67,81 @@ function scriptPath(scriptName: string): string {
   return path.join(dir, scriptName)
 }
 
+function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
+  const { library, version } = release
+  const platforms = getLibraryPlatforms(library)
+
+  const pipeline: BuildkitePipeline = {
+    steps: [],
+  }
+
+  // Build steps for each platform
+  const buildSteps: CommandStep[] = []
+
+  for (const targetTriple of platforms) {
+    const queue = targetTriple.includes("windows")
+      ? "windows"
+      : targetTriple.includes("linux") || targetTriple.includes("android")
+      ? "linux"
+      : "macos"
+
+    const artifactName = `${library}_${targetTriple}.tar.gz`
+
+    const buildCmd = version
+      ? `divvun-actions run ${library}-build ${targetTriple} ${version}`
+      : `divvun-actions run ${library}-build ${targetTriple}`
+
+    buildSteps.push(
+      command({
+        label: `:package: ${library} ${targetTriple}`,
+        key: `${library}-${targetTriple}`,
+        command: [
+          "set -e",
+          buildCmd,
+          targetTriple.includes("windows")
+            ? `C:\\msys2\\usr\\bin\\bash.exe -c "bsdtar -czf target/${artifactName} -C target/${targetTriple} ${library}"`
+            : `tar -czf target/${artifactName} -C target/${targetTriple} ${library}`,
+        ].join("\n"),
+        agents: {
+          queue,
+        },
+        artifact_paths: [`target/${artifactName}`],
+      }),
+    )
+  }
+
+  pipeline.steps.push({
+    group: `:package: Build ${library} v${version}`,
+    key: `build-${library}`,
+    steps: buildSteps,
+  })
+
+  // Publish step
+  pipeline.steps.push(
+    command({
+      label: `:rocket: Publish ${library} v${version}`,
+      key: `publish-${library}`,
+      depends_on: `build-${library}`,
+      agents: {
+        queue: "linux",
+      },
+      command: `divvun-actions run publish-library ${library} ${version}`,
+    }),
+  )
+
+  return pipeline
+}
+
 export function pipelineStaticLibBuild(): BuildkitePipeline {
+  // Check if this is a release build
+  const releaseTag = builder.env.tag ? parseReleaseTag(builder.env.tag) : null
+
+  if (releaseTag) {
+    // Generate pipeline for specific library release
+    return generateReleasePipeline(releaseTag)
+  }
+
+  // Full pipeline for all libraries
   const pipeline: BuildkitePipeline = {
     env: {
       PYTORCH_VERSION,

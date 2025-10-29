@@ -276,28 +276,49 @@ async function runPipeline(args) {
       const { buildIcu4c } = await import(
         "./pipelines/static-lib-build/build-icu4c.ts"
       )
-      await buildIcu4c({ target: args._[1] as string })
+      await buildIcu4c({
+        target: args._[1] as string,
+        version: args._[2] as string | undefined,
+      })
       break
     }
     case "libomp-build": {
       const { buildLibomp } = await import(
         "./pipelines/static-lib-build/build-libomp.ts"
       )
-      await buildLibomp({ target: args._[1] as string })
+      await buildLibomp({
+        target: args._[1] as string,
+        version: args._[2] as string | undefined,
+      })
       break
     }
     case "protobuf-build": {
       const { buildProtobuf } = await import(
         "./pipelines/static-lib-build/build-protobuf.ts"
       )
-      await buildProtobuf({ target: args._[1] as string })
+      await buildProtobuf({
+        target: args._[1] as string,
+        version: args._[2] as string | undefined,
+      })
       break
     }
     case "download-cache": {
       const { downloadCache } = await import(
         "./pipelines/static-lib-build/download-cache.ts"
       )
-      await downloadCache()
+      await downloadCache(args._[1] as string | undefined)
+      break
+    }
+    case "publish-library": {
+      const { publishLibrary } = await import(
+        "./pipelines/static-lib-build/publish.ts"
+      )
+      const library = args._[1] as string
+      const version = args._[2] as string
+      if (!library || !version) {
+        throw new Error("Usage: publish-library <library> <version>")
+      }
+      await publishLibrary(library, version)
       break
     }
     default: {
