@@ -58,18 +58,18 @@ export function makeTempDirSync(
   return assignDispose(originalMakeTempDirSync(options))
 }
 
-Deno.makeTempDir = (): Promise<string> => {
+Deno.makeTempDir = (): never => {
   throw new Error("Use util/temp.ts to create temporary directories")
 }
 
-Deno.makeTempDirSync = (): string => {
+Deno.makeTempDirSync = (): never => {
   throw new Error("Use util/temp.ts to create temporary directories")
 }
 
-Deno.makeTempFile = (): Promise<string> => {
+Deno.makeTempFile = (): never => {
   throw new Error("Use util/temp.ts to create temporary files")
 }
 
-Deno.makeTempFileSync = (): string => {
+Deno.makeTempFileSync = (): never  => {
   throw new Error("Use util/temp.ts to create temporary files")
 }

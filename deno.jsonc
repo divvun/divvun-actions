@@ -4,6 +4,7 @@
   },
   "compilerOptions": {
     "lib": ["deno.unstable", "deno.ns", "dom"],
+    "types": ["./deno.d.ts"],
     "strict": true,
     "noImplicitAny": true,
     "noFallthroughCasesInSwitch": true,
