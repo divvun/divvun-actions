@@ -374,6 +374,6 @@ export async function runLibdivvunspellPublish() {
 
   logger.info("Creating GitHub release...")
   const gh = new GitHub(builder.env.repo)
-  await gh.createRelease(builder.env.tag, artifacts, false, false)
+  await gh.createRelease(builder.env.tag, artifacts)
   logger.info("GitHub release completed")
 }

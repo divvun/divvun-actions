@@ -54,7 +54,7 @@ export async function publishLibrary(library: string, version: string) {
   const exists = await gh.releaseExists(tag)
   if (!exists) {
     console.log(`Creating GitHub release ${tag}`)
-    await gh.createRelease(tag, [], false, false)
+    await gh.createRelease(tag, [], { verifyTag: false })
   }
 
   console.log(`Uploading ${versionedArtifacts.length} artifacts to ${tag}`)

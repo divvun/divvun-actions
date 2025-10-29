@@ -100,7 +100,7 @@ export async function downloadCache(version?: string) {
     // Create release if it doesn't exist
     if (!releaseExists) {
       console.log(`Creating release ${releaseTag}...`)
-      await gh.createRelease(releaseTag, [], false, false)
+      await gh.createRelease(releaseTag, [], { verifyTag: false })
     }
 
     // Upload tarball to release

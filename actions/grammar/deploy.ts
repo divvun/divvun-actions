@@ -52,7 +52,7 @@ export default async function grammarDeploy({
     logger.info(`Payload: ${payloadPath}`)
 
     const gh = new GitHub(builder.env.repo)
-    await gh.createRelease(builder.env.tag, [payloadPath], false, prerelease)
+    await gh.createRelease(builder.env.tag, [payloadPath], { prerelease })
 
     logger.info("Grammar checker deployed successfully")
   } catch (error: any) {

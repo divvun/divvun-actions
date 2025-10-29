@@ -24,18 +24,34 @@ export class GitHub {
   async createRelease(
     tag: string,
     artifacts: string[],
-    draft = false,
-    prerelease = false,
+    options: {
+      draft?: boolean
+      prerelease?: boolean
+      latest?: boolean
+      verifyTag?: boolean
+    } = {},
   ) {
+    const {
+      draft = false,
+      prerelease = false,
+      latest = false,
+      verifyTag = true,
+    } = options
+
     const args = [
       "release",
       "create",
       tag,
       "--generate-notes",
+      `--latest=${latest}`,
       "--repo",
       this.#repo,
       ...artifacts,
     ]
+
+    if (verifyTag) {
+      args.splice(3, 0, "--verify-tag")
+    }
 
     if (draft) {
       args.push("--draft")

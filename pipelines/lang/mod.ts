@@ -251,8 +251,7 @@ export async function runLangDeploy() {
     await gh.createRelease(
       builder.env.tag,
       [windowsFiles, macosFiles, mobileFiles],
-      false,
-      prerelease,
+      { prerelease },
     )
 
     logger.info("Speller GitHub release created successfully")
@@ -337,8 +336,7 @@ export async function runLangGrammarDeploy() {
   await gh.createRelease(
     builder.env.tag,
     [versionedDrbFile, versionedZcheckFile],
-    false,
-    prerelease,
+    { prerelease },
   )
 
   logger.info("Grammar checker GitHub release created successfully")
