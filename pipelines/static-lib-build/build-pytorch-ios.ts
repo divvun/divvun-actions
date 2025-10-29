@@ -36,39 +36,84 @@ export async function buildPytorchIos(options: BuildPytorchIosOptions) {
   const repoRoot = Deno.cwd()
   const pytorchRoot = path.join(repoRoot, "pytorch")
 
-  // Download protobuf dependency from GitHub releases if not present
+  // Download protobuf dependencies from GitHub releases if not present
   const { target } = options
   const protobufVersion = "v33.0"
-  const protobufArtifact = `protobuf_${protobufVersion}_${target}.tar.gz`
-  const protobufPath = path.join(repoRoot, `target/${target}/protobuf`)
+
+  // Detect host architecture for macOS protoc
+  const hostArch = Deno.build.arch === "aarch64" ? "aarch64" : "x86_64"
+  const hostTarget = `${hostArch}-apple-darwin`
+
+  // Download host protoc (needed to run protoc compiler during build)
+  const hostProtobufArtifact =
+    `protobuf_${protobufVersion}_${hostTarget}.tar.gz`
+  const hostProtobufPath = path.join(repoRoot, `target/${hostTarget}/protobuf`)
 
   try {
-    await Deno.stat(path.join(protobufPath, "bin/protoc"))
-    console.log(`Protobuf already exists at ${protobufPath}`)
+    await Deno.stat(path.join(hostProtobufPath, "bin/protoc"))
+    console.log(`Host protobuf already exists at ${hostProtobufPath}`)
   } catch {
-    console.log(`Downloading protobuf ${protobufVersion} for ${target}...`)
-    const downloadUrl =
-      `https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/${protobufArtifact}`
-    await builder.exec("curl", ["-sSfL", downloadUrl, "-o", protobufArtifact])
+    console.log(
+      `Downloading host protobuf ${protobufVersion} for ${hostTarget}...`,
+    )
+    const hostDownloadUrl =
+      `https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/${hostProtobufArtifact}`
+    await builder.exec("curl", [
+      "-sSfL",
+      hostDownloadUrl,
+      "-o",
+      hostProtobufArtifact,
+    ])
 
-    // Extract protobuf artifact
-    console.log(`Extracting ${protobufArtifact}...`)
+    console.log(`Extracting ${hostProtobufArtifact}...`)
+    await Deno.mkdir(path.join(repoRoot, `target/${hostTarget}`), {
+      recursive: true,
+    })
+    await builder.exec("tar", [
+      "-xzf",
+      hostProtobufArtifact,
+      "-C",
+      path.join(repoRoot, `target/${hostTarget}`),
+    ])
+    await Deno.remove(hostProtobufArtifact)
+    console.log(`Host protobuf extracted to ${hostProtobufPath}`)
+  }
+
+  // Download target protobuf (iOS library to link against)
+  const targetProtobufArtifact = `protobuf_${protobufVersion}_${target}.tar.gz`
+  const targetProtobufPath = path.join(repoRoot, `target/${target}/protobuf`)
+
+  try {
+    await Deno.stat(path.join(targetProtobufPath, "lib/libprotobuf.a"))
+    console.log(`Target protobuf already exists at ${targetProtobufPath}`)
+  } catch {
+    console.log(
+      `Downloading target protobuf ${protobufVersion} for ${target}...`,
+    )
+    const targetDownloadUrl =
+      `https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/${targetProtobufArtifact}`
+    await builder.exec("curl", [
+      "-sSfL",
+      targetDownloadUrl,
+      "-o",
+      targetProtobufArtifact,
+    ])
+
+    console.log(`Extracting ${targetProtobufArtifact}...`)
     await Deno.mkdir(path.join(repoRoot, `target/${target}`), {
       recursive: true,
     })
     await builder.exec("tar", [
       "-xzf",
-      protobufArtifact,
+      targetProtobufArtifact,
       "-C",
       path.join(repoRoot, `target/${target}`),
     ])
-    await Deno.remove(protobufArtifact)
-    console.log(`Protobuf extracted to ${protobufPath}`)
+    await Deno.remove(targetProtobufArtifact)
+    console.log(`Target protobuf extracted to ${targetProtobufPath}`)
   }
 
-  // Detect host architecture
-  const hostArch = Deno.build.arch === "aarch64" ? "arm64" : "x86_64"
-  const brewPrefix = hostArch === "arm64" ? "/opt/homebrew" : "/usr/local"
+  const brewPrefix = hostArch === "aarch64" ? "/opt/homebrew" : "/usr/local"
 
   // Get tool paths
   const ninjaPath = `${brewPrefix}/bin/ninja`
