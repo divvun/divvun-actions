@@ -385,7 +385,9 @@ async function runCi(args) {
     }
   }
 
-  const input = yaml.stringify(pipeline)
+  // Strip undefined values from pipeline object before YAML serialization
+  // JSON.stringify removes undefined properties, then parse reconstructs the clean object
+  const input = yaml.stringify(JSON.parse(JSON.stringify(pipeline)))
   using pipelinePath = await makeTempFile({ suffix: ".yml" })
 
   Deno.writeTextFileSync(pipelinePath.path, input)
