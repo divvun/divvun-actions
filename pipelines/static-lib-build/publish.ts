@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import { GitHub } from "~/util/github.ts"
 
 export async function publishLibrary(library: string, version: string) {
   console.log(`Publishing ${library} ${version}`)
@@ -48,14 +49,16 @@ export async function publishLibrary(library: string, version: string) {
 
   // Create GitHub release
   const tag = `${library}/${version}`
-  console.log(`Creating GitHub release ${tag}`)
+  const gh = new GitHub(builder.env.repo)
 
-  await builder.exec("gh", [
-    "release",
-    "create",
-    tag,
-    ...versionedArtifacts,
-  ])
+  const exists = await gh.releaseExists(tag)
+  if (!exists) {
+    console.log(`Creating GitHub release ${tag}`)
+    await gh.createRelease(tag, [], false, false)
+  }
+
+  console.log(`Uploading ${versionedArtifacts.length} artifacts to ${tag}`)
+  await gh.uploadRelease(tag, versionedArtifacts)
 
   console.log(`Successfully published ${library} ${version}`)
 }

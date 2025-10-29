@@ -59,6 +59,42 @@ export class GitHub {
     }
   }
 
+  async uploadRelease(tag: string, artifacts: string[]) {
+    const args = [
+      "release",
+      "upload",
+      tag,
+      "--repo",
+      this.#repo,
+      ...artifacts,
+    ]
+
+    logger.info(
+      `Uploading to release: gh ${args.map((a) => `"${a}"`).join(" ")}`,
+    )
+    const proc = new Deno.Command("gh", {
+      args,
+    }).spawn()
+
+    const { code } = await proc.output()
+    if (code !== 0) {
+      throw new Error(`Failed to upload to release: exit code ${code}`)
+    }
+  }
+
+  async releaseExists(tag: string): Promise<boolean> {
+    const args = ["release", "view", tag, "--repo", this.#repo]
+
+    const proc = new Deno.Command("gh", {
+      args,
+      stdout: "null",
+      stderr: "null",
+    }).spawn()
+
+    const { code } = await proc.output()
+    return code === 0
+  }
+
   async getLatestRelease(
     pattern: string | RegExp,
     includePrerelease = false,

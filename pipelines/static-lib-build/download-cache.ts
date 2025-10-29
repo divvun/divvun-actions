@@ -1,4 +1,5 @@
 import * as builder from "~/builder.ts"
+import { GitHub } from "~/util/github.ts"
 
 const DEFAULT_PYTORCH_VERSION = "v2.8.0"
 const PYTORCH_REPO = "https://github.com/pytorch/pytorch.git"
@@ -93,33 +94,18 @@ export async function downloadCache(version?: string) {
 
     // Check if release exists
     const releaseTag = `pytorch/${pytorchVersion}`
-    let releaseExists = false
-    try {
-      await builder.exec("gh", ["release", "view", releaseTag])
-      releaseExists = true
-    } catch {
-      // Release doesn't exist
-    }
+    const gh = new GitHub(builder.env.repo)
+    const releaseExists = await gh.releaseExists(releaseTag)
 
     // Create release if it doesn't exist
     if (!releaseExists) {
       console.log(`Creating release ${releaseTag}...`)
-      await builder.exec("gh", [
-        "release",
-        "create",
-        releaseTag,
-      ])
+      await gh.createRelease(releaseTag, [], false, false)
     }
 
     // Upload tarball to release
     console.log(`Uploading ${tarballName} to release ${releaseTag}...`)
-    await builder.exec("gh", [
-      "release",
-      "upload",
-      releaseTag,
-      tarballName,
-      "--clobber",
-    ])
+    await gh.uploadRelease(releaseTag, [tarballName])
 
     // Clean up tarball
     await Deno.remove(tarballName)
