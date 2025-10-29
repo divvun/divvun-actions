@@ -79,8 +79,8 @@ export async function buildPytorchMacos(options: BuildPytorchMacosOptions) {
   try {
     let content = await Deno.readTextFile(cmakeListsPath)
     content = content.replace(
-      /CMAKE_OSX_ARCHITECTURES MATCHES.*x86_64.*arm64\)/g,
-      "CMAKE_OSX_ARCHITECTURES MATCHES.*x86_64.*arm64 AND NOT DEFINED CAFFE2_CUSTOM_PROTOC_EXECUTABLE)",
+      /(CMAKE_OSX_ARCHITECTURES MATCHES[^)]*x86_64[^)]*arm64[^)]*)\)/gm,
+      "$1 AND NOT DEFINED CAFFE2_CUSTOM_PROTOC_EXECUTABLE)",
     )
     await Deno.writeTextFile(cmakeListsPath, content)
   } catch (error) {
