@@ -40,12 +40,12 @@ export async function publishLibrary(library: string, version: string) {
 
     try {
       // Extract original artifact
-      await builder.exec("tar", ["-xzf", artifact, "-C", tempDir])
+      await builder.exec("tar", ["-xzf", artifact, "-C", tempDir.path])
 
       // The extracted directory will be: tempDir/target/library/
       // We want to repackage it as just library/ in the root
 
-      const extractedPath = path.join(tempDir, target, library)
+      const extractedPath = path.join(tempDir.path, target, library)
 
       // Check if extraction was successful
       try {
@@ -55,7 +55,7 @@ export async function publishLibrary(library: string, version: string) {
           `Warning: Expected path ${extractedPath} not found, trying alternative structure`,
         )
         // Maybe it's already in the correct structure?
-        const altPath = path.join(tempDir, library)
+        const altPath = path.join(tempDir.path, library)
         try {
           await Deno.stat(altPath)
           console.log(`Found library at ${altPath}`)
@@ -73,7 +73,7 @@ export async function publishLibrary(library: string, version: string) {
         "-czf",
         versionedArtifact,
         "-C",
-        path.join(tempDir, target),
+        path.join(tempDir.path, target),
         library,
       ])
 
@@ -81,7 +81,7 @@ export async function publishLibrary(library: string, version: string) {
       console.log(`Created ${versionedArtifact}`)
     } finally {
       // Clean up temp directory
-      await Deno.remove(tempDir, { recursive: true })
+      await Deno.remove(tempDir.path, { recursive: true })
     }
   }
 
