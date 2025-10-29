@@ -105,6 +105,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       commands.push(
         'buildkite-agent artifact download "pytorch.tar.gz" .',
         "tar -xzf pytorch.tar.gz",
+        "divvun-actions run download-library protobuf v33.0",
       )
     }
     commands.push(
