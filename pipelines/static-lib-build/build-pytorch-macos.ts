@@ -1,6 +1,5 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
-import { GitHub } from "~/util/github.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 
@@ -41,12 +40,9 @@ export async function buildPytorchMacos(options: BuildPytorchMacosOptions) {
     console.log(`Protobuf already exists at ${protobufPath}`)
   } catch {
     console.log(`Downloading protobuf ${protobufVersion} for ${target}...`)
-    const gh = new GitHub(builder.env.repo)
-    await gh.downloadReleaseAssets(
-      `protobuf/${protobufVersion}`,
-      protobufArtifact,
-      ".",
-    )
+    const downloadUrl =
+      `https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/${protobufArtifact}`
+    await builder.exec("curl", ["-sSfL", downloadUrl, "-o", protobufArtifact])
 
     // Extract protobuf artifact
     console.log(`Extracting ${protobufArtifact}...`)

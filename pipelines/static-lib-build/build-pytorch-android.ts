@@ -1,6 +1,5 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
-import { GitHub } from "~/util/github.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 type AndroidABI = "arm64-v8a" | "armeabi-v7a" | "x86_64" | "x86"
@@ -41,7 +40,6 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
   const { target } = options
   const protobufVersion = "v33.0"
   const hostTarget = "x86_64-unknown-linux-gnu"
-  const gh = new GitHub(builder.env.repo)
 
   // Download host protoc (needed to run protoc compiler during build)
   const hostProtobufArtifact =
@@ -55,11 +53,14 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
     console.log(
       `Downloading host protobuf ${protobufVersion} for ${hostTarget}...`,
     )
-    await gh.downloadReleaseAssets(
-      `protobuf/${protobufVersion}`,
+    const hostDownloadUrl =
+      `https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/${hostProtobufArtifact}`
+    await builder.exec("curl", [
+      "-sSfL",
+      hostDownloadUrl,
+      "-o",
       hostProtobufArtifact,
-      ".",
-    )
+    ])
 
     console.log(`Extracting ${hostProtobufArtifact}...`)
     await Deno.mkdir(path.join(repoRoot, `target/${hostTarget}`), {
@@ -86,11 +87,14 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
     console.log(
       `Downloading target protobuf ${protobufVersion} for ${target}...`,
     )
-    await gh.downloadReleaseAssets(
-      `protobuf/${protobufVersion}`,
+    const targetDownloadUrl =
+      `https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/${targetProtobufArtifact}`
+    await builder.exec("curl", [
+      "-sSfL",
+      targetDownloadUrl,
+      "-o",
       targetProtobufArtifact,
-      ".",
-    )
+    ])
 
     console.log(`Extracting ${targetProtobufArtifact}...`)
     await Deno.mkdir(path.join(repoRoot, `target/${target}`), {
