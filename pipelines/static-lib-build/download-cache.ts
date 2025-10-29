@@ -14,7 +14,7 @@ export async function downloadCache(version?: string) {
   const pytorchVersion = convertPytorchVersionToTag(
     version || DEFAULT_PYTORCH_VERSION,
   )
-  const tarballName = `pytorch-${pytorchVersion}.src.tar.gz`
+  const tarballName = `pytorch_${pytorchVersion}.src.tar.gz`
   const pytorchUrl =
     `https://github.com/divvun/static-lib-build/releases/download/pytorch%2F${pytorchVersion}/${tarballName}`
 
