@@ -19,7 +19,7 @@ function parseReleaseTag(tag: string): ReleaseTag | null {
 
   return {
     library: match[1] as LibraryType,
-    version: match[2],
+    version: match[2].startsWith("v") ? match[2] : `v${match[2]}`,
   }
 }
 
