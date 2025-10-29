@@ -1,8 +1,9 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import * as temp from "~/util/temp.ts"
 
 export async function publishLibrary(library: string, version: string) {
-  console.log(`Publishing ${library} v${version}`)
+  console.log(`Publishing ${library} ${version}`)
 
   // Download all artifacts
   await builder.downloadArtifacts(`target/${library}_*.tar.gz`, ".")
@@ -35,7 +36,7 @@ export async function publishLibrary(library: string, version: string) {
     console.log(`Processing ${artifact} for target ${target}`)
 
     // Create temp directory
-    const tempDir = await Deno.makeTempDir()
+    const tempDir = await temp.makeTempDir()
 
     try {
       // Extract original artifact
@@ -65,7 +66,7 @@ export async function publishLibrary(library: string, version: string) {
       }
 
       // Create new tarball with version in filename
-      const versionedArtifact = `${library}-v${version}-${target}.tar.gz`
+      const versionedArtifact = `${library}-${version}-${target}.tar.gz`
 
       // Create tarball from the library directory, stripping the target prefix
       await builder.exec("tar", [
@@ -89,7 +90,7 @@ export async function publishLibrary(library: string, version: string) {
   }
 
   // Create GitHub release
-  const tag = `${library}/v${version}`
+  const tag = `${library}/${version}`
   console.log(`Creating GitHub release ${tag}`)
 
   await builder.exec("gh", [
@@ -97,11 +98,11 @@ export async function publishLibrary(library: string, version: string) {
     "create",
     tag,
     "--title",
-    `${library} v${version}`,
+    `${library} ${version}`,
     "--notes",
-    `Release ${library} v${version}`,
+    `Release ${library} ${version}`,
     ...repackagedArtifacts,
   ])
 
-  console.log(`Successfully published ${library} v${version}`)
+  console.log(`Successfully published ${library} ${version}`)
 }
