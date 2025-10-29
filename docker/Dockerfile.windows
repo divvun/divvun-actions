@@ -161,7 +161,7 @@ RUN git config --global core.longpaths true
 
 # Install vcpkg
 RUN git clone --depth 1 --branch 2025.10.17 https://github.com/microsoft/vcpkg.git C:\vcpkg ; \
-    C:\vcpkg\bootstrap-vcpkg.bat ; \
+    C:\vcpkg\bootstrap-vcpkg.bat -disableMetrics; \
     setx /M PATH $($Env:PATH + ';C:\vcpkg')
 
 ENV VCPKG_ROOT="C:\\vcpkg"
