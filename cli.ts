@@ -41,6 +41,7 @@ import {
   pipelinePdfStrings,
   runPdfStringsPublish,
 } from "./pipelines/pdf-strings/mod.ts"
+import { pipelineStaticLibBuild } from "./pipelines/static-lib-build/mod.ts"
 import macosSign from "./services/macos-codesign.ts"
 import sign from "./services/windows-codesign.ts"
 import { makeTempFile } from "./util/temp.ts"
@@ -271,6 +272,34 @@ async function runPipeline(args) {
       await macosSign(file, version, entitlementsPath)
       break
     }
+    case "icu4c-build": {
+      const { buildIcu4c } = await import(
+        "./pipelines/static-lib-build/build-icu4c.ts"
+      )
+      await buildIcu4c({ target: args._[1] as string })
+      break
+    }
+    case "libomp-build": {
+      const { buildLibomp } = await import(
+        "./pipelines/static-lib-build/build-libomp.ts"
+      )
+      await buildLibomp({ target: args._[1] as string })
+      break
+    }
+    case "protobuf-build": {
+      const { buildProtobuf } = await import(
+        "./pipelines/static-lib-build/build-protobuf.ts"
+      )
+      await buildProtobuf({ target: args._[1] as string })
+      break
+    }
+    case "download-cache": {
+      const { downloadCache } = await import(
+        "./pipelines/static-lib-build/download-cache.ts"
+      )
+      await downloadCache()
+      break
+    }
     default: {
       throw new Error(`Unknown repo: ${builder.env.repoName}`)
     }
@@ -308,6 +337,10 @@ async function runCi(args) {
     }
     case "pdf-strings": {
       pipeline = pipelinePdfStrings()
+      break
+    }
+    case "static-lib-build": {
+      pipeline = pipelineStaticLibBuild()
       break
     }
     default: {
