@@ -31,7 +31,6 @@ export class GitHub {
       "release",
       "create",
       tag,
-      "--verify-tag",
       "--generate-notes",
       "--repo",
       this.#repo,
