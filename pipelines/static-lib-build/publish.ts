@@ -5,16 +5,16 @@ export async function publishLibrary(library: string, version: string) {
   console.log(`Publishing ${library} v${version}`)
 
   // Download all artifacts
-  await builder.downloadArtifacts(`${library}_*.tar.gz`, ".")
+  await builder.downloadArtifacts(`target/${library}_*.tar.gz`, ".")
 
   // Find all downloaded artifacts
   const artifacts: string[] = []
-  for await (const entry of Deno.readDir(".")) {
+  for await (const entry of Deno.readDir("target")) {
     if (
       entry.isFile && entry.name.startsWith(`${library}_`) &&
       entry.name.endsWith(".tar.gz")
     ) {
-      artifacts.push(entry.name)
+      artifacts.push(path.join("target", entry.name))
     }
   }
 
