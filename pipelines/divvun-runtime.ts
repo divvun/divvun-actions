@@ -122,7 +122,7 @@ export async function pipelineDivvunRuntime() {
     } else {
       // Non-macOS targets: Build and upload directly
       buildSteps.push(command({
-        label: `${target}`,
+        label: `build-${target}`,
         command: [
           `./x build --target ${target}`,
           `mv ${targetFile} ./${artifactName}-${target} && buildkite-agent artifact upload ${artifactName}-${target}`,
@@ -143,8 +143,8 @@ export async function pipelineDivvunRuntime() {
 
     // Step 1: Build on macOS and upload unsigned app
     uiBuildSteps.push(command({
-      label: "Playground (macOS) - Build",
-      key: "playground-build",
+      label: `Playground (${target}) - Build`,
+      key: `playground-build-${target}`,
       command: [
         "echo '--- Building UI'",
         `./x build-ui --target ${target}`,
@@ -160,7 +160,7 @@ export async function pipelineDivvunRuntime() {
 
     // Step 2: Sign on Linux and create final artifact
     uiBuildSteps.push(command({
-      label: "Playground (macOS) - Sign",
+      label: `Playground (${target}) - Sign`,
       command: [
         "echo '--- Downloading unsigned app'",
         "buildkite-agent artifact download divvun-rt-playground-unsigned.zip .",
@@ -173,7 +173,7 @@ export async function pipelineDivvunRuntime() {
         `buildkite-agent artifact upload divvun-rt-playground-${target}`,
       ],
       agents: { queue: "linux" },
-      depends_on: "playground-build",
+      depends_on: `playground-build-${target}`,
     }))
   }
 
