@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import { GitHub } from "~/util/github.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 
@@ -29,6 +30,38 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
 
   const repoRoot = Deno.cwd()
   const pytorchRoot = path.join(repoRoot, "pytorch")
+
+  // Download protobuf dependency from GitHub releases if not present
+  const protobufVersion = "v33.0"
+  const protobufArtifact = `protobuf_${protobufVersion}_${target}.tar.gz`
+  const protobufPath = path.join(repoRoot, `target/${target}/protobuf`)
+
+  try {
+    await Deno.stat(path.join(protobufPath, "bin/protoc"))
+    console.log(`Protobuf already exists at ${protobufPath}`)
+  } catch {
+    console.log(`Downloading protobuf ${protobufVersion} for ${target}...`)
+    const gh = new GitHub(builder.env.repo)
+    await gh.downloadReleaseAssets(
+      `protobuf/${protobufVersion}`,
+      protobufArtifact,
+      ".",
+    )
+
+    // Extract protobuf artifact
+    console.log(`Extracting ${protobufArtifact}...`)
+    await Deno.mkdir(path.join(repoRoot, `target/${target}`), {
+      recursive: true,
+    })
+    await builder.exec("tar", [
+      "-xzf",
+      protobufArtifact,
+      "-C",
+      path.join(repoRoot, `target/${target}`),
+    ])
+    await Deno.remove(protobufArtifact)
+    console.log(`Protobuf extracted to ${protobufPath}`)
+  }
 
   // Detect host architecture
   const hostArch = Deno.build.arch === "aarch64" ? "aarch64" : "x86_64"
