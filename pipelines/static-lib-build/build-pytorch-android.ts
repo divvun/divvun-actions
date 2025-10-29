@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import { GitHub } from "~/util/github.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 type AndroidABI = "arm64-v8a" | "armeabi-v7a" | "x86_64" | "x86"
@@ -35,6 +36,75 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
 
   const repoRoot = Deno.cwd()
   const pytorchRoot = path.join(repoRoot, "pytorch")
+
+  // Download protobuf dependencies from GitHub releases if not present
+  const { target } = options
+  const protobufVersion = "v33.0"
+  const hostTarget = "x86_64-unknown-linux-gnu"
+  const gh = new GitHub(builder.env.repo)
+
+  // Download host protoc (needed to run protoc compiler during build)
+  const hostProtobufArtifact =
+    `protobuf_${protobufVersion}_${hostTarget}.tar.gz`
+  const hostProtobufPath = path.join(repoRoot, `target/${hostTarget}/protobuf`)
+
+  try {
+    await Deno.stat(path.join(hostProtobufPath, "bin/protoc"))
+    console.log(`Host protobuf already exists at ${hostProtobufPath}`)
+  } catch {
+    console.log(
+      `Downloading host protobuf ${protobufVersion} for ${hostTarget}...`,
+    )
+    await gh.downloadReleaseAssets(
+      `protobuf/${protobufVersion}`,
+      hostProtobufArtifact,
+      ".",
+    )
+
+    console.log(`Extracting ${hostProtobufArtifact}...`)
+    await Deno.mkdir(path.join(repoRoot, `target/${hostTarget}`), {
+      recursive: true,
+    })
+    await builder.exec("tar", [
+      "-xzf",
+      hostProtobufArtifact,
+      "-C",
+      path.join(repoRoot, `target/${hostTarget}`),
+    ])
+    await Deno.remove(hostProtobufArtifact)
+    console.log(`Host protobuf extracted to ${hostProtobufPath}`)
+  }
+
+  // Download target protobuf (Android library to link against)
+  const targetProtobufArtifact = `protobuf_${protobufVersion}_${target}.tar.gz`
+  const targetProtobufPath = path.join(repoRoot, `target/${target}/protobuf`)
+
+  try {
+    await Deno.stat(path.join(targetProtobufPath, "lib/libprotobuf.a"))
+    console.log(`Target protobuf already exists at ${targetProtobufPath}`)
+  } catch {
+    console.log(
+      `Downloading target protobuf ${protobufVersion} for ${target}...`,
+    )
+    await gh.downloadReleaseAssets(
+      `protobuf/${protobufVersion}`,
+      targetProtobufArtifact,
+      ".",
+    )
+
+    console.log(`Extracting ${targetProtobufArtifact}...`)
+    await Deno.mkdir(path.join(repoRoot, `target/${target}`), {
+      recursive: true,
+    })
+    await builder.exec("tar", [
+      "-xzf",
+      targetProtobufArtifact,
+      "-C",
+      path.join(repoRoot, `target/${target}`),
+    ])
+    await Deno.remove(targetProtobufArtifact)
+    console.log(`Target protobuf extracted to ${targetProtobufPath}`)
+  }
 
   // Check for ANDROID_NDK
   let androidNdk = Deno.env.get("ANDROID_NDK")
