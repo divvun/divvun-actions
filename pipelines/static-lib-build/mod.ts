@@ -79,7 +79,6 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
         agents: {
           queue: "linux",
         },
-        artifact_paths: ["pytorch.tar.gz"],
       }),
     )
   }

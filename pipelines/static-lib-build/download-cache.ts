@@ -51,7 +51,7 @@ export async function downloadCache(version?: string) {
     )
 
     // Clone PyTorch at specific tag
-    console.log(`Cloning PyTorch at tag ${pytorchVersion}...`)
+    console.log(`--- Cloning PyTorch at tag ${pytorchVersion}...`)
     await builder.exec("git", [
       "clone",
       "--depth",
@@ -63,7 +63,7 @@ export async function downloadCache(version?: string) {
     ])
 
     // Initialize submodules
-    console.log("Initializing submodules...")
+    console.log("--- Initializing submodules...")
     await builder.exec(
       "git",
       ["submodule", "update", "--init", "--recursive", "--depth", "1"],
@@ -71,7 +71,7 @@ export async function downloadCache(version?: string) {
     )
 
     // Fetch optional submodules (eigen)
-    console.log("Fetching optional submodules (eigen)...")
+    console.log("--- Fetching optional submodules (eigen)...")
     await builder.exec(
       "python3",
       ["tools/optional_submodules.py", "checkout_eigen"],
@@ -81,7 +81,7 @@ export async function downloadCache(version?: string) {
     console.log(`PyTorch ${pytorchVersion} cloned successfully`)
 
     // Create cache tarball
-    console.log(`Creating cache archive: ${tarballName}`)
+    console.log(`--- Creating cache archive: ${tarballName}`)
     await builder.exec("tar", [
       "--exclude=.git",
       "--exclude=.github",
@@ -99,12 +99,12 @@ export async function downloadCache(version?: string) {
 
     // Create release if it doesn't exist
     if (!releaseExists) {
-      console.log(`Creating release ${releaseTag}...`)
+      console.log(`--- Creating release ${releaseTag}...`)
       await gh.createRelease(releaseTag, [], { verifyTag: false })
     }
 
     // Upload tarball to release
-    console.log(`Uploading ${tarballName} to release ${releaseTag}...`)
+    console.log(`--- Uploading ${tarballName} to release ${releaseTag}...`)
     await gh.uploadRelease(releaseTag, [tarballName])
 
     // Clean up tarball
@@ -116,15 +116,8 @@ export async function downloadCache(version?: string) {
   }
 
   // Upload pytorch directory as Buildkite artifact for other build steps to use
-  if (Deno.env.get("BUILDKITE")) {
-    console.log("Creating Buildkite artifact from pytorch directory...")
-    const buildkiteArtifact = "pytorch.tar.gz"
-    await builder.exec("tar", ["-czf", buildkiteArtifact, PYTORCH_DIR])
-    await builder.exec("buildkite-agent", [
-      "artifact",
-      "upload",
-      buildkiteArtifact,
-    ])
-    console.log("PyTorch source uploaded as Buildkite artifact")
-  }
+  console.log("--- Uploading PyTorch directory as Buildkite artifact...")
+  const buildkiteArtifact = "pytorch.tar.gz"
+  await builder.exec("tar", ["-czf", buildkiteArtifact, PYTORCH_DIR])
+  await builder.uploadArtifacts(buildkiteArtifact)
 }
