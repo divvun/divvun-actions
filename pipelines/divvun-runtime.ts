@@ -94,7 +94,7 @@ export async function pipelineDivvunRuntime() {
         label: `${target} - Build`,
         key: `cli-build-${target}`,
         command: [
-          `just build ${target}`,
+          `./x build ${target}`,
           `mv ${targetFile} ./divvun-runtime-unsigned-${target}`,
           `buildkite-agent artifact upload divvun-runtime-unsigned-${target}`,
         ],
@@ -124,7 +124,7 @@ export async function pipelineDivvunRuntime() {
       buildSteps.push(command({
         label: `${target}`,
         command: [
-          `just build ${target}`,
+          `./x build ${target}`,
           `mv ${targetFile} ./${artifactName}-${target} && buildkite-agent artifact upload ${artifactName}-${target}`,
         ],
         agents: {
@@ -147,7 +147,7 @@ export async function pipelineDivvunRuntime() {
       key: "playground-build",
       command: [
         "echo '--- Building UI'",
-        "just build-ui",
+        "./x build-ui",
         "cp -r './playground/src-tauri/target/release/bundle/macos/Divvun Runtime Playground.app' .",
         "echo '--- Updating version'",
         `/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${version}" './Divvun Runtime Playground.app/Contents/Info.plist'`,
