@@ -68,7 +68,10 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       throw new Error("VCPKG_ROOT environment variable not set")
     }
 
-    const vcpkgInstalled = path.join(vcpkgRoot, "packages/icu_x64-windows-static")
+    const vcpkgInstalled = path.join(
+      vcpkgRoot,
+      "packages/icu_x64-windows-static",
+    )
 
     // Create output directories
     await fs.ensureDir(path.join(installPrefix, "lib"))
@@ -102,7 +105,8 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     // macOS: use clang from Xcode
     const cc = (await builder.output("xcrun", ["-f", "clang"])).stdout.trim()
     const cxx = (await builder.output("xcrun", ["-f", "clang++"])).stdout.trim()
-    const sdkroot = (await builder.output("xcrun", ["--show-sdk-path"])).stdout.trim()
+    const sdkroot = (await builder.output("xcrun", ["--show-sdk-path"])).stdout
+      .trim()
 
     Deno.env.set("CC", cc)
     Deno.env.set("CXX", cxx)
@@ -234,7 +238,8 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   let maxJobs = Deno.env.get("MAX_JOBS")
   if (!maxJobs) {
     if (platform === "darwin") {
-      maxJobs = (await builder.output("sysctl", ["-n", "hw.ncpu"])).stdout.trim()
+      maxJobs = (await builder.output("sysctl", ["-n", "hw.ncpu"])).stdout
+        .trim()
     } else {
       try {
         maxJobs = (await builder.output("nproc")).stdout.trim()

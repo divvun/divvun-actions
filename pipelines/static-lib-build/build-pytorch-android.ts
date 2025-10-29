@@ -86,13 +86,17 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
     try {
       await Deno.stat(ninjaPath)
     } catch {
-      throw new Error(`ninja not found at ${ninjaPath}. Install it with: brew install ninja`)
+      throw new Error(
+        `ninja not found at ${ninjaPath}. Install it with: brew install ninja`,
+      )
     }
 
     try {
       await Deno.stat(cmakePath)
     } catch {
-      throw new Error(`cmake not found at ${cmakePath}. Install it with: brew install cmake`)
+      throw new Error(
+        `cmake not found at ${cmakePath}. Install it with: brew install cmake`,
+      )
     }
   } else {
     // Linux
@@ -366,7 +370,8 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
     if (isLinux) {
       maxJobs = (await builder.output("nproc", [])).stdout.trim()
     } else {
-      maxJobs = (await builder.output("sysctl", ["-n", "hw.ncpu"])).stdout.trim()
+      maxJobs = (await builder.output("sysctl", ["-n", "hw.ncpu"])).stdout
+        .trim()
     }
   }
 

@@ -852,7 +852,9 @@ export default async function syncGithub(
         JSON.stringify(statusData, null, 2),
       )
       console.log(
-        `✅ Wrote status for ${Object.keys(statusData).length} pipelines to status.json`,
+        `✅ Wrote status for ${
+          Object.keys(statusData).length
+        } pipelines to status.json`,
       )
     } catch (error) {
       console.error(`❌ Failed to write status.json: ${error}`)

@@ -164,7 +164,8 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
   let maxJobs = Deno.env.get("MAX_JOBS")
   if (!maxJobs) {
     if (platform === "darwin") {
-      maxJobs = (await builder.output("sysctl", ["-n", "hw.ncpu"])).stdout.trim()
+      maxJobs = (await builder.output("sysctl", ["-n", "hw.ncpu"])).stdout
+        .trim()
     } else {
       try {
         maxJobs = (await builder.output("nproc")).stdout.trim()
@@ -194,9 +195,9 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
       "libabsl_*.a",
     ])
 
-    const abslLibs = findResult.stdout.trim().split("\n").filter((line: string) =>
-      line.length > 0
-    )
+    const abslLibs = findResult.stdout.trim().split("\n").filter((
+      line: string,
+    ) => line.length > 0)
 
     if (abslLibs.length > 0) {
       for (const lib of abslLibs) {

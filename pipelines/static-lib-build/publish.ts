@@ -10,7 +10,10 @@ export async function publishLibrary(library: string, version: string) {
   // Find all downloaded artifacts
   const artifacts: string[] = []
   for await (const entry of Deno.readDir(".")) {
-    if (entry.isFile && entry.name.startsWith(`${library}_`) && entry.name.endsWith(".tar.gz")) {
+    if (
+      entry.isFile && entry.name.startsWith(`${library}_`) &&
+      entry.name.endsWith(".tar.gz")
+    ) {
       artifacts.push(entry.name)
     }
   }
@@ -47,7 +50,9 @@ export async function publishLibrary(library: string, version: string) {
       try {
         await Deno.stat(extractedPath)
       } catch {
-        console.log(`Warning: Expected path ${extractedPath} not found, trying alternative structure`)
+        console.log(
+          `Warning: Expected path ${extractedPath} not found, trying alternative structure`,
+        )
         // Maybe it's already in the correct structure?
         const altPath = path.join(tempDir, library)
         try {

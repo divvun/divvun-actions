@@ -1,4 +1,3 @@
-import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
@@ -106,7 +105,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
   }
 
   pipeline.steps.push({
-    group: `:package: Build ${library} v${version}`,
+    group: `:package: Build ${library} ${version}`,
     key: `build-${library}`,
     steps: buildSteps,
   })
@@ -114,7 +113,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
   // Publish step
   pipeline.steps.push(
     command({
-      label: `:rocket: Publish ${library} v${version}`,
+      label: `:rocket: Publish ${library} ${version}`,
       key: `publish-${library}`,
       depends_on: `build-${library}`,
       agents: {

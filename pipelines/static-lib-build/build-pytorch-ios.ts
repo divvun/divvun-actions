@@ -47,13 +47,17 @@ export async function buildPytorchIos(options: BuildPytorchIosOptions) {
   try {
     await Deno.stat(ninjaPath)
   } catch {
-    throw new Error(`ninja not found at ${ninjaPath}. Install it with: brew install ninja`)
+    throw new Error(
+      `ninja not found at ${ninjaPath}. Install it with: brew install ninja`,
+    )
   }
 
   try {
     await Deno.stat(cmakePath)
   } catch {
-    throw new Error(`cmake not found at ${cmakePath}. Install it with: brew install cmake`)
+    throw new Error(
+      `cmake not found at ${cmakePath}. Install it with: brew install cmake`,
+    )
   }
 
   // Check for Python venv

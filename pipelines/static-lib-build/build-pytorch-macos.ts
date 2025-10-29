@@ -162,7 +162,9 @@ export async function buildPytorchMacos(options: BuildPytorchMacosOptions) {
   if (isCrossCompile) {
     if (targetTriple === "x86_64-apple-darwin") {
       cmakeArgs.push("-DCMAKE_OSX_ARCHITECTURES=x86_64")
-      console.log("Setting CMAKE_OSX_ARCHITECTURES=x86_64 for cross-compilation")
+      console.log(
+        "Setting CMAKE_OSX_ARCHITECTURES=x86_64 for cross-compilation",
+      )
     } else if (targetTriple === "aarch64-apple-darwin") {
       cmakeArgs.push("-DCMAKE_OSX_ARCHITECTURES=arm64")
       console.log("Setting CMAKE_OSX_ARCHITECTURES=arm64 for cross-compilation")

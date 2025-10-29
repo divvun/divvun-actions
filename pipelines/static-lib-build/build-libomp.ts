@@ -173,7 +173,8 @@ export async function buildLibomp(options: BuildLibompOptions) {
   let maxJobs = Deno.env.get("MAX_JOBS")
   if (!maxJobs) {
     if (platform === "darwin") {
-      maxJobs = (await builder.output("sysctl", ["-n", "hw.ncpu"])).stdout.trim()
+      maxJobs = (await builder.output("sysctl", ["-n", "hw.ncpu"])).stdout
+        .trim()
     } else {
       try {
         maxJobs = (await builder.output("nproc")).stdout.trim()
