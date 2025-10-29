@@ -62,11 +62,6 @@ function command(input: CommandStep): CommandStep {
   }
 }
 
-function scriptPath(scriptName: string): string {
-  const dir = path.dirname(import.meta.filename!)
-  return path.join(dir, scriptName)
-}
-
 function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
   const { library, version } = release
   const platforms = getLibraryPlatforms(library)
@@ -199,7 +194,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               'buildkite-agent artifact download "target/protobuf_aarch64-apple-darwin.tar.gz" .',
               "mkdir -p target/aarch64-apple-darwin",
               "tar -xzf target/protobuf_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin",
-              `${scriptPath("build-pytorch.sh")} --target aarch64-apple-darwin`,
+              "divvun-actions run pytorch-build aarch64-apple-darwin",
               "tar -czf target/pytorch_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin pytorch",
             ].join("\n"),
             agents: {
@@ -254,7 +249,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "mkdir -p target/aarch64-apple-darwin target/aarch64-apple-ios",
               "tar -xzf target/protobuf_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin",
               "tar -xzf target/protobuf_aarch64-apple-ios.tar.gz -C target/aarch64-apple-ios",
-              `${scriptPath("build-pytorch.sh")} --target aarch64-apple-ios`,
+              "divvun-actions run pytorch-build aarch64-apple-ios",
               "tar -czf target/pytorch_aarch64-apple-ios.tar.gz -C target/aarch64-apple-ios pytorch",
             ].join("\n"),
             agents: {
@@ -309,7 +304,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "mkdir -p target/x86_64-unknown-linux-gnu target/aarch64-linux-android",
               "tar -xzf target/protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               "tar -xzf target/protobuf_aarch64-linux-android.tar.gz -C target/aarch64-linux-android",
-              `ANDROID_NDK=$ANDROID_NDK_HOME ${scriptPath("build-pytorch.sh")} --target aarch64-linux-android`,
+              "ANDROID_NDK=$ANDROID_NDK_HOME divvun-actions run pytorch-build aarch64-linux-android",
               "tar -czf target/pytorch_aarch64-linux-android.tar.gz -C target/aarch64-linux-android pytorch",
             ].join("\n"),
             agents: {
@@ -371,7 +366,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               'buildkite-agent artifact download "target/protobuf_x86_64-unknown-linux-gnu.tar.gz" .',
               "mkdir -p target/x86_64-unknown-linux-gnu",
               "tar -xzf target/protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
-              `${scriptPath("build-pytorch.sh")} --target x86_64-unknown-linux-gnu`,
+              "divvun-actions run pytorch-build x86_64-unknown-linux-gnu",
               "tar -czf target/pytorch_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu pytorch",
             ].join("\n"),
             agents: {

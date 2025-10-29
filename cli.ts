@@ -278,7 +278,7 @@ async function runPipeline(args) {
       )
       await buildIcu4c({
         target: args._[1] as string,
-        version: args._[2] as string | undefined,
+        version: args._[2] != null ? String(args._[2]) : undefined,
       })
       break
     }
@@ -288,7 +288,7 @@ async function runPipeline(args) {
       )
       await buildLibomp({
         target: args._[1] as string,
-        version: args._[2] as string | undefined,
+        version: args._[2] != null ? String(args._[2]) : undefined,
       })
       break
     }
@@ -298,7 +298,7 @@ async function runPipeline(args) {
       )
       await buildProtobuf({
         target: args._[1] as string,
-        version: args._[2] as string | undefined,
+        version: args._[2] != null ? String(args._[2]) : undefined,
       })
       break
     }
@@ -306,7 +306,17 @@ async function runPipeline(args) {
       const { downloadCache } = await import(
         "./pipelines/static-lib-build/download-cache.ts"
       )
-      await downloadCache(args._[1] as string | undefined)
+      await downloadCache(args._[1] != null ? String(args._[1]) : undefined)
+      break
+    }
+    case "pytorch-build": {
+      const { buildPytorch } = await import(
+        "./pipelines/static-lib-build/build-pytorch.ts"
+      )
+      await buildPytorch({
+        target: args._[1] as string,
+        version: args._[2] != null ? String(args._[2]) : undefined,
+      })
       break
     }
     case "publish-library": {
