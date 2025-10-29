@@ -5,20 +5,20 @@ declare namespace Deno {
    * @deprecated Use {@link ~/util/temp.ts} instead.
    * @see {@link ~/util/temp.ts#makeTempDir}
    */
-  export function makeTempDir(options?: MakeTempOptions): Promise<never>;
+  export function makeTempDir(options?: MakeTempOptions): Promise<never>
   /**
    * @deprecated Use {@link ~/util/temp.ts} instead.
    * @see {@link ~/util/temp.ts#makeTempDirSync}
    */
-  export function makeTempDirSync(options?: MakeTempOptions): never;
+  export function makeTempDirSync(options?: MakeTempOptions): never
   /**
    * @deprecated Use {@link ~/util/temp.ts} instead.
    * @see {@link ~/util/temp.ts#makeTempFile}
    */
-  export function makeTempFile(options?: MakeTempOptions): Promise<never>;
+  export function makeTempFile(options?: MakeTempOptions): Promise<never>
   /**
    * @deprecated Use {@link ~/util/temp.ts} instead.
    * @see {@link ~/util/temp.ts#makeTempFileSync}
    */
-  export function makeTempFileSync(options?: MakeTempOptions): never;
+  export function makeTempFileSync(options?: MakeTempOptions): never
 }

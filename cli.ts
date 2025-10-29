@@ -302,7 +302,7 @@ async function runPipeline(args) {
       })
       break
     }
-    case "download-cache": {
+    case "pytorch-cache-download": {
       const { downloadCache } = await import(
         "./pipelines/static-lib-build/download-cache.ts"
       )

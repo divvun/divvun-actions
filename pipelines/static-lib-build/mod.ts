@@ -69,6 +69,21 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
     steps: [],
   }
 
+  // Add PyTorch cache download step if building PyTorch
+  if (library === "pytorch") {
+    pipeline.steps.push(
+      command({
+        label: ":package: Download PyTorch Cache",
+        key: "pytorch-cache-download",
+        command: `divvun-actions run pytorch-cache-download ${version}`,
+        agents: {
+          queue: "linux",
+        },
+        artifact_paths: ["pytorch.tar.gz"],
+      }),
+    )
+  }
+
   // Build steps for each platform
   const buildSteps: CommandStep[] = []
 
@@ -85,17 +100,29 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       ? `divvun-actions run ${library}-build ${targetTriple} ${version}`
       : `divvun-actions run ${library}-build ${targetTriple}`
 
+    // For PyTorch builds, add cache download and extraction commands
+    const commands = ["set -e"]
+    if (library === "pytorch") {
+      commands.push(
+        'buildkite-agent artifact download "pytorch.tar.gz" .',
+        "tar -xzf pytorch.tar.gz",
+      )
+    }
+    commands.push(
+      buildCmd,
+      targetTriple.includes("windows")
+        ? `C:\\msys2\\usr\\bin\\bash.exe -c "bsdtar -czf target/${artifactName} -C target/${targetTriple} ${library}"`
+        : `tar -czf target/${artifactName} -C target/${targetTriple} ${library}`,
+    )
+
     buildSteps.push(
       command({
         label: `:package: ${library} ${targetTriple}`,
         key: `${library}-${targetTriple}`,
-        command: [
-          "set -e",
-          buildCmd,
-          targetTriple.includes("windows")
-            ? `C:\\msys2\\usr\\bin\\bash.exe -c "bsdtar -czf target/${artifactName} -C target/${targetTriple} ${library}"`
-            : `tar -czf target/${artifactName} -C target/${targetTriple} ${library}`,
-        ].join("\n"),
+        depends_on: library === "pytorch"
+          ? "pytorch-cache-download"
+          : undefined,
+        command: commands.join("\n"),
         agents: {
           queue,
         },
@@ -141,6 +168,16 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       PYTORCH_VERSION,
     },
     steps: [
+      // PyTorch cache download step - all PyTorch builds depend on this
+      command({
+        label: ":package: Download PyTorch Cache",
+        key: "pytorch-cache-download",
+        command: `divvun-actions run pytorch-cache-download ${PYTORCH_VERSION}`,
+        agents: {
+          queue: "linux",
+        },
+        artifact_paths: ["pytorch.tar.gz"],
+      }),
       {
         group: ":apple: macOS Builds",
         steps: [
@@ -186,10 +223,11 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
           command({
             label: "macOS ARM64: PyTorch",
             key: "macos-arm64-pytorch",
-            depends_on: "macos-arm64-protobuf",
+            depends_on: ["macos-arm64-protobuf", "pytorch-cache-download"],
             command: [
               "set -e",
-              "divvun-actions run download-cache",
+              'buildkite-agent artifact download "pytorch.tar.gz" .',
+              "tar -xzf pytorch.tar.gz",
               'buildkite-agent artifact download "target/protobuf_aarch64-apple-darwin.tar.gz" .',
               "mkdir -p target/aarch64-apple-darwin",
               "tar -xzf target/protobuf_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin",
@@ -239,10 +277,15 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
           command({
             label: "iOS ARM64: PyTorch",
             key: "ios-arm64-pytorch",
-            depends_on: ["macos-arm64-protobuf", "ios-arm64-protobuf"],
+            depends_on: [
+              "macos-arm64-protobuf",
+              "ios-arm64-protobuf",
+              "pytorch-cache-download",
+            ],
             command: [
               "set -e",
-              "divvun-actions run download-cache",
+              'buildkite-agent artifact download "pytorch.tar.gz" .',
+              "tar -xzf pytorch.tar.gz",
               'buildkite-agent artifact download "target/protobuf_aarch64-apple-darwin.tar.gz" .',
               'buildkite-agent artifact download "target/protobuf_aarch64-apple-ios.tar.gz" .',
               "mkdir -p target/aarch64-apple-darwin target/aarch64-apple-ios",
@@ -294,10 +337,15 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
           command({
             label: "Android ARM64: PyTorch",
             key: "android-arm64-pytorch",
-            depends_on: ["linux-x86_64-protobuf", "android-arm64-protobuf"],
+            depends_on: [
+              "linux-x86_64-protobuf",
+              "android-arm64-protobuf",
+              "pytorch-cache-download",
+            ],
             command: [
               "set -e",
-              "divvun-actions run download-cache",
+              'buildkite-agent artifact download "pytorch.tar.gz" .',
+              "tar -xzf pytorch.tar.gz",
               'buildkite-agent artifact download "target/protobuf_x86_64-unknown-linux-gnu.tar.gz" .',
               'buildkite-agent artifact download "target/protobuf_aarch64-linux-android.tar.gz" .',
               "mkdir -p target/x86_64-unknown-linux-gnu target/aarch64-linux-android",
@@ -358,10 +406,11 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
           command({
             label: "Linux x86_64: PyTorch",
             key: "linux-x86_64-pytorch",
-            depends_on: "linux-x86_64-protobuf",
+            depends_on: ["linux-x86_64-protobuf", "pytorch-cache-download"],
             command: [
               "set -e",
-              "divvun-actions run download-cache",
+              'buildkite-agent artifact download "pytorch.tar.gz" .',
+              "tar -xzf pytorch.tar.gz",
               'buildkite-agent artifact download "target/protobuf_x86_64-unknown-linux-gnu.tar.gz" .',
               "mkdir -p target/x86_64-unknown-linux-gnu",
               "tar -xzf target/protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",

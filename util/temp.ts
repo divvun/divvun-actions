@@ -70,6 +70,6 @@ Deno.makeTempFile = (): never => {
   throw new Error("Use util/temp.ts to create temporary files")
 }
 
-Deno.makeTempFileSync = (): never  => {
+Deno.makeTempFileSync = (): never => {
   throw new Error("Use util/temp.ts to create temporary files")
 }
