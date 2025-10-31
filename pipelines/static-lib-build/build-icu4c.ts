@@ -67,19 +67,63 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
 
   // Windows uses vcpkg for ICU installation
   if (platform === "windows") {
-    console.log("Installing ICU with vcpkg...")
-    await builder.exec("vcpkg", ["install", "icu:x64-windows-static"])
-
-    console.log("Copying ICU files...")
     const vcpkgRoot = Deno.env.get("VCPKG_ROOT")
     if (!vcpkgRoot) {
       throw new Error("VCPKG_ROOT environment variable not set")
+    }
+
+    // Clone or update the vcpkg overlay
+    const overlayPath = path.join(repoRoot, "vcpkg-overlay")
+    try {
+      await Deno.stat(path.join(overlayPath, ".git"))
+      console.log("Updating vcpkg overlay...")
+      await builder.exec("git", ["pull"], { cwd: overlayPath })
+    } catch {
+      console.log("Cloning vcpkg overlay...")
+      await builder.exec("git", [
+        "clone",
+        "https://github.com/divvun/vcpkg-overlay.git",
+        overlayPath,
+      ])
+    }
+
+    // Check if the correct version of ICU is already installed
+    try {
+      const result = await builder.output("vcpkg", ["list", "icu"])
+      const installedVersion = result.stdout.match(/icu:x64-windows-static\s+([\d.]+)/)?.[1]
+
+      const targetVersion = version.replace(/^v/, "")
+
+      if (installedVersion === targetVersion) {
+        console.log(`ICU ${targetVersion} already installed in vcpkg, using cached version`)
+      } else {
+        if (installedVersion) {
+          console.log(`Found ICU ${installedVersion} but need ${targetVersion}, reinstalling...`)
+          await builder.exec("vcpkg", ["remove", "icu:x64-windows-static"])
+        }
+        console.log(`Installing ICU ${targetVersion} with vcpkg using overlay...`)
+        await builder.exec("vcpkg", [
+          "install",
+          "icu:x64-windows-static",
+          `--overlay-ports=${overlayPath}/ports`,
+        ])
+      }
+    } catch {
+      // vcpkg list failed, assume not installed
+      console.log(`Installing ICU ${version} with vcpkg using overlay...`)
+      await builder.exec("vcpkg", [
+        "install",
+        "icu:x64-windows-static",
+        `--overlay-ports=${overlayPath}/ports`,
+      ])
     }
 
     const vcpkgInstalled = path.join(
       vcpkgRoot,
       "packages/icu_x64-windows-static",
     )
+
+    console.log("Copying ICU files...")
 
     // Create output directories
     await fs.ensureDir(path.join(installPrefix, "lib"))
@@ -229,6 +273,10 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   )
   await Deno.writeTextFile(acincludePath, acincludeContent)
   console.log("Patched ICU to recognize iOS as Darwin platform")
+
+  // Regenerate configure script with the patched acinclude.m4
+  console.log("Regenerating configure script...")
+  await builder.exec("autoconf", [], { cwd: icuSourceDir })
 
   // Clean build directory if requested
   if (clean) {
