@@ -241,7 +241,9 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
 
   // Platform-specific configuration
   if (platform === "ios") {
+    const hostBuildDir = path.join(repoRoot, "target/aarch64-apple-darwin/build/icu")
     configureArgs.push("--host=aarch64-apple-ios")
+    configureArgs.push(`--with-cross-build=${hostBuildDir}`)
     const sdkPath =
       (await builder.output("xcrun", ["--sdk", "iphoneos", "--show-sdk-path"]))
         .stdout.trim()
@@ -261,7 +263,9 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
         "ANDROID_NDK_HOME or ANDROID_NDK environment variable not set",
       )
     }
+    const hostBuildDir = path.join(repoRoot, "target/x86_64-unknown-linux-gnu/build/icu")
     configureArgs.push("--host=aarch64-linux-android")
+    configureArgs.push(`--with-cross-build=${hostBuildDir}`)
     const toolchainPath = `${ndkPath}/toolchains/llvm/prebuilt/linux-x86_64`
     const sysroot = `${toolchainPath}/sysroot`
     const cflags = `-target aarch64-linux-android21 --sysroot=${sysroot}`

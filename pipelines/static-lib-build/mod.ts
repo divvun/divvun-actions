@@ -246,8 +246,12 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
           command({
             label: "iOS ARM64: ICU",
             key: "ios-arm64-icu",
+            depends_on: "macos-arm64-icu",
             command: [
               "set -e",
+              'buildkite-agent artifact download "target/icu4c_aarch64-apple-darwin.tar.gz" .',
+              "mkdir -p target/aarch64-apple-darwin",
+              "tar -xzf target/icu4c_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin",
               "divvun-actions run icu4c-build aarch64-apple-ios",
               "tar -czf target/icu4c_aarch64-apple-ios.tar.gz -C target/aarch64-apple-ios icu4c",
             ].join("\n"),
@@ -306,8 +310,12 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
           command({
             label: "Android ARM64: ICU",
             key: "android-arm64-icu",
+            depends_on: "linux-x86_64-icu",
             command: [
               "set -e",
+              'buildkite-agent artifact download "target/icu4c_x86_64-unknown-linux-gnu.tar.gz" .',
+              "mkdir -p target/x86_64-unknown-linux-gnu",
+              "tar -xzf target/icu4c_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               "divvun-actions run icu4c-build aarch64-linux-android",
               "tar -czf target/icu4c_aarch64-linux-android.tar.gz -C target/aarch64-linux-android icu4c",
             ].join("\n"),
