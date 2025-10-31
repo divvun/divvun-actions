@@ -4,7 +4,7 @@ import * as builder from "~/builder.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 
-type Platform = "darwin" | "linux" | "windows"
+type Platform = "darwin" | "ios" | "linux" | "android" | "windows"
 
 export interface BuildIcu4cOptions {
   target: string
@@ -15,8 +15,12 @@ export interface BuildIcu4cOptions {
 }
 
 function detectPlatform(target: string): Platform {
-  if (target.includes("-apple-darwin") || target.includes("-apple-ios")) {
+  if (target.includes("-apple-ios")) {
+    return "ios"
+  } else if (target.includes("-apple-darwin")) {
     return "darwin"
+  } else if (target.includes("-linux-android")) {
+    return "android"
   } else if (target.includes("-linux-")) {
     return "linux"
   } else if (target.includes("-windows-")) {
@@ -29,7 +33,11 @@ function getIcuPlatform(platform: Platform): string {
   switch (platform) {
     case "darwin":
       return "MacOSX"
+    case "ios":
+      return "MacOSX"
     case "linux":
+      return "Linux"
+    case "android":
       return "Linux"
     case "windows":
       return "MSYS/MSVC"
@@ -112,6 +120,29 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     Deno.env.set("CXX", cxx)
     Deno.env.set("SDKROOT", sdkroot)
     Deno.env.set("MACOSX_DEPLOYMENT_TARGET", "11.0")
+  } else if (platform === "ios") {
+    // iOS: use clang with iOS SDK
+    const cc = (await builder.output("xcrun", ["-f", "clang"])).stdout.trim()
+    const cxx = (await builder.output("xcrun", ["-f", "clang++"])).stdout.trim()
+    const sdkroot =
+      (await builder.output("xcrun", ["--sdk", "iphoneos", "--show-sdk-path"]))
+        .stdout
+        .trim()
+
+    Deno.env.set("CC", cc)
+    Deno.env.set("CXX", cxx)
+    Deno.env.set("SDKROOT", sdkroot)
+    Deno.env.set("IPHONEOS_DEPLOYMENT_TARGET", "12.0")
+  } else if (platform === "android") {
+    // Android: use clang or gcc
+    try {
+      await builder.exec("which", ["clang"])
+      Deno.env.set("CC", "clang")
+      Deno.env.set("CXX", "clang++")
+    } catch {
+      Deno.env.set("CC", "gcc")
+      Deno.env.set("CXX", "g++")
+    }
   } else if (platform === "linux") {
     // Linux: prefer clang if available
     try {
@@ -206,6 +237,43 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
 
   if (verbose) {
     configureArgs.push("--enable-debug")
+  }
+
+  // Platform-specific configuration
+  if (platform === "ios") {
+    configureArgs.push("--host=arm-apple-darwin")
+    configureArgs.push("--with-cross-build=no")
+    const sdkPath =
+      (await builder.output("xcrun", ["--sdk", "iphoneos", "--show-sdk-path"]))
+        .stdout.trim()
+    const cflags =
+      `-arch arm64 -miphoneos-version-min=12.0 -isysroot ${sdkPath}`
+    const cxxflags =
+      `-arch arm64 -miphoneos-version-min=12.0 -isysroot ${sdkPath}`
+    Deno.env.set("CFLAGS", `${Deno.env.get("CFLAGS") || ""} ${cflags}`.trim())
+    Deno.env.set(
+      "CXXFLAGS",
+      `${Deno.env.get("CXXFLAGS") || ""} ${cxxflags}`.trim(),
+    )
+  } else if (platform === "android") {
+    const ndkPath = Deno.env.get("ANDROID_NDK_HOME") || Deno.env.get("NDK_ROOT")
+    if (!ndkPath) {
+      throw new Error(
+        "ANDROID_NDK_HOME or NDK_ROOT environment variable not set",
+      )
+    }
+    configureArgs.push("--host=aarch64-linux-android")
+    configureArgs.push("--with-cross-build=no")
+    const toolchainPath = `${ndkPath}/toolchains/llvm/prebuilt/linux-x86_64`
+    const sysroot = `${toolchainPath}/sysroot`
+    const cflags = `-target aarch64-linux-android24 --sysroot=${sysroot}`
+    const cxxflags =
+      `-target aarch64-linux-android24 --sysroot=${sysroot} -stdlib=libc++`
+    Deno.env.set("CFLAGS", `${Deno.env.get("CFLAGS") || ""} ${cflags}`.trim())
+    Deno.env.set(
+      "CXXFLAGS",
+      `${Deno.env.get("CXXFLAGS") || ""} ${cxxflags}`.trim(),
+    )
   }
 
   // Check if runConfigureICU exists

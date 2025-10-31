@@ -135,9 +135,14 @@ export async function buildPytorchMacos(options: BuildPytorchMacosOptions) {
   )
 
   if (clean) {
-    console.log("Cleaning build directory...")
+    console.log("Cleaning build and install directories...")
     try {
       await Deno.remove(buildRoot, { recursive: true })
+    } catch {
+      // Ignore if doesn't exist
+    }
+    try {
+      await Deno.remove(installPrefix, { recursive: true })
     } catch {
       // Ignore if doesn't exist
     }

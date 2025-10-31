@@ -3,7 +3,7 @@ import * as builder from "~/builder.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 
-type Platform = "darwin" | "linux" | "windows"
+type Platform = "darwin" | "ios" | "linux" | "android" | "windows"
 
 export interface BuildProtobufOptions {
   target: string
@@ -19,8 +19,12 @@ function convertProtobufVersionToTag(version: string): string {
 }
 
 function detectPlatform(target: string): Platform {
-  if (target.includes("-apple-darwin") || target.includes("-apple-ios")) {
+  if (target.includes("-apple-ios")) {
+    return "ios"
+  } else if (target.includes("-apple-darwin")) {
     return "darwin"
+  } else if (target.includes("-linux-android")) {
+    return "android"
   } else if (target.includes("-linux-")) {
     return "linux"
   } else if (target.includes("-windows-")) {
@@ -61,6 +65,25 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
     const brewPrefix = arch === "aarch64" ? "/opt/homebrew" : "/usr/local"
     cmakePath = `${brewPrefix}/bin/cmake`
     ninjaPath = `${brewPrefix}/bin/ninja`
+  } else if (platform === "ios") {
+    cc = (await builder.output("xcrun", ["-f", "clang"])).stdout.trim()
+    cxx = (await builder.output("xcrun", ["-f", "clang++"])).stdout.trim()
+
+    const arch = Deno.build.arch
+    const brewPrefix = arch === "aarch64" ? "/opt/homebrew" : "/usr/local"
+    cmakePath = `${brewPrefix}/bin/cmake`
+    ninjaPath = `${brewPrefix}/bin/ninja`
+  } else if (platform === "android") {
+    try {
+      await builder.exec("which", ["clang"])
+      cc = "clang"
+      cxx = "clang++"
+    } catch {
+      cc = "gcc"
+      cxx = "g++"
+    }
+    cmakePath = (await builder.output("which", ["cmake"])).stdout.trim()
+    ninjaPath = (await builder.output("which", ["ninja"])).stdout.trim()
   } else if (platform === "linux") {
     try {
       await builder.exec("which", ["clang"])
@@ -147,6 +170,27 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
 
   if (platform === "darwin") {
     cmakeArgs.push("-DCMAKE_OSX_DEPLOYMENT_TARGET=11.0")
+  } else if (platform === "ios") {
+    const sdkPath =
+      (await builder.output("xcrun", ["--sdk", "iphoneos", "--show-sdk-path"]))
+        .stdout.trim()
+    cmakeArgs.push("-DCMAKE_SYSTEM_NAME=iOS")
+    cmakeArgs.push("-DCMAKE_OSX_DEPLOYMENT_TARGET=12.0")
+    cmakeArgs.push(`-DCMAKE_OSX_SYSROOT=${sdkPath}`)
+    cmakeArgs.push("-DCMAKE_OSX_ARCHITECTURES=arm64")
+  } else if (platform === "android") {
+    const ndkPath = Deno.env.get("ANDROID_NDK_HOME") || Deno.env.get("NDK_ROOT")
+    if (!ndkPath) {
+      throw new Error(
+        "ANDROID_NDK_HOME or NDK_ROOT environment variable not set",
+      )
+    }
+    cmakeArgs.push(
+      `-DCMAKE_TOOLCHAIN_FILE=${ndkPath}/build/cmake/android.toolchain.cmake`,
+    )
+    cmakeArgs.push("-DANDROID_ABI=arm64-v8a")
+    cmakeArgs.push("-DANDROID_PLATFORM=android-24")
+    cmakeArgs.push("-DANDROID_STL=c++_shared")
   } else if (platform === "windows") {
     cmakeArgs.push("-DCMAKE_C_COMPILER=cl.exe")
     cmakeArgs.push("-DCMAKE_CXX_COMPILER=cl.exe")
