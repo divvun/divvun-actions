@@ -99,14 +99,45 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       ? `divvun-actions run ${library}-build ${targetTriple} ${version}`
       : `divvun-actions run ${library}-build ${targetTriple}`
 
-    // For PyTorch builds, add cache download and extraction commands
+    // Determine cross-compilation dependencies for ICU4C
+    let dependsOn: string | undefined
+    let hostArtifactName: string | undefined
+    let hostTargetDir: string | undefined
+
+    if (library === "icu4c") {
+      if (targetTriple === "aarch64-apple-ios") {
+        dependsOn = "icu4c-aarch64-apple-darwin"
+        hostArtifactName = "icu4c_aarch64-apple-darwin.tar.gz"
+        hostTargetDir = "aarch64-apple-darwin"
+      } else if (targetTriple === "aarch64-linux-android") {
+        dependsOn = "icu4c-x86_64-unknown-linux-gnu"
+        hostArtifactName = "icu4c_x86_64-unknown-linux-gnu.tar.gz"
+        hostTargetDir = "x86_64-unknown-linux-gnu"
+      }
+    } else if (library === "pytorch") {
+      dependsOn = "pytorch-cache-download"
+    }
+
+    // Build command list
     const commands = ["set -e"]
+
+    // PyTorch: download cache
     if (library === "pytorch") {
       commands.push(
         'buildkite-agent artifact download "pytorch.tar.gz" .',
         "tar -xzf pytorch.tar.gz",
       )
     }
+
+    // ICU4C cross-compilation: download host build
+    if (library === "icu4c" && hostArtifactName && hostTargetDir) {
+      commands.push(
+        `buildkite-agent artifact download "target/${hostArtifactName}" .`,
+        `mkdir -p target/${hostTargetDir}`,
+        `tar -xzf target/${hostArtifactName} -C target/${hostTargetDir}`,
+      )
+    }
+
     commands.push(
       buildCmd,
       targetTriple.includes("windows")
@@ -118,9 +149,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       command({
         label: `:package: ${library} ${targetTriple}`,
         key: `${library}-${targetTriple}`,
-        depends_on: library === "pytorch"
-          ? "pytorch-cache-download"
-          : undefined,
+        depends_on: dependsOn,
         command: commands.join("\n"),
         agents: {
           queue,
