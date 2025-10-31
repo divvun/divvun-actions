@@ -131,19 +131,39 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
 
     // ICU4C cross-compilation: download host build
     if (library === "icu4c" && hostArtifactName && hostTargetDir) {
+      // Download the build artifact (not the release artifact)
+      const buildArtifactName = hostArtifactName.replace("icu4c_", "icu4c-build_")
       commands.push(
-        `buildkite-agent artifact download "target/${hostArtifactName}" .`,
+        `buildkite-agent artifact download "target/${buildArtifactName}" .`,
         `mkdir -p target/${hostTargetDir}`,
-        `tar -xzf target/${hostArtifactName} -C target/${hostTargetDir}`,
+        `tar -xzf target/${buildArtifactName} -C target/${hostTargetDir}`,
       )
     }
 
-    commands.push(
-      buildCmd,
-      targetTriple.includes("windows")
-        ? `C:\\msys2\\usr\\bin\\bash.exe -c "bsdtar -czf target/${artifactName} -C target/${targetTriple} ${library}"`
-        : `tar -czf target/${artifactName} -C target/${targetTriple} ${library}`,
-    )
+    commands.push(buildCmd)
+
+    // Create artifacts
+    if (targetTriple.includes("windows")) {
+      commands.push(
+        `C:\\msys2\\usr\\bin\\bash.exe -c "bsdtar -czf target/${artifactName} -C target/${targetTriple} ${library}"`
+      )
+    } else {
+      commands.push(
+        `tar -czf target/${artifactName} -C target/${targetTriple} ${library}`
+      )
+      // For ICU4C native platforms, also create build artifact
+      if (library === "icu4c" && (targetTriple === "aarch64-apple-darwin" || targetTriple === "x86_64-unknown-linux-gnu")) {
+        commands.push(
+          `tar -czf target/${library}-build_${targetTriple}.tar.gz -C target/${targetTriple} build/icu`
+        )
+      }
+    }
+
+    // Determine artifact paths
+    const artifactPaths = [`target/${artifactName}`]
+    if (library === "icu4c" && (targetTriple === "aarch64-apple-darwin" || targetTriple === "x86_64-unknown-linux-gnu")) {
+      artifactPaths.push(`target/${library}-build_${targetTriple}.tar.gz`)
+    }
 
     buildSteps.push(
       command({
@@ -154,7 +174,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
         agents: {
           queue,
         },
-        artifact_paths: [`target/${artifactName}`],
+        artifact_paths: artifactPaths,
       }),
     )
   }
@@ -216,11 +236,15 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               "divvun-actions run icu4c-build aarch64-apple-darwin",
               "tar -czf target/icu4c_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin icu4c",
+              "tar -czf target/icu4c-build_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin build/icu",
             ].join("\n"),
             agents: {
               queue: "macos",
             },
-            artifact_paths: ["target/icu4c_aarch64-apple-darwin.tar.gz"],
+            artifact_paths: [
+              "target/icu4c_aarch64-apple-darwin.tar.gz",
+              "target/icu4c-build_aarch64-apple-darwin.tar.gz",
+            ],
           }),
           command({
             label: "macOS ARM64: LibOMP",
@@ -278,9 +302,9 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             depends_on: "macos-arm64-icu",
             command: [
               "set -e",
-              'buildkite-agent artifact download "target/icu4c_aarch64-apple-darwin.tar.gz" .',
+              'buildkite-agent artifact download "target/icu4c-build_aarch64-apple-darwin.tar.gz" .',
               "mkdir -p target/aarch64-apple-darwin",
-              "tar -xzf target/icu4c_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin",
+              "tar -xzf target/icu4c-build_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin",
               "divvun-actions run icu4c-build aarch64-apple-ios",
               "tar -czf target/icu4c_aarch64-apple-ios.tar.gz -C target/aarch64-apple-ios icu4c",
             ].join("\n"),
@@ -342,9 +366,9 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             depends_on: "linux-x86_64-icu",
             command: [
               "set -e",
-              'buildkite-agent artifact download "target/icu4c_x86_64-unknown-linux-gnu.tar.gz" .',
+              'buildkite-agent artifact download "target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz" .',
               "mkdir -p target/x86_64-unknown-linux-gnu",
-              "tar -xzf target/icu4c_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+              "tar -xzf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               "divvun-actions run icu4c-build aarch64-linux-android",
               "tar -czf target/icu4c_aarch64-linux-android.tar.gz -C target/aarch64-linux-android icu4c",
             ].join("\n"),
@@ -407,11 +431,15 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               "divvun-actions run icu4c-build x86_64-unknown-linux-gnu",
               "tar -czf target/icu4c_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu icu4c",
+              "tar -czf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu build/icu",
             ].join("\n"),
             agents: {
               queue: "linux",
             },
-            artifact_paths: ["target/icu4c_x86_64-unknown-linux-gnu.tar.gz"],
+            artifact_paths: [
+              "target/icu4c_x86_64-unknown-linux-gnu.tar.gz",
+              "target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz",
+            ],
           }),
           command({
             label: "Linux x86_64: LibOMP",
