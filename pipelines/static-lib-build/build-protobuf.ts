@@ -179,17 +179,17 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
     cmakeArgs.push(`-DCMAKE_OSX_SYSROOT=${sdkPath}`)
     cmakeArgs.push("-DCMAKE_OSX_ARCHITECTURES=arm64")
   } else if (platform === "android") {
-    const ndkPath = Deno.env.get("ANDROID_NDK_HOME") || Deno.env.get("NDK_ROOT")
+    const ndkPath = Deno.env.get("ANDROID_NDK_HOME") || Deno.env.get("ANDROID_NDK")
     if (!ndkPath) {
       throw new Error(
-        "ANDROID_NDK_HOME or NDK_ROOT environment variable not set",
+        "ANDROID_NDK_HOME or ANDROID_NDK environment variable not set",
       )
     }
     cmakeArgs.push(
       `-DCMAKE_TOOLCHAIN_FILE=${ndkPath}/build/cmake/android.toolchain.cmake`,
     )
     cmakeArgs.push("-DANDROID_ABI=arm64-v8a")
-    cmakeArgs.push("-DANDROID_PLATFORM=android-24")
+    cmakeArgs.push("-DANDROID_PLATFORM=android-21")
     cmakeArgs.push("-DANDROID_STL=c++_shared")
   } else if (platform === "windows") {
     cmakeArgs.push("-DCMAKE_C_COMPILER=cl.exe")

@@ -1,5 +1,5 @@
-import * as path from "@std/path"
 import * as fs from "@std/fs"
+import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
@@ -241,8 +241,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
 
   // Platform-specific configuration
   if (platform === "ios") {
-    configureArgs.push("--host=arm-apple-darwin")
-    configureArgs.push("--with-cross-build=no")
+    configureArgs.push("--host=aarch64-apple-ios")
     const sdkPath =
       (await builder.output("xcrun", ["--sdk", "iphoneos", "--show-sdk-path"]))
         .stdout.trim()
@@ -256,19 +255,18 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       `${Deno.env.get("CXXFLAGS") || ""} ${cxxflags}`.trim(),
     )
   } else if (platform === "android") {
-    const ndkPath = Deno.env.get("ANDROID_NDK_HOME") || Deno.env.get("NDK_ROOT")
+    const ndkPath = Deno.env.get("ANDROID_NDK_HOME") || Deno.env.get("ANDROID_NDK")
     if (!ndkPath) {
       throw new Error(
-        "ANDROID_NDK_HOME or NDK_ROOT environment variable not set",
+        "ANDROID_NDK_HOME or ANDROID_NDK environment variable not set",
       )
     }
     configureArgs.push("--host=aarch64-linux-android")
-    configureArgs.push("--with-cross-build=no")
     const toolchainPath = `${ndkPath}/toolchains/llvm/prebuilt/linux-x86_64`
     const sysroot = `${toolchainPath}/sysroot`
-    const cflags = `-target aarch64-linux-android24 --sysroot=${sysroot}`
+    const cflags = `-target aarch64-linux-android21 --sysroot=${sysroot}`
     const cxxflags =
-      `-target aarch64-linux-android24 --sysroot=${sysroot} -stdlib=libc++`
+      `-target aarch64-linux-android21 --sysroot=${sysroot} -stdlib=libc++`
     Deno.env.set("CFLAGS", `${Deno.env.get("CFLAGS") || ""} ${cflags}`.trim())
     Deno.env.set(
       "CXXFLAGS",
