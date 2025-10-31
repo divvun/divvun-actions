@@ -132,7 +132,10 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
     // ICU4C cross-compilation: download host build
     if (library === "icu4c" && hostArtifactName && hostTargetDir) {
       // Download the build artifact (not the release artifact)
-      const buildArtifactName = hostArtifactName.replace("icu4c_", "icu4c-build_")
+      const buildArtifactName = hostArtifactName.replace(
+        "icu4c_",
+        "icu4c-build_",
+      )
       commands.push(
         `buildkite-agent artifact download "target/${buildArtifactName}" .`,
         `mkdir -p target/${hostTargetDir}`,
@@ -145,23 +148,31 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
     // Create artifacts
     if (targetTriple.includes("windows")) {
       commands.push(
-        `C:\\msys2\\usr\\bin\\bash.exe -c "bsdtar -czf target/${artifactName} -C target/${targetTriple} ${library}"`
+        `C:\\msys2\\usr\\bin\\bash.exe -c "bsdtar -czf target/${artifactName} -C target/${targetTriple} ${library}"`,
       )
     } else {
       commands.push(
-        `tar -czf target/${artifactName} -C target/${targetTriple} ${library}`
+        `tar -czf target/${artifactName} -C target/${targetTriple} ${library}`,
       )
       // For ICU4C native platforms, also create build artifact
-      if (library === "icu4c" && (targetTriple === "aarch64-apple-darwin" || targetTriple === "x86_64-unknown-linux-gnu")) {
+      if (
+        library === "icu4c" &&
+        (targetTriple === "aarch64-apple-darwin" ||
+          targetTriple === "x86_64-unknown-linux-gnu")
+      ) {
         commands.push(
-          `tar -czf target/${library}-build_${targetTriple}.tar.gz -C target/${targetTriple} build/icu`
+          `tar -czf target/${library}-build_${targetTriple}.tar.gz -C target/${targetTriple} build/icu`,
         )
       }
     }
 
     // Determine artifact paths
     const artifactPaths = [`target/${artifactName}`]
-    if (library === "icu4c" && (targetTriple === "aarch64-apple-darwin" || targetTriple === "x86_64-unknown-linux-gnu")) {
+    if (
+      library === "icu4c" &&
+      (targetTriple === "aarch64-apple-darwin" ||
+        targetTriple === "x86_64-unknown-linux-gnu")
+    ) {
       artifactPaths.push(`target/${library}-build_${targetTriple}.tar.gz`)
     }
 

@@ -179,7 +179,8 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
     cmakeArgs.push(`-DCMAKE_OSX_SYSROOT=${sdkPath}`)
     cmakeArgs.push("-DCMAKE_OSX_ARCHITECTURES=arm64")
   } else if (platform === "android") {
-    const ndkPath = Deno.env.get("ANDROID_NDK_HOME") || Deno.env.get("ANDROID_NDK")
+    const ndkPath = Deno.env.get("ANDROID_NDK_HOME") ||
+      Deno.env.get("ANDROID_NDK")
     if (!ndkPath) {
       throw new Error(
         "ANDROID_NDK_HOME or ANDROID_NDK environment variable not set",

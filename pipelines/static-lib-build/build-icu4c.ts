@@ -90,18 +90,26 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     // Check if the correct version of ICU is already installed
     try {
       const result = await builder.output("vcpkg", ["list", "icu"])
-      const installedVersion = result.stdout.match(/icu:x64-windows-static\s+([\d.]+)/)?.[1]
+      const installedVersion = result.stdout.match(
+        /icu:x64-windows-static\s+([\d.]+)/,
+      )?.[1]
 
       const targetVersion = version.replace(/^v/, "")
 
       if (installedVersion === targetVersion) {
-        console.log(`ICU ${targetVersion} already installed in vcpkg, using cached version`)
+        console.log(
+          `ICU ${targetVersion} already installed in vcpkg, using cached version`,
+        )
       } else {
         if (installedVersion) {
-          console.log(`Found ICU ${installedVersion} but need ${targetVersion}, reinstalling...`)
+          console.log(
+            `Found ICU ${installedVersion} but need ${targetVersion}, reinstalling...`,
+          )
           await builder.exec("vcpkg", ["remove", "icu:x64-windows-static"])
         }
-        console.log(`Installing ICU ${targetVersion} with vcpkg using overlay...`)
+        console.log(
+          `Installing ICU ${targetVersion} with vcpkg using overlay...`,
+        )
         await builder.exec("vcpkg", [
           "install",
           "icu:x64-windows-static",
@@ -179,7 +187,8 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     Deno.env.set("IPHONEOS_DEPLOYMENT_TARGET", "12.0")
   } else if (platform === "android") {
     // Android: use Android NDK toolchain
-    const ndkPath = Deno.env.get("ANDROID_NDK_HOME") || Deno.env.get("ANDROID_NDK")
+    const ndkPath = Deno.env.get("ANDROID_NDK_HOME") ||
+      Deno.env.get("ANDROID_NDK")
     if (!ndkPath) {
       throw new Error(
         "ANDROID_NDK_HOME or ANDROID_NDK environment variable not set",
@@ -264,20 +273,6 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     path.join(repoRoot, "icu"),
   ])
 
-  // Patch ICU to recognize iOS as Darwin-based platform
-  const acincludePath = path.join(icuSourceDir, "acinclude.m4")
-  let acincludeContent = await Deno.readTextFile(acincludePath)
-  acincludeContent = acincludeContent.replace(
-    "*-apple-darwin*)",
-    "*-apple-*)"
-  )
-  await Deno.writeTextFile(acincludePath, acincludeContent)
-  console.log("Patched ICU to recognize iOS as Darwin platform")
-
-  // Regenerate configure script with the patched acinclude.m4
-  console.log("Regenerating configure script...")
-  await builder.exec("autoconf", [], { cwd: icuSourceDir })
-
   // Clean build directory if requested
   if (clean) {
     console.log("Cleaning build directory...")
@@ -306,7 +301,24 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
 
   // Platform-specific configuration
   if (platform === "ios") {
-    const hostBuildDir = path.join(repoRoot, "target/aarch64-apple-darwin/build/icu")
+    // Patch ICU to recognize iOS as Darwin-based platform
+    const acincludePath = path.join(icuSourceDir, "acinclude.m4")
+    let acincludeContent = await Deno.readTextFile(acincludePath)
+    acincludeContent = acincludeContent.replace(
+      "*-apple-darwin*)",
+      "*-apple-*)",
+    )
+    await Deno.writeTextFile(acincludePath, acincludeContent)
+    console.log("Patched ICU to recognize iOS as Darwin platform")
+
+    // Regenerate configure script with the patched acinclude.m4
+    console.log("Regenerating configure script...")
+    await builder.exec("autoconf", [], { cwd: icuSourceDir })
+
+    const hostBuildDir = path.join(
+      repoRoot,
+      "target/aarch64-apple-darwin/build/icu",
+    )
     configureArgs.push("--host=aarch64-apple-ios")
     configureArgs.push(`--with-cross-build=${hostBuildDir}`)
     const sdkPath =
@@ -322,13 +334,17 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       `${Deno.env.get("CXXFLAGS") || ""} ${cxxflags}`.trim(),
     )
   } else if (platform === "android") {
-    const ndkPath = Deno.env.get("ANDROID_NDK_HOME") || Deno.env.get("ANDROID_NDK")
+    const ndkPath = Deno.env.get("ANDROID_NDK_HOME") ||
+      Deno.env.get("ANDROID_NDK")
     if (!ndkPath) {
       throw new Error(
         "ANDROID_NDK_HOME or ANDROID_NDK environment variable not set",
       )
     }
-    const hostBuildDir = path.join(repoRoot, "target/x86_64-unknown-linux-gnu/build/icu")
+    const hostBuildDir = path.join(
+      repoRoot,
+      "target/x86_64-unknown-linux-gnu/build/icu",
+    )
     configureArgs.push("--host=aarch64-linux-android")
     configureArgs.push(`--with-cross-build=${hostBuildDir}`)
     // Note: We don't need to set CFLAGS/CXXFLAGS here since the NDK compiler
