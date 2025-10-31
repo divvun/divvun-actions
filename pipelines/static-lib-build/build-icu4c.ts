@@ -288,7 +288,16 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     hasRunConfigureIcu = false
   }
 
-  if (hasRunConfigureIcu) {
+  // For cross-compilation (iOS/Android), always use configure directly
+  // runConfigureICU doesn't handle cross-compilation well
+  if (platform === "ios" || platform === "android") {
+    console.log("Cross-compiling: using configure directly")
+    await builder.exec(
+      path.join(icuSourceDir, "configure"),
+      configureArgs,
+      { cwd: buildRoot },
+    )
+  } else if (hasRunConfigureIcu) {
     console.log(`Using runConfigureICU for platform: ${icuPlatform}`)
     await builder.exec(
       runConfigureIcu,
