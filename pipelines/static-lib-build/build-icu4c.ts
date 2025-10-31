@@ -315,6 +315,12 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     console.log("Regenerating configure script...")
     await builder.exec("autoconf", [], { cwd: icuSourceDir })
 
+    // Also copy mh-darwin to mh-unknown for the build phase
+    const mhDarwin = path.join(icuSourceDir, "config/mh-darwin")
+    const mhUnknown = path.join(icuSourceDir, "config/mh-unknown")
+    await Deno.copyFile(mhDarwin, mhUnknown)
+    console.log("Copied mh-darwin to mh-unknown for iOS build")
+
     const hostBuildDir = path.join(
       repoRoot,
       "target/aarch64-apple-darwin/build/icu",
