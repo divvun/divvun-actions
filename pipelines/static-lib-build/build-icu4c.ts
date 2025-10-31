@@ -134,15 +134,22 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     Deno.env.set("SDKROOT", sdkroot)
     Deno.env.set("IPHONEOS_DEPLOYMENT_TARGET", "12.0")
   } else if (platform === "android") {
-    // Android: use clang or gcc
-    try {
-      await builder.exec("which", ["clang"])
-      Deno.env.set("CC", "clang")
-      Deno.env.set("CXX", "clang++")
-    } catch {
-      Deno.env.set("CC", "gcc")
-      Deno.env.set("CXX", "g++")
+    // Android: use Android NDK toolchain
+    const ndkPath = Deno.env.get("ANDROID_NDK_HOME") || Deno.env.get("ANDROID_NDK")
+    if (!ndkPath) {
+      throw new Error(
+        "ANDROID_NDK_HOME or ANDROID_NDK environment variable not set",
+      )
     }
+    const toolchainPath = `${ndkPath}/toolchains/llvm/prebuilt/linux-x86_64`
+    const cc = `${toolchainPath}/bin/aarch64-linux-android21-clang`
+    const cxx = `${toolchainPath}/bin/aarch64-linux-android21-clang++`
+
+    Deno.env.set("CC", cc)
+    Deno.env.set("CXX", cxx)
+    Deno.env.set("AR", `${toolchainPath}/bin/llvm-ar`)
+    Deno.env.set("RANLIB", `${toolchainPath}/bin/llvm-ranlib`)
+    Deno.env.set("LD", `${toolchainPath}/bin/ld`)
   } else if (platform === "linux") {
     // Linux: prefer clang if available
     try {
@@ -213,6 +220,16 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     path.join(repoRoot, "icu"),
   ])
 
+  // Patch ICU to recognize iOS as Darwin-based platform
+  const acincludePath = path.join(icuSourceDir, "acinclude.m4")
+  let acincludeContent = await Deno.readTextFile(acincludePath)
+  acincludeContent = acincludeContent.replace(
+    "*-apple-darwin*)",
+    "*-apple-*)"
+  )
+  await Deno.writeTextFile(acincludePath, acincludeContent)
+  console.log("Patched ICU to recognize iOS as Darwin platform")
+
   // Clean build directory if requested
   if (clean) {
     console.log("Cleaning build directory...")
@@ -266,16 +283,8 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     const hostBuildDir = path.join(repoRoot, "target/x86_64-unknown-linux-gnu/build/icu")
     configureArgs.push("--host=aarch64-linux-android")
     configureArgs.push(`--with-cross-build=${hostBuildDir}`)
-    const toolchainPath = `${ndkPath}/toolchains/llvm/prebuilt/linux-x86_64`
-    const sysroot = `${toolchainPath}/sysroot`
-    const cflags = `-target aarch64-linux-android21 --sysroot=${sysroot}`
-    const cxxflags =
-      `-target aarch64-linux-android21 --sysroot=${sysroot} -stdlib=libc++`
-    Deno.env.set("CFLAGS", `${Deno.env.get("CFLAGS") || ""} ${cflags}`.trim())
-    Deno.env.set(
-      "CXXFLAGS",
-      `${Deno.env.get("CXXFLAGS") || ""} ${cxxflags}`.trim(),
-    )
+    // Note: We don't need to set CFLAGS/CXXFLAGS here since the NDK compiler
+    // already knows the correct target and sysroot from its name (aarch64-linux-android21-clang)
   }
 
   // Check if runConfigureICU exists
