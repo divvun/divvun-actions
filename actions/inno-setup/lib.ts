@@ -12,6 +12,7 @@ export async function makeInstaller(
 
   // Fetch signing secrets and pass them via environment variables
   // so they're available to the sign subprocess called by Inno Setup
+  logger.info("Fetching signing secrets for Inno Setup...")
   const secrets = await builder.secrets()
   const env = {
     ...Deno.env.toObject(),
@@ -20,6 +21,7 @@ export async function makeInstaller(
     SSLCOM_CREDENTIAL_ID: secrets.get("sslcom/credentialId"),
     SSLCOM_TOTP_SECRET: secrets.get("sslcom/totpSecret"),
   }
+  logger.info("Signing secrets fetched and added to environment")
 
   const proc = new Deno.Command(
     "cmd",
