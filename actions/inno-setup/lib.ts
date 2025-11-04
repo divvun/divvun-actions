@@ -63,6 +63,18 @@ export async function makeInstaller(
     console.error(stderrStr)
   }
 
+  // Read and display debug log from sign subprocess
+  const debugLogPath = path.join(issDir, ".divvun-sign-debug.log")
+  try {
+    const debugLog = await Deno.readTextFile(debugLogPath)
+    console.log("=== Sign subprocess debug log ===")
+    console.log(debugLog)
+    console.log("=== End debug log ===")
+    await Deno.remove(debugLogPath)
+  } catch (error) {
+    console.log("No debug log found (sign command may not have run):", error)
+  }
+
   // Clean up secrets file
   try {
     await Deno.remove(secretsFilePath)
