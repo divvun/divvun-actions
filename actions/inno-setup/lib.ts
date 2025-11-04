@@ -34,10 +34,27 @@ export async function makeInstaller(
         issPath,
       ],
       env,
+      stdout: "piped",
+      stderr: "piped",
     },
-  ).spawn()
+  )
 
-  const code = (await proc.status).code
+  const { code, stdout, stderr } = await proc.output()
+
+  // Always log stdout/stderr to see what happened
+  const decoder = new TextDecoder()
+  const stdoutStr = decoder.decode(stdout)
+  const stderrStr = decoder.decode(stderr)
+
+  if (stdoutStr) {
+    console.log("=== Inno Setup stdout ===")
+    console.log(stdoutStr)
+  }
+  if (stderrStr) {
+    console.error("=== Inno Setup stderr ===")
+    console.error(stderrStr)
+  }
+
   if (code !== 0) {
     logger.debug("=== Inno setup file ===")
     logger.debug(await Deno.readTextFile(issPath))
