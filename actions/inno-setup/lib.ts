@@ -31,12 +31,19 @@ export async function makeInstaller(
     ...Deno.env.toObject(),
   }
 
+  const buildCmd = path.join(import.meta.dirname ?? "", "build.cmd")
+  logger.info(`Calling Inno Setup:`)
+  logger.info(`  build.cmd: ${buildCmd}`)
+  logger.info(`  scriptPath: ${scriptPath}`)
+  logger.info(`  installerOutput: ${installerOutput.path}`)
+  logger.info(`  issPath: ${issPath}`)
+
   const proc = new Deno.Command(
     "cmd",
     {
       args: [
         "/C",
-        path.join(import.meta.dirname ?? "", "build.cmd"),
+        buildCmd,
         scriptPath,
         installerOutput.path,
         issPath,
@@ -84,9 +91,9 @@ export async function makeInstaller(
   }
 
   if (code !== 0) {
-    logger.debug("=== Inno setup file ===")
-    logger.debug(await Deno.readTextFile(issPath))
-    logger.debug("=/= === =/=")
+    console.log("=== Inno setup file ===")
+    console.log(await Deno.readTextFile(issPath))
+    console.log("=/= === =/=")
     throw new Error(`Process exited with code ${code}`)
   }
 
