@@ -10,18 +10,26 @@ export async function makeInstaller(
   const installerOutput = await makeTempDir()
   const scriptPath = `${target.projectPath}\\bin\\divvun-actions.bat`
 
-  // Fetch signing secrets and pass them via environment variables
-  // so they're available to the sign subprocess called by Inno Setup
+  // Fetch signing secrets and write to temp file next to the ISS file
+  // Use a predictable path so subprocess doesn't need to read env vars
   logger.info("Fetching signing secrets for Inno Setup...")
   const secrets = await builder.secrets()
+
+  // Write secrets next to the ISS file so the sign subprocess can find it
+  const issDir = path.dirname(issPath)
+  const secretsFilePath = path.join(issDir, ".divvun-sign-secrets.json")
+  const secretsData = {
+    username: secrets.get("sslcom/username"),
+    password: secrets.get("sslcom/password"),
+    credentialId: secrets.get("sslcom/credentialId"),
+    totpSecret: secrets.get("sslcom/totpSecret"),
+  }
+  await Deno.writeTextFile(secretsFilePath, JSON.stringify(secretsData))
+  logger.info(`Signing secrets written to: ${secretsFilePath}`)
+
   const env = {
     ...Deno.env.toObject(),
-    SSLCOM_USERNAME: secrets.get("sslcom/username"),
-    SSLCOM_PASSWORD: secrets.get("sslcom/password"),
-    SSLCOM_CREDENTIAL_ID: secrets.get("sslcom/credentialId"),
-    SSLCOM_TOTP_SECRET: secrets.get("sslcom/totpSecret"),
   }
-  logger.info("Signing secrets fetched and added to environment")
 
   const proc = new Deno.Command(
     "cmd",
@@ -53,6 +61,14 @@ export async function makeInstaller(
   if (stderrStr) {
     console.error("=== Inno Setup stderr ===")
     console.error(stderrStr)
+  }
+
+  // Clean up secrets file
+  try {
+    await Deno.remove(secretsFilePath)
+    logger.info("Secrets file cleaned up")
+  } catch (error) {
+    logger.warn(`Failed to clean up secrets file: ${error}`)
   }
 
   if (code !== 0) {

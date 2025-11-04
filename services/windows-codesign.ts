@@ -4,31 +4,34 @@ import { sslComCodeSign } from "../util/sslcom-codesigner.ts"
 export default async function sign(inputFile: string) {
   console.log("=== SIGN COMMAND CALLED ===")
   console.log("Input file:", inputFile)
+  console.log("Working directory:", Deno.cwd())
 
-  // Try environment variables first (for when called as subprocess from Inno Setup)
-  // Fall back to fetching from builder.secrets() if not available
-  let username = Deno.env.get("SSLCOM_USERNAME")
-  let password = Deno.env.get("SSLCOM_PASSWORD")
-  let credentialId = Deno.env.get("SSLCOM_CREDENTIAL_ID")
-  let totpSecret = Deno.env.get("SSLCOM_TOTP_SECRET")
+  let username: string
+  let password: string
+  let credentialId: string
+  let totpSecret: string
 
-  console.log("Env vars present:", {
-    username: !!username,
-    password: !!password,
-    credentialId: !!credentialId,
-    totpSecret: !!totpSecret,
-  })
+  // Try reading from secrets file in current working directory
+  // (placed there by makeInstaller before calling Inno Setup)
+  const secretsFilePath = ".divvun-sign-secrets.json"
 
-  if (!username || !password || !credentialId || !totpSecret) {
-    console.log("Fetching secrets from builder.secrets()...")
+  try {
+    console.log("Checking for secrets file:", secretsFilePath)
+    const secretsData = JSON.parse(await Deno.readTextFile(secretsFilePath))
+    username = secretsData.username
+    password = secretsData.password
+    credentialId = secretsData.credentialId
+    totpSecret = secretsData.totpSecret
+    console.log("Secrets loaded from file successfully")
+  } catch (error) {
+    console.log("Secrets file not found, fetching from builder.secrets()...")
+    console.log("Error was:", error)
     const secrets = await builder.secrets()
     username = secrets.get("sslcom/username")
     password = secrets.get("sslcom/password")
     credentialId = secrets.get("sslcom/credentialId")
     totpSecret = secrets.get("sslcom/totpSecret")
     console.log("Secrets fetched successfully")
-  } else {
-    console.log("Using secrets from environment variables")
   }
 
   try {
