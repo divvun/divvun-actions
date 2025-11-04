@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import * as target from "~/target.ts"
+import * as builder from "~/builder.ts"
 import { makeTempDir } from "../../util/temp.ts"
 import logger from "../../util/log.ts"
 
@@ -8,6 +9,17 @@ export async function makeInstaller(
 ): Promise<string> {
   const installerOutput = await makeTempDir()
   const scriptPath = `${target.projectPath}\\bin\\divvun-actions.bat`
+
+  // Fetch signing secrets and pass them via environment variables
+  // so they're available to the sign subprocess called by Inno Setup
+  const secrets = await builder.secrets()
+  const env = {
+    ...Deno.env.toObject(),
+    SSLCOM_USERNAME: secrets.get("sslcom/username"),
+    SSLCOM_PASSWORD: secrets.get("sslcom/password"),
+    SSLCOM_CREDENTIAL_ID: secrets.get("sslcom/credentialId"),
+    SSLCOM_TOTP_SECRET: secrets.get("sslcom/totpSecret"),
+  }
 
   const proc = new Deno.Command(
     "cmd",
@@ -19,6 +31,7 @@ export async function makeInstaller(
         installerOutput.path,
         issPath,
       ],
+      env,
     },
   ).spawn()
 
