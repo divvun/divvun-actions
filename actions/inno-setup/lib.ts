@@ -70,6 +70,18 @@ export async function makeInstaller(
     console.error(stderrStr)
   }
 
+  // Read and display debug log from batch file
+  const batDebugLogPath = path.join(target.projectPath, ".divvun-bat-debug.log")
+  try {
+    const batDebugLog = await Deno.readTextFile(batDebugLogPath)
+    console.log("=== Batch file debug log ===")
+    console.log(batDebugLog)
+    console.log("=== End batch file log ===")
+    await Deno.remove(batDebugLogPath)
+  } catch (error) {
+    console.log("No batch file debug log found:", error)
+  }
+
   // Read and display debug log from sign subprocess
   const debugLogPath = path.join(issDir, ".divvun-sign-debug.log")
   try {
@@ -79,7 +91,7 @@ export async function makeInstaller(
     console.log("=== End debug log ===")
     await Deno.remove(debugLogPath)
   } catch (error) {
-    console.log("No debug log found (sign command may not have run):", error)
+    console.log("No sign debug log found (sign command may not have run):", error)
   }
 
   // Clean up secrets file
