@@ -50,6 +50,8 @@ const env = (prefix: string): Env => {
   const repoPath = repoUrl.pathname.replace(/^\//, "")
   const repoName = repoPath.split("/").pop()!
   const config = parseConfigFromEnv()
+  const agentMetaData = metadata(prefix)
+  const buildTimestamp = agentMetaData["BUILD_TIMESTAMP"] ?? new Date().toISOString()
 
   return {
     jobId: Deno.env.get(`${prefix}_JOB_ID`),
@@ -58,7 +60,8 @@ const env = (prefix: string): Env => {
     buildId: Deno.env.get(`${prefix}_BUILD_ID`),
     buildNumber: Deno.env.get(`${prefix}_BUILD_NUMBER`),
     agentId: Deno.env.get(`${prefix}_AGENT_ID`),
-    agentMetaData: metadata(prefix),
+    agentMetaData,
+    buildTimestamp,
     artifactUploadDestination: Deno.env.get(
       `${prefix}_ARTIFACT_UPLOAD_DESTINATION`,
     ),
@@ -96,6 +99,7 @@ export type Env = {
   buildNumber: string | undefined
   agentId: string | undefined
   agentMetaData: Record<string, string>
+  buildTimestamp: string
   artifactUploadDestination: string | undefined
   branch: string | undefined
   tag: string | undefined

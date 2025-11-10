@@ -4,11 +4,12 @@ import * as toml from "@std/toml"
 import * as yaml from "@std/yaml"
 import grammarBundle from "~/actions/grammar/bundle.ts"
 import langBuild from "~/actions/lang/build.ts"
+import langCheck from "~/actions/lang/check.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import { GitHub } from "~/util/github.ts"
-import { versionAsNightly } from "~/util/shared.ts"
+import { versionAsDev } from "~/util/shared.ts"
 import spellerBundle from "../../actions/speller/bundle.ts"
 import spellerDeploy from "../../actions/speller/deploy.ts"
 import { SpellerManifest, SpellerType } from "../../actions/speller/manifest.ts"
@@ -54,37 +55,37 @@ function isConfigActive(config: BuildProps | undefined | null): boolean {
   })
 }
 
-export async function runLang() {
+export async function runLangBuild() {
   const yml = await Deno.readTextFile(".build-config.yml")
   const config = await yaml.parse(yml) as any
 
   const buildConfig = config?.build as BuildProps | undefined
-  const checkConfig = config?.check as BuildProps | undefined
-
-  const tag = builder.env.tag ?? ""
-  const version = extractVersionFromTag(tag)
-  const isValidSemver = version !== null && semver.canParse(version)
-  const isReleaseTag = isValidSemver &&
-    (tag.startsWith("speller-") || tag.startsWith("grammar-"))
 
   const shouldBuild = isConfigActive(buildConfig)
-  const shouldCheck = !isReleaseTag && isConfigActive(checkConfig)
 
-  if (!shouldBuild && !shouldCheck) {
+  if (!shouldBuild) {
     throw new Error(
-      "No build or check configuration found in .build-config.yml",
+      "No build configuration found in .build-config.yml",
     )
   }
 
-  if (shouldCheck && !shouldBuild) {
-    throw new Error(
-      "Cannot run tests without building. Add a 'build:' section.",
-    )
+  await langBuild(buildConfig!)
+}
+
+export async function runLangTest() {
+  const yml = await Deno.readTextFile(".build-config.yml")
+  const config = await yaml.parse(yml) as any
+
+  const checkConfig = config?.check as BuildProps | undefined
+
+  const shouldCheck = isConfigActive(checkConfig)
+
+  if (!shouldCheck) {
+    logger.info("No check configuration found in .build-config.yml, skipping tests")
+    return
   }
 
-  if (shouldBuild) {
-    await langBuild(buildConfig!, shouldCheck ? checkConfig : undefined)
-  }
+  await langCheck()
 }
 
 export async function runLangBundle(
@@ -161,6 +162,7 @@ function isPrerelease(version: string): boolean {
 
 export async function runLangDeploy() {
   const isSpellerReleaseTag = SPELLER_RELEASE_TAG.test(builder.env.tag ?? "")
+  const isMainBranch = builder.env.branch === "main"
 
   let manifest
   try {
@@ -171,7 +173,7 @@ export async function runLangDeploy() {
     logger.error("Failed to read manifest.toml:", e)
     throw e
   }
-  const version = await versionAsNightly(manifest.spellerversion)
+
   const allSecrets = await builder.secrets()
 
   const secrets = {
@@ -180,13 +182,13 @@ export async function runLangDeploy() {
     awsSecretAccessKey: allSecrets.get("s3/secretAccessKey"),
   }
 
-  await builder.downloadArtifacts("*.txz", ".")
+  await builder.downloadArtifacts("*.pkt.tar.zst", ".")
   await builder.downloadArtifacts("*.exe", ".")
   await builder.downloadArtifacts("*.pkg", ".")
 
   const windowsFiles = await globOneFile("*.exe")
   const macosFiles = await globOneFile("*.pkg")
-  const mobileFiles = await globOneFile("*.txz")
+  const mobileFiles = await globOneFile("*.pkt.tar.zst")
 
   console.log("Deploying language files:")
   console.log(`- Windows: ${windowsFiles}`)
@@ -196,36 +198,6 @@ export async function runLangDeploy() {
   if (!windowsFiles || !macosFiles || !mobileFiles) {
     throw new Error("Missing required files for deployment")
   }
-
-  await spellerDeploy({
-    spellerType: SpellerType.Windows,
-    manifestPath: "./manifest.toml",
-    payloadPath: windowsFiles,
-    version,
-    channel: isSpellerReleaseTag ? null : "nightly",
-    pahkatRepo: "https://pahkat.uit.no/main/",
-    secrets,
-  })
-
-  await spellerDeploy({
-    spellerType: SpellerType.MacOS,
-    manifestPath: "./manifest.toml",
-    payloadPath: macosFiles,
-    version,
-    channel: isSpellerReleaseTag ? null : "nightly",
-    pahkatRepo: "https://pahkat.uit.no/main/",
-    secrets,
-  })
-
-  await spellerDeploy({
-    spellerType: SpellerType.Mobile,
-    manifestPath: "./manifest.toml",
-    payloadPath: mobileFiles,
-    version,
-    channel: isSpellerReleaseTag ? null : "nightly",
-    pahkatRepo: "https://pahkat.uit.no/main/",
-    secrets,
-  })
 
   if (isSpellerReleaseTag) {
     if (!builder.env.repo) {
@@ -241,20 +213,110 @@ export async function runLangDeploy() {
       throw new Error(`Could not extract version from tag: ${builder.env.tag}`)
     }
 
+    logger.info(`Deploying speller version ${tagVersion} to Pahkat stable channel`)
+
+    await spellerDeploy({
+      spellerType: SpellerType.Windows,
+      manifestPath: "./manifest.toml",
+      payloadPath: windowsFiles,
+      version: tagVersion,
+      channel: null,
+      pahkatRepo: "https://pahkat.uit.no/main/",
+      secrets,
+    })
+
+    await spellerDeploy({
+      spellerType: SpellerType.MacOS,
+      manifestPath: "./manifest.toml",
+      payloadPath: macosFiles,
+      version: tagVersion,
+      channel: null,
+      pahkatRepo: "https://pahkat.uit.no/main/",
+      secrets,
+    })
+
+    await spellerDeploy({
+      spellerType: SpellerType.Mobile,
+      manifestPath: "./manifest.toml",
+      payloadPath: mobileFiles,
+      version: tagVersion,
+      channel: null,
+      pahkatRepo: "https://pahkat.uit.no/main/",
+      secrets,
+    })
+
     const prerelease = isPrerelease(tagVersion)
+
+    const versionWithBuild = builder.env.buildNumber
+      ? `${tagVersion}+build.${builder.env.buildNumber}`
+      : tagVersion
+
+    const langMatch = builder.env.repoName?.match(/lang-(.+)/)
+    if (!langMatch) {
+      throw new Error(`Could not extract language code from repo: ${builder.env.repoName}`)
+    }
+    const langCode = langMatch[1]
+    const packageName = `speller-${langCode}`
+
+    const versionedWindowsFile = `${packageName}_${versionWithBuild}_noarch-windows.exe`
+    const versionedMacosFile = `${packageName}_${versionWithBuild}_noarch-macos.pkg`
+    const versionedMobileFile = `${packageName}_${versionWithBuild}_noarch-mobile.pkt.tar.zst`
+
+    await Deno.rename(windowsFiles, versionedWindowsFile)
+    await Deno.rename(macosFiles, versionedMacosFile)
+    await Deno.rename(mobileFiles, versionedMobileFile)
 
     logger.info(`Creating GitHub release for speller version ${tagVersion}`)
     logger.info(`Pre-release: ${prerelease}`)
-    logger.info(`Artifacts: ${windowsFiles}, ${macosFiles}, ${mobileFiles}`)
+    logger.info(`Artifacts: ${versionedWindowsFile}, ${versionedMacosFile}, ${versionedMobileFile}`)
 
     const gh = new GitHub(builder.env.repo)
     await gh.createRelease(
       builder.env.tag,
-      [windowsFiles, macosFiles, mobileFiles],
+      [versionedWindowsFile, versionedMacosFile, versionedMobileFile],
       { prerelease },
     )
 
     logger.info("Speller GitHub release created successfully")
+  } else if (isMainBranch) {
+    if (!builder.env.repo) {
+      throw new Error("No repository information available")
+    }
+
+    const devVersion = versionAsDev(
+      manifest.spellerversion,
+      builder.env.buildTimestamp,
+      builder.env.buildNumber,
+    )
+
+    const langMatch = builder.env.repoName?.match(/lang-(.+)/)
+    if (!langMatch) {
+      throw new Error(`Could not extract language code from repo: ${builder.env.repoName}`)
+    }
+    const langCode = langMatch[1]
+    const packageName = `speller-${langCode}`
+    const releaseTag = `speller-${langCode}/dev-latest`
+
+    const versionedWindowsFile = `${packageName}_${devVersion}_noarch-windows.exe`
+    const versionedMacosFile = `${packageName}_${devVersion}_noarch-macos.pkg`
+    const versionedMobileFile = `${packageName}_${devVersion}_noarch-mobile.pkt.tar.zst`
+
+    await Deno.rename(windowsFiles, versionedWindowsFile)
+    await Deno.rename(macosFiles, versionedMacosFile)
+    await Deno.rename(mobileFiles, versionedMobileFile)
+
+    logger.info(`Creating dev-latest GitHub release for speller version ${devVersion}`)
+    logger.info(`Release tag: ${releaseTag}`)
+    logger.info(`Artifacts: ${versionedWindowsFile}, ${versionedMacosFile}, ${versionedMobileFile}`)
+
+    const gh = new GitHub(builder.env.repo)
+    await gh.updateRelease(
+      releaseTag,
+      [versionedWindowsFile, versionedMacosFile, versionedMobileFile],
+      { draft: true, prerelease: true },
+    )
+
+    logger.info("Speller dev-latest GitHub release updated successfully")
   }
 }
 
@@ -288,6 +350,9 @@ export async function runLangGrammarBundle() {
 }
 
 export async function runLangGrammarDeploy() {
+  const isGrammarReleaseTag = GRAMMAR_RELEASE_TAG.test(builder.env.tag ?? "")
+  const isMainBranch = builder.env.branch === "main"
+
   await builder.downloadArtifacts("*.drb", ".")
   await builder.downloadArtifacts("*.zcheck", ".")
 
@@ -306,40 +371,88 @@ export async function runLangGrammarDeploy() {
     throw new Error("No repository information available")
   }
 
-  if (!builder.env.tag) {
-    throw new Error("No tag information available")
+  let manifest
+  try {
+    manifest = toml.parse(
+      await Deno.readTextFile("./manifest.toml"),
+    ) as any
+  } catch (e) {
+    logger.error("Failed to read manifest.toml:", e)
+    throw e
   }
 
-  const tagVersion = extractVersionFromTag(builder.env.tag)
-  if (!tagVersion) {
-    throw new Error(`Could not extract version from tag: ${builder.env.tag}`)
-  }
-
-  const prerelease = isPrerelease(tagVersion)
   const langTag = builder.env.repoName.split("lang-")[1]?.split("-")[0] ||
     "unknown"
 
   const drbFile = drbFiles[0]
   const zcheckFile = zcheckFiles[0]
 
-  const versionedDrbFile = `grammar-${langTag}-${tagVersion}.drb`
-  const versionedZcheckFile = `grammar-${langTag}-${tagVersion}.zcheck`
+  if (isGrammarReleaseTag) {
+    if (!builder.env.tag) {
+      throw new Error("No tag information available")
+    }
 
-  await Deno.rename(drbFile, versionedDrbFile)
-  await Deno.rename(zcheckFile, versionedZcheckFile)
+    const tagVersion = extractVersionFromTag(builder.env.tag)
+    if (!tagVersion) {
+      throw new Error(`Could not extract version from tag: ${builder.env.tag}`)
+    }
 
-  logger.info(`Creating GitHub release for grammar version ${tagVersion}`)
-  logger.info(`Pre-release: ${prerelease}`)
-  logger.info(`Artifacts: ${versionedDrbFile}, ${versionedZcheckFile}`)
+    const prerelease = isPrerelease(tagVersion)
 
-  const gh = new GitHub(builder.env.repo)
-  await gh.createRelease(
-    builder.env.tag,
-    [versionedDrbFile, versionedZcheckFile],
-    { prerelease },
-  )
+    const versionWithBuild = builder.env.buildNumber
+      ? `${tagVersion}+build.${builder.env.buildNumber}`
+      : tagVersion
 
-  logger.info("Grammar checker GitHub release created successfully")
+    const packageName = `grammar-${langTag}`
+
+    const versionedDrbFile = `${packageName}_${versionWithBuild}_noarch-all.drb`
+    const versionedZcheckFile = `${packageName}_${versionWithBuild}_noarch-all.zcheck`
+
+    await Deno.rename(drbFile, versionedDrbFile)
+    await Deno.rename(zcheckFile, versionedZcheckFile)
+
+    logger.info(`Creating GitHub release for grammar version ${tagVersion}`)
+    logger.info(`Pre-release: ${prerelease}`)
+    logger.info(`Artifacts: ${versionedDrbFile}, ${versionedZcheckFile}`)
+
+    const gh = new GitHub(builder.env.repo)
+    await gh.createRelease(
+      builder.env.tag,
+      [versionedDrbFile, versionedZcheckFile],
+      { prerelease },
+    )
+
+    logger.info("Grammar checker GitHub release created successfully")
+  } else if (isMainBranch) {
+    const grammarVersion = manifest.grammarversion || manifest.version
+    const devVersion = versionAsDev(
+      grammarVersion,
+      builder.env.buildTimestamp,
+      builder.env.buildNumber,
+    )
+
+    const packageName = `grammar-${langTag}`
+    const releaseTag = `grammar-${langTag}/dev-latest`
+
+    const versionedDrbFile = `${packageName}_${devVersion}_noarch-all.drb`
+    const versionedZcheckFile = `${packageName}_${devVersion}_noarch-all.zcheck`
+
+    await Deno.rename(drbFile, versionedDrbFile)
+    await Deno.rename(zcheckFile, versionedZcheckFile)
+
+    logger.info(`Creating dev-latest GitHub release for grammar version ${devVersion}`)
+    logger.info(`Release tag: ${releaseTag}`)
+    logger.info(`Artifacts: ${versionedDrbFile}, ${versionedZcheckFile}`)
+
+    const gh = new GitHub(builder.env.repo)
+    await gh.updateRelease(
+      releaseTag,
+      [versionedDrbFile, versionedZcheckFile],
+      { draft: true, prerelease: true },
+    )
+
+    logger.info("Grammar checker dev-latest GitHub release updated successfully")
+  }
 }
 
 // Anything using more than like 20gb of RAM is considered large
@@ -351,14 +464,15 @@ const LARGE_BUILDS = [
 export function pipelineLang() {
   const isSpellerReleaseTag = SPELLER_RELEASE_TAG.test(builder.env.tag ?? "")
   const isGrammarReleaseTag = GRAMMAR_RELEASE_TAG.test(builder.env.tag ?? "")
+  const isReleaseTag = isSpellerReleaseTag || isGrammarReleaseTag
 
   const extra: Record<string, string> =
     LARGE_BUILDS.includes(builder.env.repoName) ? { size: "large" } : {}
 
-  const first = command({
+  const buildStep = command({
     key: "build",
     label: "Build",
-    command: "divvun-actions run lang",
+    command: "divvun-actions run lang-build",
     agents: {
       queue: "linux",
       ...extra,
@@ -366,17 +480,35 @@ export function pipelineLang() {
   })
 
   if (extra.size === "large") {
-    first.priority = 10
+    buildStep.priority = 10
+  }
+
+  const steps: (CommandStep | { group: string; key: string; depends_on?: string; steps: CommandStep[] })[] = [
+    buildStep,
+  ]
+
+  // Add test step if not a release tag
+  if (!isReleaseTag) {
+    const testStep = command({
+      key: "test",
+      label: "Test",
+      command: "divvun-actions run lang-test",
+      depends_on: "build",
+      soft_fail: true,
+      agents: {
+        queue: "linux",
+        ...extra,
+      },
+    })
+    steps.push(testStep)
   }
 
   // We only deploy on main branch or release tags
   const isSpellerDeploy = isSpellerReleaseTag || builder.env.branch === "main"
-  const isGrammarDeploy = isGrammarReleaseTag
+  const isGrammarDeploy = isGrammarReleaseTag || builder.env.branch === "main"
 
   const pipeline: BuildkitePipeline = {
-    steps: [
-      first,
-    ],
+    steps,
   }
 
   if (isSpellerDeploy) {

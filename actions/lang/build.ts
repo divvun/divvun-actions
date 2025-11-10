@@ -174,7 +174,6 @@ function deriveAutogenFlags(config: BuildProps) {
 
 export default async function langBuild(
   buildConfig: BuildProps,
-  checkConfig?: BuildProps,
 ): Promise<Output> {
   //   {
   //     requiresDesktopAsMobileWorkaround,
@@ -222,13 +221,8 @@ export default async function langBuild(
   logger.debug(`Flags: ${flags}`)
   await autotoolsBuilder.build(flags)
 
-  if (checkConfig) {
-    // TODO: this just runs all the tests.
-    if (Object.values(checkConfig).some((v) => v === true)) {
-      const checkFlags = deriveAutogenFlags(checkConfig)
-      await autotoolsBuilder.check(checkFlags)
-    }
-  }
+  // Upload the build directory for the test step
+  await builder.uploadArtifacts("build/**/*")
 
   if (buildConfig["grammar-checkers"]) {
     // Upload grammar files

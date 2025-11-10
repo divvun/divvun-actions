@@ -43,19 +43,19 @@ export default async function grammarBundle({
   const isGrammarReleaseTag = GRAMMAR_RELEASE_TAG.test(builder.env.tag ?? "")
 
   const packageId = `grammar-${langTag}`
-  const txzPath = `${packageId}_${version}_bundle.txz`
+  const pktPath = `${packageId}_${version}_bundle.pkt.tar.zst`
 
   const allFiles = [...drbPaths, ...zcheckPaths]
-  logger.debug(`Creating txz from [${allFiles.join(", ")}] at ${txzPath}`)
+  logger.debug(`Creating pkt from [${allFiles.join(", ")}] at ${pktPath}`)
 
-  await Tar.createFlatTxz(allFiles, txzPath)
-  logger.debug(`Created txz at ${txzPath}`)
+  await Tar.createFlatPkt(allFiles, pktPath)
+  logger.debug(`Created pkt at ${pktPath}`)
 
-  await builder.uploadArtifacts(txzPath)
+  await builder.uploadArtifacts(pktPath)
   await builder.setMetadata("grammar-version", version)
   await builder.setMetadata("grammar-name", name)
 
   return {
-    payloadPath: txzPath,
+    payloadPath: pktPath,
   }
 }

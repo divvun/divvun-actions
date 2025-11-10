@@ -110,6 +110,83 @@ export class GitHub {
     return code === 0
   }
 
+  async updateRelease(
+    tag: string,
+    artifacts: string[],
+    options: {
+      draft?: boolean
+      prerelease?: boolean
+    } = {},
+  ) {
+    const { draft = true, prerelease = true } = options
+
+    const exists = await this.releaseExists(tag)
+
+    if (exists) {
+      logger.info(`Release ${tag} exists, fetching assets to delete...`)
+
+      const viewArgs = [
+        "release",
+        "view",
+        tag,
+        "--repo",
+        this.#repo,
+        "--json",
+        "assets",
+      ]
+
+      const viewProc = new Deno.Command("gh", {
+        args: viewArgs,
+        stdout: "piped",
+        stderr: "piped",
+      })
+
+      const { code: viewCode, stdout: viewStdout } = await viewProc.output()
+      if (viewCode === 0) {
+        const releaseData = JSON.parse(new TextDecoder().decode(viewStdout)) as {
+          assets: Array<{ name: string }>
+        }
+
+        for (const asset of releaseData.assets) {
+          logger.info(`Deleting asset ${asset.name} from release ${tag}...`)
+          const deleteArgs = [
+            "release",
+            "delete-asset",
+            tag,
+            asset.name,
+            "--repo",
+            this.#repo,
+            "--yes",
+          ]
+
+          const deleteProc = new Deno.Command("gh", {
+            args: deleteArgs,
+          }).spawn()
+
+          const { code: deleteCode } = await deleteProc.output()
+          if (deleteCode !== 0) {
+            logger.warning(
+              `Failed to delete asset ${asset.name}: exit code ${deleteCode}`,
+            )
+          }
+        }
+      }
+
+      logger.info(`Uploading new artifacts to existing release ${tag}...`)
+      await this.uploadRelease(tag, artifacts)
+    } else {
+      logger.info(
+        `Release ${tag} does not exist, creating as draft and prerelease...`,
+      )
+      await this.createRelease(tag, artifacts, {
+        draft,
+        prerelease,
+        latest: false,
+        verifyTag: false,
+      })
+    }
+  }
+
   async getLatestRelease(
     pattern: string | RegExp,
     includePrerelease = false,

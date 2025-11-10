@@ -64,14 +64,14 @@ async function createTarball(
   // Ensure binary has execute permissions
   await Deno.chmod(distBinaryPath, 0o755)
 
-  // Create .txz file in temp directory
+  // Create .tar.zst file in temp directory
   const pathItems = [packageId, version, platform, architecture]
-  const txzFileName = `${pathItems.join("_")}.txz`
-  const txzPath = path.join(tempDir.path, txzFileName)
+  const tarZstFileName = `${pathItems.join("_")}.tar.zst`
+  const tarZstPath = path.join(tempDir.path, tarZstFileName)
 
-  await Tar.createFlatTxz([binDir], txzPath)
+  await Tar.createFlatTarZst([binDir], tarZstPath)
 
-  return txzPath
+  return tarZstPath
 }
 
 function releaseReq(

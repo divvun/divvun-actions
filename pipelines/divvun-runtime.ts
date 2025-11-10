@@ -169,7 +169,7 @@ export async function pipelineDivvunRuntime() {
         "echo '--- Signing'",
         `divvun-actions run macos-sign './Divvun Runtime Playground.app' '' ./playground/src-tauri/Entitlements.plist`,
         "echo '--- Creating final archive'",
-        `tar -czf divvun-rt-playground-${target} './Divvun Runtime Playground.app'`,
+        `bsdtar --gzip --options gzip:compression-level=9 -cf divvun-rt-playground-${target} './Divvun Runtime Playground.app'`,
         `buildkite-agent artifact upload divvun-rt-playground-${target}`,
       ],
       agents: { queue: "linux" },

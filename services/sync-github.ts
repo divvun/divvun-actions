@@ -129,6 +129,26 @@ type GithubWebhook = {
   created_at: string
 }
 
+type GithubRelease = {
+  tag_name: string
+  name: string
+  draft: boolean
+  prerelease: boolean
+  published_at: string
+  created_at: string
+}
+
+type PackageChannels = {
+  stable?: string
+  prerelease?: string
+  draft?: string
+}
+
+type StatusEntry = {
+  maturity: string
+  packages?: Record<string, PackageChannels>
+}
+
 async function listBuildkitePipelines(
   props: SyncGithubProps["buildkite"],
 ): Promise<BuildkitePipeline[]> {
@@ -238,6 +258,87 @@ async function listGithubWebhooks(
     updated_at: hook.updated_at,
     created_at: hook.created_at,
   }))
+}
+
+async function listGithubReleases(
+  props: Required<SyncGithubProps["github"]>,
+  repoName: string,
+): Promise<GithubRelease[]> {
+  const [owner, repo] = repoName.split("/")
+
+  let nextUrl: string | null =
+    `https://api.github.com/repos/${owner}/${repo}/releases?per_page=100`
+  let releases: GithubRelease[] = []
+
+  while (nextUrl != null) {
+    const response = await fetch(nextUrl, {
+      headers: {
+        Authorization: `Bearer ${props.apiKey}`,
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    })
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return []
+      }
+      throw new Error(
+        `Failed to list releases for ${repoName}: ${response.status}`,
+      )
+    }
+
+    const data = await response.json()
+    releases = [
+      ...releases,
+      ...data.map((release: any) => ({
+        tag_name: release.tag_name,
+        name: release.name,
+        draft: release.draft,
+        prerelease: release.prerelease,
+        published_at: release.published_at,
+        created_at: release.created_at,
+      })),
+    ]
+
+    nextUrl = parseNextLinkHeader(response.headers.get("link"))
+  }
+
+  return releases
+}
+
+function parseReleasesByPackage(
+  releases: GithubRelease[],
+): Record<string, PackageChannels> {
+  const packages: Record<string, PackageChannels> = {}
+
+  for (const release of releases) {
+    const match = release.tag_name.match(/^(.+)\/v(.+)$/) ||
+      release.tag_name.match(/^(.+)\/(dev-latest)$/)
+
+    if (!match) {
+      continue
+    }
+
+    const packageName = match[1]
+    const version = match[2]
+
+    if (!packages[packageName]) {
+      packages[packageName] = {}
+    }
+
+    const pkg = packages[packageName]
+
+    if (release.draft && !pkg.draft) {
+      pkg.draft = version
+    } else if (release.prerelease && !pkg.prerelease) {
+      pkg.prerelease = version
+    } else if (!release.draft && !release.prerelease && !pkg.stable) {
+      pkg.stable = version
+    }
+  }
+
+  return packages
 }
 
 function hasWebhookForPipeline(
@@ -692,6 +793,8 @@ export default async function syncGithub(
   console.log("🔄 Assessing sync status...")
   const results: SyncStatus[] = []
 
+  const releasesByRepo: Record<string, Record<string, PackageChannels>> = {}
+
   for (const repo of repos) {
     console.log(`🔍 Checking webhooks for ${repo.name}...`)
     let webhooks: GithubWebhook[] = []
@@ -699,6 +802,16 @@ export default async function syncGithub(
       webhooks = await listGithubWebhooks(githubProps, repo.name)
     } catch (error) {
       console.warn(`⚠️ Could not fetch webhooks for ${repo.name}: ${error}`)
+    }
+
+    console.log(`🔍 Checking releases for ${repo.name}...`)
+    try {
+      const releases = await listGithubReleases(githubProps, repo.name)
+      const packages = parseReleasesByPackage(releases)
+      releasesByRepo[repo.name] = packages
+    } catch (error) {
+      console.warn(`⚠️ Could not fetch releases for ${repo.name}: ${error}`)
+      releasesByRepo[repo.name] = {}
     }
 
     const status = assessStatus(repo, pipelines, webhooks)
@@ -835,14 +948,21 @@ export default async function syncGithub(
   // Write status.json if requested
   if (writeStatus) {
     console.log(`📝 Writing status.json...`)
-    const statusData: Record<string, { maturity: string }> = {}
+    const statusData: Record<string, StatusEntry> = {}
 
     for (const result of results) {
       if (!result.pipeline) continue
 
       const maturityValue = extractMaturityValue(result.pipeline.tags)
       if (maturityValue) {
-        statusData[result.pipeline.slug] = { maturity: maturityValue }
+        const packages = releasesByRepo[result.repoName]
+        const statusEntry: StatusEntry = { maturity: maturityValue }
+
+        if (packages && Object.keys(packages).length > 0) {
+          statusEntry.packages = packages
+        }
+
+        statusData[result.pipeline.slug] = statusEntry
       }
     }
 

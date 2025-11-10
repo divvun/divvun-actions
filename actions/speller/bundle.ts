@@ -67,13 +67,13 @@ export default async function spellerBundle({
       bhfstPaths.push(langTagBhfst)
     }
 
-    const txzPath = `${packageId}_${version}_mobile.txz`
+    const pktPath = `${packageId}_${version}_noarch-mobile.pkt.tar.zst`
     console.log /*logger.debug*/(
-      `Creating txz from [${bhfstPaths.join(", ")}] at ${txzPath}`,
+      `Creating pkt from [${bhfstPaths.join(", ")}] at ${pktPath}`,
     )
-    payloadPath = txzPath
-    await Tar.createFlatTxz(bhfstPaths, payloadPath)
-    console.log /*logger.debug*/(`Created txz at ${payloadPath}`)
+    payloadPath = pktPath
+    await Tar.createFlatPkt(bhfstPaths, payloadPath)
+    console.log /*logger.debug*/(`Created pkt at ${payloadPath}`)
   } else if (spellerType == SpellerType.Windows) {
     console.log(manifest.windows)
     if (manifest.windows.system_product_code == null) {

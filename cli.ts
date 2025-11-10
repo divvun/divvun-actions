@@ -26,7 +26,8 @@ import {
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
 import {
   pipelineLang,
-  runLang,
+  runLangBuild,
+  runLangTest,
   runLangBundle,
   runLangDeploy,
   runLangGrammarBundle,
@@ -200,8 +201,12 @@ async function runPipeline(args) {
       await runDesktopKeyboardMacOS(kbdgenBundlePath)
       break
     }
-    case "lang": {
-      await runLang()
+    case "lang-build": {
+      await runLangBuild()
+      break
+    }
+    case "lang-test": {
+      await runLangTest()
       break
     }
     case "lang-bundle": {

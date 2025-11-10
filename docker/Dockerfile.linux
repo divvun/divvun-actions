@@ -57,6 +57,7 @@ RUN apt-get update && \
     git-lfs \
     imagemagick \
     just \
+    libarchive-tools \
     libboost-all-dev \
     libc++-dev \
     libc++abi-dev \
@@ -119,17 +120,17 @@ RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.2.1/bao_2
 
 # Install pahkat-uploader
 RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/pahkat-uploader?platform=linux&channel=nightly' -o pahkat-uploader.txz && \
-    tar -xf pahkat-uploader.txz -C /usr/local && \
+    bsdtar -xf pahkat-uploader.txz -C /usr/local && \
     rm pahkat-uploader.txz
 
 # Install kbdgen
 RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/kbdgen?platform=linux&channel=nightly' -o kbdgen.txz && \
-    tar -xf kbdgen.txz -C /usr/local && \
+    bsdtar -xf kbdgen.txz -C /usr/local && \
     rm kbdgen.txz
 
 # Install thfst-tools
 RUN curl -fsSL 'https://pahkat.uit.no/artifacts/thfst-tools_1.0.0-alpha.2_linux_amd64.txz' -o thfst-tools.txz && \
-    tar -xf thfst-tools.txz -C /usr/local && \
+    bsdtar -xf thfst-tools.txz -C /usr/local && \
     rm thfst-tools.txz
 
 # Install aws-cli
@@ -140,13 +141,13 @@ RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "aw
 
 # Install divvun-runtime
 RUN curl -fsSL "https://github.com/divvun/divvun-runtime/releases/download/v0.1.1/divvun-runtime-x86_64-unknown-linux-gnu-v0.1.1.tgz" -o "divvun-runtime.tgz" && \
-    tar -xzf divvun-runtime.tgz && \
+    bsdtar -xf divvun-runtime.tgz && \
     cp divvun-runtime-x86_64*/divvun-runtime /usr/local/bin/divvun-runtime && \
     rm divvun-runtime.tgz
 
 # Add rcodesign
 RUN curl -fsSL https://x.giellalt.org/rcodesign-0.29.0-x86_64-unknown-linux-gnu.tar.gz -o rcodesign.tar.gz && \
-    tar -xzf rcodesign.tar.gz && \
+    bsdtar -xf rcodesign.tar.gz && \
     mv rcodesign /usr/local/bin/rcodesign && \
     rm rcodesign.tar.gz
 

@@ -313,14 +313,49 @@ export class Tar {
       await Bash.runScript(`cp -r ${p} ${stagingDir}`)
     }
 
-    logger.debug(`Tarring`)
-    await Bash.runScript(`tar cf ../file.tar *`, { cwd: stagingDir })
-
-    logger.debug("xz -9'ing")
-    await Bash.runScript(`xz -9 ../file.tar`, { cwd: stagingDir })
+    logger.debug(`Creating xz-compressed tarball`)
+    await Bash.runScript(`bsdtar --xz --options xz:compression-level=9,xz:threads=0 -cf ../file.tar.xz *`, { cwd: stagingDir })
 
     logger.debug("Copying file.tar.xz to " + outputPath)
     await Deno.copyFile(path.join(tmpDir.path, "file.tar.xz"), outputPath)
+  }
+
+  static async createFlatPkt(paths: string[], outputPath: string) {
+    using tmpDir = await makeTempDir()
+    const stagingDir = path.join(tmpDir.path, "staging")
+    await Deno.mkdir(stagingDir)
+
+    logger.debug(`Created tmp dir: ${tmpDir}`)
+
+    for (const p of paths) {
+      logger.debug(`Copying ${p} into ${stagingDir}`)
+      await Bash.runScript(`cp -r ${p} ${stagingDir}`)
+    }
+
+    logger.debug(`Creating zstd-compressed tarball`)
+    await Bash.runScript(`bsdtar --zstd --options zstd:compression-level=22,zstd:threads=0 -cf ../file.tar.zst *`, { cwd: stagingDir })
+
+    logger.debug("Copying file.tar.zst to " + outputPath)
+    await Deno.copyFile(path.join(tmpDir.path, "file.tar.zst"), outputPath)
+  }
+
+  static async createFlatTarZst(paths: string[], outputPath: string) {
+    using tmpDir = await makeTempDir()
+    const stagingDir = path.join(tmpDir.path, "staging")
+    await Deno.mkdir(stagingDir)
+
+    logger.debug(`Created tmp dir: ${tmpDir}`)
+
+    for (const p of paths) {
+      logger.debug(`Copying ${p} into ${stagingDir}`)
+      await Bash.runScript(`cp -r ${p} ${stagingDir}`)
+    }
+
+    logger.debug(`Creating zstd-compressed tarball`)
+    await Bash.runScript(`bsdtar --zstd --options zstd:compression-level=22,zstd:threads=0 -cf ../file.tar.zst *`, { cwd: stagingDir })
+
+    logger.debug("Copying file.tar.zst to " + outputPath)
+    await Deno.copyFile(path.join(tmpDir.path, "file.tar.zst"), outputPath)
   }
 }
 
@@ -1142,6 +1177,20 @@ export async function versionAsNightly(version: string): Promise<string> {
   const nightlyTs = new Date().toISOString().replace(/[-:\.]/g, "")
 
   return `${verChunks.join(".")}-nightly.${nightlyTs}`
+}
+
+export function versionAsDev(
+  version: string | undefined,
+  timestamp: string,
+  buildNumber: string | undefined,
+): string {
+  const baseVersion = version ?? "0.0.0"
+  const verChunks = SEMVER_RE.exec(baseVersion)?.slice(1, 4)
+  const versionPart = verChunks ? verChunks.join(".") : "0.0.0"
+  const timestampFormatted = timestamp.replace(/[-:\.]/g, "")
+  const buildPart = buildNumber ? `+build.${buildNumber}` : ""
+
+  return `${versionPart}-dev.${timestampFormatted}${buildPart}`
 }
 
 function deriveBundlerArgs(

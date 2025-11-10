@@ -125,7 +125,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
     if (library === "pytorch") {
       commands.push(
         'buildkite-agent artifact download "pytorch.tar.gz" .',
-        "tar -xzf pytorch.tar.gz",
+        "bsdtar -xf pytorch.tar.gz",
       )
     }
 
@@ -139,7 +139,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       commands.push(
         `buildkite-agent artifact download "target/${buildArtifactName}" .`,
         `mkdir -p target/${hostTargetDir}`,
-        `tar -xzf target/${buildArtifactName} -C target/${hostTargetDir}`,
+        `bsdtar -xf target/${buildArtifactName} -C target/${hostTargetDir}`,
       )
     }
 
@@ -148,11 +148,11 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
     // Create artifacts
     if (targetTriple.includes("windows")) {
       commands.push(
-        `C:\\msys2\\usr\\bin\\bash.exe -c "bsdtar -czf target/${artifactName} -C target/${targetTriple} ${library}"`,
+        `C:\\msys2\\usr\\bin\\bash.exe -c "mkdir -p target && bsdtar --gzip --options gzip:compression-level=9 -cf target/${artifactName} -C target/${targetTriple} ${library}"`,
       )
     } else {
       commands.push(
-        `tar -czf target/${artifactName} -C target/${targetTriple} ${library}`,
+        `bsdtar --gzip --options gzip:compression-level=9 -cf target/${artifactName} -C target/${targetTriple} ${library}`,
       )
       // For ICU4C native platforms, also create build artifact
       if (
@@ -161,7 +161,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
           targetTriple === "x86_64-unknown-linux-gnu")
       ) {
         commands.push(
-          `tar -czf target/${library}-build_${targetTriple}.tar.gz -C target/${targetTriple} build/icu`,
+          `bsdtar --gzip --options gzip:compression-level=9 -cf target/${library}-build_${targetTriple}.tar.gz -C target/${targetTriple} build/icu`,
         )
       }
     }
@@ -246,8 +246,8 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               "divvun-actions run icu4c-build aarch64-apple-darwin",
-              "tar -czf target/icu4c_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin icu4c",
-              "tar -czf target/icu4c-build_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin build/icu",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin icu4c",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin build/icu",
             ].join("\n"),
             agents: {
               queue: "macos",
@@ -263,7 +263,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               "divvun-actions run libomp-build aarch64-apple-darwin",
-              "tar -czf target/libomp_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin libomp",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/libomp_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin libomp",
             ].join("\n"),
             agents: {
               queue: "macos",
@@ -276,7 +276,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               "divvun-actions run protobuf-build aarch64-apple-darwin",
-              "tar -czf target/protobuf_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin protobuf",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin protobuf",
             ].join("\n"),
             agents: {
               queue: "macos",
@@ -290,12 +290,12 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               'buildkite-agent artifact download "pytorch.tar.gz" .',
-              "tar -xzf pytorch.tar.gz",
+              "bsdtar -xf pytorch.tar.gz",
               'buildkite-agent artifact download "target/protobuf_aarch64-apple-darwin.tar.gz" .',
               "mkdir -p target/aarch64-apple-darwin",
-              "tar -xzf target/protobuf_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin",
+              "bsdtar -xf target/protobuf_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin",
               "divvun-actions run pytorch-build aarch64-apple-darwin",
-              "tar -czf target/pytorch_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin pytorch",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/pytorch_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin pytorch",
             ].join("\n"),
             agents: {
               queue: "macos",
@@ -315,9 +315,9 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               'buildkite-agent artifact download "target/icu4c-build_aarch64-apple-darwin.tar.gz" .',
               "mkdir -p target/aarch64-apple-darwin",
-              "tar -xzf target/icu4c-build_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin",
+              "bsdtar -xf target/icu4c-build_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin",
               "divvun-actions run icu4c-build aarch64-apple-ios",
-              "tar -czf target/icu4c_aarch64-apple-ios.tar.gz -C target/aarch64-apple-ios icu4c",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_aarch64-apple-ios.tar.gz -C target/aarch64-apple-ios icu4c",
             ].join("\n"),
             agents: {
               queue: "macos",
@@ -332,9 +332,9 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               'buildkite-agent artifact download "target/protobuf_aarch64-apple-darwin.tar.gz" .',
               "mkdir -p target/aarch64-apple-darwin",
-              "tar -xzf target/protobuf_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin",
+              "bsdtar -xf target/protobuf_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin",
               "divvun-actions run protobuf-build aarch64-apple-ios",
-              "tar -czf target/protobuf_aarch64-apple-ios.tar.gz -C target/aarch64-apple-ios protobuf",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf_aarch64-apple-ios.tar.gz -C target/aarch64-apple-ios protobuf",
             ].join("\n"),
             agents: {
               queue: "macos",
@@ -352,14 +352,14 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               'buildkite-agent artifact download "pytorch.tar.gz" .',
-              "tar -xzf pytorch.tar.gz",
+              "bsdtar -xf pytorch.tar.gz",
               'buildkite-agent artifact download "target/protobuf_aarch64-apple-darwin.tar.gz" .',
               'buildkite-agent artifact download "target/protobuf_aarch64-apple-ios.tar.gz" .',
               "mkdir -p target/aarch64-apple-darwin target/aarch64-apple-ios",
-              "tar -xzf target/protobuf_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin",
-              "tar -xzf target/protobuf_aarch64-apple-ios.tar.gz -C target/aarch64-apple-ios",
+              "bsdtar -xf target/protobuf_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin",
+              "bsdtar -xf target/protobuf_aarch64-apple-ios.tar.gz -C target/aarch64-apple-ios",
               "divvun-actions run pytorch-build aarch64-apple-ios",
-              "tar -czf target/pytorch_aarch64-apple-ios.tar.gz -C target/aarch64-apple-ios pytorch",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/pytorch_aarch64-apple-ios.tar.gz -C target/aarch64-apple-ios pytorch",
             ].join("\n"),
             agents: {
               queue: "macos",
@@ -379,9 +379,9 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               'buildkite-agent artifact download "target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz" .',
               "mkdir -p target/x86_64-unknown-linux-gnu",
-              "tar -xzf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               "divvun-actions run icu4c-build aarch64-linux-android",
-              "tar -czf target/icu4c_aarch64-linux-android.tar.gz -C target/aarch64-linux-android icu4c",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_aarch64-linux-android.tar.gz -C target/aarch64-linux-android icu4c",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -396,9 +396,9 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               'buildkite-agent artifact download "target/protobuf_x86_64-unknown-linux-gnu.tar.gz" .',
               "mkdir -p target/x86_64-unknown-linux-gnu",
-              "tar -xzf target/protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               "divvun-actions run protobuf-build aarch64-linux-android",
-              "tar -czf target/protobuf_aarch64-linux-android.tar.gz -C target/aarch64-linux-android protobuf",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf_aarch64-linux-android.tar.gz -C target/aarch64-linux-android protobuf",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -416,14 +416,14 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               'buildkite-agent artifact download "pytorch.tar.gz" .',
-              "tar -xzf pytorch.tar.gz",
+              "bsdtar -xf pytorch.tar.gz",
               'buildkite-agent artifact download "target/protobuf_x86_64-unknown-linux-gnu.tar.gz" .',
               'buildkite-agent artifact download "target/protobuf_aarch64-linux-android.tar.gz" .',
               "mkdir -p target/x86_64-unknown-linux-gnu target/aarch64-linux-android",
-              "tar -xzf target/protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
-              "tar -xzf target/protobuf_aarch64-linux-android.tar.gz -C target/aarch64-linux-android",
+              "bsdtar -xf target/protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/protobuf_aarch64-linux-android.tar.gz -C target/aarch64-linux-android",
               "ANDROID_NDK=$ANDROID_NDK_HOME divvun-actions run pytorch-build aarch64-linux-android",
-              "tar -czf target/pytorch_aarch64-linux-android.tar.gz -C target/aarch64-linux-android pytorch",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/pytorch_aarch64-linux-android.tar.gz -C target/aarch64-linux-android pytorch",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -441,8 +441,8 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               "divvun-actions run icu4c-build x86_64-unknown-linux-gnu",
-              "tar -czf target/icu4c_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu icu4c",
-              "tar -czf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu build/icu",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu icu4c",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu build/icu",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -458,7 +458,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               "divvun-actions run libomp-build x86_64-unknown-linux-gnu",
-              "tar -czf target/libomp_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu libomp",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/libomp_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu libomp",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -471,7 +471,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               "divvun-actions run protobuf-build x86_64-unknown-linux-gnu",
-              "tar -czf target/protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu protobuf",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu protobuf",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -485,12 +485,12 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               'buildkite-agent artifact download "pytorch.tar.gz" .',
-              "tar -xzf pytorch.tar.gz",
+              "bsdtar -xf pytorch.tar.gz",
               'buildkite-agent artifact download "target/protobuf_x86_64-unknown-linux-gnu.tar.gz" .',
               "mkdir -p target/x86_64-unknown-linux-gnu",
-              "tar -xzf target/protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               "divvun-actions run pytorch-build x86_64-unknown-linux-gnu",
-              "tar -czf target/pytorch_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu pytorch",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/pytorch_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu pytorch",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -507,7 +507,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             key: "windows-x86_64-icu",
             command: [
               "divvun-actions run icu4c-build x86_64-pc-windows-msvc",
-              'C:\\msys2\\usr\\bin\\bash.exe -c "bsdtar -czf target/icu4c_x86_64-pc-windows-msvc.tar.gz -C target/x86_64-pc-windows-msvc icu4c"',
+              'C:\\msys2\\usr\\bin\\bash.exe -c "mkdir -p target && bsdtar -czf target/icu4c_x86_64-pc-windows-msvc.tar.gz -C target/x86_64-pc-windows-msvc icu4c"',
             ].join("\n"),
             agents: {
               queue: "windows",
