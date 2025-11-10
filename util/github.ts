@@ -110,6 +110,68 @@ export class GitHub {
     return code === 0
   }
 
+  async ensureTagExists(tag: string): Promise<void> {
+    logger.debug(`Checking if tag ${tag} exists...`)
+
+    // Check if tag exists locally
+    const checkProc = new Deno.Command("git", {
+      args: ["rev-parse", "--verify", tag],
+      stdout: "null",
+      stderr: "null",
+    }).spawn()
+
+    const { code: checkCode } = await checkProc.output()
+
+    if (checkCode === 0) {
+      logger.debug(`Tag ${tag} already exists`)
+      return
+    }
+
+    logger.info(`Tag ${tag} does not exist, creating at first commit...`)
+
+    // Get the first commit SHA
+    const firstCommitProc = new Deno.Command("git", {
+      args: ["rev-list", "--max-parents=0", "HEAD"],
+      stdout: "piped",
+      stderr: "piped",
+    })
+
+    const { code: firstCommitCode, stdout: firstCommitStdout } =
+      await firstCommitProc.output()
+    if (firstCommitCode !== 0) {
+      throw new Error(
+        `Failed to get first commit SHA: exit code ${firstCommitCode}`,
+      )
+    }
+
+    const firstCommitSha = new TextDecoder().decode(firstCommitStdout).trim()
+    logger.debug(`First commit SHA: ${firstCommitSha}`)
+
+    // Create the tag at the first commit
+    const createTagProc = new Deno.Command("git", {
+      args: ["tag", tag, firstCommitSha],
+    }).spawn()
+
+    const { code: createTagCode } = await createTagProc.output()
+    if (createTagCode !== 0) {
+      throw new Error(`Failed to create tag ${tag}: exit code ${createTagCode}`)
+    }
+
+    logger.debug(`Created tag ${tag} at ${firstCommitSha}`)
+
+    // Push the tag to origin
+    const pushTagProc = new Deno.Command("git", {
+      args: ["push", "origin", tag],
+    }).spawn()
+
+    const { code: pushTagCode } = await pushTagProc.output()
+    if (pushTagCode !== 0) {
+      throw new Error(`Failed to push tag ${tag}: exit code ${pushTagCode}`)
+    }
+
+    logger.info(`Successfully created and pushed tag ${tag}`)
+  }
+
   async updateRelease(
     tag: string,
     artifacts: string[],
@@ -178,11 +240,12 @@ export class GitHub {
       logger.info(
         `Release ${tag} does not exist, creating as draft and prerelease...`,
       )
+      await this.ensureTagExists(tag)
       await this.createRelease(tag, artifacts, {
         draft,
         prerelease,
         latest: false,
-        verifyTag: false,
+        verifyTag: true,
       })
     }
   }
