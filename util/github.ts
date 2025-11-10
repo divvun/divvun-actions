@@ -111,45 +111,11 @@ export class GitHub {
   }
 
   async ensureTagExists(tag: string): Promise<void> {
-    logger.debug(`Checking if tag ${tag} exists...`)
+    logger.info(`Force-updating tag ${tag} to HEAD...`)
 
-    // Check if tag exists locally
-    const checkProc = new Deno.Command("git", {
-      args: ["rev-parse", "--verify", tag],
-      stdout: "null",
-      stderr: "null",
-    }).spawn()
-
-    const { code: checkCode } = await checkProc.output()
-
-    if (checkCode === 0) {
-      logger.debug(`Tag ${tag} already exists`)
-      return
-    }
-
-    logger.info(`Tag ${tag} does not exist, creating at first commit...`)
-
-    // Get the first commit SHA
-    const firstCommitProc = new Deno.Command("git", {
-      args: ["rev-list", "--max-parents=0", "HEAD"],
-      stdout: "piped",
-      stderr: "piped",
-    })
-
-    const { code: firstCommitCode, stdout: firstCommitStdout } =
-      await firstCommitProc.output()
-    if (firstCommitCode !== 0) {
-      throw new Error(
-        `Failed to get first commit SHA: exit code ${firstCommitCode}`,
-      )
-    }
-
-    const firstCommitSha = new TextDecoder().decode(firstCommitStdout).trim()
-    logger.debug(`First commit SHA: ${firstCommitSha}`)
-
-    // Create the tag at the first commit
+    // Force create/update the tag at HEAD
     const createTagProc = new Deno.Command("git", {
-      args: ["tag", tag, firstCommitSha],
+      args: ["tag", "-f", tag, "HEAD"],
     }).spawn()
 
     const { code: createTagCode } = await createTagProc.output()
@@ -157,11 +123,11 @@ export class GitHub {
       throw new Error(`Failed to create tag ${tag}: exit code ${createTagCode}`)
     }
 
-    logger.debug(`Created tag ${tag} at ${firstCommitSha}`)
+    logger.debug(`Created/updated tag ${tag} at HEAD`)
 
-    // Push the tag to origin
+    // Force push the tag to origin
     const pushTagProc = new Deno.Command("git", {
-      args: ["push", "origin", tag],
+      args: ["push", "origin", tag, "-f"],
     }).spawn()
 
     const { code: pushTagCode } = await pushTagProc.output()
@@ -169,7 +135,7 @@ export class GitHub {
       throw new Error(`Failed to push tag ${tag}: exit code ${pushTagCode}`)
     }
 
-    logger.info(`Successfully created and pushed tag ${tag}`)
+    logger.info(`Successfully force-pushed tag ${tag} to HEAD`)
   }
 
   async updateRelease(
