@@ -108,6 +108,8 @@ type BuildkitePipeline = {
   visibility: string
   configuration: string
   branch_configuration: string | null
+  skip_queued_branch_builds?: boolean
+  skip_queued_branch_builds_filter?: string | null
   provider: {
     settings: {
       build_tags?: boolean
@@ -140,8 +142,8 @@ type GithubRelease = {
 
 type PackageChannels = {
   stable?: string
-  prerelease?: string
-  draft?: string
+  beta?: string
+  dev?: string
 }
 
 type StatusEntry = {
@@ -187,6 +189,8 @@ async function listBuildkitePipelines(
     visibility: pipeline.visibility,
     configuration: pipeline.configuration,
     branch_configuration: pipeline.branch_configuration,
+    skip_queued_branch_builds: pipeline.skip_queued_branch_builds,
+    skip_queued_branch_builds_filter: pipeline.skip_queued_branch_builds_filter,
     provider: pipeline.provider,
   }))
 }
@@ -313,8 +317,27 @@ function parseReleasesByPackage(
   const packages: Record<string, PackageChannels> = {}
 
   for (const release of releases) {
-    const match = release.tag_name.match(/^(.+)\/v(.+)$/) ||
-      release.tag_name.match(/^(.+)\/(dev-latest)$/)
+    // Handle dev-latest releases specially - extract version from release name
+    if (release.tag_name.includes("dev-latest")) {
+      // Release name format: "grammar-sma/v0.1.2-dev.20250111T123456Z+build.123"
+      const nameMatch = release.name.match(/^(.+)\/v(.+)$/)
+      if (nameMatch) {
+        const packageName = nameMatch[1]
+        const version = nameMatch[2]
+
+        if (!packages[packageName]) {
+          packages[packageName] = {}
+        }
+
+        const pkg = packages[packageName]
+        if (!pkg.dev) {
+          pkg.dev = version
+        }
+      }
+      continue
+    }
+
+    const match = release.tag_name.match(/^(.+)\/v(.+)$/)
 
     if (!match) {
       continue
@@ -329,10 +352,8 @@ function parseReleasesByPackage(
 
     const pkg = packages[packageName]
 
-    if (release.draft && !pkg.draft) {
-      pkg.draft = version
-    } else if (release.prerelease && !pkg.prerelease) {
-      pkg.prerelease = version
+    if (release.prerelease && !pkg.beta) {
+      pkg.beta = version
     } else if (!release.draft && !release.prerelease && !pkg.stable) {
       pkg.stable = version
     }
@@ -442,7 +463,14 @@ async function updateBuildkitePipeline(
   pipeline: BuildkitePipeline,
   updates:
     & Partial<
-      Pick<BuildkitePipeline, "branch_configuration" | "configuration" | "tags">
+      Pick<
+        BuildkitePipeline,
+        | "branch_configuration"
+        | "configuration"
+        | "tags"
+        | "skip_queued_branch_builds"
+        | "skip_queued_branch_builds_filter"
+      >
     >
     & {
       provider_settings?: {
@@ -552,6 +580,14 @@ function assessStatus(
     discrepancies.push({
       code: "tags-not-enabled",
       message: "Pipeline does not have build_tags enabled.",
+    })
+  }
+
+  // Check if skip_queued_branch_builds is enabled
+  if (pipeline.skip_queued_branch_builds !== true) {
+    discrepancies.push({
+      code: "skip-queued-not-enabled",
+      message: "Pipeline does not have skip_queued_branch_builds enabled.",
     })
   }
 
@@ -765,6 +801,8 @@ function getDiscrepancyIcon(code: string): string {
       return "🌿"
     case "tags-not-enabled":
       return "🏷️"
+    case "skip-queued-not-enabled":
+      return "⏭️"
     case "maturity-tags-mismatch":
       return "📦"
     default:
@@ -906,6 +944,32 @@ export default async function syncGithub(
     } catch (error) {
       console.error(
         `❌ Failed to enable build_tags for ${result.repoName}: ${error}`,
+      )
+    }
+  }
+
+  const skipQueuedNotEnabled = results.filter((r) =>
+    r.discrepancies.some((d) => d.code === "skip-queued-not-enabled") &&
+    r.pipeline
+  )
+
+  for (const result of skipQueuedNotEnabled) {
+    if (!result.pipeline) continue
+
+    console.log(`⏭️  Enabling skip_queued_branch_builds for ${result.repoName}...`)
+    try {
+      await updateBuildkitePipeline(
+        buildkiteProps,
+        result.pipeline,
+        {
+          skip_queued_branch_builds: true,
+          skip_queued_branch_builds_filter: null,
+        },
+      )
+      console.log(`✅ Enabled skip_queued_branch_builds for ${result.repoName}`)
+    } catch (error) {
+      console.error(
+        `❌ Failed to enable skip_queued_branch_builds for ${result.repoName}: ${error}`,
       )
     }
   }

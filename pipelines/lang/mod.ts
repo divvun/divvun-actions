@@ -379,11 +379,12 @@ export async function runLangDeploy() {
     logger.info(`Release tag: ${releaseTag}`)
     logger.info(`Artifacts: ${versionedWindowsFile}, ${versionedMacosFile}, ${versionedMobileFile}`)
 
+    const releaseName = `${packageName}/v${devVersion}`
     const gh = new GitHub(builder.env.repo)
     await gh.updateRelease(
       releaseTag,
       [versionedWindowsFile, versionedMacosFile, versionedMobileFile],
-      { draft: true, prerelease: true },
+      { draft: false, prerelease: true, name: releaseName },
     )
 
     logger.info("Speller dev-latest GitHub release updated successfully")
@@ -514,11 +515,12 @@ export async function runLangGrammarDeploy() {
     logger.info(`Release tag: ${releaseTag}`)
     logger.info(`Artifacts: ${versionedDrbFile}, ${versionedZcheckFile}`)
 
+    const releaseName = `${packageName}/v${devVersion}`
     const gh = new GitHub(builder.env.repo)
     await gh.updateRelease(
       releaseTag,
       [versionedDrbFile, versionedZcheckFile],
-      { draft: true, prerelease: true },
+      { draft: false, prerelease: true, name: releaseName },
     )
 
     logger.info("Grammar checker dev-latest GitHub release updated successfully")

@@ -29,6 +29,7 @@ export class GitHub {
       prerelease?: boolean
       latest?: boolean
       verifyTag?: boolean
+      name?: string
     } = {},
   ) {
     const {
@@ -36,6 +37,7 @@ export class GitHub {
       prerelease = false,
       latest = false,
       verifyTag = true,
+      name,
     } = options
 
     const args = [
@@ -51,6 +53,10 @@ export class GitHub {
 
     if (verifyTag) {
       args.splice(3, 0, "--verify-tag")
+    }
+
+    if (name) {
+      args.push("--title", name)
     }
 
     if (draft) {
@@ -144,9 +150,10 @@ export class GitHub {
     options: {
       draft?: boolean
       prerelease?: boolean
+      name?: string
     } = {},
   ) {
-    const { draft = true, prerelease = true } = options
+    const { draft = true, prerelease = true, name } = options
 
     const exists = await this.releaseExists(tag)
 
@@ -212,6 +219,7 @@ export class GitHub {
         prerelease,
         latest: false,
         verifyTag: true,
+        name,
       })
     }
   }
