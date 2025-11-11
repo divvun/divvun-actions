@@ -432,8 +432,8 @@ export async function runLangGrammarBundle() {
   }
 
   const grammarManifest = {
-    name: manifest.grammarname || manifest.name || "unknown",
-    version: manifest.grammarversion || manifest.version || "0.0.0",
+    name: manifest.package.grammar.name,
+    version: manifest.package.grammar.version,
   }
 
   await grammarBundle({
@@ -519,9 +519,8 @@ export async function runLangGrammarDeploy() {
 
     logger.info("Grammar checker GitHub release created successfully")
   } else if (isMainBranch) {
-    const grammarVersion = manifest.grammarversion || manifest.version
     const devVersion = versionAsDev(
-      grammarVersion,
+      manifest.package.grammar.version,
       builder.env.buildTimestamp,
       builder.env.buildNumber,
     )
