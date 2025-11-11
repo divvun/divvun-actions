@@ -147,8 +147,8 @@ export default async function version({
     version = Deno.env.get("GitBuildVersionSimple")
   } else if (spellerManifest != null) {
     logger.debug("Getting version from speller manifest")
-    logger.debug(`spellerversion: ${spellerManifest.spellerversion}`)
-    version = spellerManifest.spellerversion
+    logger.debug(`spellerversion: ${spellerManifest.package.speller.version}`)
+    version = spellerManifest.package.speller.version
   } else if (plistPath != null) {
     logger.debug("Getting version from plist")
     const result = (

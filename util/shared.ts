@@ -52,71 +52,48 @@ function env() {
   }
 }
 
-function assertExit0(code: number, stderr?: string) {
-  if (code !== 0) {
-    logger.error(`Process exited with exit code ${code}.`)
-    if (stderr) {
-      logger.error("Stderr:")
-      logger.error(stderr)
-    }
-    Deno.exit(code)
-  }
-}
-
 export class Apt {
   static async update(requiresSudo: boolean) {
     if (requiresSudo) {
-      assertExit0(
-        await builder.exec("sudo", ["apt-get", "-qy", "update"], {
-          env: env(),
-        }),
-      )
+      await builder.exec("sudo", ["apt-get", "-qy", "update"], {
+        env: env(),
+      })
     } else {
-      assertExit0(
-        await builder.exec("apt-get", ["-qy", "update"], { env: env() }),
-      )
+      await builder.exec("apt-get", ["-qy", "update"], { env: env() })
     }
   }
 
   static async install(packages: string[], requiresSudo: boolean) {
     if (requiresSudo) {
-      assertExit0(
-        await builder.exec(
-          "sudo",
-          ["apt-get", "install", "-qfy", ...packages],
-          { env: env() },
-        ),
+      await builder.exec(
+        "sudo",
+        ["apt-get", "install", "-qfy", ...packages],
+        { env: env() },
       )
     } else {
-      assertExit0(
-        await builder.exec("apt-get", ["install", "-qfy", ...packages], {
-          env: env(),
-        }),
-      )
+      await builder.exec("apt-get", ["install", "-qfy", ...packages], {
+        env: env(),
+      })
     }
   }
 }
 
 export class Pip {
   static async install(packages: string[]) {
-    assertExit0(
-      await builder.exec("pip3", ["install", "--user", ...packages], {
-        env: env(),
-      }),
-    )
+    await builder.exec("pip3", ["install", "--user", ...packages], {
+      env: env(),
+    })
     builder.addPath(path.join(Deno.env.get("HOME")!, ".local", "bin"))
   }
 }
 
 export class Pipx {
   static async ensurepath() {
-    assertExit0(await builder.exec("pipx", ["ensurepath"], { env: env() }))
+    await builder.exec("pipx", ["ensurepath"], { env: env() })
   }
 
   static async install(packages: string[]) {
-    assertExit0(
-      await builder.exec("pipx", ["install", ...packages], { env: env() }),
-    )
+    await builder.exec("pipx", ["install", ...packages], { env: env() })
   }
 }
 
@@ -142,14 +119,11 @@ export class Powershell {
       },
     }
 
-    assertExit0(
-      await builder.exec("pwsh", ["-c", script], {
-        env: thisEnv,
-        cwd: opts.cwd,
-        listeners,
-      }),
-      err.join(""),
-    )
+    await builder.exec("pwsh", ["-c", script], {
+      env: thisEnv,
+      cwd: opts.cwd,
+      listeners,
+    } as any)
     return [out.join(""), err.join("")]
   }
 }
@@ -247,7 +221,7 @@ export class Zip {
 }
 
 export class Tar {
-  static async extractTar(filePath: string, outputDir?: string) {
+  static async extractTar(filePath: string, outputDir?: string): Promise<string> {
     const platform = Deno.build.os
 
     logger.debug("Extracting", filePath)
@@ -277,6 +251,8 @@ export class Tar {
 
       return dir
     }
+
+    throw new Error(`Unsupported platform: ${platform}`)
   }
 
   static async createFlatTgz(paths: string[], outputPath: string) {
@@ -1259,13 +1235,11 @@ export class DivvunBundler {
       ...deriveBundlerArgs(spellerPaths),
     ]
 
-    assertExit0(
-      await builder.exec("divvun-bundler", args, {
-        env: Object.assign({}, env(), {
-          RUST_LOG: "trace",
-        }),
+    await builder.exec("divvun-bundler", args, {
+      env: Object.assign({}, env(), {
+        RUST_LOG: "trace",
       }),
-    )
+    })
 
     // FIXME: workaround bundler issue creating invalid files
     await Deno.copyFile(

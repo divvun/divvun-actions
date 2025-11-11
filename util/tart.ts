@@ -36,7 +36,7 @@ export default class Tart {
     // No await here because it runs forever...
     const proc = await spawn("nohup", args, {
       silent: true,
-    })
+    } as any)
 
     logger.info("Waiting for VM to start...")
 
@@ -73,11 +73,11 @@ export default class Tart {
 
     await exec("tart", ["get", vmName, "--format", "json"], {
       listeners: {
-        stdout: (data) => {
+        stdout: (data: any) => {
           rawOutput += data.toString()
         },
       },
-    })
+    } as any)
 
     const output: TartStatus = JSON.parse(rawOutput)
     // logger.info(output)
@@ -176,7 +176,7 @@ export default class Tart {
     logger.info("Attaching image...")
     await exec("hdiutil", ["attach", imagePath], {
       silent: true,
-    })
+    } as any)
 
     logger.info("Copying workspace...")
     await exec("ditto", [Tart.WORKSPACE_PATH, `/Volumes/${volName}`])
@@ -214,7 +214,7 @@ export default class Tart {
           output += data.toString()
         },
       },
-    }).then(() => {
+    } as any).then(() => {
       // logger.info("IP: " + output)
       return output.trim()
     })

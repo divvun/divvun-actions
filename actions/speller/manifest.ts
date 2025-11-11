@@ -1,4 +1,4 @@
-import * as builder from "~/builder.ts"
+import * as builder from "~/builder.ts";
 
 export enum SpellerType {
   MacOS = "speller-macos",
@@ -17,8 +17,20 @@ export type WindowsSpellerManifest = {
 }
 
 export type SpellerManifest = {
-  spellername: string
-  spellerversion: string
+  package: {
+    speller: {
+      name: string
+      version: string
+    }
+    grammar: {
+      name: string
+      version: string
+    }
+    "tts-text-proc": {
+      name: string
+      version: string
+    }
+  }
   windows: WindowsSpellerManifest
   macos: {
     system_pkg_id: string

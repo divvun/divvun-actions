@@ -98,9 +98,9 @@ export type Env = {
   groupKey: string | undefined
   buildId: string | undefined
   buildNumber: string | undefined
+  buildTimestamp: string
   agentId: string | undefined
   agentMetaData: Record<string, string>
-  buildTimestamp: string
   artifactUploadDestination: string | undefined
   branch: string | undefined
   tag: string | undefined

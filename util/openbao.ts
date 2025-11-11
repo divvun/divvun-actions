@@ -34,12 +34,12 @@ export class OpenBao {
           approle_mount_path: "approle",
           role_name: "builder",
         },
-      }).json()
+      }).json() as any
 
     if (roleResponse?.errors != null) {
       console.error(roleResponse)
       throw new Error(
-        `OpenBao: ${roleResponse.errors.map((e) => e.message).join(", ")}`,
+        `OpenBao: ${roleResponse.errors.map((e: any) => e.message).join(", ")}`,
       )
     }
 
@@ -51,11 +51,11 @@ export class OpenBao {
             role_name: "builder",
           },
           json: {},
-        }).json()
+        }).json() as any
 
     if (secretResponse?.errors != null) {
       throw new Error(
-        `OpenBao: ${secretResponse.errors.map((e) => e.message).join(", ")}`,
+        `OpenBao: ${secretResponse.errors.map((e: any) => e.message).join(", ")}`,
       )
     }
 

@@ -49,8 +49,8 @@ export default async function spellerBundle({
   // TODO: allow release builds
   const isSpellerReleaseTag = RELEASE_TAG.test(builder.env.tag ?? "")
   const version = isSpellerReleaseTag
-    ? manifest.spellerversion
-    : await versionAsNightly(manifest.spellerversion)
+    ? manifest.package.speller.version
+    : await versionAsNightly(manifest.package.speller.version)
   console.log /*logger.debug*/(
     `Speller bundle for ${spellerType} with version ${version} and langTag ${langTag}`,
   )

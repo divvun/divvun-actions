@@ -3,12 +3,12 @@ import * as semver from "@std/semver"
 import * as toml from "@std/toml"
 import * as yaml from "@std/yaml"
 import grammarBundle from "~/actions/grammar/bundle.ts"
-import langBuild from "~/actions/lang/build.ts"
-import langSpellerBuild from "~/actions/lang/build-speller.ts"
 import langGrammarBuild from "~/actions/lang/build-grammar.ts"
+import langSpellerBuild from "~/actions/lang/build-speller.ts"
+import langBuild from "~/actions/lang/build.ts"
 import langCheck from "~/actions/lang/check.ts"
-import langSpellerTest from "~/actions/lang/test-speller.ts"
 import langGrammarTest from "~/actions/lang/test-grammar.ts"
+import langSpellerTest from "~/actions/lang/test-speller.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
@@ -369,7 +369,7 @@ export async function runLangDeploy() {
     }
 
     const devVersion = versionAsDev(
-      manifest.spellerversion,
+      manifest.package.speller.version,
       builder.env.buildTimestamp,
       builder.env.buildNumber,
     )
