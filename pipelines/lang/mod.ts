@@ -4,7 +4,11 @@ import * as toml from "@std/toml"
 import * as yaml from "@std/yaml"
 import grammarBundle from "~/actions/grammar/bundle.ts"
 import langBuild from "~/actions/lang/build.ts"
+import langSpellerBuild from "~/actions/lang/build-speller.ts"
+import langGrammarBuild from "~/actions/lang/build-grammar.ts"
 import langCheck from "~/actions/lang/check.ts"
+import langSpellerTest from "~/actions/lang/test-speller.ts"
+import langGrammarTest from "~/actions/lang/test-grammar.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
@@ -86,6 +90,72 @@ export async function runLangTest() {
   }
 
   await langCheck()
+}
+
+export async function runLangSpellerBuild() {
+  const yml = await Deno.readTextFile(".build-config.yml")
+  const config = await yaml.parse(yml) as any
+
+  const buildConfig = config?.build as BuildProps | undefined
+
+  const shouldBuild = isConfigActive(buildConfig)
+
+  if (!shouldBuild) {
+    throw new Error(
+      "No build configuration found in .build-config.yml",
+    )
+  }
+
+  await langSpellerBuild(buildConfig!)
+}
+
+export async function runLangGrammarBuild() {
+  const yml = await Deno.readTextFile(".build-config.yml")
+  const config = await yaml.parse(yml) as any
+
+  const buildConfig = config?.build as BuildProps | undefined
+
+  const shouldBuild = isConfigActive(buildConfig)
+
+  if (!shouldBuild) {
+    throw new Error(
+      "No build configuration found in .build-config.yml",
+    )
+  }
+
+  await langGrammarBuild(buildConfig!)
+}
+
+export async function runLangSpellerTest() {
+  const yml = await Deno.readTextFile(".build-config.yml")
+  const config = await yaml.parse(yml) as any
+
+  const checkConfig = config?.check as BuildProps | undefined
+
+  const shouldCheck = isConfigActive(checkConfig)
+
+  if (!shouldCheck) {
+    logger.info("No check configuration found in .build-config.yml, skipping tests")
+    return
+  }
+
+  await langSpellerTest()
+}
+
+export async function runLangGrammarTest() {
+  const yml = await Deno.readTextFile(".build-config.yml")
+  const config = await yaml.parse(yml) as any
+
+  const checkConfig = config?.check as BuildProps | undefined
+
+  const shouldCheck = isConfigActive(checkConfig)
+
+  if (!shouldCheck) {
+    logger.info("No check configuration found in .build-config.yml, skipping tests")
+    return
+  }
+
+  await langGrammarTest()
 }
 
 export async function runLangBundle(
@@ -469,10 +539,11 @@ export function pipelineLang() {
   const extra: Record<string, string> =
     LARGE_BUILDS.includes(builder.env.repoName) ? { size: "large" } : {}
 
-  const buildStep = command({
-    key: "build",
-    label: "Build",
-    command: "divvun-actions run lang-build",
+  // Separate build steps for spellers and grammar checkers
+  const spellerBuildStep = command({
+    key: "speller-build",
+    label: "Build Spellers",
+    command: "divvun-actions run lang-speller-build",
     agents: {
       queue: "linux",
       ...extra,
@@ -480,27 +551,56 @@ export function pipelineLang() {
   })
 
   if (extra.size === "large") {
-    buildStep.priority = 10
+    spellerBuildStep.priority = 10
+  }
+
+  const grammarBuildStep = command({
+    key: "grammar-build",
+    label: "Build Grammar Checkers",
+    command: "divvun-actions run lang-grammar-build",
+    depends_on: "speller-build",
+    agents: {
+      queue: "linux",
+      ...extra,
+    },
+  })
+
+  if (extra.size === "large") {
+    grammarBuildStep.priority = 10
   }
 
   const steps: (CommandStep | { group: string; key: string; depends_on?: string; steps: CommandStep[] })[] = [
-    buildStep,
+    spellerBuildStep,
+    grammarBuildStep,
   ]
 
-  // Add test step if not a release tag
+  // Add test steps if not a release tag (run in parallel after their respective builds)
   if (!isReleaseTag) {
-    const testStep = command({
-      key: "test",
-      label: "Test",
-      command: "divvun-actions run lang-test",
-      depends_on: "build",
+    const spellerTestStep = command({
+      key: "speller-test",
+      label: "Test Spellers",
+      command: "divvun-actions run lang-speller-test",
+      depends_on: "speller-build",
       soft_fail: true,
       agents: {
         queue: "linux",
         ...extra,
       },
     })
-    steps.push(testStep)
+    steps.push(spellerTestStep)
+
+    const grammarTestStep = command({
+      key: "grammar-test",
+      label: "Test Grammar Checkers",
+      command: "divvun-actions run lang-grammar-test",
+      depends_on: "grammar-build",
+      soft_fail: true,
+      agents: {
+        queue: "linux",
+        ...extra,
+      },
+    })
+    steps.push(grammarTestStep)
   }
 
   // We only deploy on main branch or release tags
@@ -515,26 +615,26 @@ export function pipelineLang() {
     pipeline.steps = [
       ...pipeline.steps,
       {
-        group: "Bundle",
-        key: "bundle",
-        depends_on: "build",
+        group: "Speller Bundle",
+        key: "speller-bundle",
+        depends_on: "speller-build",
         steps: [
           command({
-            label: "Bundle (Windows)",
+            label: "Bundle Speller (Windows)",
             command: "divvun-actions run lang-bundle windows",
             agents: {
               queue: "windows",
             },
           }),
           command({
-            label: "Bundle (Mobile)",
+            label: "Bundle Speller (Mobile)",
             command: "divvun-actions run lang-bundle mobile",
             agents: {
               queue: "linux",
             },
           }),
           command({
-            label: "Bundle (macOS)",
+            label: "Bundle Speller (macOS)",
             command: "divvun-actions run lang-bundle macos",
             agents: {
               queue: "macos",
@@ -543,9 +643,9 @@ export function pipelineLang() {
         ],
       },
       command({
-        label: `Deploy (${isSpellerReleaseTag ? "Release" : "Nightly"})`,
+        label: `Deploy Speller (${isSpellerReleaseTag ? "Release" : "Nightly"})`,
         command: "divvun-actions run lang-deploy",
-        depends_on: "bundle",
+        depends_on: "speller-bundle",
         agents: {
           queue: "linux",
         },
@@ -557,9 +657,18 @@ export function pipelineLang() {
     pipeline.steps = [
       ...pipeline.steps,
       command({
-        label: "Deploy Grammar Checker",
+        label: "Bundle Grammar Checker",
+        key: "grammar-bundle",
+        command: "divvun-actions run lang-grammar-bundle",
+        depends_on: "grammar-build",
+        agents: {
+          queue: "linux",
+        },
+      }),
+      command({
+        label: `Deploy Grammar Checker (${isGrammarReleaseTag ? "Release" : "Nightly"})`,
         command: "divvun-actions run lang-grammar-deploy",
-        depends_on: "build",
+        depends_on: "grammar-bundle",
         agents: {
           queue: "linux",
         },

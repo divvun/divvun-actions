@@ -205,8 +205,24 @@ async function runPipeline(args) {
       await runLangBuild()
       break
     }
+    case "lang-speller-build": {
+      await runLangSpellerBuild()
+      break
+    }
+    case "lang-grammar-build": {
+      await runLangGrammarBuild()
+      break
+    }
     case "lang-test": {
       await runLangTest()
+      break
+    }
+    case "lang-speller-test": {
+      await runLangSpellerTest()
+      break
+    }
+    case "lang-grammar-test": {
+      await runLangGrammarTest()
       break
     }
     case "lang-bundle": {
