@@ -956,7 +956,9 @@ export default async function syncGithub(
   for (const result of skipQueuedNotEnabled) {
     if (!result.pipeline) continue
 
-    console.log(`⏭️  Enabling skip_queued_branch_builds for ${result.repoName}...`)
+    console.log(
+      `⏭️  Enabling skip_queued_branch_builds for ${result.repoName}...`,
+    )
     try {
       await updateBuildkitePipeline(
         buildkiteProps,

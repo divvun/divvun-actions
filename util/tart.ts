@@ -95,7 +95,7 @@ export default class Tart {
 
   static async enterVirtualMachine(
     config: DivvunActionsTargetMacOSConfig | undefined,
-    localWorkingDir: string,
+    _localWorkingDir: string,
     artifactsDir: string,
   ) {
     logger.info("Moving into virtualised environment...")

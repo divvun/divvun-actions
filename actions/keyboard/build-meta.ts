@@ -70,6 +70,10 @@ export default async function keyboardBuildMeta({
     })
   }
 
+  if (!payloadPath) {
+    throw new Error("Failed to build keyboard - no payload path generated")
+  }
+
   // In general, this will be unused, because iOS and Android builds are
   // submitted directly to their respective app stores.
   // await builder.setOutput("payload-path", payloadPath)

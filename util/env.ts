@@ -51,7 +51,8 @@ const env = (prefix: string): Env => {
   const repoName = repoPath.split("/").pop()!
   const config = parseConfigFromEnv()
   const agentMetaData = metadata(prefix)
-  const buildTimestamp = agentMetaData["BUILD_TIMESTAMP"] ?? new Date().toISOString()
+  const buildTimestamp = agentMetaData["BUILD_TIMESTAMP"] ??
+    new Date().toISOString()
 
   return {
     jobId: Deno.env.get(`${prefix}_JOB_ID`),

@@ -178,7 +178,9 @@ export class GitHub {
 
       const { code: viewCode, stdout: viewStdout } = await viewProc.output()
       if (viewCode === 0) {
-        const releaseData = JSON.parse(new TextDecoder().decode(viewStdout)) as {
+        const releaseData = JSON.parse(
+          new TextDecoder().decode(viewStdout),
+        ) as {
           assets: Array<{ name: string }>
         }
 

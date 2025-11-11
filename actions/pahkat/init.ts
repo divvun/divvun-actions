@@ -11,7 +11,7 @@ export default async function pahkatInit({
   channel,
   packages,
 }: Props) {
-  await PahkatPrefix.bootstrap()
+  await PahkatPrefix.bootstrap([])
   await PahkatPrefix.addRepo(repoUrl, channel ?? undefined)
   await PahkatPrefix.install(packages)
 }

@@ -30,7 +30,7 @@ export default async function createTxz({ filesPath }: Props): Promise<Output> {
   logger.info(input)
 
   await Tar.createFlatTxz(input, outputTxz.path)
-  return { txzPath: outputTxz }
+  return { txzPath: outputTxz.path }
 }
 
 // async function run() {

@@ -1,6 +1,6 @@
 // deno-lint-ignore-file require-await no-explicit-any
 import { crypto } from "@std/crypto"
-import { decodeBase64, encodeBase64 } from "@std/encoding/base64"
+import { encodeBase64 } from "@std/encoding/base64"
 import { encodeHex } from "@std/encoding/hex"
 import * as fs from "@std/fs"
 import * as path from "@std/path"
@@ -314,7 +314,10 @@ export class Tar {
     }
 
     logger.debug(`Creating xz-compressed tarball`)
-    await Bash.runScript(`bsdtar --xz --options xz:compression-level=9,xz:threads=0 -cf ../file.tar.xz *`, { cwd: stagingDir })
+    await Bash.runScript(
+      `bsdtar --xz --options xz:compression-level=9,xz:threads=0 -cf ../file.tar.xz *`,
+      { cwd: stagingDir },
+    )
 
     logger.debug("Copying file.tar.xz to " + outputPath)
     await Deno.copyFile(path.join(tmpDir.path, "file.tar.xz"), outputPath)
@@ -333,7 +336,10 @@ export class Tar {
     }
 
     logger.debug(`Creating zstd-compressed tarball`)
-    await Bash.runScript(`bsdtar --zstd --options zstd:compression-level=22,zstd:threads=0 -cf ../file.tar.zst *`, { cwd: stagingDir })
+    await Bash.runScript(
+      `bsdtar --zstd --options zstd:compression-level=22,zstd:threads=0 -cf ../file.tar.zst *`,
+      { cwd: stagingDir },
+    )
 
     logger.debug("Copying file.tar.zst to " + outputPath)
     await Deno.copyFile(path.join(tmpDir.path, "file.tar.zst"), outputPath)
@@ -352,7 +358,10 @@ export class Tar {
     }
 
     logger.debug(`Creating zstd-compressed tarball`)
-    await Bash.runScript(`bsdtar --zstd --options zstd:compression-level=22,zstd:threads=0 -cf ../file.tar.zst *`, { cwd: stagingDir })
+    await Bash.runScript(
+      `bsdtar --zstd --options zstd:compression-level=22,zstd:threads=0 -cf ../file.tar.zst *`,
+      { cwd: stagingDir },
+    )
 
     logger.debug("Copying file.tar.zst to " + outputPath)
     await Deno.copyFile(path.join(tmpDir.path, "file.tar.zst"), outputPath)
@@ -838,13 +847,6 @@ const PROJECTJJ_NIGHTLY_SH = `\
 wget -q https://apertium.projectjj.com/apt/install-nightly.sh -O install-nightly.sh && bash install-nightly.sh
 `
 
-async function base64AsFile(input: string) {
-  const buffer = decodeBase64(input)
-  const tmp = await makeTempFile()
-  await Deno.writeFile(tmp.path, buffer)
-  return tmp
-}
-
 export class ProjectJJ {
   static async addNightlyToApt(requiresSudo: boolean) {
     await Bash.runScript(PROJECTJJ_NIGHTLY_SH, { sudo: requiresSudo })
@@ -1174,9 +1176,10 @@ export async function versionAsNightly(version: string): Promise<string> {
   if (verChunks == null) {
     throw new Error(`Provided version '${version}' is not semantic.`)
   }
-  const nightlyTs = new Date().toISOString().replace(/[-:\.]/g, "")
+  const nightlyTs = new Date().toISOString().split(".")[0] + "Z"
+  const nightlyTsFormatted = nightlyTs.replace(/[-:]/g, "")
 
-  return `${verChunks.join(".")}-nightly.${nightlyTs}`
+  return `${verChunks.join(".")}-nightly.${nightlyTsFormatted}`
 }
 
 export function versionAsDev(
@@ -1187,7 +1190,8 @@ export function versionAsDev(
   const baseVersion = version ?? "0.0.0"
   const verChunks = SEMVER_RE.exec(baseVersion)?.slice(1, 4)
   const versionPart = verChunks ? verChunks.join(".") : "0.0.0"
-  const timestampFormatted = timestamp.replace(/[-:\.]/g, "")
+  const timestampWithoutMs = timestamp.split(".")[0] + "Z"
+  const timestampFormatted = timestampWithoutMs.replace(/[-:]/g, "")
   const buildPart = buildNumber ? `+build.${buildNumber}` : ""
 
   return `${versionPart}-dev.${timestampFormatted}${buildPart}`
@@ -1323,7 +1327,7 @@ export class DivvunBundler {
   // }
 }
 
-export function nonUndefinedProxy(obj: any, withNull: boolean = false): any {
+export function nonUndefinedProxy(obj: any, _withNull: boolean = false): any {
   return obj
   // return new Proxy(obj, {
   //   get: (target, prop, receiver) => {

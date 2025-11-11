@@ -167,7 +167,7 @@ export default async function runCli(input: string[]) {
   }
 }
 
-async function runSign(args) {
+async function runSign(args: any) {
   const inputFile = args._[0]
   await sign(inputFile)
 }
@@ -178,7 +178,7 @@ function kbdgenBundlePathMobile(): string {
     : "divvun.kbdgen"
 }
 
-async function runPipeline(args) {
+async function runPipeline(args: any) {
   const pipeline = args._[0]
 
   switch (pipeline) {
@@ -360,7 +360,7 @@ async function runPipeline(args) {
   }
 }
 
-async function runCi(args) {
+async function runCi(_args: any) {
   console.log("Running CI")
 
   let pipeline: BuildkitePipeline

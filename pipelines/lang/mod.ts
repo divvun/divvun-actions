@@ -85,7 +85,9 @@ export async function runLangTest() {
   const shouldCheck = isConfigActive(checkConfig)
 
   if (!shouldCheck) {
-    logger.info("No check configuration found in .build-config.yml, skipping tests")
+    logger.info(
+      "No check configuration found in .build-config.yml, skipping tests",
+    )
     return
   }
 
@@ -135,7 +137,9 @@ export async function runLangSpellerTest() {
   const shouldCheck = isConfigActive(checkConfig)
 
   if (!shouldCheck) {
-    logger.info("No check configuration found in .build-config.yml, skipping tests")
+    logger.info(
+      "No check configuration found in .build-config.yml, skipping tests",
+    )
     return
   }
 
@@ -151,7 +155,9 @@ export async function runLangGrammarTest() {
   const shouldCheck = isConfigActive(checkConfig)
 
   if (!shouldCheck) {
-    logger.info("No check configuration found in .build-config.yml, skipping tests")
+    logger.info(
+      "No check configuration found in .build-config.yml, skipping tests",
+    )
     return
   }
 
@@ -283,7 +289,9 @@ export async function runLangDeploy() {
       throw new Error(`Could not extract version from tag: ${builder.env.tag}`)
     }
 
-    logger.info(`Deploying speller version ${tagVersion} to Pahkat stable channel`)
+    logger.info(
+      `Deploying speller version ${tagVersion} to Pahkat stable channel`,
+    )
 
     await spellerDeploy({
       spellerType: SpellerType.Windows,
@@ -323,14 +331,19 @@ export async function runLangDeploy() {
 
     const langMatch = builder.env.repoName?.match(/lang-(.+)/)
     if (!langMatch) {
-      throw new Error(`Could not extract language code from repo: ${builder.env.repoName}`)
+      throw new Error(
+        `Could not extract language code from repo: ${builder.env.repoName}`,
+      )
     }
     const langCode = langMatch[1]
     const packageName = `speller-${langCode}`
 
-    const versionedWindowsFile = `${packageName}_${versionWithBuild}_noarch-windows.exe`
-    const versionedMacosFile = `${packageName}_${versionWithBuild}_noarch-macos.pkg`
-    const versionedMobileFile = `${packageName}_${versionWithBuild}_noarch-mobile.pkt.tar.zst`
+    const versionedWindowsFile =
+      `${packageName}_${versionWithBuild}_noarch-windows.exe`
+    const versionedMacosFile =
+      `${packageName}_${versionWithBuild}_noarch-macos.pkg`
+    const versionedMobileFile =
+      `${packageName}_${versionWithBuild}_noarch-mobile.pkt.tar.zst`
 
     await Deno.rename(windowsFiles, versionedWindowsFile)
     await Deno.rename(macosFiles, versionedMacosFile)
@@ -338,7 +351,9 @@ export async function runLangDeploy() {
 
     logger.info(`Creating GitHub release for speller version ${tagVersion}`)
     logger.info(`Pre-release: ${prerelease}`)
-    logger.info(`Artifacts: ${versionedWindowsFile}, ${versionedMacosFile}, ${versionedMobileFile}`)
+    logger.info(
+      `Artifacts: ${versionedWindowsFile}, ${versionedMacosFile}, ${versionedMobileFile}`,
+    )
 
     const gh = new GitHub(builder.env.repo)
     await gh.createRelease(
@@ -361,23 +376,31 @@ export async function runLangDeploy() {
 
     const langMatch = builder.env.repoName?.match(/lang-(.+)/)
     if (!langMatch) {
-      throw new Error(`Could not extract language code from repo: ${builder.env.repoName}`)
+      throw new Error(
+        `Could not extract language code from repo: ${builder.env.repoName}`,
+      )
     }
     const langCode = langMatch[1]
     const packageName = `speller-${langCode}`
     const releaseTag = `speller-${langCode}/dev-latest`
 
-    const versionedWindowsFile = `${packageName}_${devVersion}_noarch-windows.exe`
+    const versionedWindowsFile =
+      `${packageName}_${devVersion}_noarch-windows.exe`
     const versionedMacosFile = `${packageName}_${devVersion}_noarch-macos.pkg`
-    const versionedMobileFile = `${packageName}_${devVersion}_noarch-mobile.pkt.tar.zst`
+    const versionedMobileFile =
+      `${packageName}_${devVersion}_noarch-mobile.pkt.tar.zst`
 
     await Deno.rename(windowsFiles, versionedWindowsFile)
     await Deno.rename(macosFiles, versionedMacosFile)
     await Deno.rename(mobileFiles, versionedMobileFile)
 
-    logger.info(`Creating dev-latest GitHub release for speller version ${devVersion}`)
+    logger.info(
+      `Creating dev-latest GitHub release for speller version ${devVersion}`,
+    )
     logger.info(`Release tag: ${releaseTag}`)
-    logger.info(`Artifacts: ${versionedWindowsFile}, ${versionedMacosFile}, ${versionedMobileFile}`)
+    logger.info(
+      `Artifacts: ${versionedWindowsFile}, ${versionedMacosFile}, ${versionedMobileFile}`,
+    )
 
     const releaseName = `${packageName}/v${devVersion}`
     const gh = new GitHub(builder.env.repo)
@@ -477,7 +500,8 @@ export async function runLangGrammarDeploy() {
     const packageName = `grammar-${langTag}`
 
     const versionedDrbFile = `${packageName}_${versionWithBuild}_noarch-all.drb`
-    const versionedZcheckFile = `${packageName}_${versionWithBuild}_noarch-all.zcheck`
+    const versionedZcheckFile =
+      `${packageName}_${versionWithBuild}_noarch-all.zcheck`
 
     await Deno.rename(drbFile, versionedDrbFile)
     await Deno.rename(zcheckFile, versionedZcheckFile)
@@ -511,7 +535,9 @@ export async function runLangGrammarDeploy() {
     await Deno.rename(drbFile, versionedDrbFile)
     await Deno.rename(zcheckFile, versionedZcheckFile)
 
-    logger.info(`Creating dev-latest GitHub release for grammar version ${devVersion}`)
+    logger.info(
+      `Creating dev-latest GitHub release for grammar version ${devVersion}`,
+    )
     logger.info(`Release tag: ${releaseTag}`)
     logger.info(`Artifacts: ${versionedDrbFile}, ${versionedZcheckFile}`)
 
@@ -523,7 +549,9 @@ export async function runLangGrammarDeploy() {
       { draft: false, prerelease: true, name: releaseName },
     )
 
-    logger.info("Grammar checker dev-latest GitHub release updated successfully")
+    logger.info(
+      "Grammar checker dev-latest GitHub release updated successfully",
+    )
   }
 }
 
@@ -571,7 +599,12 @@ export function pipelineLang() {
     grammarBuildStep.priority = 10
   }
 
-  const steps: (CommandStep | { group: string; key: string; depends_on?: string; steps: CommandStep[] })[] = [
+  const steps: (CommandStep | {
+    group: string
+    key: string
+    depends_on?: string
+    steps: CommandStep[]
+  })[] = [
     spellerBuildStep,
     grammarBuildStep,
   ]
@@ -645,7 +678,9 @@ export function pipelineLang() {
         ],
       },
       command({
-        label: `Deploy Speller (${isSpellerReleaseTag ? "Release" : "Nightly"})`,
+        label: `Deploy Speller (${
+          isSpellerReleaseTag ? "Release" : "Nightly"
+        })`,
         command: "divvun-actions run lang-deploy",
         depends_on: "speller-bundle",
         agents: {
@@ -668,7 +703,9 @@ export function pipelineLang() {
         },
       }),
       command({
-        label: `Deploy Grammar Checker (${isGrammarReleaseTag ? "Release" : "Nightly"})`,
+        label: `Deploy Grammar Checker (${
+          isGrammarReleaseTag ? "Release" : "Nightly"
+        })`,
         command: "divvun-actions run lang-grammar-deploy",
         depends_on: "grammar-bundle",
         agents: {

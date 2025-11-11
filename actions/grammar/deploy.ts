@@ -23,7 +23,7 @@ async function loadManifest(manifestPath: string): Promise<GrammarManifest> {
 function isPrerelease(version: string): boolean {
   try {
     const parsed = semver.parse(version)
-    return parsed.prerelease.length > 0
+    return (parsed.prerelease?.length ?? 0) > 0
   } catch {
     return false
   }
@@ -35,8 +35,6 @@ export default async function grammarDeploy({
   version,
 }: Props) {
   try {
-    const manifest = await loadManifest(manifestPath)
-
     if (!builder.env.repo) {
       throw new Error("No repository information available")
     }

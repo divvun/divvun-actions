@@ -104,8 +104,8 @@ let redactedSecrets: SecretsStore | undefined
 
 // Fire-and-forget token renewal
 async function renewTokenInBackground(
-  token: string,
-  endpoint: string,
+  _token: string,
+  _endpoint: string,
 ): Promise<void> {
   return Promise.reject("Not implemented")
 }
