@@ -26,12 +26,14 @@ import {
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
 import {
   pipelineLang,
-  runLangBuild,
-  runLangTest,
   runLangBundle,
   runLangDeploy,
+  runLangGrammarBuild,
   runLangGrammarBundle,
   runLangGrammarDeploy,
+  runLangGrammarTest,
+  runLangSpellerBuild,
+  runLangSpellerTest,
 } from "./pipelines/lang/mod.ts"
 import pipelineLibpahkat, {
   runLibpahkatAndroid,
