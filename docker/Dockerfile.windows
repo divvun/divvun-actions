@@ -17,6 +17,11 @@ RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
     iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/buildkite/agent/main/install.ps1')); \
     setx /M PATH $($Env:PATH + 'C:\buildkite-agent\bin;');
 
+# Install choco
+RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
 # Install Visual Studio components
 RUN $components = @( \
         'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', \
@@ -53,11 +58,6 @@ RUN Invoke-WebRequest -Uri https://download.microsoft.com/download/6/f/5/6f5ce43
     Start-Process -FilePath msiexec.exe -ArgumentList '/i .\\MSKLC\\msklc.msi /qn /norestart' -Wait ; \
     Remove-Item MSKLC.exe
 
-# # Install fnm
-# RUN Invoke-WebRequest -Uri https://github.com/Schniz/fnm/releases/download/v1.38.1/fnm-windows.zip -OutFile fnm.zip ; \
-#     Expand-Archive -Path fnm.zip -DestinationPath ($Env:APPDATA + '\fnm') -Force ; \
-#     Remove-Item fnm.zip
-
 # Install CMake
 RUN Invoke-WebRequest -UseBasicParsing 'https://github.com/Kitware/CMake/releases/download/v3.28.1/cmake-3.28.1-windows-x86_64.msi' -OutFile cmake.msi ; \
     Start-Process -Wait msiexec -ArgumentList '/i', 'cmake.msi', '/quiet', '/norestart' ; \
@@ -85,11 +85,15 @@ RUN Invoke-WebRequest -Uri https://x.giellalt.org/bsdtar.zip -OutFile bsdtar.zip
     Remove-Item -Force bsdtar.zip
 
 # Code signing nonsense (from https://github.com/SSLcom/ci-images/blob/main/Dockerfile-ltsc2022)
-RUN Invoke-WebRequest -OutFile CodeSignTool.zip "https://github.com/SSLcom/CodeSignTool/releases/download/v1.3.1/CodeSignTool-v1.3.1-windows.zip" ; \
-    New-Item -ItemType Directory -Force -Path C:\CodeSignTool ; \
-    Expand-Archive -LiteralPath CodeSignTool.zip -DestinationPath C:\CodeSignTool -Force ; \
-    Remove-Item -Force CodeSignTool.zip ; \
-    setx /M PATH $($Env:PATH + ';C:\CodeSignTool')
+# RUN Invoke-WebRequest -OutFile CodeSignTool.zip "https://github.com/SSLcom/CodeSignTool/releases/download/v1.3.1/CodeSignTool-v1.3.1-windows.zip" ; \
+#     New-Item -ItemType Directory -Force -Path C:\CodeSignTool ; \
+#     Expand-Archive -LiteralPath CodeSignTool.zip -DestinationPath C:\CodeSignTool -Force ; \
+#     Remove-Item -Force CodeSignTool.zip ; \
+#     setx /M PATH $($Env:PATH + ';C:\CodeSignTool')
+
+
+# Install jsign
+RUN choco install jsign -y
 
 # Install MSYS2
 RUN Invoke-WebRequest -Uri "https://github.com/msys2/msys2-installer/releases/download/2025-02-21/msys2-x86_64-20250221.exe" -OutFile msys2-installer.exe ; \
