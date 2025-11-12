@@ -89,6 +89,12 @@ RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.78.0/gh_2.78.0_li
     rm gh.deb && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
+# Install jsign
+RUN curl -fsSL https://github.com/ebourg/jsign/releases/download/7.4/jsign_7.4_all.deb -o jsign.deb && \
+    dpkg -i jsign.deb && \
+    rm jsign.deb && \
+    rm -rf /var/lib/apt/lists/* && apt-get clean
+
 # Install Rust compiler and targets
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y && \
     ~/.cargo/bin/rustup target add \
