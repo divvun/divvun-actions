@@ -18,12 +18,13 @@ export async function makeInstaller(
   let proc: Deno.ChildProcess
 
   if (skipSigning) {
-    // Call iscc.exe directly without signing
+    // Call iscc.exe with a no-op sign tool that always succeeds
     logger.info("Building installer without code signing...")
     proc = new Deno.Command(
       "iscc.exe",
       {
         args: [
+          '/S"signtool=$qcmd$q /c exit /b 0"',
           "/Qp",
           `/O${installerOutput.path}`,
           issPath,
