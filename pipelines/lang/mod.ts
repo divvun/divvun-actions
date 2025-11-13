@@ -560,12 +560,7 @@ export function pipelineLang() {
   const isGrammarDeploy = isGrammarReleaseTag || builder.env.branch === "main"
 
   // Build speller steps array
-  const spellerSteps: (CommandStep | {
-    group: string
-    key: string
-    depends_on?: string
-    steps: CommandStep[]
-  })[] = [spellerBuildStep]
+  const spellerSteps: CommandStep[] = [spellerBuildStep]
 
   if (!isReleaseTag) {
     spellerSteps.push(command({
@@ -582,39 +577,44 @@ export function pipelineLang() {
   }
 
   if (isSpellerDeploy) {
-    spellerSteps.push({
-      group: "Speller Bundle",
-      key: "speller-bundle",
+    spellerSteps.push(command({
+      label: "Bundle Speller (Windows)",
+      key: "speller-bundle-windows",
+      command: "divvun-actions run lang-bundle windows",
       depends_on: "speller-build",
-      steps: [
-        command({
-          label: "Bundle Speller (Windows)",
-          command: "divvun-actions run lang-bundle windows",
-          agents: {
-            queue: "windows",
-          },
-        }),
-        command({
-          label: "Bundle Speller (Mobile)",
-          command: "divvun-actions run lang-bundle mobile",
-          agents: {
-            queue: "linux",
-          },
-        }),
-        command({
-          label: "Bundle Speller (macOS)",
-          command: "divvun-actions run lang-bundle macos",
-          agents: {
-            queue: "macos",
-          },
-        }),
-      ],
-    })
+      agents: {
+        queue: "windows",
+      },
+    }))
+
+    spellerSteps.push(command({
+      label: "Bundle Speller (Mobile)",
+      key: "speller-bundle-mobile",
+      command: "divvun-actions run lang-bundle mobile",
+      depends_on: "speller-build",
+      agents: {
+        queue: "linux",
+      },
+    }))
+
+    spellerSteps.push(command({
+      label: "Bundle Speller (macOS)",
+      key: "speller-bundle-macos",
+      command: "divvun-actions run lang-bundle macos",
+      depends_on: "speller-build",
+      agents: {
+        queue: "macos",
+      },
+    }))
 
     spellerSteps.push(command({
       label: `Deploy Speller (${isSpellerReleaseTag ? "Release" : "Dev"})`,
       command: "divvun-actions run lang-deploy",
-      depends_on: "speller-bundle",
+      depends_on: [
+        "speller-bundle-windows",
+        "speller-bundle-mobile",
+        "speller-bundle-macos",
+      ],
       agents: {
         queue: "linux",
       },
