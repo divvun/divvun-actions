@@ -112,7 +112,7 @@ export class InnoSetupBuilder {
     return this
   }
 
-  build(): string {
+  build(options: { codesign: boolean }): string {
     for (
       const key of [
         "name",
@@ -144,12 +144,16 @@ export class InnoSetupBuilder {
       Compression: "lzma",
       SolidCompression: "yes",
       WizardStyle: "modern",
-      SignedUninstaller: "yes",
-      SignTool: "signtool",
       MinVersion: this.data.minVersion || "6.3.9200",
       ArchitecturesAllowed: "x86 x64",
       ArchitecturesInstallIn64BitMode: "x64",
       DefaultGroupName: name,
+      ...(options.codesign != false
+        ? {
+          SignedUninstaller: "yes",
+          SignTool: "signtool",
+        }
+        : {}),
     })
       .map((x) => `${x[0]}=${x[1]}`)
       .join("\n")
@@ -207,8 +211,8 @@ export class InnoSetupBuilder {
     return out
   }
 
-  async write(filePath: string) {
-    await Deno.writeTextFile(filePath, "\ufeff" + this.build())
+  async write(filePath: string, options?: { codesign?: boolean }) {
+    await Deno.writeTextFile(filePath, "\ufeff" + this.build(options))
   }
 }
 

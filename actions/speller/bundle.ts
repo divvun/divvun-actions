@@ -93,8 +93,6 @@ export default async function spellerBundle({
     }
     console.log(zhfstPaths)
     const innoBuilder = new InnoSetupBuilder(Deno.cwd())
-
-    innoBuilder
       .name(`${spellername} Speller`)
       .version(version)
       .publisher("Universitetet i Tromsø - Norges arktiske universitet")
@@ -156,13 +154,13 @@ export default async function spellerBundle({
 
         return code
       })
-      .write("./install.iss")
 
     // console.log /*logger.debug*/("generated install.iss:")
     // console.log /*logger.debug*/(innoBuilder.build())
 
     let result: InstallerResult
     try {
+      innoBuilder.write("./install.iss", { codesign: true })
       result = await makeInstaller(".\\install.iss")
       console.log /*logger.debug*/("Installer created")
     } catch (error) {
@@ -172,6 +170,7 @@ export default async function spellerBundle({
         }`,
       )
       console.warn("Retrying without code signing...")
+      innoBuilder.write("./install.iss", { codesign: false })
       result = await makeInstaller(".\\install.iss", { skipSigning: true })
       console.log /*logger.debug*/("Unsigned installer created")
     }
@@ -208,7 +207,10 @@ export default async function spellerBundle({
       appCodeSignId:
         "Developer ID Application: The University of Tromso (2K5J2584NX)",
     })
-    payloadPath = await renameFile(pkgPath, `${packageId}_${version}_noarch-macos.pkg`)
+    payloadPath = await renameFile(
+      pkgPath,
+      `${packageId}_${version}_noarch-macos.pkg`,
+    )
     console.log /*logger.debug*/(`Installer created at ${payloadPath}`)
   } else {
     throw new Error(`Unsupported speller type: ${spellerType}`)
