@@ -96,11 +96,11 @@ export default async function spellerDeploy({
       }`
       artifactSize = getArtifactSize(payloadPath)
 
-      // Make the nightly channel be used if any channel except for the default.
+      // Make the dev channel be used if any channel except for the default.
       let deps: any = { "https://pahkat.uit.no/tools/packages/windivvun": "*" }
       if (channel != null) {
         const windivvun =
-          `https://pahkat.uit.no/tools/packages/windivvun?channel=nightly`
+          `https://pahkat.uit.no/tools/packages/windivvun?channel=dev`
         deps = {}
         deps[windivvun] = "*"
       }
@@ -132,11 +132,11 @@ export default async function spellerDeploy({
       }`
       artifactSize = getArtifactSize(payloadPath)
 
-      // Make the nightly channel be used if any channel except for the default.
+      // Make the dev channel be used if any channel except for the default.
       let deps: any = { "https://pahkat.uit.no/tools/packages/macdivvun": "*" }
       if (channel != null) {
         const macdivvun =
-          `https://pahkat.uit.no/tools/packages/macdivvun?channel=nightly`
+          `https://pahkat.uit.no/tools/packages/macdivvun?channel=dev`
         deps = {}
         deps[macdivvun] = "*"
       }

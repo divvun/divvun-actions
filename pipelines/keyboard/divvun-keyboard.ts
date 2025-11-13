@@ -92,8 +92,10 @@ async function createWindowsPackage(
   const target = await Kbdgen.loadTarget(bundlePath, "windows")
   const baseVersion = target.version as string
 
-  // Apply channel and timestamp if this is a nightly build
-  const version = channel ? await versionAsNightly(baseVersion) : baseVersion
+  // Apply channel and timestamp if this is a dev build
+  const version = channel
+    ? await versionAsNightly(baseVersion, builder.env.buildNumber)
+    : baseVersion
 
   const pathItems = [packageId, version, "windows"]
   const unsignedSuffix = unsigned ? ".UNSIGNED" : ""
@@ -123,11 +125,11 @@ export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
   // Upload artifact for later deployment
   await builder.uploadArtifacts(artifactPath)
 
-  // Get the full version (including nightly timestamp) from the artifact
+  // Get the full version (including dev timestamp) from the artifact
   const target = await Kbdgen.loadTarget(kbdgenBundlePath, "windows")
   const baseVersion = target.version as string
   const fullVersion = channel
-    ? await versionAsNightly(baseVersion)
+    ? await versionAsNightly(baseVersion, builder.env.buildNumber)
     : baseVersion
 
   // Store metadata for deployment
@@ -150,8 +152,10 @@ async function createMacosPackage(
   const target = await Kbdgen.loadTarget(bundlePath, "macos")
   const baseVersion = target.version as string
 
-  // Apply channel and timestamp if this is a nightly build
-  const version = channel ? await versionAsNightly(baseVersion) : baseVersion
+  // Apply channel and timestamp if this is a dev build
+  const version = channel
+    ? await versionAsNightly(baseVersion, builder.env.buildNumber)
+    : baseVersion
 
   const pathItems = [packageId, version, "macos"]
   const packageFileName = `${pathItems.join("_")}.pkg`
@@ -180,11 +184,11 @@ export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
 
   await builder.uploadArtifacts(artifactPath)
 
-  // Get the full version (including nightly timestamp) from the artifact
+  // Get the full version (including dev timestamp) from the artifact
   const target = await Kbdgen.loadTarget(kbdgenBundlePath, "macos")
   const baseVersion = target.version as string
   const fullVersion = channel
-    ? await versionAsNightly(baseVersion)
+    ? await versionAsNightly(baseVersion, builder.env.buildNumber)
     : baseVersion
 
   // Store metadata for deployment

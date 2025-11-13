@@ -1150,15 +1150,19 @@ export class ThfstTools {
 const SEMVER_RE =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
 
-export async function versionAsNightly(version: string): Promise<string> {
+export async function versionAsNightly(
+  version: string,
+  buildNumber?: string,
+): Promise<string> {
   const verChunks = SEMVER_RE.exec(version)?.slice(1, 4)
   if (verChunks == null) {
     throw new Error(`Provided version '${version}' is not semantic.`)
   }
-  const nightlyTs = new Date().toISOString().split(".")[0] + "Z"
-  const nightlyTsFormatted = nightlyTs.replace(/[-:]/g, "")
+  const devTs = new Date().toISOString().split(".")[0] + "Z"
+  const devTsFormatted = devTs.replace(/[-:]/g, "")
+  const buildPart = buildNumber ? `+build.${buildNumber}` : ""
 
-  return `${verChunks.join(".")}-nightly.${nightlyTsFormatted}`
+  return `${verChunks.join(".")}-dev.${devTsFormatted}${buildPart}`
 }
 
 export function versionAsDev(

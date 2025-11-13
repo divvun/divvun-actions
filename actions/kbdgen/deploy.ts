@@ -171,7 +171,7 @@ export default async function kbdgenDeploy({
 export async function runKbdgenDeploy() {
   const cargoToml = await loadCargoToml()
   const baseVersion = cargoToml.package.version
-  const version = await versionAsNightly(baseVersion)
+  const version = await versionAsNightly(baseVersion, builder.env.buildNumber)
   const allSecrets = await builder.secrets()
 
   const secrets = {
@@ -182,7 +182,7 @@ export async function runKbdgenDeploy() {
 
   const packageId = "kbdgen"
   const pahkatRepo = "https://pahkat.uit.no/devtools/"
-  const channel = "nightly"
+  const channel = "dev"
 
   using artifactsDir = await makeTempDir()
 

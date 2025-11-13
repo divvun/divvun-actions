@@ -15,7 +15,6 @@ import * as target from "~/target.ts"
 import { GitHub } from "~/util/github.ts"
 import { versionAsDev } from "~/util/shared.ts"
 import spellerBundle from "../../actions/speller/bundle.ts"
-import spellerDeploy from "../../actions/speller/deploy.ts"
 import { SpellerManifest, SpellerType } from "../../actions/speller/manifest.ts"
 import logger from "../../util/log.ts"
 
@@ -250,14 +249,6 @@ export async function runLangDeploy() {
     throw e
   }
 
-  const allSecrets = await builder.secrets()
-
-  const secrets = {
-    pahkatApiKey: allSecrets.get("pahkat/apiKey"),
-    awsAccessKeyId: allSecrets.get("s3/accessKeyId"),
-    awsSecretAccessKey: allSecrets.get("s3/secretAccessKey"),
-  }
-
   await builder.downloadArtifacts("*.pkt.tar.zst", ".")
   await builder.downloadArtifacts("*.exe", ".")
   await builder.downloadArtifacts("*.pkg", ".")
@@ -288,40 +279,6 @@ export async function runLangDeploy() {
     if (!tagVersion) {
       throw new Error(`Could not extract version from tag: ${builder.env.tag}`)
     }
-
-    logger.info(
-      `Deploying speller version ${tagVersion} to Pahkat stable channel`,
-    )
-
-    await spellerDeploy({
-      spellerType: SpellerType.Windows,
-      manifestPath: "./manifest.toml",
-      payloadPath: windowsFiles,
-      version: tagVersion,
-      channel: null,
-      pahkatRepo: "https://pahkat.uit.no/main/",
-      secrets,
-    })
-
-    await spellerDeploy({
-      spellerType: SpellerType.MacOS,
-      manifestPath: "./manifest.toml",
-      payloadPath: macosFiles,
-      version: tagVersion,
-      channel: null,
-      pahkatRepo: "https://pahkat.uit.no/main/",
-      secrets,
-    })
-
-    await spellerDeploy({
-      spellerType: SpellerType.Mobile,
-      manifestPath: "./manifest.toml",
-      payloadPath: mobileFiles,
-      version: tagVersion,
-      channel: null,
-      pahkatRepo: "https://pahkat.uit.no/main/",
-      secrets,
-    })
 
     const prerelease = isPrerelease(tagVersion)
 
@@ -598,19 +555,20 @@ export function pipelineLang() {
     grammarBuildStep.priority = 10
   }
 
-  const steps: (CommandStep | {
+  // We only deploy on main branch or release tags
+  const isSpellerDeploy = isSpellerReleaseTag || builder.env.branch === "main"
+  const isGrammarDeploy = isGrammarReleaseTag || builder.env.branch === "main"
+
+  // Build speller steps array
+  const spellerSteps: (CommandStep | {
     group: string
     key: string
     depends_on?: string
     steps: CommandStep[]
-  })[] = [
-    spellerBuildStep,
-    grammarBuildStep,
-  ]
+  })[] = [spellerBuildStep]
 
-  // Add test steps if not a release tag (run in parallel after their respective builds)
   if (!isReleaseTag) {
-    const spellerTestStep = command({
+    spellerSteps.push(command({
       key: "speller-test",
       label: "Test Spellers",
       command: "divvun-actions run lang-speller-test",
@@ -620,10 +578,54 @@ export function pipelineLang() {
         queue: "linux",
         ...extra,
       },
-    })
-    steps.push(spellerTestStep)
+    }))
+  }
 
-    const grammarTestStep = command({
+  if (isSpellerDeploy) {
+    spellerSteps.push({
+      group: "Speller Bundle",
+      key: "speller-bundle",
+      depends_on: "speller-build",
+      steps: [
+        command({
+          label: "Bundle Speller (Windows)",
+          command: "divvun-actions run lang-bundle windows",
+          agents: {
+            queue: "windows",
+          },
+        }),
+        command({
+          label: "Bundle Speller (Mobile)",
+          command: "divvun-actions run lang-bundle mobile",
+          agents: {
+            queue: "linux",
+          },
+        }),
+        command({
+          label: "Bundle Speller (macOS)",
+          command: "divvun-actions run lang-bundle macos",
+          agents: {
+            queue: "macos",
+          },
+        }),
+      ],
+    })
+
+    spellerSteps.push(command({
+      label: `Deploy Speller (${isSpellerReleaseTag ? "Release" : "Dev"})`,
+      command: "divvun-actions run lang-deploy",
+      depends_on: "speller-bundle",
+      agents: {
+        queue: "linux",
+      },
+    }))
+  }
+
+  // Build grammar steps array
+  const grammarSteps: CommandStep[] = [grammarBuildStep]
+
+  if (!isReleaseTag) {
+    grammarSteps.push(command({
       key: "grammar-test",
       label: "Test Grammar Checkers",
       command: "divvun-actions run lang-grammar-test",
@@ -633,85 +635,46 @@ export function pipelineLang() {
         queue: "linux",
         ...extra,
       },
-    })
-    steps.push(grammarTestStep)
-  }
-
-  // We only deploy on main branch or release tags
-  const isSpellerDeploy = isSpellerReleaseTag || builder.env.branch === "main"
-  const isGrammarDeploy = isGrammarReleaseTag || builder.env.branch === "main"
-
-  const pipeline: BuildkitePipeline = {
-    steps,
-  }
-
-  if (isSpellerDeploy) {
-    pipeline.steps = [
-      ...pipeline.steps,
-      {
-        group: "Speller Bundle",
-        key: "speller-bundle",
-        depends_on: "speller-build",
-        steps: [
-          command({
-            label: "Bundle Speller (Windows)",
-            command: "divvun-actions run lang-bundle windows",
-            agents: {
-              queue: "windows",
-            },
-          }),
-          command({
-            label: "Bundle Speller (Mobile)",
-            command: "divvun-actions run lang-bundle mobile",
-            agents: {
-              queue: "linux",
-            },
-          }),
-          command({
-            label: "Bundle Speller (macOS)",
-            command: "divvun-actions run lang-bundle macos",
-            agents: {
-              queue: "macos",
-            },
-          }),
-        ],
-      },
-      command({
-        label: `Deploy Speller (${
-          isSpellerReleaseTag ? "Release" : "Nightly"
-        })`,
-        command: "divvun-actions run lang-deploy",
-        depends_on: "speller-bundle",
-        agents: {
-          queue: "linux",
-        },
-      }),
-    ]
+    }))
   }
 
   if (isGrammarDeploy) {
-    pipeline.steps = [
-      ...pipeline.steps,
-      command({
-        label: "Bundle Grammar Checker",
-        key: "grammar-bundle",
-        command: "divvun-actions run lang-grammar-bundle",
-        depends_on: "grammar-build",
-        agents: {
-          queue: "linux",
-        },
-      }),
-      command({
-        label: `Deploy Grammar Checker (${
-          isGrammarReleaseTag ? "Release" : "Nightly"
-        })`,
-        command: "divvun-actions run lang-grammar-deploy",
-        depends_on: "grammar-bundle",
-        agents: {
-          queue: "linux",
-        },
-      }),
-    ]
+    grammarSteps.push(command({
+      label: "Bundle Grammar Checker",
+      key: "grammar-bundle",
+      command: "divvun-actions run lang-grammar-bundle",
+      depends_on: "grammar-build",
+      agents: {
+        queue: "linux",
+      },
+    }))
+
+    grammarSteps.push(command({
+      label: `Deploy Grammar Checker (${
+        isGrammarReleaseTag ? "Release" : "Dev"
+      })`,
+      command: "divvun-actions run lang-grammar-deploy",
+      depends_on: "grammar-bundle",
+      agents: {
+        queue: "linux",
+      },
+    }))
+  }
+
+  const pipeline: BuildkitePipeline = {
+    steps: [
+      {
+        group: "Speller",
+        key: "speller",
+        steps: spellerSteps,
+      },
+      {
+        group: "Grammar Checker",
+        key: "grammar",
+        depends_on: "speller-build",
+        steps: grammarSteps,
+      },
+    ],
   }
 
   return pipeline
