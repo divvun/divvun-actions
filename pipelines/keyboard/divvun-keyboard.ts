@@ -84,6 +84,7 @@ async function createWindowsPackage(
   packageId: string,
   bundlePath: string,
   channel: string | null,
+  unsigned: boolean,
 ): Promise<string> {
   using tempDir = await makeTempDir()
 
@@ -95,7 +96,8 @@ async function createWindowsPackage(
   const version = channel ? await versionAsNightly(baseVersion) : baseVersion
 
   const pathItems = [packageId, version, "windows"]
-  const packageFileName = `${pathItems.join("_")}.exe`
+  const unsignedSuffix = unsigned ? ".UNSIGNED" : ""
+  const packageFileName = `${pathItems.join("_")}${unsignedSuffix}.exe`
   const packagePath = path.join(tempDir.path, packageFileName)
 
   await Deno.copyFile(payloadPath, packagePath)
@@ -105,7 +107,7 @@ async function createWindowsPackage(
 export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
   logger.info("Building Divvun Keyboard for Windows")
 
-  const { payloadPath, channel } = await keyboardBuild({
+  const { payloadPath, channel, unsigned } = await keyboardBuild({
     keyboardType: KeyboardType.Windows,
     bundlePath: kbdgenBundlePath,
   })
@@ -115,6 +117,7 @@ export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
     builder.env.repoName,
     kbdgenBundlePath,
     channel,
+    unsigned,
   )
 
   // Upload artifact for later deployment
@@ -165,6 +168,7 @@ export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
     keyboardType: KeyboardType.MacOS,
     bundlePath: kbdgenBundlePath,
   })
+  // Note: unsigned is always false for macOS builds
 
   // Create properly named package
   const artifactPath = await createMacosPackage(

@@ -55,7 +55,9 @@ export class OpenBao {
 
     if (secretResponse?.errors != null) {
       throw new Error(
-        `OpenBao: ${secretResponse.errors.map((e: any) => e.message).join(", ")}`,
+        `OpenBao: ${
+          secretResponse.errors.map((e: any) => e.message).join(", ")
+        }`,
       )
     }
 

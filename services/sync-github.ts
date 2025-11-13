@@ -110,6 +110,8 @@ type BuildkitePipeline = {
   branch_configuration: string | null
   skip_queued_branch_builds?: boolean
   skip_queued_branch_builds_filter?: string | null
+  filter_enabled?: boolean
+  filter_condition?: string | null
   provider: {
     settings: {
       build_tags?: boolean
@@ -470,6 +472,8 @@ async function updateBuildkitePipeline(
         | "tags"
         | "skip_queued_branch_builds"
         | "skip_queued_branch_builds_filter"
+        | "filter_enabled"
+        | "filter_condition"
       >
     >
     & {
@@ -588,6 +592,19 @@ function assessStatus(
     discrepancies.push({
       code: "skip-queued-not-enabled",
       message: "Pipeline does not have skip_queued_branch_builds enabled.",
+    })
+  }
+
+  // Check if build filter is properly set
+  const expectedFilter =
+    `build.branch != "gh-pages" && build.tag !~ /dev-latest$/`
+  if (
+    pipeline.filter_enabled !== true ||
+    pipeline.filter_condition !== expectedFilter
+  ) {
+    discrepancies.push({
+      code: "filter-not-set",
+      message: "Pipeline does not have build filter properly configured.",
     })
   }
 
@@ -944,6 +961,32 @@ export default async function syncGithub(
     } catch (error) {
       console.error(
         `❌ Failed to enable build_tags for ${result.repoName}: ${error}`,
+      )
+    }
+  }
+
+  const filterNotSet = results.filter((r) =>
+    r.discrepancies.some((d) => d.code === "filter-not-set") && r.pipeline
+  )
+
+  for (const result of filterNotSet) {
+    if (!result.pipeline) continue
+
+    console.log(`🔍 Setting build filter for ${result.repoName}...`)
+    try {
+      await updateBuildkitePipeline(
+        buildkiteProps,
+        result.pipeline,
+        {
+          filter_enabled: true,
+          filter_condition:
+            `build.branch != "gh-pages" && build.tag !~ /dev-latest$/`,
+        },
+      )
+      console.log(`✅ Set build filter for ${result.repoName}`)
+    } catch (error) {
+      console.error(
+        `❌ Failed to set build filter for ${result.repoName}: ${error}`,
       )
     }
   }

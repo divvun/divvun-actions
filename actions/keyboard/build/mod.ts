@@ -1,7 +1,7 @@
 import * as path from "@std/path"
 import logger from "~/util/log.ts"
 import { isMatchingTag, Kbdgen, PahkatPrefix } from "~/util/shared.ts"
-import { makeInstaller } from "../../inno-setup/lib.ts"
+import { type InstallerResult, makeInstaller } from "../../inno-setup/lib.ts"
 import { KeyboardType } from "../types.ts"
 import { generateKbdInnoFromBundle } from "./iss.ts"
 import { NIGHTLY_CHANNEL } from "../../version.ts"
@@ -18,6 +18,7 @@ export type Props = {
 export type Output = {
   channel: string | null
   payloadPath: string
+  unsigned: boolean
 }
 
 export default async function keyboardBuild({
@@ -39,13 +40,21 @@ export default async function keyboardBuild({
     platform,
   )
 
-  const payloadPath = keyboardType === KeyboardType.MacOS
-    ? await Kbdgen.buildMacOS(bundlePath)
-    : await buildWindowsKeyboard(bundlePath)
+  let payloadPath: string
+  let unsigned = false
+
+  if (keyboardType === KeyboardType.MacOS) {
+    payloadPath = await Kbdgen.buildMacOS(bundlePath)
+  } else {
+    const result = await buildWindowsKeyboard(bundlePath)
+    payloadPath = result.path
+    unsigned = result.unsigned
+  }
 
   return {
     payloadPath,
     channel,
+    unsigned,
   }
 }
 
@@ -63,7 +72,9 @@ async function determineVersionAndChannel(
   }
 }
 
-async function buildWindowsKeyboard(bundlePath: string): Promise<string> {
+async function buildWindowsKeyboard(
+  bundlePath: string,
+): Promise<InstallerResult> {
   await setupWindowsDependencies()
 
   logger.debug("Building Windows keyboard")
@@ -154,13 +165,25 @@ async function copyArchitectureDirectory(
 async function createWindowsInstaller(
   bundlePath: string,
   outputPath: string,
-): Promise<string> {
+): Promise<InstallerResult> {
   logger.debug("Generating Inno Setup script")
   const issPath = await generateKbdInnoFromBundle(bundlePath, outputPath)
 
   logger.debug("Creating Windows installer")
-  const installerPath = await makeInstaller(issPath)
-  logger.debug("Installer created")
+  let result: InstallerResult
+  try {
+    result = await makeInstaller(issPath)
+    logger.debug("Installer created")
+  } catch (error) {
+    logger.warning(
+      `Signing failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+    logger.warning("Retrying without code signing...")
+    result = await makeInstaller(issPath, { skipSigning: true })
+    logger.debug("Unsigned installer created")
+  }
 
-  return installerPath
+  return result
 }

@@ -1,7 +1,10 @@
 import * as path from "@std/path"
 import * as toml from "@std/toml"
 
-import { makeInstaller } from "~/actions/inno-setup/lib.ts"
+import {
+  type InstallerResult,
+  makeInstaller,
+} from "~/actions/inno-setup/lib.ts"
 import * as builder from "~/builder.ts"
 import { InnoSetupBuilder } from "~/util/inno.ts"
 import {
@@ -158,10 +161,25 @@ export default async function spellerBundle({
     // console.log /*logger.debug*/("generated install.iss:")
     // console.log /*logger.debug*/(innoBuilder.build())
 
-    const installerPath = await makeInstaller(".\\install.iss")
+    let result: InstallerResult
+    try {
+      result = await makeInstaller(".\\install.iss")
+      console.log /*logger.debug*/("Installer created")
+    } catch (error) {
+      console.warn(
+        `Signing failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+      console.warn("Retrying without code signing...")
+      result = await makeInstaller(".\\install.iss", { skipSigning: true })
+      console.log /*logger.debug*/("Unsigned installer created")
+    }
+
+    const unsignedSuffix = result.unsigned ? ".UNSIGNED" : ""
     payloadPath = await renameFile(
-      installerPath,
-      `${packageId}_${version}_windows.exe`,
+      result.path,
+      `${packageId}_${version}_windows${unsignedSuffix}.exe`,
     )
     console.log /*logger.debug*/(`Installer created at ${payloadPath}`)
   } else if (spellerType == SpellerType.MacOS) {

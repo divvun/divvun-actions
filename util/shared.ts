@@ -221,7 +221,10 @@ export class Zip {
 }
 
 export class Tar {
-  static async extractTar(filePath: string, outputDir?: string): Promise<string> {
+  static async extractTar(
+    filePath: string,
+    outputDir?: string,
+  ): Promise<string> {
     const platform = Deno.build.os
 
     logger.debug("Extracting", filePath)
