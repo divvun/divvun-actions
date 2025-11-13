@@ -8,6 +8,7 @@
 set scriptPath=%1
 set installerOutput=%2
 set issPath=%3
+set skip=%4
 
 @REM echo iscc.exe /S"signtool=$q%scriptPath%$q sign $f" /Qp "/O%installerOutput%" %issPath%
-iscc.exe /S"signtool=$q%scriptPath%$q sign $f" /Qp "/O%installerOutput%" %issPath%
+iscc.exe /S"signtool=$q%scriptPath%$q sign $f %4" /Qp "/O%installerOutput%" %issPath%

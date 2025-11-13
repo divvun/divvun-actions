@@ -179,7 +179,7 @@ export default async function spellerBundle({
     const unsignedSuffix = result.unsigned ? ".UNSIGNED" : ""
     payloadPath = await renameFile(
       result.path,
-      `${packageId}_${version}_windows${unsignedSuffix}.exe`,
+      `${packageId}_${version}_noarch-windows${unsignedSuffix}.exe`,
     )
     console.log /*logger.debug*/(`Installer created at ${payloadPath}`)
   } else if (spellerType == SpellerType.MacOS) {
@@ -208,7 +208,7 @@ export default async function spellerBundle({
       appCodeSignId:
         "Developer ID Application: The University of Tromso (2K5J2584NX)",
     })
-    payloadPath = await renameFile(pkgPath, `${packageId}_${version}_macos.pkg`)
+    payloadPath = await renameFile(pkgPath, `${packageId}_${version}_noarch-macos.pkg`)
     console.log /*logger.debug*/(`Installer created at ${payloadPath}`)
   } else {
     throw new Error(`Unsupported speller type: ${spellerType}`)

@@ -77,7 +77,7 @@ export default async function spellerDeploy({
 
     // Generate the payload metadata
     if (spellerType === SpellerType.Windows) {
-      platform = "windows"
+      platform = "noarch-windows"
       const productCode = validateProductCode(
         WindowsExecutableKind.Inno,
         manifest.windows.system_product_code,
@@ -116,7 +116,7 @@ export default async function spellerDeploy({
         secrets,
       )
     } else if (spellerType === SpellerType.MacOS) {
-      platform = "macos"
+      platform = "noarch-macos"
       const pkgId = manifest.macos.system_pkg_id
 
       const ext = path.extname(payloadPath)
@@ -152,7 +152,7 @@ export default async function spellerDeploy({
         secrets,
       )
     } else if (spellerType === SpellerType.Mobile) {
-      platform = "mobile"
+      platform = "noarch-mobile"
 
       const ext = path.extname(payloadPath)
       const pathItems = [packageId, version, platform]

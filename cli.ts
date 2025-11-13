@@ -169,6 +169,10 @@ export default async function runCli(input: string[]) {
 
 async function runSign(args: any) {
   const inputFile = args._[0]
+  const skipSign = args._[1] === "true"
+  if (skipSign) {
+    return
+  }
   await sign(inputFile)
 }
 
