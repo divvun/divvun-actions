@@ -560,7 +560,11 @@ export function pipelineLang() {
   const isGrammarDeploy = isGrammarReleaseTag || builder.env.branch === "main"
 
   // Build phase steps array
-  const buildSteps: CommandStep[] = [spellerBuildStep, grammarBuildStep]
+  const buildSteps: CommandStep[] = [spellerBuildStep]
+
+  if (isGrammarReleaseTag || !isSpellerReleaseTag) {
+    buildSteps.push(grammarBuildStep)
+  }
 
   // Test phase steps array (only on non-release builds)
   const testSteps: CommandStep[] = []
@@ -578,17 +582,20 @@ export function pipelineLang() {
       },
     }))
 
-    testSteps.push(command({
-      key: "grammar-test",
-      label: "Test Grammar Checkers",
-      command: "divvun-actions run lang-grammar-test",
-      depends_on: "grammar-build",
-      soft_fail: true,
-      agents: {
-        queue: "linux",
-        ...extra,
-      },
-    }))
+    // Only test grammar if we built it
+    if (isGrammarReleaseTag || !isSpellerReleaseTag) {
+      testSteps.push(command({
+        key: "grammar-test",
+        label: "Test Grammar Checkers",
+        command: "divvun-actions run lang-grammar-test",
+        depends_on: "grammar-build",
+        soft_fail: true,
+        agents: {
+          queue: "linux",
+          ...extra,
+        },
+      }))
+    }
   }
 
   // Bundle phase steps array (only on deploy)
