@@ -559,11 +559,14 @@ export function pipelineLang() {
   const isSpellerDeploy = isSpellerReleaseTag || builder.env.branch === "main"
   const isGrammarDeploy = isGrammarReleaseTag || builder.env.branch === "main"
 
-  // Build speller steps array
-  const spellerSteps: CommandStep[] = [spellerBuildStep]
+  // Build phase steps array
+  const buildSteps: CommandStep[] = [spellerBuildStep, grammarBuildStep]
+
+  // Test phase steps array (only on non-release builds)
+  const testSteps: CommandStep[] = []
 
   if (!isReleaseTag) {
-    spellerSteps.push(command({
+    testSteps.push(command({
       key: "speller-test",
       label: "Test Spellers",
       command: "divvun-actions run lang-speller-test",
@@ -574,10 +577,25 @@ export function pipelineLang() {
         ...extra,
       },
     }))
+
+    testSteps.push(command({
+      key: "grammar-test",
+      label: "Test Grammar Checkers",
+      command: "divvun-actions run lang-grammar-test",
+      depends_on: "grammar-build",
+      soft_fail: true,
+      agents: {
+        queue: "linux",
+        ...extra,
+      },
+    }))
   }
 
+  // Bundle phase steps array (only on deploy)
+  const bundleSteps: CommandStep[] = []
+
   if (isSpellerDeploy) {
-    spellerSteps.push(command({
+    bundleSteps.push(command({
       label: "Bundle Speller (Windows)",
       key: "speller-bundle-windows",
       command: "divvun-actions run lang-bundle windows",
@@ -587,7 +605,7 @@ export function pipelineLang() {
       },
     }))
 
-    spellerSteps.push(command({
+    bundleSteps.push(command({
       label: "Bundle Speller (Mobile)",
       key: "speller-bundle-mobile",
       command: "divvun-actions run lang-bundle mobile",
@@ -597,7 +615,7 @@ export function pipelineLang() {
       },
     }))
 
-    spellerSteps.push(command({
+    bundleSteps.push(command({
       label: "Bundle Speller (macOS)",
       key: "speller-bundle-macos",
       command: "divvun-actions run lang-bundle macos",
@@ -606,8 +624,25 @@ export function pipelineLang() {
         queue: "macos",
       },
     }))
+  }
 
-    spellerSteps.push(command({
+  if (isGrammarDeploy) {
+    bundleSteps.push(command({
+      label: "Bundle Grammar Checker",
+      key: "grammar-bundle",
+      command: "divvun-actions run lang-grammar-bundle",
+      depends_on: "grammar-build",
+      agents: {
+        queue: "linux",
+      },
+    }))
+  }
+
+  // Deploy phase steps array (only on deploy)
+  const deploySteps: CommandStep[] = []
+
+  if (isSpellerDeploy) {
+    deploySteps.push(command({
       label: `Deploy Speller (${isSpellerReleaseTag ? "Release" : "Dev"})`,
       command: "divvun-actions run lang-deploy",
       depends_on: [
@@ -621,35 +656,8 @@ export function pipelineLang() {
     }))
   }
 
-  // Build grammar steps array
-  const grammarSteps: CommandStep[] = [grammarBuildStep]
-
-  if (!isReleaseTag) {
-    grammarSteps.push(command({
-      key: "grammar-test",
-      label: "Test Grammar Checkers",
-      command: "divvun-actions run lang-grammar-test",
-      depends_on: "grammar-build",
-      soft_fail: true,
-      agents: {
-        queue: "linux",
-        ...extra,
-      },
-    }))
-  }
-
   if (isGrammarDeploy) {
-    grammarSteps.push(command({
-      label: "Bundle Grammar Checker",
-      key: "grammar-bundle",
-      command: "divvun-actions run lang-grammar-bundle",
-      depends_on: "grammar-build",
-      agents: {
-        queue: "linux",
-      },
-    }))
-
-    grammarSteps.push(command({
+    deploySteps.push(command({
       label: `Deploy Grammar Checker (${
         isGrammarReleaseTag ? "Release" : "Dev"
       })`,
@@ -661,20 +669,41 @@ export function pipelineLang() {
     }))
   }
 
+  // Construct pipeline with phase-based groups
+  const steps: any[] = [
+    {
+      group: "Build",
+      key: "build",
+      steps: buildSteps,
+    },
+  ]
+
+  if (testSteps.length > 0) {
+    steps.push({
+      group: "Test",
+      key: "test",
+      steps: testSteps,
+    })
+  }
+
+  if (bundleSteps.length > 0) {
+    steps.push({
+      group: "Bundle",
+      key: "bundle",
+      steps: bundleSteps,
+    })
+  }
+
+  if (deploySteps.length > 0) {
+    steps.push({
+      group: "Deploy",
+      key: "deploy",
+      steps: deploySteps,
+    })
+  }
+
   const pipeline: BuildkitePipeline = {
-    steps: [
-      {
-        group: "Speller",
-        key: "speller",
-        steps: spellerSteps,
-      },
-      {
-        group: "Grammar Checker",
-        key: "grammar",
-        depends_on: "speller-build",
-        steps: grammarSteps,
-      },
-    ],
+    steps,
   }
 
   return pipeline
