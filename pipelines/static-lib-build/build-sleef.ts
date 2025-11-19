@@ -154,6 +154,8 @@ export async function buildSleef(options: BuildSleefOptions) {
     "-DBUILD_DFT=OFF",
     "-DBUILD_GNUABI_LIBS=OFF",
     "-DBUILD_INLINE_HEADERS=OFF",
+    "-DSLEEF_ENABLE_SVE=OFF",
+    "-DSLEEF_ENABLE_ADVSIMD=ON",
   ]
 
   if (platform === "darwin") {
