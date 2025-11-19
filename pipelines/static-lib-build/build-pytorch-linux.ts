@@ -197,6 +197,10 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   // Set C++17 standard explicitly
   cmakeArgs.push("-DCMAKE_CXX_STANDARD=17")
 
+  // Disable SVE and force NEON/AdvSIMD only
+  cmakeArgs.push("-DCMAKE_C_FLAGS=-march=armv8-a -mno-sve")
+  cmakeArgs.push("-DCMAKE_CXX_FLAGS=-march=armv8-a -mno-sve")
+
   // Static or shared libraries
   if (shared) {
     cmakeArgs.push("-DBUILD_SHARED_LIBS=ON")
@@ -321,6 +325,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   Deno.env.set("CC", "clang")
   Deno.env.set("CXX", "clang++")
   Deno.env.set("CMAKE_MAKE_PROGRAM", ninjaPath)
+  Deno.env.set("DISABLE_SVE", "1")
 
   // Run CMake configuration
   console.log("Running CMake configuration")
