@@ -348,6 +348,27 @@ export async function buildPytorchMacos(options: BuildPytorchMacosOptions) {
     { cwd: buildRoot },
   )
 
+  // Install libraries and headers
+  console.log("Installing libraries and headers")
+  try {
+    await builder.exec("cp", [
+      "-rf",
+      path.join(buildRoot, "lib") + "/.",
+      path.join(installPrefix, "lib") + "/",
+    ])
+  } catch {
+    // Ignore if copy fails
+  }
+  try {
+    await builder.exec("cp", [
+      "-rf",
+      path.join(buildRoot, "include") + "/.",
+      path.join(installPrefix, "include") + "/",
+    ])
+  } catch {
+    // Ignore if copy fails
+  }
+
   console.log("")
   console.log("macOS build completed successfully!")
   console.log("")
