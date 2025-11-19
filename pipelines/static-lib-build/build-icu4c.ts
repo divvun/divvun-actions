@@ -65,6 +65,19 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   const repoRoot = Deno.cwd()
   const installPrefix = path.join(repoRoot, `target/${target}/icu4c`)
 
+  // Detect cross-compilation
+  const targetTriple = target
+  const hostArch = Deno.build.arch
+  const hostTriple = hostArch === "aarch64"
+    ? "aarch64-unknown-linux-gnu"
+    : "x86_64-unknown-linux-gnu"
+  const isCrossCompile = platform === "linux" && targetTriple !== hostTriple
+  const targetArch = targetTriple.split("-")[0]
+
+  if (isCrossCompile) {
+    console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
+  }
+
   // Windows uses vcpkg for ICU installation
   if (platform === "windows") {
     const vcpkgRoot = Deno.env.get("VCPKG_ROOT")
@@ -212,6 +225,14 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     } catch {
       Deno.env.set("CC", "gcc")
       Deno.env.set("CXX", "g++")
+    }
+
+    // Set cross-compilation flags for Linux
+    if (isCrossCompile) {
+      const crossFlags = `--target=${targetTriple} -fuse-ld=lld`
+      Deno.env.set("CFLAGS", crossFlags)
+      Deno.env.set("CXXFLAGS", crossFlags)
+      Deno.env.set("LDFLAGS", "-fuse-ld=lld")
     }
   }
 
@@ -363,6 +384,15 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     configureArgs.push("--with-data-packaging=static")
     // Note: We don't need to set CFLAGS/CXXFLAGS here since the NDK compiler
     // already knows the correct target and sysroot from its name (aarch64-linux-android21-clang)
+  } else if (isCrossCompile) {
+    // Linux cross-compilation
+    const hostBuildDir = path.join(
+      repoRoot,
+      `target/${hostTriple}/build/icu`,
+    )
+    configureArgs.push(`--host=${targetTriple}`)
+    configureArgs.push(`--with-cross-build=${hostBuildDir}`)
+    // Note: CFLAGS/CXXFLAGS/LDFLAGS were already set above with --target and -fuse-ld=lld
   }
 
   // Check if runConfigureICU exists

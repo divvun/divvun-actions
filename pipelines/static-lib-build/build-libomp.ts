@@ -54,6 +54,19 @@ export async function buildLibomp(options: BuildLibompOptions) {
   const buildRoot = path.join(repoRoot, `target/${target}/build/openmp`)
   const installPrefix = path.join(repoRoot, `target/${target}/libomp`)
 
+  // Detect cross-compilation
+  const targetTriple = target
+  const hostArch = Deno.build.arch
+  const hostTriple = hostArch === "aarch64"
+    ? "aarch64-unknown-linux-gnu"
+    : "x86_64-unknown-linux-gnu"
+  const isCrossCompile = platform === "linux" && targetTriple !== hostTriple
+  const targetArch = targetTriple.split("-")[0]
+
+  if (isCrossCompile) {
+    console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
+  }
+
   // Set up compilers
   let cc: string
   let cxx: string
@@ -153,6 +166,14 @@ export async function buildLibomp(options: BuildLibompOptions) {
   } else if (platform === "windows") {
     cmakeArgs.push("-DCMAKE_C_COMPILER=cl.exe")
     cmakeArgs.push("-DCMAKE_CXX_COMPILER=cl.exe")
+  } else if (isCrossCompile) {
+    // Linux cross-compilation configuration
+    cmakeArgs.push("-DCMAKE_SYSTEM_NAME=Linux")
+    cmakeArgs.push(`-DCMAKE_SYSTEM_PROCESSOR=${targetArch}`)
+    cmakeArgs.push(`-DCMAKE_C_COMPILER_TARGET=${targetTriple}`)
+    cmakeArgs.push(`-DCMAKE_CXX_COMPILER_TARGET=${targetTriple}`)
+    cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld")
+    cmakeArgs.push("-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld")
   }
 
   if (verbose) {
