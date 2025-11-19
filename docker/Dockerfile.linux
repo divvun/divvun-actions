@@ -80,6 +80,16 @@ RUN apt-get update && \
     clang-format clang-tidy clang-tools clang clangd libc++-dev libc++1 libc++abi-dev libc++abi1 libclang-dev libclang1 liblldb-dev libllvm-ocaml-dev libomp-dev libomp5 lld lldb llvm-dev llvm-runtime llvm python3-clang && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
+# Install ARM64 cross-compilation support
+RUN dpkg --add-architecture arm64 && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    gcc-aarch64-linux-gnu \
+    g++-aarch64-linux-gnu \
+    libc6-dev-arm64-cross \
+    libstdc++-14-dev-arm64-cross && \
+    rm -rf /var/lib/apt/lists/* && apt-get clean
+
 # Install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
