@@ -167,6 +167,7 @@ export async function buildSleef(options: BuildSleefOptions) {
     cmakeArgs.push(`-DCMAKE_CXX_COMPILER_TARGET=${targetTriple}`)
     cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld")
     cmakeArgs.push("-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld")
+    cmakeArgs.push(`-DCMAKE_ASM_FLAGS=--target=${targetTriple}`)
 
     // Point to native build directory for host tools
     const nativeBuildDir = path.join(
