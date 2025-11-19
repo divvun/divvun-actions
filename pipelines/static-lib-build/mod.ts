@@ -203,11 +203,13 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       if (targetTriple === "x86_64-unknown-linux-gnu") {
         commands.push(
           'buildkite-agent artifact download "target/sleef_x86_64-unknown-linux-gnu.tar.gz" .',
+          "mkdir -p target/x86_64-unknown-linux-gnu",
           "bsdtar -xf target/sleef_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
         )
       } else if (targetTriple === "aarch64-unknown-linux-gnu") {
         commands.push(
           'buildkite-agent artifact download "target/sleef_aarch64-unknown-linux-gnu.tar.gz" .',
+          "mkdir -p target/aarch64-unknown-linux-gnu",
           "bsdtar -xf target/sleef_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu",
           'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
           "mkdir -p target/x86_64-unknown-linux-gnu",
