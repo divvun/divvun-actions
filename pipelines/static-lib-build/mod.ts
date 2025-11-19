@@ -173,6 +173,10 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
         dependsOn = "icu4c-x86_64-unknown-linux-gnu"
         hostArtifactName = "icu4c_x86_64-unknown-linux-gnu.tar.gz"
         hostTargetDir = "x86_64-unknown-linux-gnu"
+      } else if (targetTriple === "aarch64-unknown-linux-gnu") {
+        dependsOn = "icu4c-x86_64-unknown-linux-gnu"
+        hostArtifactName = "icu4c_x86_64-unknown-linux-gnu.tar.gz"
+        hostTargetDir = "x86_64-unknown-linux-gnu"
       }
     } else if (library === "pytorch") {
       // PyTorch depends on cache download and SLEEF for Linux builds
