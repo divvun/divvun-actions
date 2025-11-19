@@ -113,6 +113,9 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
   }
 
+  // Parse target architecture from triple
+  const targetArch = targetTriple.split("-")[0]
+
   // Set up directories
   const installPrefix = path.join(repoRoot, `target/${targetTriple}/pytorch`)
   const buildRoot = path.join(
@@ -170,6 +173,14 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   // Build configuration
   cmakeArgs.push(`-DCMAKE_INSTALL_PREFIX=${installPrefix}`)
   cmakeArgs.push(`-DCMAKE_BUILD_TYPE=${buildType}`)
+
+  // Cross-compilation configuration
+  if (isCrossCompile) {
+    cmakeArgs.push("-DCMAKE_SYSTEM_NAME=Linux")
+    cmakeArgs.push(`-DCMAKE_SYSTEM_PROCESSOR=${targetArch}`)
+    cmakeArgs.push(`-DCMAKE_C_COMPILER_TARGET=${targetTriple}`)
+    cmakeArgs.push(`-DCMAKE_CXX_COMPILER_TARGET=${targetTriple}`)
+  }
 
   // Set C++17 standard explicitly
   cmakeArgs.push("-DCMAKE_CXX_STANDARD=17")
