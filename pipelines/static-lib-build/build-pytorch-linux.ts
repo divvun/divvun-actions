@@ -197,9 +197,9 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   // Set C++17 standard explicitly
   cmakeArgs.push("-DCMAKE_CXX_STANDARD=17")
 
-  // Disable SVE and force NEON/AdvSIMD only
-  cmakeArgs.push("-DCMAKE_C_FLAGS=-march=armv8-a -mno-sve")
-  cmakeArgs.push("-DCMAKE_CXX_FLAGS=-march=armv8-a -mno-sve")
+  // Force ARMv8-A (NEON only, no SVE)
+  cmakeArgs.push("-DCMAKE_C_FLAGS=-march=armv8-a")
+  cmakeArgs.push("-DCMAKE_CXX_FLAGS=-march=armv8-a")
 
   // Static or shared libraries
   if (shared) {
