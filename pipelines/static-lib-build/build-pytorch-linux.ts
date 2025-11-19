@@ -153,13 +153,14 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   // Dependency prefixes
   const libompPrefix = path.join(repoRoot, `target/${targetTriple}/libomp`)
   const protobufPrefix = path.join(repoRoot, `target/${targetTriple}/protobuf`)
+  const sleefPrefix = path.join(repoRoot, `target/${targetTriple}/sleef`)
 
   // Prepare CMake arguments
   const cmakeArgs: string[] = []
 
   // Add all dependency prefixes to CMAKE_PREFIX_PATH
   cmakeArgs.push(
-    `-DCMAKE_PREFIX_PATH=${installPrefix};${libompPrefix};${protobufPrefix};${pythonPrefixPath}`,
+    `-DCMAKE_PREFIX_PATH=${installPrefix};${libompPrefix};${protobufPrefix};${sleefPrefix};${pythonPrefixPath}`,
   )
   cmakeArgs.push(`-DPython_EXECUTABLE=${pythonExecutable}`)
 
@@ -226,6 +227,9 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   } catch {
     cmakeArgs.push("-DUSE_OPENMP=ON")
   }
+
+  // Use system SLEEF library
+  cmakeArgs.push("-DUSE_SYSTEM_SLEEF=ON")
 
   if (distributed) {
     cmakeArgs.push("-DUSE_DISTRIBUTED=ON")

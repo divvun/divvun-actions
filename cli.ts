@@ -329,6 +329,16 @@ async function runPipeline(args: any) {
       })
       break
     }
+    case "sleef-build": {
+      const { buildSleef } = await import(
+        "./pipelines/static-lib-build/build-sleef.ts"
+      )
+      await buildSleef({
+        target: args._[1] as string,
+        version: args._[2] != null ? String(args._[2]) : undefined,
+      })
+      break
+    }
     case "pytorch-cache-download": {
       const { downloadCache } = await import(
         "./pipelines/static-lib-build/download-cache.ts"

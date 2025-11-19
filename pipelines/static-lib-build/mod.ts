@@ -504,6 +504,19 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             artifact_paths: ["target/pytorch_x86_64-unknown-linux-gnu.tar.gz"],
           }),
           command({
+            label: "Linux x86_64: SLEEF",
+            key: "linux-x86_64-sleef",
+            command: [
+              "set -e",
+              "divvun-actions run sleef-build x86_64-unknown-linux-gnu",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu sleef",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: ["target/sleef_x86_64-unknown-linux-gnu.tar.gz"],
+          }),
+          command({
             label: "Linux ARM64: ICU",
             key: "linux-aarch64-icu",
             depends_on: ["linux-x86_64-icu"],
@@ -551,11 +564,30 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             artifact_paths: ["target/protobuf_aarch64-unknown-linux-gnu.tar.gz"],
           }),
           command({
+            label: "Linux ARM64: SLEEF",
+            key: "linux-aarch64-sleef",
+            depends_on: ["linux-x86_64-sleef"],
+            command: [
+              "set -e",
+              'buildkite-agent artifact download "target/sleef_x86_64-unknown-linux-gnu.tar.gz" .',
+              "mkdir -p target/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/sleef_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+              "divvun-actions run sleef-build aarch64-unknown-linux-gnu",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu sleef",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: ["target/sleef_aarch64-unknown-linux-gnu.tar.gz"],
+          }),
+          command({
             label: "Linux ARM64: PyTorch",
             key: "linux-aarch64-pytorch",
             depends_on: [
               "linux-x86_64-protobuf",
               "linux-aarch64-protobuf",
+              "linux-x86_64-sleef",
+              "linux-aarch64-sleef",
               "pytorch-cache-download",
             ],
             command: [
@@ -568,6 +600,8 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               'buildkite-agent artifact download "target/protobuf_aarch64-unknown-linux-gnu.tar.gz" .',
               "mkdir -p target/aarch64-unknown-linux-gnu",
               "bsdtar -xf target/protobuf_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu",
+              'buildkite-agent artifact download "target/sleef_aarch64-unknown-linux-gnu.tar.gz" .',
+              "bsdtar -xf target/sleef_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu",
               "divvun-actions run pytorch-build aarch64-unknown-linux-gnu",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/pytorch_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu pytorch",
             ].join("\n"),
