@@ -231,6 +231,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
 
   // Use system SLEEF library
   cmakeArgs.push("-DUSE_SYSTEM_SLEEF=ON")
+  cmakeArgs.push(`-DSleef_DIR=${sleefPrefix}/lib/cmake/sleef`)
 
   if (distributed) {
     cmakeArgs.push("-DUSE_DISTRIBUTED=ON")
