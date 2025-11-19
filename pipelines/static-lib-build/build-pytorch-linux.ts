@@ -102,6 +102,14 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     )
   }
 
+  // Apply SLEEF patch
+  console.log("Applying SLEEF patch")
+  const patchPath = path.join(
+    import.meta.dirname!,
+    "patches/pytorch/aten-sleef.patch",
+  )
+  await builder.exec("patch", ["-p1", "-i", patchPath], { cwd: pytorchRoot })
+
   // Determine target triple
   const targetTriple = target
   const hostTriple = hostArch === "aarch64"
