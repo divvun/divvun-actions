@@ -582,7 +582,6 @@ export function pipelineLang() {
       },
     }))
 
-    // Only test grammar if we built it
     if (isGrammarReleaseTag || !isSpellerReleaseTag) {
       testSteps.push(command({
         key: "grammar-test",
