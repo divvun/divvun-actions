@@ -85,6 +85,7 @@ export class GitHub {
       "release",
       "upload",
       tag,
+      "--clobber",
       "--repo",
       this.#repo,
       ...artifacts,
