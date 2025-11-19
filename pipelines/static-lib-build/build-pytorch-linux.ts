@@ -352,6 +352,27 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     // Ignore if copy fails
   }
 
+  // Copy SLEEF libraries into PyTorch bundle
+  console.log("Copying SLEEF libraries")
+  try {
+    await builder.exec("cp", [
+      "-rf",
+      path.join(sleefPrefix, "lib") + "/.",
+      path.join(installPrefix, "lib") + "/",
+    ])
+  } catch {
+    // Ignore if copy fails
+  }
+  try {
+    await builder.exec("cp", [
+      "-rf",
+      path.join(sleefPrefix, "include") + "/.",
+      path.join(installPrefix, "include") + "/",
+    ])
+  } catch {
+    // Ignore if copy fails
+  }
+
   console.log("")
   console.log("Linux build completed successfully!")
   console.log("")
