@@ -81,7 +81,11 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
 # Install ARM64 cross-compilation support
-RUN dpkg --add-architecture arm64 && \
+RUN echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse" >> /etc/apt/sources.list.d/arm64.list && \
+    echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse" >> /etc/apt/sources.list.d/arm64.list && \
+    echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-backports main restricted universe multiverse" >> /etc/apt/sources.list.d/arm64.list && \
+    echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse" >> /etc/apt/sources.list.d/arm64.list && \
+    dpkg --add-architecture arm64 && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
     gcc-aarch64-linux-gnu \
