@@ -553,11 +553,18 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
           command({
             label: "Linux ARM64: PyTorch",
             key: "linux-aarch64-pytorch",
-            depends_on: ["linux-aarch64-protobuf", "pytorch-cache-download"],
+            depends_on: [
+              "linux-x86_64-protobuf",
+              "linux-aarch64-protobuf",
+              "pytorch-cache-download",
+            ],
             command: [
               "set -e",
               'buildkite-agent artifact download "pytorch.tar.gz" .',
               "bsdtar -xf pytorch.tar.gz",
+              'buildkite-agent artifact download "target/protobuf_x86_64-unknown-linux-gnu.tar.gz" .',
+              "mkdir -p target/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               'buildkite-agent artifact download "target/protobuf_aarch64-unknown-linux-gnu.tar.gz" .',
               "mkdir -p target/aarch64-unknown-linux-gnu",
               "bsdtar -xf target/protobuf_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu",
