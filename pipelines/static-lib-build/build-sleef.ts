@@ -33,7 +33,9 @@ export async function buildSleef(options: BuildSleefOptions) {
     version = "3.6",
   } = options
 
-  console.log("Building SLEEF (SIMD Library for Evaluating Elementary Functions)")
+  console.log(
+    "Building SLEEF (SIMD Library for Evaluating Elementary Functions)",
+  )
 
   const platform = detectPlatform(target)
   const repoRoot = Deno.cwd()

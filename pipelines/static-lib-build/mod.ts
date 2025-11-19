@@ -88,6 +88,59 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
         },
       }),
     )
+
+    // Build SLEEF for Linux platforms (required for PyTorch)
+    const sleefBuildSteps: CommandStep[] = []
+
+    // x86_64 Linux SLEEF
+    sleefBuildSteps.push(
+      command({
+        label: `:package: SLEEF x86_64-unknown-linux-gnu`,
+        key: "sleef-x86_64-unknown-linux-gnu",
+        command: [
+          "set -e",
+          "divvun-actions run sleef-build x86_64-unknown-linux-gnu",
+          "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu sleef",
+          "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu build/sleef",
+        ].join("\n"),
+        agents: {
+          queue: "linux",
+        },
+        artifact_paths: [
+          "target/sleef_x86_64-unknown-linux-gnu.tar.gz",
+          "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz",
+        ],
+      }),
+    )
+
+    // aarch64 Linux SLEEF
+    sleefBuildSteps.push(
+      command({
+        label: `:package: SLEEF aarch64-unknown-linux-gnu`,
+        key: "sleef-aarch64-unknown-linux-gnu",
+        depends_on: "sleef-x86_64-unknown-linux-gnu",
+        command: [
+          "set -e",
+          'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
+          "mkdir -p target/x86_64-unknown-linux-gnu",
+          "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+          "divvun-actions run sleef-build aarch64-unknown-linux-gnu",
+          "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu sleef",
+        ].join("\n"),
+        agents: {
+          queue: "linux",
+        },
+        artifact_paths: [
+          "target/sleef_aarch64-unknown-linux-gnu.tar.gz",
+        ],
+      }),
+    )
+
+    pipeline.steps.push({
+      group: ":package: Build SLEEF for PyTorch",
+      key: "build-sleef",
+      steps: sleefBuildSteps,
+    })
   }
 
   // Build steps for each platform
@@ -107,7 +160,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       : `divvun-actions run ${library}-build ${targetTriple}`
 
     // Determine cross-compilation dependencies for ICU4C
-    let dependsOn: string | undefined
+    let dependsOn: string | string[] | undefined
     let hostArtifactName: string | undefined
     let hostTargetDir: string | undefined
 
@@ -122,7 +175,18 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
         hostTargetDir = "x86_64-unknown-linux-gnu"
       }
     } else if (library === "pytorch") {
-      dependsOn = "pytorch-cache-download"
+      // PyTorch depends on cache download and SLEEF for Linux builds
+      if (targetTriple === "x86_64-unknown-linux-gnu") {
+        dependsOn = ["pytorch-cache-download", "sleef-x86_64-unknown-linux-gnu"]
+      } else if (targetTriple === "aarch64-unknown-linux-gnu") {
+        dependsOn = [
+          "pytorch-cache-download",
+          "sleef-x86_64-unknown-linux-gnu",
+          "sleef-aarch64-unknown-linux-gnu",
+        ]
+      } else {
+        dependsOn = "pytorch-cache-download"
+      }
     }
 
     // Build command list
@@ -134,6 +198,22 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
         'buildkite-agent artifact download "pytorch.tar.gz" .',
         "bsdtar -xf pytorch.tar.gz",
       )
+
+      // Download SLEEF for Linux builds
+      if (targetTriple === "x86_64-unknown-linux-gnu") {
+        commands.push(
+          'buildkite-agent artifact download "target/sleef_x86_64-unknown-linux-gnu.tar.gz" .',
+          "bsdtar -xf target/sleef_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+        )
+      } else if (targetTriple === "aarch64-unknown-linux-gnu") {
+        commands.push(
+          'buildkite-agent artifact download "target/sleef_aarch64-unknown-linux-gnu.tar.gz" .',
+          "bsdtar -xf target/sleef_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu",
+          'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
+          "mkdir -p target/x86_64-unknown-linux-gnu",
+          "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+        )
+      }
     }
 
     // ICU4C cross-compilation: download host build
@@ -241,7 +321,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
         command: `divvun-actions run pytorch-cache-download ${PYTORCH_VERSION}`,
         agents: {
           queue: "linux",
-        }
+        },
       }),
       {
         group: ":apple: macOS Builds",
@@ -571,7 +651,9 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             agents: {
               queue: "linux",
             },
-            artifact_paths: ["target/protobuf_aarch64-unknown-linux-gnu.tar.gz"],
+            artifact_paths: [
+              "target/protobuf_aarch64-unknown-linux-gnu.tar.gz",
+            ],
           }),
           command({
             label: "Linux ARM64: SLEEF",
