@@ -29,16 +29,22 @@ function getLibraryPlatforms(library: LibraryType): string[] {
         "aarch64-apple-darwin",
         "aarch64-apple-ios",
         "aarch64-linux-android",
+        "aarch64-unknown-linux-gnu",
         "x86_64-unknown-linux-gnu",
         "x86_64-pc-windows-msvc",
       ]
     case "libomp":
-      return ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"]
+      return [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "x86_64-unknown-linux-gnu",
+      ]
     case "protobuf":
       return [
         "aarch64-apple-darwin",
         "aarch64-apple-ios",
         "aarch64-linux-android",
+        "aarch64-unknown-linux-gnu",
         "x86_64-unknown-linux-gnu",
       ]
     case "pytorch":
@@ -46,6 +52,7 @@ function getLibraryPlatforms(library: LibraryType): string[] {
         "aarch64-apple-darwin",
         "aarch64-apple-ios",
         "aarch64-linux-android",
+        "aarch64-unknown-linux-gnu",
         "x86_64-unknown-linux-gnu",
       ]
   }
@@ -496,6 +503,72 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               queue: "linux",
             },
             artifact_paths: ["target/pytorch_x86_64-unknown-linux-gnu.tar.gz"],
+          }),
+          command({
+            label: "Linux ARM64: ICU",
+            key: "linux-aarch64-icu",
+            depends_on: ["linux-x86_64-icu"],
+            command: [
+              "set -e",
+              'buildkite-agent artifact download "target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz" .',
+              "mkdir -p target/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+              "divvun-actions run icu4c-build aarch64-unknown-linux-gnu",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu icu4c",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu build/icu",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: [
+              "target/icu4c_aarch64-unknown-linux-gnu.tar.gz",
+              "target/icu4c-build_aarch64-unknown-linux-gnu.tar.gz",
+            ],
+          }),
+          command({
+            label: "Linux ARM64: LibOMP",
+            key: "linux-aarch64-libomp",
+            command: [
+              "set -e",
+              "divvun-actions run libomp-build aarch64-unknown-linux-gnu",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/libomp_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu libomp",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: ["target/libomp_aarch64-unknown-linux-gnu.tar.gz"],
+          }),
+          command({
+            label: "Linux ARM64: Protobuf",
+            key: "linux-aarch64-protobuf",
+            command: [
+              "set -e",
+              "divvun-actions run protobuf-build aarch64-unknown-linux-gnu",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu protobuf",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: ["target/protobuf_aarch64-unknown-linux-gnu.tar.gz"],
+          }),
+          command({
+            label: "Linux ARM64: PyTorch",
+            key: "linux-aarch64-pytorch",
+            depends_on: ["linux-aarch64-protobuf", "pytorch-cache-download"],
+            command: [
+              "set -e",
+              'buildkite-agent artifact download "pytorch.tar.gz" .',
+              "bsdtar -xf pytorch.tar.gz",
+              'buildkite-agent artifact download "target/protobuf_aarch64-unknown-linux-gnu.tar.gz" .',
+              "mkdir -p target/aarch64-unknown-linux-gnu",
+              "bsdtar -xf target/protobuf_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu",
+              "divvun-actions run pytorch-build aarch64-unknown-linux-gnu",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/pytorch_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu pytorch",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: ["target/pytorch_aarch64-unknown-linux-gnu.tar.gz"],
           }),
         ],
       },

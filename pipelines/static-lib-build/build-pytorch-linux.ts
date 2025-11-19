@@ -230,6 +230,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   cmakeArgs.push("-DUSE_MKLDNN=OFF")
   cmakeArgs.push("-DUSE_FBGEMM=OFF")
   cmakeArgs.push("-DUSE_PROF=OFF")
+  cmakeArgs.push("-DUSE_NUMA=OFF")
 
   // Check for custom-built Protobuf
   const hostProtobufPrefix = isCrossCompile
