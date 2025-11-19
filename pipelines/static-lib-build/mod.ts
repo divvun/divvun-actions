@@ -241,8 +241,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
         command: `divvun-actions run pytorch-cache-download ${PYTORCH_VERSION}`,
         agents: {
           queue: "linux",
-        },
-        artifact_paths: ["pytorch.tar.gz"],
+        }
       }),
       {
         group: ":apple: macOS Builds",
