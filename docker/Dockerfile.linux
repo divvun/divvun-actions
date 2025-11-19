@@ -38,6 +38,11 @@ RUN curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-1
     "build-tools;35.0.1" \
     "ndk;28.2.13676358"
 
+# Add LLVM apt repository for newer clang/LLVM
+RUN curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/noble/ llvm-toolchain-noble-19 main" > /etc/apt/sources.list.d/llvm.list && \
+    apt-get update
+
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive \
     apt-get install -y \
@@ -78,8 +83,14 @@ RUN apt-get update && \
     socat \
     tree \
     unzip \
-    clang-format clang-tidy clang-tools clang clangd libc++-dev libc++1 libc++abi-dev libc++abi1 libclang-dev libclang1 liblldb-dev libllvm-ocaml-dev libomp-dev libomp5 lld lldb llvm-dev llvm-runtime llvm python3-clang && \
+    clang-19 clang-format-19 clang-tidy-19 clang-tools-19 clangd-19 libc++-19-dev libc++1-19 libc++abi-19-dev libc++abi1-19 libclang-19-dev lld-19 lldb-19 llvm-19 llvm-19-dev llvm-19-runtime python3-clang-19 && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
+
+# Set clang-19 as default
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100 && \
+    update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100 && \
+    update-alternatives --install /usr/bin/lld lld /usr/bin/lld-19 100 && \
+    update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-19 100
 
 # Install ARM64 cross-compilation support
 RUN echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse" >> /etc/apt/sources.list.d/arm64.list && \
