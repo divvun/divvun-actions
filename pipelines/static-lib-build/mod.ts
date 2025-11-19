@@ -203,20 +203,28 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
         "bsdtar -xf pytorch.tar.gz",
       )
 
-      // Download SLEEF for Linux builds
+      // Download protobuf and SLEEF for Linux builds
       if (targetTriple === "x86_64-unknown-linux-gnu") {
+        const protobufVersion = "v33.0"
         commands.push(
-          'buildkite-agent artifact download "target/sleef_x86_64-unknown-linux-gnu.tar.gz" .',
+          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
           "mkdir -p target/x86_64-unknown-linux-gnu",
+          "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+          'buildkite-agent artifact download "target/sleef_x86_64-unknown-linux-gnu.tar.gz" .',
           "bsdtar -xf target/sleef_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
         )
       } else if (targetTriple === "aarch64-unknown-linux-gnu") {
+        const protobufVersion = "v33.0"
         commands.push(
-          'buildkite-agent artifact download "target/sleef_aarch64-unknown-linux-gnu.tar.gz" .',
+          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
+          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_aarch64-unknown-linux-gnu.tar.gz" -o protobuf_aarch64-unknown-linux-gnu.tar.gz`,
+          "mkdir -p target/x86_64-unknown-linux-gnu",
+          "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
           "mkdir -p target/aarch64-unknown-linux-gnu",
+          "bsdtar -xf protobuf_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu",
+          'buildkite-agent artifact download "target/sleef_aarch64-unknown-linux-gnu.tar.gz" .',
           "bsdtar -xf target/sleef_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu",
           'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
-          "mkdir -p target/x86_64-unknown-linux-gnu",
           "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
         )
       }
