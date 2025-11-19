@@ -510,11 +510,15 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               "divvun-actions run sleef-build x86_64-unknown-linux-gnu",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu sleef",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu build/sleef",
             ].join("\n"),
             agents: {
               queue: "linux",
             },
-            artifact_paths: ["target/sleef_x86_64-unknown-linux-gnu.tar.gz"],
+            artifact_paths: [
+              "target/sleef_x86_64-unknown-linux-gnu.tar.gz",
+              "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz",
+            ],
           }),
           command({
             label: "Linux ARM64: ICU",
@@ -569,9 +573,9 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             depends_on: ["linux-x86_64-sleef"],
             command: [
               "set -e",
-              'buildkite-agent artifact download "target/sleef_x86_64-unknown-linux-gnu.tar.gz" .',
+              'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
               "mkdir -p target/x86_64-unknown-linux-gnu",
-              "bsdtar -xf target/sleef_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               "divvun-actions run sleef-build aarch64-unknown-linux-gnu",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu sleef",
             ].join("\n"),
