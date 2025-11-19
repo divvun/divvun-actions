@@ -6,9 +6,10 @@ ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="/var/cache/buildkite"
 ENV ANDROID_HOME="/root/Android/sdk"
 ENV ANDROID_NDK_HOME="/root/Android/sdk/ndk/28.2.13676358"
 
-# Replace archive.ubuntu.com with Finnish mirror
+# Replace archive.ubuntu.com with Finnish mirror and restrict to amd64
 RUN sed -i 's/archive\.ubuntu/fi\.archive\.ubuntu/g' /etc/apt/sources.list.d/ubuntu.sources && \
     sed -i 's/security\.ubuntu/fi\.archive\.ubuntu/g' /etc/apt/sources.list.d/ubuntu.sources && \
+    sed -i '/^Types:/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources && \
     curl -fsSL https://apertium.projectjj.com/apt/install-nightly.sh | bash
 
 RUN apt-get update && \
