@@ -197,9 +197,9 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
 
     // Use cross-compiler based on target
     if (targetArch === "x86_64" && isMusl) {
-      cmakeArgs.push("-DCMAKE_C_COMPILER=musl-gcc")
-      cmakeArgs.push("-DCMAKE_CXX_COMPILER=musl-g++")
-      cmakeArgs.push("-DCMAKE_ASM_COMPILER=musl-gcc")
+      cmakeArgs.push("-DCMAKE_C_COMPILER=x86_64-linux-musl-gcc")
+      cmakeArgs.push("-DCMAKE_CXX_COMPILER=x86_64-linux-musl-g++")
+      cmakeArgs.push("-DCMAKE_ASM_COMPILER=x86_64-linux-musl-gcc")
     } else if (targetArch === "aarch64") {
       if (isMusl) {
         cmakeArgs.push("-DCMAKE_C_COMPILER=aarch64-linux-musl-gcc")
@@ -345,8 +345,8 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   const isMusl = targetTriple.includes("-musl")
   if (isMusl) {
     if (targetArch === "x86_64") {
-      Deno.env.set("CC", "musl-gcc")
-      Deno.env.set("CXX", "musl-g++")
+      Deno.env.set("CC", "x86_64-linux-musl-gcc")
+      Deno.env.set("CXX", "x86_64-linux-musl-g++")
     } else if (targetArch === "aarch64") {
       Deno.env.set("CC", "aarch64-linux-musl-gcc")
       Deno.env.set("CXX", "aarch64-linux-musl-g++")

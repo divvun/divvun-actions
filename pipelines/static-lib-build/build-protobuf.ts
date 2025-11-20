@@ -104,8 +104,8 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
 
     if (isMusl) {
       if (targetArch === "x86_64") {
-        cc = "musl-gcc"
-        cxx = "musl-g++"
+        cc = "x86_64-linux-musl-gcc"
+        cxx = "x86_64-linux-musl-g++"
       } else if (targetArch === "aarch64") {
         cc = "aarch64-linux-musl-gcc"
         cxx = "aarch64-linux-musl-g++"

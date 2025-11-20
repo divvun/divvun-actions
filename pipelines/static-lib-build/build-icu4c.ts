@@ -230,8 +230,8 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     // Linux: use musl compilers for musl targets
     if (isMusl) {
       if (targetArch === "x86_64") {
-        Deno.env.set("CC", "musl-gcc")
-        Deno.env.set("CXX", "musl-g++")
+        Deno.env.set("CC", "x86_64-linux-musl-gcc")
+        Deno.env.set("CXX", "x86_64-linux-musl-g++")
       } else if (targetArch === "aarch64") {
         Deno.env.set("CC", "aarch64-linux-musl-gcc")
         Deno.env.set("CXX", "aarch64-linux-musl-g++")
@@ -409,13 +409,20 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     // already knows the correct target and sysroot from its name (aarch64-linux-android21-clang)
   } else if (isCrossCompile) {
     // Linux cross-compilation
+    const isMusl = targetTriple.includes("-musl")
+    // For musl builds, use musl host build; for glibc, use glibc host build
+    const hostBuildTriple = isMusl
+      ? (hostArch === "aarch64"
+        ? "aarch64-unknown-linux-musl"
+        : "x86_64-unknown-linux-musl")
+      : hostTriple
     const hostBuildDir = path.join(
       repoRoot,
-      `target/${hostTriple}/build/icu`,
+      `target/${hostBuildTriple}/build/icu`,
     )
     configureArgs.push(`--host=${targetTriple}`)
     configureArgs.push(`--with-cross-build=${hostBuildDir}`)
-    // Note: CFLAGS/CXXFLAGS/LDFLAGS were already set above with --target and -fuse-ld=lld
+    // Note: For glibc, CFLAGS/CXXFLAGS/LDFLAGS were already set above with --target and -fuse-ld=lld
   }
 
   // Check if runConfigureICU exists
