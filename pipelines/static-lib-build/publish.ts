@@ -7,8 +7,12 @@ export async function publishLibrary(library: string, version: string) {
 
   // Download all artifacts (both Unix and Windows path separators)
   await builder.downloadArtifacts(`target/${library}_*.tar.gz`, ".")
-  await builder.downloadArtifacts(`target\\${library}_*.tar.gz`, ".")
-
+  try {
+    await builder.downloadArtifacts(`target\\${library}_*.tar.gz`, ".")
+  } catch {
+    // Ignore errors from Windows-style paths if none exist
+  }
+  
   // Find all downloaded artifacts
   const artifacts: string[] = []
   for await (const entry of Deno.readDir("target")) {
