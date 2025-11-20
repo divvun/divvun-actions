@@ -92,6 +92,8 @@ export async function buildLibomp(options: BuildLibompOptions) {
       } else if (targetArch === "aarch64") {
         cc = "aarch64-linux-musl-gcc"
         cxx = "aarch64-linux-musl-g++"
+      } else {
+        throw new Error(`Unsupported musl architecture: ${targetArch}`)
       }
     } else {
       try {
