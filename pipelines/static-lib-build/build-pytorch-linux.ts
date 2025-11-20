@@ -113,8 +113,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   })
 
   // Apply tensorpipe prctl.h patch for musl builds
-  const isMusl = target.includes("-musl")
-  if (isMusl) {
+  if (target.includes("-musl")) {
     console.log("Applying tensorpipe prctl.h patch for musl")
     const tensorpipePatchPath = path.join(
       import.meta.dirname!,
