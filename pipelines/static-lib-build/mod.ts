@@ -725,6 +725,189 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             },
             artifact_paths: ["target/pytorch_aarch64-unknown-linux-gnu.tar.gz"],
           }),
+          command({
+            label: "Linux x86_64 musl: ICU",
+            key: "linux-x86_64-musl-icu",
+            command: [
+              "set -e",
+              "divvun-actions run icu4c-build x86_64-unknown-linux-musl",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl icu4c",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl build/icu",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: [
+              "target/icu4c_x86_64-unknown-linux-musl.tar.gz",
+              "target/icu4c-build_x86_64-unknown-linux-musl.tar.gz",
+            ],
+          }),
+          command({
+            label: "Linux x86_64 musl: LibOMP",
+            key: "linux-x86_64-musl-libomp",
+            command: [
+              "set -e",
+              "divvun-actions run libomp-build x86_64-unknown-linux-musl",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/libomp_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl libomp",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: ["target/libomp_x86_64-unknown-linux-musl.tar.gz"],
+          }),
+          command({
+            label: "Linux x86_64 musl: Protobuf",
+            key: "linux-x86_64-musl-protobuf",
+            command: [
+              "set -e",
+              "divvun-actions run protobuf-build x86_64-unknown-linux-musl",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl protobuf",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: ["target/protobuf_x86_64-unknown-linux-musl.tar.gz"],
+          }),
+          command({
+            label: "Linux x86_64 musl: SLEEF",
+            key: "linux-x86_64-musl-sleef",
+            command: [
+              "set -e",
+              "divvun-actions run sleef-build x86_64-unknown-linux-musl",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl sleef",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl build/sleef",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: [
+              "target/sleef_x86_64-unknown-linux-musl.tar.gz",
+              "target/sleef-build_x86_64-unknown-linux-musl.tar.gz",
+            ],
+          }),
+          command({
+            label: "Linux x86_64 musl: PyTorch",
+            key: "linux-x86_64-musl-pytorch",
+            depends_on: [
+              "linux-x86_64-musl-protobuf",
+              "linux-x86_64-musl-sleef",
+              "pytorch-cache-download",
+            ],
+            command: [
+              "set -e",
+              'buildkite-agent artifact download "pytorch.tar.gz" .',
+              "bsdtar -xf pytorch.tar.gz",
+              'buildkite-agent artifact download "target/protobuf_x86_64-unknown-linux-musl.tar.gz" .',
+              "mkdir -p target/x86_64-unknown-linux-musl",
+              "bsdtar -xf target/protobuf_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
+              'buildkite-agent artifact download "target/sleef_x86_64-unknown-linux-musl.tar.gz" .',
+              "bsdtar -xf target/sleef_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
+              "divvun-actions run pytorch-build x86_64-unknown-linux-musl",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/pytorch_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl pytorch",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: ["target/pytorch_x86_64-unknown-linux-musl.tar.gz"],
+          }),
+          command({
+            label: "Linux ARM64 musl: ICU",
+            key: "linux-aarch64-musl-icu",
+            depends_on: ["linux-x86_64-musl-icu"],
+            command: [
+              "set -e",
+              'buildkite-agent artifact download "target/icu4c-build_x86_64-unknown-linux-musl.tar.gz" .',
+              "mkdir -p target/x86_64-unknown-linux-musl",
+              "bsdtar -xf target/icu4c-build_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
+              "divvun-actions run icu4c-build aarch64-unknown-linux-musl",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl icu4c",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl build/icu",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: [
+              "target/icu4c_aarch64-unknown-linux-musl.tar.gz",
+              "target/icu4c-build_aarch64-unknown-linux-musl.tar.gz",
+            ],
+          }),
+          command({
+            label: "Linux ARM64 musl: LibOMP",
+            key: "linux-aarch64-musl-libomp",
+            command: [
+              "set -e",
+              "divvun-actions run libomp-build aarch64-unknown-linux-musl",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/libomp_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl libomp",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: ["target/libomp_aarch64-unknown-linux-musl.tar.gz"],
+          }),
+          command({
+            label: "Linux ARM64 musl: Protobuf",
+            key: "linux-aarch64-musl-protobuf",
+            command: [
+              "set -e",
+              "divvun-actions run protobuf-build aarch64-unknown-linux-musl",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl protobuf",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: [
+              "target/protobuf_aarch64-unknown-linux-musl.tar.gz",
+            ],
+          }),
+          command({
+            label: "Linux ARM64 musl: SLEEF",
+            key: "linux-aarch64-musl-sleef",
+            depends_on: ["linux-x86_64-musl-sleef"],
+            command: [
+              "set -e",
+              'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-musl.tar.gz" .',
+              "mkdir -p target/x86_64-unknown-linux-musl",
+              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
+              "divvun-actions run sleef-build aarch64-unknown-linux-musl",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl sleef",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: ["target/sleef_aarch64-unknown-linux-musl.tar.gz"],
+          }),
+          command({
+            label: "Linux ARM64 musl: PyTorch",
+            key: "linux-aarch64-musl-pytorch",
+            depends_on: [
+              "linux-x86_64-musl-protobuf",
+              "linux-aarch64-musl-protobuf",
+              "linux-x86_64-musl-sleef",
+              "linux-aarch64-musl-sleef",
+              "pytorch-cache-download",
+            ],
+            command: [
+              "set -e",
+              'buildkite-agent artifact download "pytorch.tar.gz" .',
+              "bsdtar -xf pytorch.tar.gz",
+              'buildkite-agent artifact download "target/protobuf_x86_64-unknown-linux-musl.tar.gz" .',
+              "mkdir -p target/x86_64-unknown-linux-musl",
+              "bsdtar -xf target/protobuf_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
+              'buildkite-agent artifact download "target/protobuf_aarch64-unknown-linux-musl.tar.gz" .',
+              "mkdir -p target/aarch64-unknown-linux-musl",
+              "bsdtar -xf target/protobuf_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
+              'buildkite-agent artifact download "target/sleef_aarch64-unknown-linux-musl.tar.gz" .',
+              "bsdtar -xf target/sleef_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
+              'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-musl.tar.gz" .',
+              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
+              "divvun-actions run pytorch-build aarch64-unknown-linux-musl",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/pytorch_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl pytorch",
+            ].join("\n"),
+            agents: {
+              queue: "linux",
+            },
+            artifact_paths: ["target/pytorch_aarch64-unknown-linux-musl.tar.gz"],
+          }),
         ],
       },
       {
