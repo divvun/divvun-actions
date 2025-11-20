@@ -822,12 +822,12 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
           command({
             label: "Linux ARM64 musl: ICU",
             key: "linux-aarch64-musl-icu",
-            depends_on: ["linux-x86_64-musl-icu"],
+            depends_on: ["linux-x86_64-icu"],
             command: [
               "set -e",
-              'buildkite-agent artifact download "target/icu4c-build_x86_64-unknown-linux-musl.tar.gz" .',
-              "mkdir -p target/x86_64-unknown-linux-musl",
-              "bsdtar -xf target/icu4c-build_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
+              'buildkite-agent artifact download "target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz" .',
+              "mkdir -p target/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               "divvun-actions run icu4c-build aarch64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl icu4c",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl build/icu",
