@@ -23,8 +23,6 @@ index bf425af..1f21b1f 100644
 +    target_link_libraries(sleef INTERFACE sleef_system)
    endif()
    list(APPEND ATen_CPU_DEPENDENCY_LIBS sleef)
---- a/aten/src/ATen/CMakeLists.txt
-+++ b/aten/src/ATen/CMakeLists.txt
 @@ -455,16 +455,17 @@ endif()
 +  # Disable SVE for Linux cross-compilation due to LLVM backend issues
 +  if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CROSSCOMPILING)
