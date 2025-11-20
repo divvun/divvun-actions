@@ -249,7 +249,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
     // Create artifacts
     if (targetTriple.includes("windows")) {
       commands.push(
-        `if not exist target mkdir target`,
+        "mkdir target",
         `C:\\msys2\\usr\\bin\\bash.exe -c "bsdtar --gzip --options gzip:compression-level=9 -cf target/${artifactName} -C target/${targetTriple} ${library}"`,
       )
     } else {
@@ -727,7 +727,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             key: "windows-x86_64-icu",
             command: [
               "divvun-actions run icu4c-build x86_64-pc-windows-msvc",
-              "if not exist target mkdir target",
+              "mkdir target",
               'C:\\msys2\\usr\\bin\\bash.exe -c "bsdtar -czf target/icu4c_x86_64-pc-windows-msvc.tar.gz -C target/x86_64-pc-windows-msvc icu4c"',
             ].join("\n"),
             agents: {
