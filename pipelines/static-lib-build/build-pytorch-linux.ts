@@ -194,6 +194,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     if (targetArch === "aarch64") {
       cmakeArgs.push("-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc")
       cmakeArgs.push("-DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++")
+      cmakeArgs.push("-DCMAKE_ASM_COMPILER=aarch64-linux-gnu-gcc")
     }
   }
 
