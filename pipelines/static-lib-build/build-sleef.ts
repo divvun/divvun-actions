@@ -165,17 +165,16 @@ export async function buildSleef(options: BuildSleefOptions) {
     `-DCMAKE_CXX_COMPILER=${cxx}`,
     "-DBUILD_SHARED_LIBS=OFF",
     "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
-    "-DBUILD_TESTS=OFF",
-    "-DBUILD_DFT=OFF",
-    "-DBUILD_GNUABI_LIBS=OFF",
-    "-DBUILD_INLINE_HEADERS=OFF",
-    "-DSLEEF_ENABLE_SSL=NO",
+    "-DSLEEF_BUILD_TESTS=OFF",
+    "-DSLEEF_BUILD_DFT=OFF",
+    "-DSLEEF_BUILD_INLINE_HEADERS=OFF",
+    "-DSLEEF_ENABLE_TESTER4=OFF",
+    "-DSLEEF_ENABLE_MPFR=OFF",
+    "-DSLEEF_ENABLE_TLFLOAT=OFF",
   ]
 
   // Enable ARM-specific SIMD features for aarch64
   if (targetArch === "aarch64") {
-    cmakeArgs.push("-DSLEEF_ENABLE_SVE=ON")
-    cmakeArgs.push("-DSLEEF_ENABLE_ADVSIMD=ON")
     cmakeArgs.push("-DCMAKE_C_FLAGS=-march=armv8-a+sve")
     cmakeArgs.push("-DCMAKE_CXX_FLAGS=-march=armv8-a+sve")
   }
