@@ -171,20 +171,14 @@ export async function buildSleef(options: BuildSleefOptions) {
     "-DSLEEF_ENABLE_TESTER4=OFF",
     "-DSLEEF_ENABLE_MPFR=OFF",
     "-DSLEEF_ENABLE_TLFLOAT=OFF",
-    "-DSLEEF_USE_INTERNAL_SHA256=OFF",
+    "-DSLEEF_DISABLE_SSL=ON",
+    "-DSLEEF_ENABLE_SSL=OFF",
   ]
 
   // Enable ARM-specific SIMD features for aarch64
   if (targetArch === "aarch64") {
     cmakeArgs.push("-DCMAKE_C_FLAGS=-march=armv8-a+sve")
     cmakeArgs.push("-DCMAKE_CXX_FLAGS=-march=armv8-a+sve")
-  }
-
-  // For musl builds, don't add system include paths
-  const isMusl = targetTriple.includes("-musl")
-  if (platform === "linux" && isMusl) {
-    cmakeArgs.push("-DCMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES=")
-    cmakeArgs.push("-DCMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES=")
   }
 
   if (platform === "darwin") {
