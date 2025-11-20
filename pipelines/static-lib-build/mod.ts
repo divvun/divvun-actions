@@ -103,59 +103,6 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
         },
       }),
     )
-
-    // Build SLEEF for Linux platforms (required for PyTorch)
-    const sleefBuildSteps: CommandStep[] = []
-
-    // x86_64 Linux SLEEF
-    sleefBuildSteps.push(
-      command({
-        label: `:package: SLEEF x86_64-unknown-linux-gnu`,
-        key: "sleef-x86_64-unknown-linux-gnu",
-        command: [
-          "set -e",
-          "divvun-actions run sleef-build x86_64-unknown-linux-gnu",
-          "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu sleef",
-          "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu build/sleef",
-        ].join("\n"),
-        agents: {
-          queue: "linux",
-        },
-        artifact_paths: [
-          "target/sleef_x86_64-unknown-linux-gnu.tar.gz",
-          "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz",
-        ],
-      }),
-    )
-
-    // aarch64 Linux SLEEF
-    sleefBuildSteps.push(
-      command({
-        label: `:package: SLEEF aarch64-unknown-linux-gnu`,
-        key: "sleef-aarch64-unknown-linux-gnu",
-        depends_on: "sleef-x86_64-unknown-linux-gnu",
-        command: [
-          "set -e",
-          'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
-          "mkdir -p target/x86_64-unknown-linux-gnu",
-          "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
-          "divvun-actions run sleef-build aarch64-unknown-linux-gnu",
-          "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu sleef",
-        ].join("\n"),
-        agents: {
-          queue: "linux",
-        },
-        artifact_paths: [
-          "target/sleef_aarch64-unknown-linux-gnu.tar.gz",
-        ],
-      }),
-    )
-
-    pipeline.steps.push({
-      group: ":package: Build SLEEF for PyTorch",
-      key: "build-sleef",
-      steps: sleefBuildSteps,
-    })
   }
 
   // Build steps for each platform
@@ -204,18 +151,8 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
         hostTargetDir = "x86_64-unknown-linux-gnu"
       }
     } else if (library === "pytorch") {
-      // PyTorch depends on cache download and SLEEF for Linux builds
-      if (targetTriple === "x86_64-unknown-linux-gnu") {
-        dependsOn = ["pytorch-cache-download", "sleef-x86_64-unknown-linux-gnu"]
-      } else if (targetTriple === "aarch64-unknown-linux-gnu") {
-        dependsOn = [
-          "pytorch-cache-download",
-          "sleef-x86_64-unknown-linux-gnu",
-          "sleef-aarch64-unknown-linux-gnu",
-        ]
-      } else {
-        dependsOn = "pytorch-cache-download"
-      }
+      // PyTorch depends on cache download
+      dependsOn = "pytorch-cache-download"
     }
 
     // Build command list
@@ -231,15 +168,17 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       // Download protobuf and SLEEF for Linux builds
       if (targetTriple === "x86_64-unknown-linux-gnu") {
         const protobufVersion = "v33.0"
+        const sleefVersion = "v3.9.0"
         commands.push(
           `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
           "mkdir -p target/x86_64-unknown-linux-gnu",
           "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
-          'buildkite-agent artifact download "target/sleef_x86_64-unknown-linux-gnu.tar.gz" .',
-          "bsdtar -xf target/sleef_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/sleef%2F${sleefVersion}/sleef_${sleefVersion}_x86_64-unknown-linux-gnu.tar.gz" -o sleef_x86_64-unknown-linux-gnu.tar.gz`,
+          "bsdtar -xf sleef_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
         )
       } else if (targetTriple === "aarch64-unknown-linux-gnu") {
         const protobufVersion = "v33.0"
+        const sleefVersion = "v3.9.0"
         commands.push(
           `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
           `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_aarch64-unknown-linux-gnu.tar.gz" -o protobuf_aarch64-unknown-linux-gnu.tar.gz`,
@@ -247,10 +186,34 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
           "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
           "mkdir -p target/aarch64-unknown-linux-gnu",
           "bsdtar -xf protobuf_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu",
-          'buildkite-agent artifact download "target/sleef_aarch64-unknown-linux-gnu.tar.gz" .',
-          "bsdtar -xf target/sleef_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu",
-          'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
-          "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/sleef%2F${sleefVersion}/sleef_${sleefVersion}_aarch64-unknown-linux-gnu.tar.gz" -o sleef_aarch64-unknown-linux-gnu.tar.gz`,
+          "bsdtar -xf sleef_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu",
+        )
+      } else if (targetTriple === "x86_64-unknown-linux-musl") {
+        const protobufVersion = "v33.0"
+        const sleefVersion = "v3.9.0"
+        commands.push(
+          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
+          "mkdir -p target/x86_64-unknown-linux-gnu",
+          "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_x86_64-unknown-linux-musl.tar.gz" -o protobuf_x86_64-unknown-linux-musl.tar.gz`,
+          "mkdir -p target/x86_64-unknown-linux-musl",
+          "bsdtar -xf protobuf_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
+          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/sleef%2F${sleefVersion}/sleef_${sleefVersion}_x86_64-unknown-linux-musl.tar.gz" -o sleef_x86_64-unknown-linux-musl.tar.gz`,
+          "bsdtar -xf sleef_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
+        )
+      } else if (targetTriple === "aarch64-unknown-linux-musl") {
+        const protobufVersion = "v33.0"
+        const sleefVersion = "v3.9.0"
+        commands.push(
+          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
+          "mkdir -p target/x86_64-unknown-linux-gnu",
+          "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_aarch64-unknown-linux-musl.tar.gz" -o protobuf_aarch64-unknown-linux-musl.tar.gz`,
+          "mkdir -p target/aarch64-unknown-linux-musl",
+          "bsdtar -xf protobuf_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
+          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/sleef%2F${sleefVersion}/sleef_${sleefVersion}_aarch64-unknown-linux-musl.tar.gz" -o sleef_aarch64-unknown-linux-musl.tar.gz`,
+          "bsdtar -xf sleef_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
         )
       }
     }

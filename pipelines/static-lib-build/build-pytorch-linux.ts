@@ -112,6 +112,19 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     cwd: pytorchRoot,
   })
 
+  // Apply tensorpipe prctl.h patch for musl builds
+  const isMusl = target.includes("-musl")
+  if (isMusl) {
+    console.log("Applying tensorpipe prctl.h patch for musl")
+    const tensorpipePatchPath = path.join(
+      import.meta.dirname!,
+      "patches/pytorch/tensorpipe-prctl.patch",
+    )
+    await builder.exec("patch", ["-p1", "-i", tensorpipePatchPath], {
+      cwd: pytorchRoot,
+    })
+  }
+
   // Determine target triple
   const targetTriple = target
   const hostTriple = hostArch === "aarch64"
