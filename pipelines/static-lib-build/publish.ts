@@ -5,8 +5,9 @@ import { GitHub } from "~/util/github.ts"
 export async function publishLibrary(library: string, version: string) {
   console.log(`Publishing ${library} ${version}`)
 
-  // Download all artifacts
+  // Download all artifacts (both Unix and Windows path separators)
   await builder.downloadArtifacts(`target/${library}_*.tar.gz`, ".")
+  await builder.downloadArtifacts(`target\\${library}_*.tar.gz`, ".")
 
   // Find all downloaded artifacts
   const artifacts: string[] = []
@@ -34,7 +35,8 @@ export async function publishLibrary(library: string, version: string) {
     const target = targetMatch[1]
 
     // Create new filename with version
-    const versionedArtifact = `${library}_${version}_${target}.tar.gz`
+    const versionedFilename = `${library}_${version}_${target}.tar.gz`
+    const versionedArtifact = path.join("target", versionedFilename)
 
     // Rename the artifact
     await Deno.rename(artifact, versionedArtifact)
