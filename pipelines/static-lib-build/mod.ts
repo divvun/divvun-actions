@@ -30,14 +30,18 @@ function getLibraryPlatforms(library: LibraryType): string[] {
         "aarch64-apple-ios",
         "aarch64-linux-android",
         "aarch64-unknown-linux-gnu",
+        "aarch64-unknown-linux-musl",
         "x86_64-unknown-linux-gnu",
+        "x86_64-unknown-linux-musl",
         "x86_64-pc-windows-msvc",
       ]
     case "libomp":
       return [
         "aarch64-apple-darwin",
         "aarch64-unknown-linux-gnu",
+        "aarch64-unknown-linux-musl",
         "x86_64-unknown-linux-gnu",
+        "x86_64-unknown-linux-musl",
       ]
     case "protobuf":
       return [
@@ -45,7 +49,9 @@ function getLibraryPlatforms(library: LibraryType): string[] {
         "aarch64-apple-ios",
         "aarch64-linux-android",
         "aarch64-unknown-linux-gnu",
+        "aarch64-unknown-linux-musl",
         "x86_64-unknown-linux-gnu",
+        "x86_64-unknown-linux-musl",
       ]
     case "pytorch":
       return [
@@ -53,7 +59,9 @@ function getLibraryPlatforms(library: LibraryType): string[] {
         "aarch64-apple-ios",
         "aarch64-linux-android",
         "aarch64-unknown-linux-gnu",
+        "aarch64-unknown-linux-musl",
         "x86_64-unknown-linux-gnu",
+        "x86_64-unknown-linux-musl",
       ]
   }
 }

@@ -57,8 +57,10 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
   const hostTriple = hostArch === "aarch64"
     ? "aarch64-unknown-linux-gnu"
     : "x86_64-unknown-linux-gnu"
-  const isCrossCompile = platform === "linux" && targetTriple !== hostTriple
   const targetArch = targetTriple.split("-")[0]
+  // Cross-compilation if arch differs OR if target is musl (host is always glibc)
+  const isCrossCompile = platform === "linux" &&
+    (targetTriple !== hostTriple || targetTriple.includes("-musl"))
 
   if (isCrossCompile) {
     console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
@@ -98,13 +100,25 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
     cmakePath = (await builder.output("which", ["cmake"])).stdout.trim()
     ninjaPath = (await builder.output("which", ["ninja"])).stdout.trim()
   } else if (platform === "linux") {
-    try {
-      await builder.exec("which", ["clang"])
-      cc = "clang"
-      cxx = "clang++"
-    } catch {
-      cc = "gcc"
-      cxx = "g++"
+    const isMusl = targetTriple.includes("-musl")
+
+    if (isMusl) {
+      if (targetArch === "x86_64") {
+        cc = "musl-gcc"
+        cxx = "musl-g++"
+      } else if (targetArch === "aarch64") {
+        cc = "aarch64-linux-musl-gcc"
+        cxx = "aarch64-linux-musl-g++"
+      }
+    } else {
+      try {
+        await builder.exec("which", ["clang"])
+        cc = "clang"
+        cxx = "clang++"
+      } catch {
+        cc = "gcc"
+        cxx = "g++"
+      }
     }
     cmakePath = (await builder.output("which", ["cmake"])).stdout.trim()
     ninjaPath = (await builder.output("which", ["ninja"])).stdout.trim()

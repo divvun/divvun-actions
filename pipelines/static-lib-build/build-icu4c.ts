@@ -71,8 +71,10 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   const hostTriple = hostArch === "aarch64"
     ? "aarch64-unknown-linux-gnu"
     : "x86_64-unknown-linux-gnu"
-  const isCrossCompile = platform === "linux" && targetTriple !== hostTriple
   const targetArch = targetTriple.split("-")[0]
+  // Cross-compilation if arch differs OR if target is musl (host is always glibc)
+  const isCrossCompile = platform === "linux" &&
+    (targetTriple !== hostTriple || targetTriple.includes("-musl"))
 
   if (isCrossCompile) {
     console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
@@ -223,22 +225,35 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     Deno.env.set("RANLIB", `${toolchainPath}/bin/llvm-ranlib`)
     Deno.env.set("LD", `${toolchainPath}/bin/ld`)
   } else if (platform === "linux") {
-    // Linux: prefer clang if available
-    try {
-      await builder.exec("which", ["clang"])
-      Deno.env.set("CC", "clang")
-      Deno.env.set("CXX", "clang++")
-    } catch {
-      Deno.env.set("CC", "gcc")
-      Deno.env.set("CXX", "g++")
-    }
+    const isMusl = targetTriple.includes("-musl")
 
-    // Set cross-compilation flags for Linux
-    if (isCrossCompile) {
-      const crossFlags = `--target=${targetTriple} -fuse-ld=lld`
-      Deno.env.set("CFLAGS", crossFlags)
-      Deno.env.set("CXXFLAGS", crossFlags)
-      Deno.env.set("LDFLAGS", "-fuse-ld=lld")
+    // Linux: use musl compilers for musl targets
+    if (isMusl) {
+      if (targetArch === "x86_64") {
+        Deno.env.set("CC", "musl-gcc")
+        Deno.env.set("CXX", "musl-g++")
+      } else if (targetArch === "aarch64") {
+        Deno.env.set("CC", "aarch64-linux-musl-gcc")
+        Deno.env.set("CXX", "aarch64-linux-musl-g++")
+      }
+    } else {
+      // Linux glibc: prefer clang if available
+      try {
+        await builder.exec("which", ["clang"])
+        Deno.env.set("CC", "clang")
+        Deno.env.set("CXX", "clang++")
+      } catch {
+        Deno.env.set("CC", "gcc")
+        Deno.env.set("CXX", "g++")
+      }
+
+      // Set cross-compilation flags for Linux glibc
+      if (isCrossCompile) {
+        const crossFlags = `--target=${targetTriple} -fuse-ld=lld`
+        Deno.env.set("CFLAGS", crossFlags)
+        Deno.env.set("CXXFLAGS", crossFlags)
+        Deno.env.set("LDFLAGS", "-fuse-ld=lld")
+      }
     }
   }
 

@@ -118,13 +118,16 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     ? "aarch64-unknown-linux-gnu"
     : "x86_64-unknown-linux-gnu"
 
-  const isCrossCompile = targetTriple !== hostTriple
+  // Parse target architecture from triple
+  const targetArch = targetTriple.split("-")[0]
+
+  // Cross-compilation if arch differs OR if target is musl (host is always glibc)
+  const isCrossCompile = targetTriple !== hostTriple ||
+    targetTriple.includes("-musl")
+
   if (isCrossCompile) {
     console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
   }
-
-  // Parse target architecture from triple
-  const targetArch = targetTriple.split("-")[0]
 
   // Set up directories
   const installPrefix = path.join(repoRoot, `target/${targetTriple}/pytorch`)
@@ -190,11 +193,23 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     cmakeArgs.push("-DCMAKE_SYSTEM_NAME=Linux")
     cmakeArgs.push(`-DCMAKE_SYSTEM_PROCESSOR=${targetArch}`)
 
-    // Use cross-compiler for aarch64
-    if (targetArch === "aarch64") {
-      cmakeArgs.push("-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc")
-      cmakeArgs.push("-DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++")
-      cmakeArgs.push("-DCMAKE_ASM_COMPILER=aarch64-linux-gnu-gcc")
+    const isMusl = targetTriple.includes("-musl")
+
+    // Use cross-compiler based on target
+    if (targetArch === "x86_64" && isMusl) {
+      cmakeArgs.push("-DCMAKE_C_COMPILER=musl-gcc")
+      cmakeArgs.push("-DCMAKE_CXX_COMPILER=musl-g++")
+      cmakeArgs.push("-DCMAKE_ASM_COMPILER=musl-gcc")
+    } else if (targetArch === "aarch64") {
+      if (isMusl) {
+        cmakeArgs.push("-DCMAKE_C_COMPILER=aarch64-linux-musl-gcc")
+        cmakeArgs.push("-DCMAKE_CXX_COMPILER=aarch64-linux-musl-g++")
+        cmakeArgs.push("-DCMAKE_ASM_COMPILER=aarch64-linux-musl-gcc")
+      } else {
+        cmakeArgs.push("-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc")
+        cmakeArgs.push("-DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++")
+        cmakeArgs.push("-DCMAKE_ASM_COMPILER=aarch64-linux-gnu-gcc")
+      }
       cmakeArgs.push("-DCMAKE_C_FLAGS=-march=armv8-a+sve")
       cmakeArgs.push("-DCMAKE_CXX_FLAGS=-march=armv8-a+sve")
     }
@@ -327,8 +342,19 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   console.log("")
 
   // Set environment variables
-  Deno.env.set("CC", "gcc")
-  Deno.env.set("CXX", "g++")
+  const isMusl = targetTriple.includes("-musl")
+  if (isMusl) {
+    if (targetArch === "x86_64") {
+      Deno.env.set("CC", "musl-gcc")
+      Deno.env.set("CXX", "musl-g++")
+    } else if (targetArch === "aarch64") {
+      Deno.env.set("CC", "aarch64-linux-musl-gcc")
+      Deno.env.set("CXX", "aarch64-linux-musl-g++")
+    }
+  } else {
+    Deno.env.set("CC", "gcc")
+    Deno.env.set("CXX", "g++")
+  }
   Deno.env.set("CMAKE_MAKE_PROGRAM", ninjaPath)
 
   // Run CMake configuration
