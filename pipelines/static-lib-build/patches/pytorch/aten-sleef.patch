@@ -22,4 +22,9 @@ index bf425af..1f21b1f 100644
 +    add_library(sleef INTERFACE)
 +    target_link_libraries(sleef INTERFACE sleef_system)
    endif()
++# Disable SVE for Linux cross-compilation due to LLVM backend issues
++if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CROSSCOMPILING)
++  set(DISABLE_SVE ON CACHE BOOL "Disable SVE for cross-compilation to avoid LLVM backend errors" FORCE)
++  message(STATUS "SVE disabled for Linux cross-compilation")
++endif()
    list(APPEND ATen_CPU_DEPENDENCY_LIBS sleef)

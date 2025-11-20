@@ -110,14 +110,6 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   )
   await builder.exec("patch", ["-p1", "-i", sleefPatchPath], { cwd: pytorchRoot })
 
-  // Apply SVE disable patch
-  console.log("Applying SVE disable patch")
-  const svePatchPath = path.join(
-    import.meta.dirname!,
-    "patches/pytorch/disable-sve.patch",
-  )
-  await builder.exec("patch", ["-p1", "-i", svePatchPath], { cwd: pytorchRoot })
-
   // Determine target triple
   const targetTriple = target
   const hostTriple = hostArch === "aarch64"
