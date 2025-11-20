@@ -587,7 +587,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
         ],
       },
       {
-        group: ":linux: Linux GNU Builds",
+        group: ":linux: Linux GNU x86_64 Builds",
         steps: [
           command({
             label: "Linux x86_64: ICU",
@@ -674,6 +674,11 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             },
             artifact_paths: ["target/pytorch_x86_64-unknown-linux-gnu.tar.gz"],
           }),
+        ],
+      },
+      {
+        group: ":linux: Linux GNU ARM64 Builds",
+        steps: [
           command({
             label: "Linux ARM64: ICU",
             key: "linux-aarch64-icu",
@@ -773,7 +778,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
         ],
       },
       {
-        group: ":linux: Linux musl Builds",
+        group: ":linux: Linux musl x86_64 Builds",
         steps: [
           command({
             label: "Linux x86_64 musl: ICU",
@@ -850,6 +855,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             key: "linux-x86_64-musl-pytorch",
             depends_on: [
               "linux-x86_64-musl-protobuf",
+              "linux-x86_64-sleef",
               "linux-x86_64-musl-sleef",
               "pytorch-cache-download",
             ],
@@ -857,11 +863,16 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               'buildkite-agent artifact download "pytorch.tar.gz" .',
               "bsdtar -xf pytorch.tar.gz",
+              `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2Fv33.0/protobuf_v33.0_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
+              "mkdir -p target/x86_64-unknown-linux-gnu",
+              "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               'buildkite-agent artifact download "target/protobuf_x86_64-unknown-linux-musl.tar.gz" .',
               "mkdir -p target/x86_64-unknown-linux-musl",
               "bsdtar -xf target/protobuf_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
               'buildkite-agent artifact download "target/sleef_x86_64-unknown-linux-musl.tar.gz" .',
               "bsdtar -xf target/sleef_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
+              'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
+              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               "divvun-actions run pytorch-build x86_64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/pytorch_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl pytorch",
             ].join("\n"),
@@ -870,6 +881,11 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             },
             artifact_paths: ["target/pytorch_x86_64-unknown-linux-musl.tar.gz"],
           }),
+        ],
+      },
+      {
+        group: ":linux: Linux musl ARM64 Builds",
+        steps: [
           command({
             label: "Linux ARM64 musl: ICU",
             key: "linux-aarch64-musl-icu",
@@ -949,13 +965,15 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               'buildkite-agent artifact download "pytorch.tar.gz" .',
               "bsdtar -xf pytorch.tar.gz",
+              `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2Fv33.0/protobuf_v33.0_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
+              "mkdir -p target/x86_64-unknown-linux-gnu",
+              "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               'buildkite-agent artifact download "target/protobuf_aarch64-unknown-linux-musl.tar.gz" .',
               "mkdir -p target/aarch64-unknown-linux-musl",
               "bsdtar -xf target/protobuf_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
               'buildkite-agent artifact download "target/sleef_aarch64-unknown-linux-musl.tar.gz" .',
               "bsdtar -xf target/sleef_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
               'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
-              "mkdir -p target/x86_64-unknown-linux-gnu",
               "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               "divvun-actions run pytorch-build aarch64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/pytorch_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl pytorch",
