@@ -118,14 +118,19 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
           console.log(
             `Found ICU ${installedVersion} but need ${targetVersion}, reinstalling...`,
           )
-          await builder.exec("vcpkg", ["remove", "icu:x64-windows-static"])
+          await builder.exec("vcpkg", [
+            "remove",
+            "icu",
+            "--triplet=x64-windows-static",
+          ])
         }
         console.log(
           `Installing ICU ${targetVersion} with vcpkg using overlay...`,
         )
         await builder.exec("vcpkg", [
           "install",
-          "icu:x64-windows-static",
+          "icu",
+          "--triplet=x64-windows-static",
           `--overlay-ports=${overlayPath}/ports`,
         ])
       }
@@ -134,7 +139,8 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       console.log(`Installing ICU ${version} with vcpkg using overlay...`)
       await builder.exec("vcpkg", [
         "install",
-        "icu:x64-windows-static",
+        "icu",
+        "--triplet=x64-windows-static",
         `--overlay-ports=${overlayPath}/ports`,
       ])
     }
