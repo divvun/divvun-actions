@@ -154,7 +154,7 @@ export async function buildSleef(options: BuildSleefOptions) {
     "-DBUILD_DFT=OFF",
     "-DBUILD_GNUABI_LIBS=OFF",
     "-DBUILD_INLINE_HEADERS=OFF",
-    "-DSLEEF_ENABLE_SVE=OFF",
+    "-DSLEEF_ENABLE_SVE=ON",
     "-DSLEEF_ENABLE_ADVSIMD=ON",
   ]
 
@@ -167,11 +167,12 @@ export async function buildSleef(options: BuildSleefOptions) {
     // Linux cross-compilation configuration
     cmakeArgs.push("-DCMAKE_SYSTEM_NAME=Linux")
     cmakeArgs.push(`-DCMAKE_SYSTEM_PROCESSOR=${targetArch}`)
-    cmakeArgs.push(`-DCMAKE_C_COMPILER_TARGET=${targetTriple}`)
-    cmakeArgs.push(`-DCMAKE_CXX_COMPILER_TARGET=${targetTriple}`)
-    cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld")
-    cmakeArgs.push("-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld")
-    cmakeArgs.push(`-DCMAKE_ASM_FLAGS=--target=${targetTriple}`)
+
+    // Use cross-compiler for aarch64
+    if (targetArch === "aarch64") {
+      cmakeArgs.push("-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc")
+      cmakeArgs.push("-DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++")
+    }
 
     // Point to native build directory for host tools
     const nativeBuildDir = path.join(
