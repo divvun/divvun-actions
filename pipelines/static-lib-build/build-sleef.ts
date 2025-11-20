@@ -160,6 +160,8 @@ export async function buildSleef(options: BuildSleefOptions) {
   if (targetArch === "aarch64") {
     cmakeArgs.push("-DSLEEF_ENABLE_SVE=ON")
     cmakeArgs.push("-DSLEEF_ENABLE_ADVSIMD=ON")
+    cmakeArgs.push("-DCMAKE_C_FLAGS=-march=armv8-a+sve")
+    cmakeArgs.push("-DCMAKE_CXX_FLAGS=-march=armv8-a+sve")
   }
 
   if (platform === "darwin") {
