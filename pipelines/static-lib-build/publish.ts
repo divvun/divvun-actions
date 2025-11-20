@@ -12,7 +12,7 @@ export async function publishLibrary(library: string, version: string) {
   } catch {
     // Ignore errors from Windows-style paths if none exist
   }
-  
+
   // Find all downloaded artifacts
   const artifacts: string[] = []
   for await (const entry of Deno.readDir("target")) {

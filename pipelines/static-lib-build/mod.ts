@@ -775,13 +775,19 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             agents: {
               queue: "linux",
             },
-            artifact_paths: ["target/protobuf_x86_64-unknown-linux-musl.tar.gz"],
+            artifact_paths: [
+              "target/protobuf_x86_64-unknown-linux-musl.tar.gz",
+            ],
           }),
           command({
             label: "Linux x86_64 musl: SLEEF",
             key: "linux-x86_64-musl-sleef",
+            depends_on: ["linux-x86_64-sleef"],
             command: [
               "set -e",
+              'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
+              "mkdir -p target/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               "divvun-actions run sleef-build x86_64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl sleef",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl build/sleef",
@@ -871,12 +877,12 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
           command({
             label: "Linux ARM64 musl: SLEEF",
             key: "linux-aarch64-musl-sleef",
-            depends_on: ["linux-x86_64-musl-sleef"],
+            depends_on: ["linux-x86_64-sleef"],
             command: [
               "set -e",
-              'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-musl.tar.gz" .',
-              "mkdir -p target/x86_64-unknown-linux-musl",
-              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
+              'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
+              "mkdir -p target/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               "divvun-actions run sleef-build aarch64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl sleef",
             ].join("\n"),
@@ -912,7 +918,9 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             agents: {
               queue: "linux",
             },
-            artifact_paths: ["target/pytorch_aarch64-unknown-linux-musl.tar.gz"],
+            artifact_paths: [
+              "target/pytorch_aarch64-unknown-linux-musl.tar.gz",
+            ],
           }),
         ],
       },
