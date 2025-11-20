@@ -30,7 +30,7 @@ export async function buildSleef(options: BuildSleefOptions) {
     buildType = "Release",
     clean = true,
     verbose = false,
-    version = "3.9",
+    version = "3.9.0",
   } = options
 
   console.log(
