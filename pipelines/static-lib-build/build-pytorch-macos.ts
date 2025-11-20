@@ -192,6 +192,9 @@ export async function buildPytorchMacos(options: BuildPytorchMacosOptions) {
   // Set C++17 standard explicitly
   cmakeArgs.push("-DCMAKE_CXX_STANDARD=17")
 
+  // Enable position independent code for static libraries
+  cmakeArgs.push("-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
+
   // Cross-compilation: Set target architecture
   if (isCrossCompile) {
     if (targetTriple === "x86_64-apple-darwin") {

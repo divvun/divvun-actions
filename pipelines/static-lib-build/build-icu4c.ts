@@ -248,25 +248,27 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
 
   switch (buildType) {
     case "Debug":
-      cflagsOpt = "-O0 -g"
-      cxxflagsOpt = "-O0 -g"
+      cflagsOpt = "-O0 -g -fPIC"
+      cxxflagsOpt = "-O0 -g -fPIC"
       break
     case "Release":
-      cflagsOpt = "-O3"
-      cxxflagsOpt = "-O3"
+      cflagsOpt = "-O3 -fPIC"
+      cxxflagsOpt = "-O3 -fPIC"
       break
     case "RelWithDebInfo":
-      cflagsOpt = "-O2 -g"
-      cxxflagsOpt = "-O2 -g"
+      cflagsOpt = "-O2 -g -fPIC"
+      cxxflagsOpt = "-O2 -g -fPIC"
       break
     case "MinSizeRel":
-      cflagsOpt = "-Os"
-      cxxflagsOpt = "-Os"
+      cflagsOpt = "-Os -fPIC"
+      cxxflagsOpt = "-Os -fPIC"
       break
   }
 
-  Deno.env.set("CFLAGS", cflagsOpt)
-  Deno.env.set("CXXFLAGS", cxxflagsOpt)
+  const existingCflags = Deno.env.get("CFLAGS") || ""
+  const existingCxxflags = Deno.env.get("CXXFLAGS") || ""
+  Deno.env.set("CFLAGS", `${existingCflags} ${cflagsOpt}`.trim())
+  Deno.env.set("CXXFLAGS", `${existingCxxflags} ${cxxflagsOpt}`.trim())
 
   console.log("")
   console.log("=== ICU Build Configuration ===")

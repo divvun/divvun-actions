@@ -326,6 +326,9 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
   // Set C++17 standard explicitly
   cmakeArgs.push("-DCMAKE_CXX_STANDARD=17")
 
+  // Enable position independent code for static libraries
+  cmakeArgs.push("-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
+
   // Android always uses static libraries
   cmakeArgs.push("-DBUILD_SHARED_LIBS=OFF")
 
