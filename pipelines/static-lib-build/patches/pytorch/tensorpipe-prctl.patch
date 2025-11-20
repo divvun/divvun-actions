@@ -1,0 +1,12 @@
+diff --git a/third_party/tensorpipe/tensorpipe/channel/cma/context_impl.cc b/third_party/tensorpipe/tensorpipe/channel/cma/context_impl.cc
+index 6b63fa5..9ca4823 100644
+--- a/third_party/tensorpipe/tensorpipe/channel/cma/context_impl.cc
++++ b/third_party/tensorpipe/tensorpipe/channel/cma/context_impl.cc
+@@ -8,7 +8,6 @@
+
+ #include <tensorpipe/channel/cma/context_impl.h>
+
+-#include <linux/prctl.h>
+ #include <sys/prctl.h>
+ #include <sys/syscall.h>
+ #include <sys/uio.h>
