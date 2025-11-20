@@ -132,7 +132,7 @@ export async function buildSleef(options: BuildSleefOptions) {
     "--depth",
     "1",
     "--branch",
-    version,
+    version.replace(/^v/, ""),
     "https://github.com/shibatch/sleef.git",
     sleefDir,
   ])
