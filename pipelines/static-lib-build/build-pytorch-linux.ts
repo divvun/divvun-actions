@@ -108,7 +108,18 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     import.meta.dirname!,
     "patches/pytorch/aten-sleef.patch",
   )
-  await builder.exec("patch", ["-p1", "-i", sleefPatchPath], { cwd: pytorchRoot })
+  await builder.exec("patch", ["-p1", "-i", sleefPatchPath], {
+    cwd: pytorchRoot,
+  })
+
+  // Disable SVE for Linux cross-compilation using sed
+  console.log("Disabling SVE for Linux cross-compilation")
+  const cmakeListsPath = path.join(pytorchRoot, "aten/src/ATen/CMakeLists.txt")
+  await builder.exec("sed", [
+    "-i",
+    '/Xcode\'s clang-12.5 crashes while trying to compile SVE code/a\\\\n# Disable SVE for Linux cross-compilation due to LLVM backend issues\\nif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CROSSCOMPILING)\\n  set(DISABLE_SVE ON CACHE BOOL "Disable SVE for cross-compilation to avoid LLVM backend errors" FORCE)\\n  message(STATUS "SVE disabled for Linux cross-compilation")\\nendif()',
+    cmakeListsPath,
+  ])
 
   // Determine target triple
   const targetTriple = target
