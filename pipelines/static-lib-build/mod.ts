@@ -542,7 +542,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
         ],
       },
       {
-        group: ":linux: Linux Builds",
+        group: ":linux: Linux GNU Builds",
         steps: [
           command({
             label: "Linux x86_64: ICU",
@@ -725,6 +725,11 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             },
             artifact_paths: ["target/pytorch_aarch64-unknown-linux-gnu.tar.gz"],
           }),
+        ],
+      },
+      {
+        group: ":linux: Linux musl Builds",
+        steps: [
           command({
             label: "Linux x86_64 musl: ICU",
             key: "linux-x86_64-musl-icu",

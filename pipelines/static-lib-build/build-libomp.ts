@@ -61,9 +61,8 @@ export async function buildLibomp(options: BuildLibompOptions) {
     ? "aarch64-unknown-linux-gnu"
     : "x86_64-unknown-linux-gnu"
   const targetArch = targetTriple.split("-")[0]
-  // Cross-compilation if arch differs OR if target is musl (host is always glibc)
-  const isCrossCompile = platform === "linux" &&
-    (targetTriple !== hostTriple || targetTriple.includes("-musl"))
+  // Cross-compilation only if architecture differs (not just different libc)
+  const isCrossCompile = platform === "linux" && targetArch !== hostArch
 
   if (isCrossCompile) {
     console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)

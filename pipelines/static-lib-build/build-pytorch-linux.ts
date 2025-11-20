@@ -121,9 +121,8 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   // Parse target architecture from triple
   const targetArch = targetTriple.split("-")[0]
 
-  // Cross-compilation if arch differs OR if target is musl (host is always glibc)
-  const isCrossCompile = targetTriple !== hostTriple ||
-    targetTriple.includes("-musl")
+  // Cross-compilation only if architecture differs (not just different libc)
+  const isCrossCompile = targetArch !== hostArch
 
   if (isCrossCompile) {
     console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
@@ -284,9 +283,18 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   cmakeArgs.push("-DUSE_NUMA=OFF")
 
   // Check for custom-built Protobuf
-  const hostProtobufPrefix = isCrossCompile
-    ? path.join(repoRoot, `target/${hostTriple}/protobuf`)
-    : protobufPrefix
+  // Use matching libc for host protoc (musl -> musl, glibc -> glibc)
+  const hostProtobufTriple = isCrossCompile
+    ? (targetTriple.includes("-musl")
+      ? (hostArch === "aarch64"
+        ? "aarch64-unknown-linux-musl"
+        : "x86_64-unknown-linux-musl")
+      : hostTriple)
+    : targetTriple
+  const hostProtobufPrefix = path.join(
+    repoRoot,
+    `target/${hostProtobufTriple}/protobuf`,
+  )
 
   const customProtoc = path.join(hostProtobufPrefix, "bin/protoc")
   const customProtobufLib = path.join(protobufPrefix, "lib/libprotobuf.a")

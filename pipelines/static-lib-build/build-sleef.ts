@@ -50,9 +50,8 @@ export async function buildSleef(options: BuildSleefOptions) {
     ? "aarch64-unknown-linux-gnu"
     : "x86_64-unknown-linux-gnu"
   const targetArch = targetTriple.split("-")[0]
-  // Cross-compilation if arch differs OR if target is musl (host is always glibc)
-  const isCrossCompile = platform === "linux" &&
-    (targetTriple !== hostTriple || targetTriple.includes("-musl"))
+  // Cross-compilation only if architecture differs (not just different libc)
+  const isCrossCompile = platform === "linux" && targetArch !== hostArch
 
   if (isCrossCompile) {
     console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
@@ -197,9 +196,15 @@ export async function buildSleef(options: BuildSleefOptions) {
     }
 
     // Point to native build directory for host tools
+    // Use matching libc for the host build (musl -> musl, glibc -> glibc)
+    const nativeBuildTriple = isMusl
+      ? (hostArch === "aarch64"
+        ? "aarch64-unknown-linux-musl"
+        : "x86_64-unknown-linux-musl")
+      : hostTriple
     const nativeBuildDir = path.join(
       repoRoot,
-      `target/${hostTriple}/build/sleef`,
+      `target/${nativeBuildTriple}/build/sleef`,
     )
     cmakeArgs.push(`-DNATIVE_BUILD_DIR=${nativeBuildDir}`)
   }
