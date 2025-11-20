@@ -249,10 +249,16 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
 
       // Set cross-compilation flags for Linux glibc
       if (isCrossCompile) {
-        const crossFlags = `--target=${targetTriple} -fuse-ld=lld`
-        Deno.env.set("CFLAGS", crossFlags)
-        Deno.env.set("CXXFLAGS", crossFlags)
-        Deno.env.set("LDFLAGS", "-fuse-ld=lld")
+        const isMusl = targetTriple.includes("-musl")
+
+        if (!isMusl) {
+          // Only use clang-specific flags for glibc cross-compilation
+          const crossFlags = `--target=${targetTriple} -fuse-ld=lld`
+          Deno.env.set("CFLAGS", crossFlags)
+          Deno.env.set("CXXFLAGS", crossFlags)
+          Deno.env.set("LDFLAGS", "-fuse-ld=lld")
+        }
+        // For musl, the cross-compiler already knows its target, no extra flags needed
       }
     }
   }

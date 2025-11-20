@@ -182,14 +182,21 @@ export async function buildLibomp(options: BuildLibompOptions) {
     cmakeArgs.push("-DCMAKE_CXX_COMPILER=cl.exe")
   } else if (isCrossCompile) {
     // Linux cross-compilation configuration
+    const isMusl = targetTriple.includes("-musl")
+
     cmakeArgs.push("-DCMAKE_SYSTEM_NAME=Linux")
     cmakeArgs.push(`-DCMAKE_SYSTEM_PROCESSOR=${targetArch}`)
-    cmakeArgs.push(`-DCMAKE_C_COMPILER_TARGET=${targetTriple}`)
-    cmakeArgs.push(`-DCMAKE_CXX_COMPILER_TARGET=${targetTriple}`)
-    cmakeArgs.push(`-DCMAKE_ASM_COMPILER_TARGET=${targetTriple}`)
-    cmakeArgs.push(`-DCMAKE_ASM_FLAGS=--target=${targetTriple}`)
-    cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld")
-    cmakeArgs.push("-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld")
+
+    if (!isMusl) {
+      // Only use clang-specific flags for glibc cross-compilation
+      cmakeArgs.push(`-DCMAKE_C_COMPILER_TARGET=${targetTriple}`)
+      cmakeArgs.push(`-DCMAKE_CXX_COMPILER_TARGET=${targetTriple}`)
+      cmakeArgs.push(`-DCMAKE_ASM_COMPILER_TARGET=${targetTriple}`)
+      cmakeArgs.push(`-DCMAKE_ASM_FLAGS=--target=${targetTriple}`)
+      cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld")
+      cmakeArgs.push("-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld")
+    }
+    // For musl, the cross-compiler already knows its target, no extra flags needed
   }
 
   if (verbose) {
