@@ -72,8 +72,9 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     ? "aarch64-unknown-linux-gnu"
     : "x86_64-unknown-linux-gnu"
   const targetArch = targetTriple.split("-")[0]
-  // Cross-compilation only if architecture differs (not just different libc)
-  const isCrossCompile = platform === "linux" && targetArch !== hostArch
+  // Cross-compilation if arch differs OR if target is musl (host is always glibc)
+  const isCrossCompile = platform === "linux" &&
+    (targetTriple !== hostTriple || targetTriple.includes("-musl"))
 
   if (isCrossCompile) {
     console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
@@ -414,16 +415,10 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     // already knows the correct target and sysroot from its name (aarch64-linux-android21-clang)
   } else if (isCrossCompile) {
     // Linux cross-compilation
-    const isMusl = targetTriple.includes("-musl")
-    // For musl builds, use musl host build; for glibc, use glibc host build
-    const hostBuildTriple = isMusl
-      ? (hostArch === "aarch64"
-        ? "aarch64-unknown-linux-musl"
-        : "x86_64-unknown-linux-musl")
-      : hostTriple
+    // Host build is always glibc (since build environment is glibc)
     const hostBuildDir = path.join(
       repoRoot,
-      `target/${hostBuildTriple}/build/icu`,
+      `target/${hostTriple}/build/icu`,
     )
     configureArgs.push(`--host=${targetTriple}`)
     configureArgs.push(`--with-cross-build=${hostBuildDir}`)
