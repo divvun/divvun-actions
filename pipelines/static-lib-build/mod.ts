@@ -4,7 +4,7 @@ import * as target from "~/target.ts"
 
 const PYTORCH_VERSION = "v2.8.0"
 
-type LibraryType = "icu4c" | "libomp" | "protobuf" | "pytorch"
+type LibraryType = "icu4c" | "libomp" | "protobuf" | "sleef" | "pytorch"
 
 interface ReleaseTag {
   library: LibraryType
@@ -12,8 +12,8 @@ interface ReleaseTag {
 }
 
 function parseReleaseTag(tag: string): ReleaseTag | null {
-  // Match tags like: icu4c/v77.1, libomp/v21.1.4, protobuf/v33.0, pytorch/v2.8.0
-  const match = tag.match(/^(icu4c|libomp|protobuf|pytorch)\/v?(.+)$/)
+  // Match tags like: icu4c/v77.1, libomp/v21.1.4, protobuf/v33.0, sleef/v3.9.0, pytorch/v2.8.0
+  const match = tag.match(/^(icu4c|libomp|protobuf|sleef|pytorch)\/v?(.+)$/)
   if (!match) return null
 
   return {
@@ -48,6 +48,13 @@ function getLibraryPlatforms(library: LibraryType): string[] {
         "aarch64-apple-darwin",
         "aarch64-apple-ios",
         "aarch64-linux-android",
+        "aarch64-unknown-linux-gnu",
+        "aarch64-unknown-linux-musl",
+        "x86_64-unknown-linux-gnu",
+        "x86_64-unknown-linux-musl",
+      ]
+    case "sleef":
+      return [
         "aarch64-unknown-linux-gnu",
         "aarch64-unknown-linux-musl",
         "x86_64-unknown-linux-gnu",
@@ -186,6 +193,16 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
         hostArtifactName = "icu4c_x86_64-unknown-linux-gnu.tar.gz"
         hostTargetDir = "x86_64-unknown-linux-gnu"
       }
+    } else if (library === "sleef") {
+      if (
+        targetTriple === "aarch64-unknown-linux-gnu" ||
+        targetTriple === "x86_64-unknown-linux-musl" ||
+        targetTriple === "aarch64-unknown-linux-musl"
+      ) {
+        dependsOn = "sleef-x86_64-unknown-linux-gnu"
+        hostArtifactName = "sleef_x86_64-unknown-linux-gnu.tar.gz"
+        hostTargetDir = "x86_64-unknown-linux-gnu"
+      }
     } else if (library === "pytorch") {
       // PyTorch depends on cache download and SLEEF for Linux builds
       if (targetTriple === "x86_64-unknown-linux-gnu") {
@@ -252,6 +269,19 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       )
     }
 
+    // SLEEF cross-compilation: download host build
+    if (library === "sleef" && hostArtifactName && hostTargetDir) {
+      const buildArtifactName = hostArtifactName.replace(
+        "sleef_",
+        "sleef-build_",
+      )
+      commands.push(
+        `buildkite-agent artifact download "target/${buildArtifactName}" .`,
+        `mkdir -p target/${hostTargetDir}`,
+        `bsdtar -xf target/${buildArtifactName} -C target/${hostTargetDir}`,
+      )
+    }
+
     commands.push(buildCmd)
 
     // Create artifacts
@@ -274,6 +304,15 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
           `bsdtar --gzip --options gzip:compression-level=9 -cf target/${library}-build_${targetTriple}.tar.gz -C target/${targetTriple} build/icu`,
         )
       }
+      // For SLEEF x86_64 glibc (host build), also create build artifact
+      if (
+        library === "sleef" &&
+        targetTriple === "x86_64-unknown-linux-gnu"
+      ) {
+        commands.push(
+          `bsdtar --gzip --options gzip:compression-level=9 -cf target/${library}-build_${targetTriple}.tar.gz -C target/${targetTriple} build/sleef`,
+        )
+      }
     }
 
     // Determine artifact paths
@@ -282,6 +321,12 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       library === "icu4c" &&
       (targetTriple === "aarch64-apple-darwin" ||
         targetTriple === "x86_64-unknown-linux-gnu")
+    ) {
+      artifactPaths.push(`target/${library}-build_${targetTriple}.tar.gz`)
+    }
+    if (
+      library === "sleef" &&
+      targetTriple === "x86_64-unknown-linux-gnu"
     ) {
       artifactPaths.push(`target/${library}-build_${targetTriple}.tar.gz`)
     }

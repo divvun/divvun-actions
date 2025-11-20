@@ -46,7 +46,9 @@ export async function buildPytorch(options: BuildPytorchOptions) {
     await buildPytorchAndroid({ ...options, abi: "x86" })
   } else if (
     target === "x86_64-unknown-linux-gnu" ||
-    target === "aarch64-unknown-linux-gnu"
+    target === "aarch64-unknown-linux-gnu" ||
+    target === "x86_64-unknown-linux-musl" ||
+    target === "aarch64-unknown-linux-musl"
   ) {
     console.log("--- Building PyTorch for Linux")
     await buildPytorchLinux(options)
