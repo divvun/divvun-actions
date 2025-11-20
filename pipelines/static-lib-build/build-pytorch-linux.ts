@@ -112,15 +112,6 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     cwd: pytorchRoot,
   })
 
-  // Disable SVE support by replacing SVE256 capability block
-  console.log("Disabling SVE support")
-  const findArmPath = path.join(pytorchRoot, "cmake/Modules/FindARM.cmake")
-  await builder.exec("sed", [
-    "-i",
-    '/if(CXX_SVE_FOUND AND CXX_SVE256_FOUND AND CXX_ARM_BF16_FOUND)/,/endif()/c\\set(CXX_SVE_FOUND FALSE CACHE BOOL "SVE not available on host")',
-    findArmPath,
-  ])
-
   // Determine target triple
   const targetTriple = target
   const hostTriple = hostArch === "aarch64"
@@ -198,11 +189,12 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   if (isCrossCompile) {
     cmakeArgs.push("-DCMAKE_SYSTEM_NAME=Linux")
     cmakeArgs.push(`-DCMAKE_SYSTEM_PROCESSOR=${targetArch}`)
-    cmakeArgs.push(`-DCMAKE_C_COMPILER_TARGET=${targetTriple}`)
-    cmakeArgs.push(`-DCMAKE_CXX_COMPILER_TARGET=${targetTriple}`)
-    cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld")
-    cmakeArgs.push("-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld")
-    cmakeArgs.push(`-DCMAKE_ASM_FLAGS=--target=${targetTriple}`)
+
+    // Use cross-compiler for aarch64
+    if (targetArch === "aarch64") {
+      cmakeArgs.push("-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc")
+      cmakeArgs.push("-DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++")
+    }
   }
 
   // Set C++17 standard explicitly
@@ -329,8 +321,8 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   console.log("")
 
   // Set environment variables
-  Deno.env.set("CC", "clang")
-  Deno.env.set("CXX", "clang++")
+  Deno.env.set("CC", "gcc")
+  Deno.env.set("CXX", "g++")
   Deno.env.set("CMAKE_MAKE_PROGRAM", ninjaPath)
 
   // Run CMake configuration
