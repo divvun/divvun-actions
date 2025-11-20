@@ -229,7 +229,7 @@ function extractVersionFromTag(tag: string): string | null {
 function isPrerelease(version: string): boolean {
   try {
     const parsed = semver.parse(version)
-    return (parsed.prerelease?.length ?? 0) > 0
+    return parsed.major === 0 || (parsed.prerelease?.length ?? 0) > 0
   } catch {
     return false
   }
