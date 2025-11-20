@@ -154,9 +154,13 @@ export async function buildSleef(options: BuildSleefOptions) {
     "-DBUILD_DFT=OFF",
     "-DBUILD_GNUABI_LIBS=OFF",
     "-DBUILD_INLINE_HEADERS=OFF",
-    "-DSLEEF_ENABLE_SVE=ON",
-    "-DSLEEF_ENABLE_ADVSIMD=ON",
   ]
+
+  // Enable ARM-specific SIMD features for aarch64
+  if (targetArch === "aarch64") {
+    cmakeArgs.push("-DSLEEF_ENABLE_SVE=ON")
+    cmakeArgs.push("-DSLEEF_ENABLE_ADVSIMD=ON")
+  }
 
   if (platform === "darwin") {
     cmakeArgs.push("-DCMAKE_OSX_DEPLOYMENT_TARGET=11.0")
