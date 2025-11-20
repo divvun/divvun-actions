@@ -1,0 +1,16 @@
+diff --git a/aten/src/ATen/CMakeLists.txt b/aten/src/ATen/CMakeLists.txt
+index bf425af..1f21b1f 100644
+--- a/aten/src/ATen/CMakeLists.txt
++++ b/aten/src/ATen/CMakeLists.txt
+@@ -565,6 +565,11 @@ if(NOT MSVC AND NOT EMSCRIPTEN AND NOT INTERN_BUILD_MOBILE)
+       set(DISABLE_SVE ON CACHE BOOL "Xcode's clang-12.5 crashes while trying to compile SVE code" FORCE)
+     endif()
+   endif()
++  # Disable SVE for Linux cross-compilation due to LLVM backend issues
++  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
++    set(DISABLE_SVE ON CACHE BOOL "Disable SVE to avoid LLVM backend errors" FORCE)
++    message(STATUS "SVE disabled for Linux build")
++  endif()
+   if(USE_SLEEF)
+     if(NOT TARGET sleef)
+       set(SLEEF_BUILD_SHARED_LIBS OFF CACHE BOOL "Don't build sleef shared libs")

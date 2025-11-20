@@ -104,11 +104,19 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
 
   // Apply SLEEF patch
   console.log("Applying SLEEF patch")
-  const patchPath = path.join(
+  const sleefPatchPath = path.join(
     import.meta.dirname!,
     "patches/pytorch/aten-sleef.patch",
   )
-  await builder.exec("patch", ["-p1", "-i", patchPath], { cwd: pytorchRoot })
+  await builder.exec("patch", ["-p1", "-i", sleefPatchPath], { cwd: pytorchRoot })
+
+  // Apply SVE disable patch
+  console.log("Applying SVE disable patch")
+  const svePatchPath = path.join(
+    import.meta.dirname!,
+    "patches/pytorch/disable-sve.patch",
+  )
+  await builder.exec("patch", ["-p1", "-i", svePatchPath], { cwd: pytorchRoot })
 
   // Determine target triple
   const targetTriple = target
@@ -196,12 +204,6 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
 
   // Set C++17 standard explicitly
   cmakeArgs.push("-DCMAKE_CXX_STANDARD=17")
-
-  // Disable SVE for ARM64 targets
-  if (targetArch === "aarch64") {
-    cmakeArgs.push("-DCMAKE_C_FLAGS=-march=armv8-a+nosve")
-    cmakeArgs.push("-DCMAKE_CXX_FLAGS=-march=armv8-a+nosve")
-  }
 
   // Static or shared libraries
   if (shared) {
@@ -327,7 +329,6 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   Deno.env.set("CC", "clang")
   Deno.env.set("CXX", "clang++")
   Deno.env.set("CMAKE_MAKE_PROGRAM", ninjaPath)
-  Deno.env.set("DISABLE_SVE", "1")
 
   // Run CMake configuration
   console.log("Running CMake configuration")
