@@ -43,7 +43,7 @@ export default async function spellerBundle({
   manifest,
   spellerPaths,
 }: Props): Promise<Output> {
-  const { spellername } = manifest
+  const spellerName = manifest.package.speller.name
   const packageId = derivePackageId(spellerType)
   const langTag = deriveLangTag()
 
@@ -96,7 +96,7 @@ export default async function spellerBundle({
     }
     console.log(zhfstPaths)
     const innoBuilder = new InnoSetupBuilder(Deno.cwd())
-      .name(`${spellername} Speller`)
+      .name(`${spellerName} Speller`)
       .version(version)
       .publisher("Universitetet i Tromsø - Norges arktiske universitet")
       .url("http://divvun.no/")
