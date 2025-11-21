@@ -286,6 +286,12 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       break
   }
 
+  // For musl builds, add -fvisibility=default to prevent localalias issues
+  if (targetTriple.includes("-musl")) {
+    cflagsOpt += " -fvisibility=default"
+    cxxflagsOpt += " -fvisibility=default"
+  }
+
   const existingCflags = Deno.env.get("CFLAGS") || ""
   const existingCxxflags = Deno.env.get("CXXFLAGS") || ""
   Deno.env.set("CFLAGS", `${existingCflags} ${cflagsOpt}`.trim())
