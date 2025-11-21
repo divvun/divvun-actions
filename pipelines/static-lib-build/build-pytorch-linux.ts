@@ -151,6 +151,16 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     })
   }
 
+  // Apply FindARM SVE detection patch for all builds
+  console.log("Applying FindARM SVE detection patch")
+  const findArmPatchPath = path.join(
+    import.meta.dirname!,
+    "patches/pytorch/findarm-sve.patch",
+  )
+  await builder.exec("patch", ["-p1", "-i", findArmPatchPath], {
+    cwd: pytorchRoot,
+  })
+
   // Determine target triple
   const targetTriple = target
   const hostTriple = hostArch === "aarch64"

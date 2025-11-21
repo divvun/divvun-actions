@@ -1,0 +1,20 @@
+diff --git a/cmake/Modules/FindARM.cmake b/cmake/Modules/FindARM.cmake
+index 903025c5c..4c78d07cb 100644
+--- a/cmake/Modules/FindARM.cmake
++++ b/cmake/Modules/FindARM.cmake
+@@ -156,14 +156,7 @@ IF(CMAKE_SYSTEM_NAME MATCHES "Linux")
+     CHECK_COMPILES(CXX "ARM_BF16" "-march=armv8.2-a+sve+bf16 -msve-vector-bits=256" "${ARM_BF16_CODE}")
+
+     # If SVE256 support is not found, set CXX_SVE_FOUND to FALSE and notify the user
+-    if(NOT CXX_SVE256_FOUND)
+-      set(CXX_SVE_FOUND FALSE CACHE BOOL "SVE not available on host")
+-      message(STATUS "No SVE processor on this machine.")
+-    else()
+-      # If SVE256 support is found, set CXX_SVE_FOUND to TRUE and notify the user
+-      set(CXX_SVE_FOUND TRUE CACHE BOOL "SVE available on host")
+-      message(STATUS "SVE support detected.")
+-    endif()
++    set(CXX_SVE_FOUND FALSE CACHE BOOL "SVE not available on host")
+
+     # Mark the SVE support variable as advanced
+     mark_as_advanced(CXX_SVE_FOUND)
