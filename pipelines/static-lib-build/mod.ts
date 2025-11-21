@@ -66,7 +66,7 @@ function getLibraryPlatforms(library: LibraryType): string[] {
         "aarch64-apple-ios",
         "aarch64-linux-android",
         "aarch64-unknown-linux-gnu",
-        "aarch64-unknown-linux-musl",
+        // "aarch64-unknown-linux-musl",
         "x86_64-unknown-linux-gnu",
         "x86_64-unknown-linux-musl",
       ]
@@ -210,20 +210,21 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
           `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/sleef%2F${sleefVersion}/sleef_${sleefVersion}_x86_64-unknown-linux-musl.tar.gz" -o sleef_x86_64-unknown-linux-musl.tar.gz`,
           "bsdtar -xf sleef_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
         )
-      } else if (targetTriple === "aarch64-unknown-linux-musl") {
-        const protobufVersion = "v33.0"
-        const sleefVersion = "v3.9.0"
-        commands.push(
-          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
-          "mkdir -p target/x86_64-unknown-linux-gnu",
-          "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
-          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_aarch64-unknown-linux-musl.tar.gz" -o protobuf_aarch64-unknown-linux-musl.tar.gz`,
-          "mkdir -p target/aarch64-unknown-linux-musl",
-          "bsdtar -xf protobuf_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
-          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/sleef%2F${sleefVersion}/sleef_${sleefVersion}_aarch64-unknown-linux-musl.tar.gz" -o sleef_aarch64-unknown-linux-musl.tar.gz`,
-          "bsdtar -xf sleef_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
-        )
       }
+      // else if (targetTriple === "aarch64-unknown-linux-musl") {
+      //   const protobufVersion = "v33.0"
+      //   const sleefVersion = "v3.9.0"
+      //   commands.push(
+      //     `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
+      //     "mkdir -p target/x86_64-unknown-linux-gnu",
+      //     "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+      //     `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_aarch64-unknown-linux-musl.tar.gz" -o protobuf_aarch64-unknown-linux-musl.tar.gz`,
+      //     "mkdir -p target/aarch64-unknown-linux-musl",
+      //     "bsdtar -xf protobuf_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
+      //     `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/sleef%2F${sleefVersion}/sleef_${sleefVersion}_aarch64-unknown-linux-musl.tar.gz" -o sleef_aarch64-unknown-linux-musl.tar.gz`,
+      //     "bsdtar -xf sleef_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
+      //   )
+      // }
     }
 
     // ICU4C cross-compilation: download host build
@@ -936,41 +937,41 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             },
             artifact_paths: ["target/sleef_aarch64-unknown-linux-musl.tar.gz"],
           }),
-          command({
-            label: "Linux ARM64 musl: PyTorch",
-            key: "linux-aarch64-musl-pytorch",
-            depends_on: [
-              "linux-aarch64-musl-protobuf",
-              "linux-x86_64-sleef",
-              "linux-aarch64-musl-sleef",
-              "pytorch-cache-download",
-            ],
-            priority: 1,
-            command: [
-              "set -e",
-              'buildkite-agent artifact download "pytorch.tar.gz" .',
-              "bsdtar -xf pytorch.tar.gz",
-              `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2Fv33.0/protobuf_v33.0_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
-              "mkdir -p target/x86_64-unknown-linux-gnu",
-              "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
-              'buildkite-agent artifact download "target/protobuf_aarch64-unknown-linux-musl.tar.gz" .',
-              "mkdir -p target/aarch64-unknown-linux-musl",
-              "bsdtar -xf target/protobuf_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
-              'buildkite-agent artifact download "target/sleef_aarch64-unknown-linux-musl.tar.gz" .',
-              "bsdtar -xf target/sleef_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
-              'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
-              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
-              "divvun-actions run pytorch-build aarch64-unknown-linux-musl",
-              "bsdtar --gzip --options gzip:compression-level=9 -cf target/pytorch_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl pytorch",
-            ].join("\n"),
-            agents: {
-              queue: "linux",
-              size: "large",
-            },
-            artifact_paths: [
-              "target/pytorch_aarch64-unknown-linux-musl.tar.gz",
-            ],
-          }),
+          // command({
+          //   label: "Linux ARM64 musl: PyTorch",
+          //   key: "linux-aarch64-musl-pytorch",
+          //   depends_on: [
+          //     "linux-aarch64-musl-protobuf",
+          //     "linux-x86_64-sleef",
+          //     "linux-aarch64-musl-sleef",
+          //     "pytorch-cache-download",
+          //   ],
+          //   priority: 1,
+          //   command: [
+          //     "set -e",
+          //     'buildkite-agent artifact download "pytorch.tar.gz" .',
+          //     "bsdtar -xf pytorch.tar.gz",
+          //     `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2Fv33.0/protobuf_v33.0_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
+          //     "mkdir -p target/x86_64-unknown-linux-gnu",
+          //     "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+          //     'buildkite-agent artifact download "target/protobuf_aarch64-unknown-linux-musl.tar.gz" .',
+          //     "mkdir -p target/aarch64-unknown-linux-musl",
+          //     "bsdtar -xf target/protobuf_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
+          //     'buildkite-agent artifact download "target/sleef_aarch64-unknown-linux-musl.tar.gz" .',
+          //     "bsdtar -xf target/sleef_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
+          //     'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
+          //     "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+          //     "divvun-actions run pytorch-build aarch64-unknown-linux-musl",
+          //     "bsdtar --gzip --options gzip:compression-level=9 -cf target/pytorch_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl pytorch",
+          //   ].join("\n"),
+          //   agents: {
+          //     queue: "linux",
+          //     size: "large",
+          //   },
+          //   artifact_paths: [
+          //     "target/pytorch_aarch64-unknown-linux-musl.tar.gz",
+          //   ],
+          // }),
         ],
       },
       {
