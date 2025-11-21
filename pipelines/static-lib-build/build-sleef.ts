@@ -172,14 +172,15 @@ export async function buildSleef(options: BuildSleefOptions) {
     "-DSLEEF_ENABLE_TESTER4=OFF",
     "-DSLEEF_ENABLE_MPFR=OFF",
     "-DSLEEF_ENABLE_TLFLOAT=OFF",
+    "-DSLEEF_ENABLE_SVE=OFF",
     "-DSLEEF_DISABLE_SSL=ON",
     "-DSLEEF_ENABLE_SSL=OFF",
   ]
 
   // Enable ARM-specific SIMD features for aarch64
   if (targetArch === "aarch64") {
-    cmakeArgs.push("-DCMAKE_C_FLAGS=-march=armv8-a+sve")
-    cmakeArgs.push("-DCMAKE_CXX_FLAGS=-march=armv8-a+sve")
+    cmakeArgs.push("-DCMAKE_C_FLAGS=-march=armv8-a")
+    cmakeArgs.push("-DCMAKE_CXX_FLAGS=-march=armv8-a")
   }
 
   if (platform === "darwin") {

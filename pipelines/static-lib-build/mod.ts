@@ -308,9 +308,14 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
         key: `${library}-${targetTriple}`,
         depends_on: dependsOn,
         command: commands.join("\n"),
-        agents: {
-          queue,
-        },
+        agents: library === "pytorch" && queue === "linux"
+          ? {
+            queue,
+            size: "large",
+          }
+          : {
+            queue,
+          },
         artifact_paths: artifactPaths,
       }),
     )
@@ -642,6 +647,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             ].join("\n"),
             agents: {
               queue: "linux",
+              size: "large",
             },
             artifact_paths: ["target/pytorch_x86_64-unknown-linux-gnu.tar.gz"],
           }),
@@ -743,6 +749,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             ].join("\n"),
             agents: {
               queue: "linux",
+              size: "large",
             },
             artifact_paths: ["target/pytorch_aarch64-unknown-linux-gnu.tar.gz"],
           }),
@@ -849,6 +856,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             ].join("\n"),
             agents: {
               queue: "linux",
+              size: "large",
             },
             artifact_paths: ["target/pytorch_x86_64-unknown-linux-musl.tar.gz"],
           }),
@@ -951,6 +959,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             ].join("\n"),
             agents: {
               queue: "linux",
+              size: "large",
             },
             artifact_paths: [
               "target/pytorch_aarch64-unknown-linux-musl.tar.gz",
