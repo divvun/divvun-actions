@@ -307,7 +307,8 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       key: `${library}-${targetTriple}`,
       depends_on: dependsOn,
       command: commands.join("\n"),
-      agents: library === "pytorch" && queue === "linux"
+      agents: library === "pytorch" && queue === "linux" &&
+          targetTriple.includes("-musl")
         ? {
           queue,
           size: "large",
@@ -652,7 +653,6 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             ].join("\n"),
             agents: {
               queue: "linux",
-              size: "large",
             },
             artifact_paths: ["target/pytorch_x86_64-unknown-linux-gnu.tar.gz"],
           }),
@@ -754,7 +754,6 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             ].join("\n"),
             agents: {
               queue: "linux",
-              size: "large",
             },
             artifact_paths: ["target/pytorch_aarch64-unknown-linux-gnu.tar.gz"],
           }),
