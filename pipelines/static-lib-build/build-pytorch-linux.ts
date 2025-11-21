@@ -122,6 +122,15 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     await builder.exec("patch", ["-p1", "-i", tensorpipePatchPath], {
       cwd: pytorchRoot,
     })
+
+    console.log("Applying gloo caddr_t patch for musl")
+    const glooPatchPath = path.join(
+      import.meta.dirname!,
+      "patches/pytorch/gloo-caddr.patch",
+    )
+    await builder.exec("patch", ["-p1", "-i", glooPatchPath], {
+      cwd: pytorchRoot,
+    })
   }
 
   // Determine target triple

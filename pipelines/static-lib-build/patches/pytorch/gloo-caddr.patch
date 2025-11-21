@@ -1,0 +1,21 @@
+diff --git a/third_party/gloo/gloo/common/linux.cc b/third_party/gloo/gloo/common/linux.cc
+index 9b45fc3..b918422 100644
+--- a/third_party/gloo/gloo/common/linux.cc
++++ b/third_party/gloo/gloo/common/linux.cc
+@@ -198,7 +198,7 @@ static int getInterfaceSpeedGLinkSettings(int sock, struct ifreq* ifr) {
+   } ecmd;
+   int rv;
+
+-  ifr->ifr_data = (__caddr_t)&ecmd;
++  ifr->ifr_data = (char*)&ecmd;
+   memset(&ecmd, 0, sizeof(ecmd));
+   ecmd.req.cmd = ETHTOOL_GLINKSETTINGS;
+
+@@ -226,7 +226,7 @@ static int getInterfaceSpeedGSet(int sock, struct ifreq* ifr) {
+   struct ethtool_cmd edata;
+   int rv;
+
+-  ifr->ifr_data = (__caddr_t)&edata;
++  ifr->ifr_data = (char*)&edata;
+   memset(&edata, 0, sizeof(edata));
+   edata.cmd = ETHTOOL_GSET;
