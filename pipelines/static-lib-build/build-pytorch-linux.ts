@@ -249,8 +249,8 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
         cmakeArgs.push("-DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++")
         cmakeArgs.push("-DCMAKE_ASM_COMPILER=aarch64-linux-gnu-gcc")
       }
-      cmakeArgs.push("-DCMAKE_C_FLAGS=-march=armv8-a+sve+bf16+i8mm+fp16")
-      cmakeArgs.push("-DCMAKE_CXX_FLAGS=-march=armv8-a+sve+bf16+i8mm+fp16")
+      cmakeArgs.push("-DCMAKE_C_FLAGS=-march=armv8-a+sve+bf16")
+      cmakeArgs.push("-DCMAKE_CXX_FLAGS=-march=armv8-a+sve+bf16")
     }
   }
 
@@ -321,6 +321,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   cmakeArgs.push("-DUSE_FBGEMM=OFF")
   cmakeArgs.push("-DUSE_PROF=OFF")
   cmakeArgs.push("-DUSE_NUMA=OFF")
+  cmakeArgs.push("-DUSE_KLEIDIAI=OFF")
 
   // Check for custom-built Protobuf
   // Use host glibc protoc for all cross-compilation (host is always glibc)
