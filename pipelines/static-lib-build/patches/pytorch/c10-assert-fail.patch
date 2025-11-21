@@ -28,6 +28,38 @@ index 7d8238f91..28abecd23 100644
 +#else
 +        int line,
 +#endif
-         const char* function) noexcept(true);
- #endif // (defined(__CUDA_ARCH__) && !(defined(__clang__) && defined(__CUDA__)))
+         const char* function) noexcept __attribute__((__noreturn__));
+ 
  #endif // __SYCL_DEVICE_ONLY__
+@@ -422,6 +431,7 @@ __host__ __device__
+     abort();                     \
+   }
+ #else
++#ifdef __GLIBC__
+ #define CUDA_KERNEL_ASSERT(cond)                                         \
+   if (C10_UNLIKELY(!(cond))) {                                           \
+     __assert_fail(                                                       \
+@@ -437,6 +447,23 @@ __host__ __device__
+     __assert_fail(                                                       \
+         #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
+   }
++#else
++#define CUDA_KERNEL_ASSERT(cond)                                  \
++  if (C10_UNLIKELY(!(cond))) {                                    \
++    __assert_fail(                                                \
++        #cond, __FILE__, static_cast<int>(__LINE__), __func__);   \
++  }
++#define CUDA_KERNEL_ASSERT_MSG(cond, msg)                       \
++  if (C10_UNLIKELY(!(cond))) {                                  \
++    __assert_fail(                                              \
++        msg, __FILE__, static_cast<int>(__LINE__), __func__);   \
++  }
++#define SYCL_KERNEL_ASSERT(cond)                                  \
++  if (C10_UNLIKELY(!(cond))) {                                    \
++    __assert_fail(                                                \
++        #cond, __FILE__, static_cast<int>(__LINE__), __func__);   \
++  }
++#endif
+ #endif //  C10_USE_ROCM_KERNEL_ASSERT and USE_ROCM
+ #endif // __APPLE__
+ 
