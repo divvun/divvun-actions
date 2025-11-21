@@ -302,23 +302,28 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       artifactPaths.push(`target/${library}-build_${targetTriple}.tar.gz`)
     }
 
-    buildSteps.push(
-      command({
-        label: `:package: ${library} ${targetTriple}`,
-        key: `${library}-${targetTriple}`,
-        depends_on: dependsOn,
-        command: commands.join("\n"),
-        agents: library === "pytorch" && queue === "linux"
-          ? {
-            queue,
-            size: "large",
-          }
-          : {
-            queue,
-          },
-        artifact_paths: artifactPaths,
-      }),
-    )
+    const step: CommandStep = {
+      label: `:package: ${library} ${targetTriple}`,
+      key: `${library}-${targetTriple}`,
+      depends_on: dependsOn,
+      command: commands.join("\n"),
+      agents: library === "pytorch" && queue === "linux"
+        ? {
+          queue,
+          size: "large",
+        }
+        : {
+          queue,
+        },
+      artifact_paths: artifactPaths,
+    }
+
+    // Add priority for musl PyTorch builds
+    if (library === "pytorch" && targetTriple.includes("-musl")) {
+      step.priority = 1
+    }
+
+    buildSteps.push(command(step))
   }
 
   pipeline.steps.push({
@@ -837,6 +842,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "linux-x86_64-musl-sleef",
               "pytorch-cache-download",
             ],
+            priority: 1,
             command: [
               "set -e",
               'buildkite-agent artifact download "pytorch.tar.gz" .',
@@ -940,6 +946,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "linux-aarch64-musl-sleef",
               "pytorch-cache-download",
             ],
+            priority: 1,
             command: [
               "set -e",
               'buildkite-agent artifact download "pytorch.tar.gz" .',
