@@ -1,0 +1,33 @@
+diff --git a/c10/macros/Macros.h b/c10/macros/Macros.h
+index 7d8238f91..28abecd23 100644
+--- a/c10/macros/Macros.h
++++ b/c10/macros/Macros.h
+@@ -380,7 +380,11 @@ extern "C" {
+ extern SYCL_EXTERNAL void __assert_fail(
+     const char* expr,
+     const char* file,
++#ifdef __GLIBC__
+     unsigned int line,
++#else
++    int line,
++#endif
+     const char* func);
+ #else // __SYCL_DEVICE_ONLY__
+ #if (defined(__CUDA_ARCH__) && !(defined(__clang__) && defined(__CUDA__)))
+@@ -393,11 +397,16 @@ __host__ __device__
+     // exactly how it is in glibc in case parts of the program are compiled with
+     // different NDEBUG settings. Otherwise we might get 'ambiguous declaration'
+     // error. Note: On ROCm - this declaration serves for host side compilation.
++    // Note: musl libc uses 'int' for line parameter instead of 'unsigned int'.
+     void
+     __assert_fail(
+         const char* assertion,
+         const char* file,
++#ifdef __GLIBC__
+         unsigned int line,
++#else
++        int line,
++#endif
+         const char* function) noexcept(true);
+ #endif // (defined(__CUDA_ARCH__) && !(defined(__clang__) && defined(__CUDA__)))
+ #endif // __SYCL_DEVICE_ONLY__

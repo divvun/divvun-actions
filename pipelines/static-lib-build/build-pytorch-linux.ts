@@ -131,6 +131,24 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     await builder.exec("patch", ["-p1", "-i", glooPatchPath], {
       cwd: pytorchRoot,
     })
+
+    console.log("Applying mimalloc prctl.h patch for musl")
+    const mimallocPatchPath = path.join(
+      import.meta.dirname!,
+      "patches/pytorch/mimalloc-prctl.patch",
+    )
+    await builder.exec("patch", ["-p1", "-i", mimallocPatchPath], {
+      cwd: pytorchRoot,
+    })
+
+    console.log("Applying c10 __assert_fail patch for musl")
+    const c10PatchPath = path.join(
+      import.meta.dirname!,
+      "patches/pytorch/c10-assert-fail.patch",
+    )
+    await builder.exec("patch", ["-p1", "-i", c10PatchPath], {
+      cwd: pytorchRoot,
+    })
   }
 
   // Determine target triple
