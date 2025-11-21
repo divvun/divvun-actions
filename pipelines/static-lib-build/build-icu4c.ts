@@ -286,10 +286,14 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       break
   }
 
-  // For musl builds, add -fvisibility=default to prevent localalias issues
+  // For musl builds, use -O2 instead of -Os and disable optimizations that create localalias
   if (targetTriple.includes("-musl")) {
-    cflagsOpt += " -fvisibility=default"
-    cxxflagsOpt += " -fvisibility=default"
+    // Replace -Os with -O2 to avoid localalias generation
+    cflagsOpt = cflagsOpt.replace("-Os", "-O2")
+    cxxflagsOpt = cxxflagsOpt.replace("-Os", "-O2")
+    // Disable specific optimizations that create local aliases
+    cflagsOpt += " -fno-ipa-cp -fno-ipa-cp-clone"
+    cxxflagsOpt += " -fno-ipa-cp -fno-ipa-cp-clone"
   }
 
   const existingCflags = Deno.env.get("CFLAGS") || ""
