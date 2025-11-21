@@ -703,12 +703,14 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               "divvun-actions run protobuf-build aarch64-unknown-linux-gnu",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu protobuf",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf-build_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu build/protobuf",
             ].join("\n"),
             agents: {
               queue: "linux",
             },
             artifact_paths: [
               "target/protobuf_aarch64-unknown-linux-gnu.tar.gz",
+              "target/protobuf-build_aarch64-unknown-linux-gnu.tar.gz",
             ],
           }),
           command({
@@ -722,11 +724,15 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               "divvun-actions run sleef-build aarch64-unknown-linux-gnu",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu sleef",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu build/sleef",
             ].join("\n"),
             agents: {
               queue: "linux",
             },
-            artifact_paths: ["target/sleef_aarch64-unknown-linux-gnu.tar.gz"],
+            artifact_paths: [
+              "target/sleef_aarch64-unknown-linux-gnu.tar.gz",
+              "target/sleef-build_aarch64-unknown-linux-gnu.tar.gz",
+            ],
           }),
           command({
             label: "Linux ARM64: PyTorch",
@@ -914,12 +920,14 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               "divvun-actions run protobuf-build aarch64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl protobuf",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf-build_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl build/protobuf",
             ].join("\n"),
             agents: {
               queue: "linux",
             },
             artifact_paths: [
               "target/protobuf_aarch64-unknown-linux-musl.tar.gz",
+              "target/protobuf-build_aarch64-unknown-linux-musl.tar.gz",
             ],
           }),
           command({
@@ -933,11 +941,15 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
               "divvun-actions run sleef-build aarch64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl sleef",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl build/sleef",
             ].join("\n"),
             agents: {
               queue: "linux",
             },
-            artifact_paths: ["target/sleef_aarch64-unknown-linux-musl.tar.gz"],
+            artifact_paths: [
+              "target/sleef_aarch64-unknown-linux-musl.tar.gz",
+              "target/sleef-build_aarch64-unknown-linux-musl.tar.gz",
+            ],
           }),
           command({
             label: "Linux ARM64 musl: PyTorch",

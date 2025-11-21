@@ -7,8 +7,10 @@ export async function publishLibrary(library: string, version: string) {
 
   // Download all artifacts (both Unix and Windows path separators)
   await builder.downloadArtifacts(`target/${library}_*.tar.gz`, ".")
+  await builder.downloadArtifacts(`target/${library}-build_*.tar.gz`, ".")
   try {
     await builder.downloadArtifacts(`target\\${library}_*.tar.gz`, ".")
+    await builder.downloadArtifacts(`target\\${library}-build_*.tar.gz`, ".")
   } catch {
     // Ignore errors from Windows-style paths if none exist
   }
@@ -17,7 +19,9 @@ export async function publishLibrary(library: string, version: string) {
   const artifacts: string[] = []
   for await (const entry of Deno.readDir("target")) {
     if (
-      entry.isFile && entry.name.startsWith(`${library}_`) &&
+      entry.isFile &&
+      (entry.name.startsWith(`${library}_`) ||
+        entry.name.startsWith(`${library}-build_`)) &&
       entry.name.endsWith(".tar.gz")
     ) {
       artifacts.push(path.join("target", entry.name))
@@ -31,15 +35,19 @@ export async function publishLibrary(library: string, version: string) {
 
   for (const artifact of artifacts) {
     // Extract target from artifact name (e.g., icu4c_aarch64-apple-darwin.tar.gz -> aarch64-apple-darwin)
-    const targetMatch = artifact.match(`${library}_(.+)\\.tar\\.gz$`)
+    // Also handle -build artifacts (e.g., icu4c-build_aarch64-apple-darwin.tar.gz)
+    const targetMatch = artifact.match(`${library}(?:-build)?_(.+)\\.tar\\.gz$`)
     if (!targetMatch) {
       console.log(`Warning: Could not parse target from ${artifact}`)
       continue
     }
     const target = targetMatch[1]
+    const isBuildArtifact = artifact.includes(`${library}-build_`)
 
     // Create new filename with version
-    const versionedFilename = `${library}_${version}_${target}.tar.gz`
+    const versionedFilename = isBuildArtifact
+      ? `${library}-build_${version}_${target}.tar.gz`
+      : `${library}_${version}_${target}.tar.gz`
     const versionedArtifact = path.join("target", versionedFilename)
 
     // Rename the artifact
