@@ -9,6 +9,8 @@
     "jsr:@deno/cache-dir@0.25.0": "0.25.0",
     "jsr:@necessary/sodium@0.1.0-alpha.5": "0.1.0-alpha.5",
     "jsr:@openbao/api@^0.0.3": "0.0.3",
+    "jsr:@optique/core@~0.6.2": "0.6.2",
+    "jsr:@optique/run@~0.6.2": "0.6.2",
     "jsr:@std/bytes@^1.0.5": "1.0.6",
     "jsr:@std/bytes@^1.0.6": "1.0.6",
     "jsr:@std/cache@0.2": "0.2.0",
@@ -87,6 +89,15 @@
       "integrity": "bb1fe8daa81dcda6e7924c6317b77d4f82a8eb0ac5a2ec1815e72d9a069afe08",
       "dependencies": [
         "npm:fets"
+      ]
+    },
+    "@optique/core@0.6.2": {
+      "integrity": "da0b7c792c44f8835d16cc211ded2d995c0785aaa54d694da0c0c7140dcb8f1f"
+    },
+    "@optique/run@0.6.2": {
+      "integrity": "e90ae47fde75665a1c1ad185318c4ee9bc07d412b9e42554dd4bcdf68fb0551c",
+      "dependencies": [
+        "jsr:@optique/core"
       ]
     },
     "@std/bytes@1.0.6": {
@@ -553,6 +564,8 @@
       "jsr:@david/which@~0.4.1",
       "jsr:@necessary/sodium@0.1.0-alpha.5",
       "jsr:@openbao/api@^0.0.3",
+      "jsr:@optique/core@~0.6.2",
+      "jsr:@optique/run@~0.6.2",
       "jsr:@std/cache@0.2",
       "jsr:@std/cli@^1.0.23",
       "jsr:@std/crypto@^1.0.5",

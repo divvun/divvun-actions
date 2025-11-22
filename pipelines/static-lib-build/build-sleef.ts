@@ -1,5 +1,5 @@
 import * as path from "@std/path"
-import * as builder from "~/builder.ts"
+import { exec, output } from "~/util/process.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 
@@ -80,8 +80,8 @@ export async function buildSleef(options: BuildSleefOptions) {
   let ninjaPath: string
 
   if (platform === "darwin") {
-    cc = (await builder.output("xcrun", ["-f", "clang"])).stdout.trim()
-    cxx = (await builder.output("xcrun", ["-f", "clang++"])).stdout.trim()
+    cc = (await output("xcrun", ["-f", "clang"])).stdout.trim()
+    cxx = (await output("xcrun", ["-f", "clang++"])).stdout.trim()
 
     const arch = Deno.build.arch
     const brewPrefix = arch === "aarch64" ? "/opt/homebrew" : "/usr/local"
@@ -102,7 +102,7 @@ export async function buildSleef(options: BuildSleefOptions) {
       }
     } else {
       try {
-        await builder.exec("which", ["clang"])
+        await exec("which", ["clang"])
         cc = "clang"
         cxx = "clang++"
       } catch {
@@ -110,12 +110,12 @@ export async function buildSleef(options: BuildSleefOptions) {
         cxx = "g++"
       }
     }
-    cmakePath = (await builder.output("which", ["cmake"])).stdout.trim()
-    ninjaPath = (await builder.output("which", ["ninja"])).stdout.trim()
+    cmakePath = (await output("which", ["cmake"])).stdout.trim()
+    ninjaPath = (await output("which", ["ninja"])).stdout.trim()
   } else {
     // Windows
-    cmakePath = (await builder.output("which", ["cmake"])).stdout.trim()
-    ninjaPath = (await builder.output("which", ["ninja"])).stdout.trim()
+    cmakePath = (await output("which", ["cmake"])).stdout.trim()
+    ninjaPath = (await output("which", ["ninja"])).stdout.trim()
     cc = "cl.exe"
     cxx = "cl.exe"
   }
@@ -142,7 +142,7 @@ export async function buildSleef(options: BuildSleefOptions) {
   }
 
   console.log(`Cloning SLEEF from GitHub (version ${version})...`)
-  await builder.exec("git", [
+  await exec("git", [
     "clone",
     "--depth",
     "1",
@@ -231,17 +231,17 @@ export async function buildSleef(options: BuildSleefOptions) {
 
   // Run CMake configuration
   console.log("Running CMake configuration...")
-  await builder.exec(cmakePath, cmakeArgs, { cwd: buildRoot })
+  await exec(cmakePath, cmakeArgs, { cwd: buildRoot })
 
   // Determine number of parallel jobs
   let maxJobs = Deno.env.get("MAX_JOBS")
   if (!maxJobs) {
     if (platform === "darwin") {
-      maxJobs = (await builder.output("sysctl", ["-n", "hw.ncpu"])).stdout
+      maxJobs = (await output("sysctl", ["-n", "hw.ncpu"])).stdout
         .trim()
     } else {
       try {
-        maxJobs = (await builder.output("nproc", [])).stdout.trim()
+        maxJobs = (await output("nproc", [])).stdout.trim()
       } catch {
         maxJobs = "4"
       }
@@ -250,7 +250,7 @@ export async function buildSleef(options: BuildSleefOptions) {
 
   // Build
   console.log(`Building SLEEF (${maxJobs} parallel jobs)`)
-  await builder.exec(
+  await exec(
     cmakePath,
     ["--build", ".", "--target", "install", "--", `-j${maxJobs}`],
     { cwd: buildRoot },
@@ -267,4 +267,30 @@ export async function buildSleef(options: BuildSleefOptions) {
   console.log("Header files:")
   console.log(`  ${installPrefix}/include/`)
   console.log("")
+}
+
+if (import.meta.main) {
+  const { object } = await import("@optique/core/constructs")
+  const { option, flag } = await import("@optique/core/primitives")
+  const { string, choice } = await import("@optique/core/valueparser")
+  const { withDefault, optional } = await import("@optique/core/modifiers")
+  const { run } = await import("@optique/run")
+
+  const parser = object({
+    target: option("-t", "--target", string()),
+    buildType: withDefault(
+      option(
+        "-b",
+        "--build-type",
+        choice(["Debug", "Release", "RelWithDebInfo", "MinSizeRel"]),
+      ),
+      "Release" as const,
+    ),
+    clean: withDefault(flag("-c", "--clean"), true),
+    verbose: flag("-v", "--verbose"),
+    version: optional(option("--version", string())),
+  })
+
+  const args = run(parser)
+  await buildSleef(args)
 }

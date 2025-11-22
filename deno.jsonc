@@ -38,6 +38,8 @@
     "@david/which": "jsr:@david/which@^0.4.1",
     "@necessary/sodium": "jsr:@necessary/sodium@0.1.0-alpha.5",
     "@openbao/api": "jsr:@openbao/api@^0.0.3",
+    "@optique/core": "jsr:@optique/core@^0.6.2",
+    "@optique/run": "jsr:@optique/run@^0.6.2",
     "@std/cache": "jsr:@std/cache@^0.2.0",
     "@std/cli": "jsr:@std/cli@^1.0.23",
     "@std/crypto": "jsr:@std/crypto@^1.0.5",
