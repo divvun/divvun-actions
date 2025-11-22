@@ -307,7 +307,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
     }
 
     const buildLib = buildTriples[library as keyof typeof buildTriples] ?? null
-    if buildLib != null && buildLib.includes(targetTriple) {
+    if (buildLib != null && buildLib.includes(targetTriple)) {
       artifactPaths.push(`target/${library}-build_${targetTriple}.tar.gz`)
     }
 
