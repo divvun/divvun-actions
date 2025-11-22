@@ -24,6 +24,16 @@ function detectPlatform(target: string): Platform {
   throw new Error(`Unsupported target triple: ${target}`)
 }
 
+async function detectAlpineVersion(): Promise<string | null> {
+  const out = await output("cat", ["/etc/alpine-release"])
+
+  if (out.status.success) {
+    return out.stdout.trim()
+  }
+
+  return null
+}
+
 export async function buildSleef(options: BuildSleefOptions) {
   const {
     target,
@@ -43,31 +53,46 @@ export async function buildSleef(options: BuildSleefOptions) {
   const buildRoot = path.join(repoRoot, `target/${target}/build/sleef`)
   const installPrefix = path.join(repoRoot, `target/${target}/sleef`)
 
+  const isAlpine = Deno.build.os === "linux" &&
+    await detectAlpineVersion() != null
+
   // Detect cross-compilation
   const targetTriple = target
   const hostArch = Deno.build.arch
   let hostTriple: string
-  switch (targetTriple) {
-    case "x86_64-unknown-linux-gnu":
-      hostTriple = "x86_64-unknown-linux-gnu"
-      break
-    case "aarch64-unknown-linux-gnu":
-      hostTriple = "x86_64-unknown-linux-gnu"
-      break
-    case "x86_64-unknown-linux-musl":
-      hostTriple = "x86_64-unknown-linux-gnu"
-      break
-    case "aarch64-unknown-linux-musl":
-      hostTriple = "x86_64-unknown-linux-musl"
-      break
-    default:
-      throw new Error(`Unsupported target triple: ${targetTriple}`)
+
+  if (isAlpine) {
+    switch (targetTriple) {
+      case "x86_64-unknown-linux-musl":
+      case "aarch64-unknown-linux-musl":
+        hostTriple = "x86_64-unknown-linux-musl"
+        break
+      default:
+        throw new Error(`Unsupported target triple: ${targetTriple}`)
+    }
+  } else {
+    switch (targetTriple) {
+      case "x86_64-unknown-linux-gnu":
+        hostTriple = "x86_64-unknown-linux-gnu"
+        break
+      case "aarch64-unknown-linux-gnu":
+        hostTriple = "x86_64-unknown-linux-gnu"
+        break
+      case "x86_64-unknown-linux-musl":
+        hostTriple = "x86_64-unknown-linux-musl"
+        break
+      case "aarch64-unknown-linux-musl":
+        hostTriple = "x86_64-unknown-linux-gnu"
+        break
+      default:
+        throw new Error(`Unsupported target triple: ${targetTriple}`)
+    }
   }
 
   const targetArch = targetTriple.split("-")[0]
   // Cross-compilation if arch differs OR if target is musl (musl binaries can't run on glibc host)
   const isCrossCompile = platform === "linux" &&
-    (targetArch !== hostArch || targetTriple.includes("-musl"))
+    (targetArch !== hostArch ||  hostTriple.includes("gnu") && targetTriple.includes("-musl"))
 
   if (isCrossCompile) {
     console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
@@ -287,7 +312,7 @@ if (import.meta.main) {
       "Release" as const,
     ),
     clean: withDefault(flag("-c", "--clean"), true),
-    verbose: flag("-v", "--verbose"),
+    verbose: withDefault(flag("-v", "--verbose"), false),
     version: optional(option("--version", string())),
   })
 
