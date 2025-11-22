@@ -46,9 +46,24 @@ export async function buildSleef(options: BuildSleefOptions) {
   // Detect cross-compilation
   const targetTriple = target
   const hostArch = Deno.build.arch
-  const hostTriple = hostArch === "aarch64"
-    ? "aarch64-unknown-linux-gnu"
-    : "x86_64-unknown-linux-gnu"
+  let hostTriple: string
+  switch (targetTriple) {
+    case "x86_64-unknown-linux-gnu":
+      hostTriple = "x86_64-unknown-linux-gnu"
+      break
+    case "aarch64-unknown-linux-gnu":
+      hostTriple = "x86_64-unknown-linux-gnu"
+      break
+    case "x86_64-unknown-linux-musl":
+      hostTriple = "x86_64-unknown-linux-gnu"
+      break
+    case "aarch64-unknown-linux-musl":
+      hostTriple = "x86_64-unknown-linux-musl"
+      break
+    default:
+      throw new Error(`Unsupported target triple: ${targetTriple}`)
+  }
+
   const targetArch = targetTriple.split("-")[0]
   // Cross-compilation if arch differs OR if target is musl (musl binaries can't run on glibc host)
   const isCrossCompile = platform === "linux" &&

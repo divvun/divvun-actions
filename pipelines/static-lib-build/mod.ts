@@ -274,7 +274,8 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       if (
         library === "icu4c" &&
         (targetTriple === "aarch64-apple-darwin" ||
-          targetTriple === "x86_64-unknown-linux-gnu" || targetTriple === "x86_64-unknown-linux-musl")
+          targetTriple === "x86_64-unknown-linux-gnu" ||
+          targetTriple === "x86_64-unknown-linux-musl")
       ) {
         commands.push(
           `bsdtar --gzip --options gzip:compression-level=9 -cf target/${library}-build_${targetTriple}.tar.gz -C target/${targetTriple} build/icu`,
@@ -283,7 +284,8 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       // For SLEEF x86_64 glibc (host build), also create build artifact
       if (
         library === "sleef" &&
-        targetTriple === "x86_64-unknown-linux-gnu" || targetTriple === "x86_64-unknown-linux-musl"
+          targetTriple === "x86_64-unknown-linux-gnu" ||
+        targetTriple === "x86_64-unknown-linux-musl"
       ) {
         commands.push(
           `bsdtar --gzip --options gzip:compression-level=9 -cf target/${library}-build_${targetTriple}.tar.gz -C target/${targetTriple} build/sleef`,
@@ -307,7 +309,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       "icu4c": [
         "aarch64-apple-darwin",
         "x86_64-unknown-linux-gnu",
-      ]
+      ],
     }
 
     const buildLib = buildTriples[library as keyof typeof buildTriples] ?? null
