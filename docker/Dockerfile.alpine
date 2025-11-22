@@ -1,0 +1,49 @@
+FROM rust:alpine
+
+# Add aarch64 Rust toolchain
+RUN rustup target add aarch64-unknown-linux-musl
+
+# Install x86_64-linux-musl cross-compiler from musl.cc
+RUN curl -fsSL https://musl.cc/x86_64-linux-musl-cross.tgz -o x86_64-musl-cross.tgz && \
+    tar -xzf x86_64-musl-cross.tgz -C /opt && \
+    rm x86_64-musl-cross.tgz
+
+# Install aarch64-linux-musl cross-compiler from musl.cc
+RUN curl -fsSL https://musl.cc/aarch64-linux-musl-cross.tgz -o aarch64-musl-cross.tgz && \
+    tar -xzf aarch64-musl-cross.tgz -C /opt && \
+    rm aarch64-musl-cross.tgz
+
+# Install Alpine packages
+RUN apk add --no-cache \
+    bash \
+    boost-dev \
+    build-base \
+    bison \
+    ca-certificates \
+    cmake \
+    curl \
+    deno \
+    flex \
+    git \
+    git-lfs \
+    icu-static \
+    libarchive-tools \
+    make \
+    ninja \
+    openssl-dev \
+    patchelf \
+    pkgconf \
+    protobuf \
+    rsync \
+    sqlite-dev \
+    tree \
+    unzip \
+    uv
+
+# Add musl toolchains to PATH
+ENV PATH="/opt/x86_64-linux-musl-cross/bin:/opt/aarch64-linux-musl-cross/bin:${PATH}"
+
+# Configure git-lfs
+RUN git lfs install
+
+WORKDIR /workspace
