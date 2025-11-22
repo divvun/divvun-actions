@@ -50,7 +50,7 @@ export async function buildSleef(options: BuildSleefOptions) {
   const platform = detectPlatform(target)
   const repoRoot = Deno.cwd()
   const sleefDir = path.join(repoRoot, "sleef")
-  const buildRoot = path.join(repoRoot, `target/${target}/build/sleef`)
+  const buildRoot = path.join(repoRoot, `build/${target}/sleef`)
   const installPrefix = path.join(repoRoot, `target/${target}/sleef`)
 
   const isAlpine = Deno.build.os === "linux" &&
@@ -245,7 +245,7 @@ export async function buildSleef(options: BuildSleefOptions) {
     // Host build is always glibc (since build environment is glibc)
     const nativeBuildDir = path.join(
       repoRoot,
-      `target/${hostTriple}/build/sleef`,
+      `build/${hostTriple}/sleef`,
     )
     cmakeArgs.push(`-DNATIVE_BUILD_DIR=${nativeBuildDir}`)
   }
