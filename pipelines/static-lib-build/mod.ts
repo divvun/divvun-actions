@@ -289,17 +289,25 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
 
     // Determine artifact paths
     const artifactPaths = [`target/${artifactName}`]
-    if (
-      library === "icu4c" &&
-      (targetTriple === "aarch64-apple-darwin" ||
-        targetTriple === "x86_64-unknown-linux-gnu")
-    ) {
-      artifactPaths.push(`target/${library}-build_${targetTriple}.tar.gz`)
+    const buildTriples = {
+      "sleef": [
+        "aarch64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
+        "x86_64-unknown-linux-musl",
+      ],
+      "protobuf": [
+        "aarch64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
+        "x86_64-unknown-linux-musl",
+      ],
+      "icu4c": [
+        "aarch64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
+      ]
     }
-    if (
-      library === "sleef" &&
-      targetTriple === "x86_64-unknown-linux-gnu"
-    ) {
+
+    const buildLib = buildTriples[library as keyof typeof buildTriples] ?? null
+    if buildLib != null && buildLib.includes(targetTriple) {
       artifactPaths.push(`target/${library}-build_${targetTriple}.tar.gz`)
     }
 

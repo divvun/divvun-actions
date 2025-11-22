@@ -8,8 +8,13 @@ export async function publishLibrary(library: string, version: string) {
   // Download all artifacts (both Unix and Windows path separators)
   await builder.downloadArtifacts(`target/${library}_*.tar.gz`, ".")
   await builder.downloadArtifacts(`target/${library}-build_*.tar.gz`, ".")
+
   try {
     await builder.downloadArtifacts(`target\\${library}_*.tar.gz`, ".")
+  } catch {
+    // Ignore errors from Windows-style paths if none exist
+  }
+  try {
     await builder.downloadArtifacts(`target\\${library}-build_*.tar.gz`, ".")
   } catch {
     // Ignore errors from Windows-style paths if none exist
