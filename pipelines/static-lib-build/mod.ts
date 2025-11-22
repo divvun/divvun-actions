@@ -151,12 +151,16 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
     } else if (library === "sleef") {
       if (
         targetTriple === "aarch64-unknown-linux-gnu" ||
-        targetTriple === "x86_64-unknown-linux-musl" ||
-        targetTriple === "aarch64-unknown-linux-musl"
+        targetTriple === "x86_64-unknown-linux-musl"
       ) {
         dependsOn = "sleef-x86_64-unknown-linux-gnu"
         hostArtifactName = "sleef_x86_64-unknown-linux-gnu.tar.gz"
         hostTargetDir = "x86_64-unknown-linux-gnu"
+      }
+      if (targetTriple === "aarch64-unknown-linux-musl") {
+        dependsOn = "sleef-x86_64-unknown-linux-musl"
+        hostArtifactName = "sleef_x86_64-unknown-linux-musl.tar.gz"
+        hostTargetDir = "x86_64-unknown-linux-musl"
       }
     } else if (library === "pytorch") {
       // PyTorch depends on cache download
@@ -270,7 +274,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       if (
         library === "icu4c" &&
         (targetTriple === "aarch64-apple-darwin" ||
-          targetTriple === "x86_64-unknown-linux-gnu")
+          targetTriple === "x86_64-unknown-linux-gnu" || targetTriple === "x86_64-unknown-linux-musl")
       ) {
         commands.push(
           `bsdtar --gzip --options gzip:compression-level=9 -cf target/${library}-build_${targetTriple}.tar.gz -C target/${targetTriple} build/icu`,
@@ -279,7 +283,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       // For SLEEF x86_64 glibc (host build), also create build artifact
       if (
         library === "sleef" &&
-        targetTriple === "x86_64-unknown-linux-gnu"
+        targetTriple === "x86_64-unknown-linux-gnu" || targetTriple === "x86_64-unknown-linux-musl"
       ) {
         commands.push(
           `bsdtar --gzip --options gzip:compression-level=9 -cf target/${library}-build_${targetTriple}.tar.gz -C target/${targetTriple} build/sleef`,
@@ -315,7 +319,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       label: `:package: ${library} ${targetTriple}`,
       key: `${library}-${targetTriple}`,
       depends_on: dependsOn,
-      command: commands.join("\n"),
+      command: commands,
       agents: library === "pytorch" && queue === "linux" &&
           targetTriple.includes("-musl")
         ? {
