@@ -3,16 +3,6 @@ FROM rust:alpine
 # Add aarch64 Rust toolchain
 RUN rustup target add aarch64-unknown-linux-musl
 
-# Install x86_64-linux-musl cross-compiler from musl.cc
-RUN curl -fsSL https://musl.cc/x86_64-linux-musl-cross.tgz -o x86_64-musl-cross.tgz && \
-    tar -xzf x86_64-musl-cross.tgz -C /opt && \
-    rm x86_64-musl-cross.tgz
-
-# Install aarch64-linux-musl cross-compiler from musl.cc
-RUN curl -fsSL https://musl.cc/aarch64-linux-musl-cross.tgz -o aarch64-musl-cross.tgz && \
-    tar -xzf aarch64-musl-cross.tgz -C /opt && \
-    rm aarch64-musl-cross.tgz
-
 # Install Alpine packages
 RUN apk add --no-cache \
     bash \
@@ -39,6 +29,16 @@ RUN apk add --no-cache \
     tree \
     unzip \
     uv
+
+# Install x86_64-linux-musl cross-compiler from musl.cc
+RUN curl -fsSL https://musl.cc/x86_64-linux-musl-cross.tgz -o x86_64-musl-cross.tgz && \
+    tar -xzf x86_64-musl-cross.tgz -C /opt && \
+    rm x86_64-musl-cross.tgz
+
+# Install aarch64-linux-musl cross-compiler from musl.cc
+RUN curl -fsSL https://musl.cc/aarch64-linux-musl-cross.tgz -o aarch64-musl-cross.tgz && \
+    tar -xzf aarch64-musl-cross.tgz -C /opt && \
+    rm aarch64-musl-cross.tgz
 
 # Add musl toolchains to PATH
 ENV PATH="/opt/x86_64-linux-musl-cross/bin:/opt/aarch64-linux-musl-cross/bin:${PATH}"
