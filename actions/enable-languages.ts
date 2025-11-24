@@ -13,11 +13,3 @@ export default async function enableLanguages({ tags }: Props) {
   script += `Set-WinUserLanguageList -LanguageList $langs;`
   await Powershell.runScript(script)
 }
-
-// async function run() {
-//   const tags = (await builder.getInput("tags", { required: true }))
-//     .split(",")
-//     .map((x) => x.trim())
-
-//   await enableLanguages({ tags })
-// }

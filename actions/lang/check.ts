@@ -28,7 +28,3 @@ export default async function langCheck() {
 
   logger.info("Tests passed")
 }
-
-// async function run() {
-//   await langCheck()
-// }

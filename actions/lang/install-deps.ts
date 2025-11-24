@@ -70,10 +70,3 @@ export default async function langInstallDeps({
   await Pipx.install(pipxPackages)
   await Ssh.cleanKnownHosts()
 }
-
-// async function run() {
-//   const requiresSudo = await getSudo()
-//   const requiresApertium = !!(await builder.getInput("apertium"))
-
-//   await langInstallDeps({ requiresSudo, requiresApertium })
-// }

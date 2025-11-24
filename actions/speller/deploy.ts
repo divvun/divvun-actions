@@ -215,31 +215,3 @@ export default async function spellerDeploy({
     Deno.exit(1)
   }
 }
-
-// async function run() {
-//   const spellerType = (await builder.getInput("speller-type", {
-//     required: true,
-//   })) as SpellerType
-//   const manifestPath = await builder.getInput("speller-manifest-path", {
-//     required: true,
-//   })
-//   const payloadPath = await builder.getInput("payload-path", {
-//     required: true,
-//   })
-//   const version = await builder.getInput("version", { required: true })
-//   const channel = (await builder.getInput("channel")) || null
-//   const nightlyChannel = await builder.getInput("nightly-channel", {
-//     required: true,
-//   })
-//   const pahkatRepo = await builder.getInput("repo", { required: true })
-
-//   await spellerDeploy({
-//     spellerType,
-//     manifestPath,
-//     payloadPath,
-//     version,
-//     channel,
-//     nightlyChannel,
-//     pahkatRepo,
-//   })
-// }

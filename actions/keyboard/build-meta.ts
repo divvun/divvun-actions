@@ -1,7 +1,7 @@
 import * as builder from "~/builder.ts"
 import { Kbdgen } from "~/util/shared.ts"
-import { KeyboardType } from "./types.ts"
 import logger from "../../util/log.ts"
+import { KeyboardType } from "./types.ts"
 
 export type Props = {
   keyboardType: KeyboardType
@@ -80,12 +80,3 @@ export default async function keyboardBuildMeta({
 
   return { payloadPath }
 }
-
-// async function run() {
-//   const keyboardType = (await builder.getInput("keyboard-type", {
-//     required: true,
-//   })) as KeyboardType
-//   const bundlePath = await builder.getInput("bundle-path", { required: true })
-
-//   await keyboardBuildMeta({ keyboardType, bundlePath })
-// }

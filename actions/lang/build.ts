@@ -291,36 +291,3 @@ export default async function langBuild(
 
   return { spellerPaths: null }
 }
-
-// async function run() {
-//   const requiresDesktopAsMobileWorkaround = Boolean(
-//     await builder.getInput("force-desktop-spellers-as-mobile"),
-//   )
-
-//   const config = await deriveInputs([
-//     "fst",
-//     "generators",
-//     "spellers",
-//     "hyphenators",
-//     "analysers",
-//     "grammar-checkers",
-//     "hyperminimalisation",
-//     "reversed-intersect",
-//     "two-step-intersect",
-//     "speller-optimisation",
-//     "backend-format",
-//     "force-all-tools",
-//     "minimised-spellers",
-//   ])
-
-//   const props = {
-//     requiresDesktopAsMobileWorkaround,
-//     ...config,
-//   } as Props
-
-//   const { spellerPaths: out } = await langBuild(props)
-
-//   if (out != null) {
-//     await builder.setOutput("speller-paths", JSON.stringify(out, null, 0))
-//   }
-// }

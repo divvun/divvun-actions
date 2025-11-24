@@ -32,9 +32,3 @@ export default async function createTxz({ filesPath }: Props): Promise<Output> {
   await Tar.createFlatTxz(input, outputTxz.path)
   return { txzPath: outputTxz.path }
 }
-
-// async function run() {
-//   const filesPath = await builder.getInput("path", { required: true })
-//   const { txzPath } = await createTxz({ filesPath })
-//   await builder.setOutput("txz-path", txzPath)
-// }

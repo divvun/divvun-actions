@@ -227,28 +227,3 @@ export default async function spellerBundle({
     payloadPath,
   }
 }
-
-// async function run() {
-//   const version = await builder.getInput("version", { required: true })
-//   const spellerType = (await builder.getInput("speller-type", {
-//     required: true,
-//   })) as SpellerType
-//   const manifest = toml.parse(
-//     await Deno.readFile(
-//       await builder.getInput("speller-manifest-path", { required: true }),
-//       "utf8",
-//     ),
-//   ) as SpellerManifest
-//   const spellerPaths = nonUndefinedProxy(
-//     JSON.parse(await builder.getInput("speller-paths", { required: true })),
-//     true,
-//   ) as SpellerPaths
-
-//   const { payloadPath } = await spellerBundle({
-//     version,
-//     spellerType,
-//     manifest,
-//     spellerPaths,
-//   })
-//   await builder.setOutput("payload-path", payloadPath)
-// }
