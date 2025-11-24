@@ -13,6 +13,7 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import { GitHub } from "~/util/github.ts"
+import { blake3Hash } from "~/util/hash.ts"
 import { versionAsDev } from "~/util/shared.ts"
 import spellerBundle from "../../actions/speller/bundle.ts"
 import { SpellerManifest, SpellerType } from "../../actions/speller/manifest.ts"
@@ -306,6 +307,18 @@ export async function runLangDeploy() {
     await Deno.rename(macosFiles, versionedMacosFile)
     await Deno.rename(mobileFiles, versionedMobileFile)
 
+    const windowsHash = await blake3Hash(versionedWindowsFile)
+    const macosHash = await blake3Hash(versionedMacosFile)
+    const mobileHash = await blake3Hash(versionedMobileFile)
+
+    const windowsHashFile = `${versionedWindowsFile}.blake3`
+    const macosHashFile = `${versionedMacosFile}.blake3`
+    const mobileHashFile = `${versionedMobileFile}.blake3`
+
+    await Deno.writeTextFile(windowsHashFile, windowsHash)
+    await Deno.writeTextFile(macosHashFile, macosHash)
+    await Deno.writeTextFile(mobileHashFile, mobileHash)
+
     logger.info(`Creating GitHub release for speller version ${tagVersion}`)
     logger.info(`Pre-release: ${prerelease}`)
     logger.info(
@@ -315,7 +328,14 @@ export async function runLangDeploy() {
     const gh = new GitHub(builder.env.repo)
     await gh.createRelease(
       builder.env.tag,
-      [versionedWindowsFile, versionedMacosFile, versionedMobileFile],
+      [
+        versionedWindowsFile,
+        versionedMacosFile,
+        versionedMobileFile,
+        windowsHashFile,
+        macosHashFile,
+        mobileHashFile,
+      ],
       { prerelease },
     )
 
@@ -351,6 +371,18 @@ export async function runLangDeploy() {
     await Deno.rename(macosFiles, versionedMacosFile)
     await Deno.rename(mobileFiles, versionedMobileFile)
 
+    const windowsHash = await blake3Hash(versionedWindowsFile)
+    const macosHash = await blake3Hash(versionedMacosFile)
+    const mobileHash = await blake3Hash(versionedMobileFile)
+
+    const windowsHashFile = `${versionedWindowsFile}.blake3`
+    const macosHashFile = `${versionedMacosFile}.blake3`
+    const mobileHashFile = `${versionedMobileFile}.blake3`
+
+    await Deno.writeTextFile(windowsHashFile, windowsHash)
+    await Deno.writeTextFile(macosHashFile, macosHash)
+    await Deno.writeTextFile(mobileHashFile, mobileHash)
+
     logger.info(
       `Creating dev-latest GitHub release for speller version ${devVersion}`,
     )
@@ -363,7 +395,14 @@ export async function runLangDeploy() {
     const gh = new GitHub(builder.env.repo)
     await gh.updateRelease(
       releaseTag,
-      [versionedWindowsFile, versionedMacosFile, versionedMobileFile],
+      [
+        versionedWindowsFile,
+        versionedMacosFile,
+        versionedMobileFile,
+        windowsHashFile,
+        macosHashFile,
+        mobileHashFile,
+      ],
       { draft: false, prerelease: true, name: releaseName },
     )
 
@@ -463,6 +502,15 @@ export async function runLangGrammarDeploy() {
     await Deno.rename(drbFile, versionedDrbFile)
     await Deno.rename(zcheckFile, versionedZcheckFile)
 
+    const drbHash = await blake3Hash(versionedDrbFile)
+    const zcheckHash = await blake3Hash(versionedZcheckFile)
+
+    const drbHashFile = `${versionedDrbFile}.blake3`
+    const zcheckHashFile = `${versionedZcheckFile}.blake3`
+
+    await Deno.writeTextFile(drbHashFile, drbHash)
+    await Deno.writeTextFile(zcheckHashFile, zcheckHash)
+
     logger.info(`Creating GitHub release for grammar version ${tagVersion}`)
     logger.info(`Pre-release: ${prerelease}`)
     logger.info(`Artifacts: ${versionedDrbFile}, ${versionedZcheckFile}`)
@@ -470,7 +518,7 @@ export async function runLangGrammarDeploy() {
     const gh = new GitHub(builder.env.repo)
     await gh.createRelease(
       builder.env.tag,
-      [versionedDrbFile, versionedZcheckFile],
+      [versionedDrbFile, versionedZcheckFile, drbHashFile, zcheckHashFile],
       { prerelease },
     )
 
@@ -491,6 +539,15 @@ export async function runLangGrammarDeploy() {
     await Deno.rename(drbFile, versionedDrbFile)
     await Deno.rename(zcheckFile, versionedZcheckFile)
 
+    const drbHash = await blake3Hash(versionedDrbFile)
+    const zcheckHash = await blake3Hash(versionedZcheckFile)
+
+    const drbHashFile = `${versionedDrbFile}.blake3`
+    const zcheckHashFile = `${versionedZcheckFile}.blake3`
+
+    await Deno.writeTextFile(drbHashFile, drbHash)
+    await Deno.writeTextFile(zcheckHashFile, zcheckHash)
+
     logger.info(
       `Creating dev-latest GitHub release for grammar version ${devVersion}`,
     )
@@ -501,7 +558,7 @@ export async function runLangGrammarDeploy() {
     const gh = new GitHub(builder.env.repo)
     await gh.updateRelease(
       releaseTag,
-      [versionedDrbFile, versionedZcheckFile],
+      [versionedDrbFile, versionedZcheckFile, drbHashFile, zcheckHashFile],
       { draft: false, prerelease: true, name: releaseName },
     )
 
