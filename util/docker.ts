@@ -57,7 +57,7 @@ export default class Docker {
 
   static async runAlpine(command: string[]) {
     await Docker.run(
-      "ghcr.io/divvun/divvun-actions:builder-alpine-latest",
+      "ghcr.io/divvun/divvun-actions:worker-alpine-latest",
       command,
     )
   }

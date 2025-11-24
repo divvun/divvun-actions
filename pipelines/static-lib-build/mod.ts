@@ -948,12 +948,12 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
           command({
             label: "Linux ARM64 musl: SLEEF",
             key: "linux-aarch64-musl-sleef",
-            depends_on: ["linux-x86_64-sleef"],
+            depends_on: ["linux-x86_64-musl-sleef"],
             command: [
               "set -e",
-              'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
-              "mkdir -p build/x86_64-unknown-linux-gnu",
-              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C .",
+              'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-musl.tar.gz" .',
+              "mkdir -p build/x86_64-unknown-linux-musl",
+              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-musl.tar.gz -C .",
               "divvun-actions run-alpine sleef-build aarch64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl sleef",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_aarch64-unknown-linux-musl.tar.gz -C build/aarch64-unknown-linux-musl sleef",
