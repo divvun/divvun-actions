@@ -234,7 +234,7 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
   const installPrefix = path.join(repoRoot, `target/${targetTriple}/pytorch`)
   const buildRoot = path.join(
     repoRoot,
-    `target/${targetTriple}/build/pytorch`,
+    `build/${targetTriple}/pytorch`,
   )
 
   if (clean) {

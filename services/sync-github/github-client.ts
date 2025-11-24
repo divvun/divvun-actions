@@ -1,4 +1,6 @@
+import { pooledMap } from "@std/async/pool"
 import { parseNextLinkHeader } from "./utils.ts"
+import { fetchGithub } from "./api.ts"
 import type {
   BuildkitePipeline,
   GithubRelease,
@@ -10,12 +12,17 @@ import type {
 export async function listGithubRepos(
   props: Required<SyncGithubProps["github"]>,
 ): Promise<GithubRepo[]> {
-  let responses: any[] = []
-  for (const org of props.orgs) {
-    const repos = await listGithubReposForOrg(props, org.name)
-    responses = [...responses, ...repos]
+  const allRepos: any[] = []
+  for await (
+    const repos of pooledMap(
+      3,
+      props.orgs,
+      (org) => listGithubReposForOrg(props, org.name),
+    )
+  ) {
+    allRepos.push(...repos)
   }
-  return responses.map((repo) => ({
+  return allRepos.map((repo) => ({
     name: repo.full_name,
     description: repo.description,
     url: repo.html_url,
@@ -38,10 +45,8 @@ async function listGithubReposForOrg(
   let responses: any[] = []
 
   while (nextUrl != null) {
-    const response = await fetch(nextUrl, {
+    const response = await fetchGithub(nextUrl, props.apiKey, {
       headers: {
-        Authorization: `Bearer ${props.apiKey}`,
-        "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
       },
     })
@@ -61,12 +66,11 @@ export async function listGithubWebhooks(
 ): Promise<GithubWebhook[]> {
   const [owner, repo] = repoName.split("/")
 
-  const response = await fetch(
+  const response = await fetchGithub(
     `https://api.github.com/repos/${owner}/${repo}/hooks`,
+    props.apiKey,
     {
       headers: {
-        Authorization: `Bearer ${props.apiKey}`,
-        "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
       },
     },
@@ -104,10 +108,8 @@ export async function listGithubReleases(
   let releases: GithubRelease[] = []
 
   while (nextUrl != null) {
-    const response = await fetch(nextUrl, {
+    const response = await fetchGithub(nextUrl, props.apiKey, {
       headers: {
-        Authorization: `Bearer ${props.apiKey}`,
-        "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
       },
     })
@@ -158,13 +160,12 @@ export async function createBuildkiteWebhook(
     },
   }
 
-  const response = await fetch(
+  const response = await fetchGithub(
     `https://api.github.com/repos/${owner}/${repo}/hooks`,
+    props.apiKey,
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${props.apiKey}`,
-        "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
         "Content-Type": "application/json",
       },

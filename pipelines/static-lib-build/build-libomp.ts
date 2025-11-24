@@ -51,7 +51,7 @@ export async function buildLibomp(options: BuildLibompOptions) {
 
   const repoRoot = Deno.cwd()
   const llvmProjectDir = path.join(repoRoot, "llvm-project")
-  const buildRoot = path.join(repoRoot, `target/${target}/build/openmp`)
+  const buildRoot = path.join(repoRoot, `build/${target}/openmp`)
   const installPrefix = path.join(repoRoot, `target/${target}/libomp`)
 
   // Detect cross-compilation

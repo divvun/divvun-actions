@@ -131,7 +131,7 @@ export async function buildPytorchMacos(options: BuildPytorchMacosOptions) {
   const installPrefix = path.join(repoRoot, `target/${targetTriple}/pytorch`)
   const buildRoot = path.join(
     repoRoot,
-    `target/${targetTriple}/build/pytorch`,
+    `build/${targetTriple}/pytorch`,
   )
 
   if (clean) {

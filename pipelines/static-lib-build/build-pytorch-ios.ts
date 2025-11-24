@@ -195,7 +195,7 @@ export async function buildPytorchIos(options: BuildPytorchIosOptions) {
   const installPrefix = path.join(repoRoot, `target/${targetTriple}/pytorch`)
   const buildRoot = path.join(
     repoRoot,
-    `target/${targetTriple}/build/pytorch`,
+    `build/${targetTriple}/pytorch`,
   )
 
   if (clean) {

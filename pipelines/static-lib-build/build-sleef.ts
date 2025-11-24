@@ -92,7 +92,8 @@ export async function buildSleef(options: BuildSleefOptions) {
   const targetArch = targetTriple.split("-")[0]
   // Cross-compilation if arch differs OR if target is musl (musl binaries can't run on glibc host)
   const isCrossCompile = platform === "linux" &&
-    (targetArch !== hostArch ||  hostTriple.includes("gnu") && targetTriple.includes("-musl"))
+    (targetArch !== hostArch ||
+      hostTriple.includes("gnu") && targetTriple.includes("-musl"))
 
   if (isCrossCompile) {
     console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)

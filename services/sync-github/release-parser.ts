@@ -1,4 +1,14 @@
+import * as semver from "@std/semver"
 import type { GithubRelease, PackageChannels } from "./types.ts"
+
+function isStableVersion(version: string): boolean {
+  try {
+    const parsed = semver.parse(version)
+    return parsed.major >= 1
+  } catch {
+    return false
+  }
+}
 
 export function parseReleasesByPackage(
   releases: GithubRelease[],
@@ -44,7 +54,11 @@ export function parseReleasesByPackage(
     if (release.prerelease && !pkg.beta) {
       pkg.beta = version
     } else if (!release.draft && !release.prerelease && !pkg.stable) {
-      pkg.stable = version
+      if (isStableVersion(version)) {
+        pkg.stable = version
+      } else if (!pkg.beta) {
+        pkg.beta = version
+      }
     }
   }
 

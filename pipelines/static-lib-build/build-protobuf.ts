@@ -48,7 +48,7 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
 
   const repoRoot = Deno.cwd()
   const protobufSourceDir = path.join(repoRoot, "protobuf")
-  const buildRoot = path.join(repoRoot, `target/${target}/build/protobuf`)
+  const buildRoot = path.join(repoRoot, `build/${target}/protobuf`)
   const installPrefix = path.join(repoRoot, `target/${target}/protobuf`)
 
   // Detect cross-compilation

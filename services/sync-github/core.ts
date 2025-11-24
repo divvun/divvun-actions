@@ -1,3 +1,4 @@
+import { pooledMap } from "@std/async/pool"
 import { listGithubRepos, listGithubWebhooks } from "./github-client.ts"
 import { listBuildkitePipelines } from "./buildkite-client.ts"
 import { assessStatus } from "./assessor.ts"
@@ -32,16 +33,25 @@ export async function getStatus(props: SyncGithubProps): Promise<SyncStatus[]> {
   console.log("🔄 Assessing sync status...")
   const results: SyncStatus[] = []
 
-  for (const repo of repos) {
-    console.log(`🔍 Checking ${repo.name}...`)
-    let webhooks: GithubWebhook[] = []
-    try {
-      webhooks = await listGithubWebhooks(githubProps, repo.name)
-    } catch (error) {
-      console.warn(`⚠️ Could not fetch webhooks for ${repo.name}: ${error}`)
-    }
+  for await (
+    const status of pooledMap(
+      5,
+      repos,
+      async (repo) => {
+        console.log(`🔍 Checking ${repo.name}...`)
+        let webhooks: GithubWebhook[] = []
+        try {
+          webhooks = await listGithubWebhooks(githubProps, repo.name)
+        } catch (error) {
+          console.warn(
+            `⚠️ Could not fetch webhooks for ${repo.name}: ${error}`,
+          )
+        }
 
-    const status = assessStatus(repo, pipelines, webhooks)
+        return assessStatus(repo, pipelines, webhooks)
+      },
+    )
+  ) {
     results.push(status)
   }
 
@@ -71,16 +81,25 @@ export async function syncAndFix(
   console.log("🔄 Assessing sync status...")
   const results: SyncStatus[] = []
 
-  for (const repo of repos) {
-    console.log(`🔍 Checking webhooks for ${repo.name}...`)
-    let webhooks: GithubWebhook[] = []
-    try {
-      webhooks = await listGithubWebhooks(githubProps, repo.name)
-    } catch (error) {
-      console.warn(`⚠️ Could not fetch webhooks for ${repo.name}: ${error}`)
-    }
+  for await (
+    const status of pooledMap(
+      5,
+      repos,
+      async (repo) => {
+        console.log(`🔍 Checking webhooks for ${repo.name}...`)
+        let webhooks: GithubWebhook[] = []
+        try {
+          webhooks = await listGithubWebhooks(githubProps, repo.name)
+        } catch (error) {
+          console.warn(
+            `⚠️ Could not fetch webhooks for ${repo.name}: ${error}`,
+          )
+        }
 
-    const status = assessStatus(repo, pipelines, webhooks)
+        return assessStatus(repo, pipelines, webhooks)
+      },
+    )
+  ) {
     results.push(status)
   }
 

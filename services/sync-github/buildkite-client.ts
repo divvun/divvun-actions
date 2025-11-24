@@ -1,4 +1,5 @@
 import { parseNextLinkHeader } from "./utils.ts"
+import { fetchBuildkite } from "./api.ts"
 import {
   BUILDKITE_CLUSTER_ID,
   type BuildkitePipeline,
@@ -15,14 +16,7 @@ export async function listBuildkitePipelines(
 
   while (nextUrl != null) {
     console.log(`Fetching pipelines from ${nextUrl}`)
-    const response = await fetch(
-      nextUrl,
-      {
-        headers: {
-          Authorization: `Bearer ${props.apiKey}`,
-        },
-      },
-    )
+    const response = await fetchBuildkite(nextUrl, props.apiKey)
 
     nextUrl = parseNextLinkHeader(response.headers.get("link"))
     const data = await response.json()
@@ -54,11 +48,11 @@ export async function createBuildkitePipeline(
   props: SyncGithubProps["buildkite"],
   repo: any,
 ) {
-  const response = await fetch(
+  const response = await fetchBuildkite(
     `https://api.buildkite.com/v2/organizations/${props.orgName}/pipelines`,
+    props.apiKey,
     {
       headers: {
-        Authorization: `Bearer ${props.apiKey}`,
         "Content-Type": "application/json",
       },
       method: "POST",
@@ -98,23 +92,17 @@ export async function updateBuildkitePipeline(
       }
     },
 ) {
-  const response = await fetch(
+  const response = await fetchBuildkite(
     `https://api.buildkite.com/v2/organizations/${props.orgName}/pipelines/${pipeline.slug}`,
+    props.apiKey,
     {
       headers: {
-        Authorization: `Bearer ${props.apiKey}`,
         "Content-Type": "application/json",
       },
       method: "PATCH",
       body: JSON.stringify(updates),
     },
   )
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to update pipeline ${pipeline.name}: ${response.status}`,
-    )
-  }
 
   return await response.json()
 }

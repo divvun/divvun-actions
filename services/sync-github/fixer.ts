@@ -1,3 +1,4 @@
+import { pooledMap } from "@std/async/pool"
 import { createBuildkiteWebhook } from "./github-client.ts"
 import {
   createBuildkitePipeline,
@@ -30,22 +31,30 @@ export async function applyFixes(
     r.discrepancies.some((d) => d.code === "no-webhook") && r.pipeline
   )
 
-  for (const result of noWebhooks) {
-    if (!result.pipeline) continue
+  for await (
+    const _result of pooledMap(
+      3,
+      noWebhooks,
+      async (result) => {
+        if (!result.pipeline) return
 
-    console.log(`🔗 Creating webhook for ${result.repoName}...`)
-    try {
-      const webhook = await createBuildkiteWebhook(
-        githubProps,
-        result.repoName,
-        result.pipeline,
-      )
-      console.log(`✅ Created webhook: ${webhook.config.url}`)
-    } catch (error) {
-      console.error(
-        `❌ Failed to create webhook for ${result.repoName}: ${error}`,
-      )
-    }
+        console.log(`🔗 Creating webhook for ${result.repoName}...`)
+        try {
+          const webhook = await createBuildkiteWebhook(
+            githubProps,
+            result.repoName,
+            result.pipeline,
+          )
+          console.log(`✅ Created webhook: ${webhook.config.url}`)
+        } catch (error) {
+          console.error(
+            `❌ Failed to create webhook for ${result.repoName}: ${error}`,
+          )
+        }
+      },
+    )
+  ) {
+    // pooledMap iteration
   }
 
   // Fix 3: Update branch configuration
@@ -54,32 +63,43 @@ export async function applyFixes(
     r.pipeline
   )
 
-  for (const result of noBranchConfig) {
-    if (!result.pipeline) continue
+  for await (
+    const _result of pooledMap(
+      3,
+      noBranchConfig,
+      async (result) => {
+        if (!result.pipeline) return
 
-    console.log(`🌿 Updating branch configuration for ${result.repoName}...`)
-    try {
-      let newBranchConfig = "!gh-pages"
+        console.log(
+          `🌿 Updating branch configuration for ${result.repoName}...`,
+        )
+        try {
+          let newBranchConfig = "!gh-pages"
 
-      // If there's an existing branch configuration, append to it
-      if (
-        result.pipeline.branch_configuration &&
-        result.pipeline.branch_configuration.trim()
-      ) {
-        newBranchConfig = `${result.pipeline.branch_configuration} !gh-pages`
-      }
+          // If there's an existing branch configuration, append to it
+          if (
+            result.pipeline.branch_configuration &&
+            result.pipeline.branch_configuration.trim()
+          ) {
+            newBranchConfig =
+              `${result.pipeline.branch_configuration} !gh-pages`
+          }
 
-      await updateBuildkitePipeline(
-        buildkiteProps,
-        result.pipeline,
-        { branch_configuration: newBranchConfig },
-      )
-      console.log(`✅ Updated branch configuration: ${newBranchConfig}`)
-    } catch (error) {
-      console.error(
-        `❌ Failed to update branch configuration for ${result.repoName}: ${error}`,
-      )
-    }
+          await updateBuildkitePipeline(
+            buildkiteProps,
+            result.pipeline,
+            { branch_configuration: newBranchConfig },
+          )
+          console.log(`✅ Updated branch configuration: ${newBranchConfig}`)
+        } catch (error) {
+          console.error(
+            `❌ Failed to update branch configuration for ${result.repoName}: ${error}`,
+          )
+        }
+      },
+    )
+  ) {
+    // pooledMap iteration
   }
 
   // Fix 4: Enable build_tags
@@ -87,22 +107,30 @@ export async function applyFixes(
     r.discrepancies.some((d) => d.code === "tags-not-enabled") && r.pipeline
   )
 
-  for (const result of tagsNotEnabled) {
-    if (!result.pipeline) continue
+  for await (
+    const _result of pooledMap(
+      3,
+      tagsNotEnabled,
+      async (result) => {
+        if (!result.pipeline) return
 
-    console.log(`🏷️  Enabling build_tags for ${result.repoName}...`)
-    try {
-      await updateBuildkitePipeline(
-        buildkiteProps,
-        result.pipeline,
-        { provider_settings: { build_tags: true } },
-      )
-      console.log(`✅ Enabled build_tags for ${result.repoName}`)
-    } catch (error) {
-      console.error(
-        `❌ Failed to enable build_tags for ${result.repoName}: ${error}`,
-      )
-    }
+        console.log(`🏷️  Enabling build_tags for ${result.repoName}...`)
+        try {
+          await updateBuildkitePipeline(
+            buildkiteProps,
+            result.pipeline,
+            { provider_settings: { build_tags: true } },
+          )
+          console.log(`✅ Enabled build_tags for ${result.repoName}`)
+        } catch (error) {
+          console.error(
+            `❌ Failed to enable build_tags for ${result.repoName}: ${error}`,
+          )
+        }
+      },
+    )
+  ) {
+    // pooledMap iteration
   }
 
   // Fix 5: Set build filter
@@ -110,26 +138,34 @@ export async function applyFixes(
     r.discrepancies.some((d) => d.code === "filter-not-set") && r.pipeline
   )
 
-  for (const result of filterNotSet) {
-    if (!result.pipeline) continue
+  for await (
+    const _result of pooledMap(
+      3,
+      filterNotSet,
+      async (result) => {
+        if (!result.pipeline) return
 
-    console.log(`🔍 Setting build filter for ${result.repoName}...`)
-    try {
-      await updateBuildkitePipeline(
-        buildkiteProps,
-        result.pipeline,
-        {
-          filter_enabled: true,
-          filter_condition:
-            `build.branch != "gh-pages" && build.tag !~ /dev-latest$/`,
-        },
-      )
-      console.log(`✅ Set build filter for ${result.repoName}`)
-    } catch (error) {
-      console.error(
-        `❌ Failed to set build filter for ${result.repoName}: ${error}`,
-      )
-    }
+        console.log(`🔍 Setting build filter for ${result.repoName}...`)
+        try {
+          await updateBuildkitePipeline(
+            buildkiteProps,
+            result.pipeline,
+            {
+              filter_enabled: true,
+              filter_condition:
+                `build.branch != "gh-pages" && build.tag !~ /dev-latest$/`,
+            },
+          )
+          console.log(`✅ Set build filter for ${result.repoName}`)
+        } catch (error) {
+          console.error(
+            `❌ Failed to set build filter for ${result.repoName}: ${error}`,
+          )
+        }
+      },
+    )
+  ) {
+    // pooledMap iteration
   }
 
   // Fix 6: Enable skip_queued_branch_builds
@@ -138,27 +174,37 @@ export async function applyFixes(
     r.pipeline
   )
 
-  for (const result of skipQueuedNotEnabled) {
-    if (!result.pipeline) continue
+  for await (
+    const _result of pooledMap(
+      3,
+      skipQueuedNotEnabled,
+      async (result) => {
+        if (!result.pipeline) return
 
-    console.log(
-      `⏭️  Enabling skip_queued_branch_builds for ${result.repoName}...`,
+        console.log(
+          `⏭️  Enabling skip_queued_branch_builds for ${result.repoName}...`,
+        )
+        try {
+          await updateBuildkitePipeline(
+            buildkiteProps,
+            result.pipeline,
+            {
+              skip_queued_branch_builds: true,
+              skip_queued_branch_builds_filter: null,
+            },
+          )
+          console.log(
+            `✅ Enabled skip_queued_branch_builds for ${result.repoName}`,
+          )
+        } catch (error) {
+          console.error(
+            `❌ Failed to enable skip_queued_branch_builds for ${result.repoName}: ${error}`,
+          )
+        }
+      },
     )
-    try {
-      await updateBuildkitePipeline(
-        buildkiteProps,
-        result.pipeline,
-        {
-          skip_queued_branch_builds: true,
-          skip_queued_branch_builds_filter: null,
-        },
-      )
-      console.log(`✅ Enabled skip_queued_branch_builds for ${result.repoName}`)
-    } catch (error) {
-      console.error(
-        `❌ Failed to enable skip_queued_branch_builds for ${result.repoName}: ${error}`,
-      )
-    }
+  ) {
+    // pooledMap iteration
   }
 
   // Fix 7: Sync maturity tags
@@ -168,32 +214,40 @@ export async function applyFixes(
     r.repo
   )
 
-  for (const result of maturityTagsMismatch) {
-    if (!result.pipeline || !result.repo) continue
+  for await (
+    const _result of pooledMap(
+      3,
+      maturityTagsMismatch,
+      async (result) => {
+        if (!result.pipeline || !result.repo) return
 
-    const expectedMaturityTag = extractMaturityTag(result.repo.topics)
-    if (!expectedMaturityTag) continue
+        const expectedMaturityTag = extractMaturityTag(result.repo.topics)
+        if (!expectedMaturityTag) return
 
-    console.log(`📦 Updating maturity tag for ${result.repoName}...`)
-    try {
-      // Remove old :package: tags and add the new one
-      const otherTags = result.pipeline.tags.filter((tag) =>
-        !tag.startsWith(":package: ")
-      )
-      const newTags = [...otherTags, expectedMaturityTag]
+        console.log(`📦 Updating maturity tag for ${result.repoName}...`)
+        try {
+          // Remove old :package: tags and add the new one
+          const otherTags = result.pipeline.tags.filter((tag) =>
+            !tag.startsWith(":package: ")
+          )
+          const newTags = [...otherTags, expectedMaturityTag]
 
-      await updateBuildkitePipeline(
-        buildkiteProps,
-        result.pipeline,
-        { tags: newTags },
-      )
-      console.log(
-        `✅ Updated maturity tag for ${result.repoName}: ${expectedMaturityTag}`,
-      )
-    } catch (error) {
-      console.error(
-        `❌ Failed to update maturity tag for ${result.repoName}: ${error}`,
-      )
-    }
+          await updateBuildkitePipeline(
+            buildkiteProps,
+            result.pipeline,
+            { tags: newTags },
+          )
+          console.log(
+            `✅ Updated maturity tag for ${result.repoName}: ${expectedMaturityTag}`,
+          )
+        } catch (error) {
+          console.error(
+            `❌ Failed to update maturity tag for ${result.repoName}: ${error}`,
+          )
+        }
+      },
+    )
+  ) {
+    // pooledMap iteration
   }
 }

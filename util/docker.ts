@@ -3,9 +3,11 @@ import * as fs from "@std/fs"
 import * as path from "@std/path"
 import { exec } from "~/builder.ts"
 import type { CommandStep } from "~/builder/pipeline.ts"
+import { projectPath } from "~/target.ts"
 import logger from "~/util/log.ts"
+import { exec as processExec } from "~/util/process.ts"
 import { Powershell } from "./shared.ts"
-import { makeTempDirSync } from "./temp.ts"
+import { makeTempDirSync, makeTempFile } from "./temp.ts"
 
 export default class Docker {
   static readonly DIVVUN_ACTIONS_PATH = path.resolve(
@@ -19,6 +21,45 @@ export default class Docker {
       )
     }
     return (await fs.exists("/actions")) && (await fs.exists("/workspace"))
+  }
+
+  static async run(image: string, command: string[]) {
+    await processExec("docker", ["pull", image])
+
+    const cwd = Deno.cwd()
+
+    // Collect BUILDKITE-prefixed environment variables
+    const envVars = Object.entries(Deno.env.toObject())
+      .filter(([key]) => key.startsWith("BUILDKITE"))
+      .map(([key, value]) => `${key}=${value}`)
+      .join("\n")
+
+    // Create temp file for env vars
+    using envFile = await makeTempFile()
+    await Deno.writeTextFile(envFile.path, envVars)
+
+    const args = [
+      "run",
+      "--rm",
+      "-it",
+      "-v",
+      `${cwd}:/workspace`,
+      "-v",
+      `${projectPath}:/actions:ro`,
+      "--env-file",
+      envFile.path,
+      image,
+      ...command,
+    ]
+
+    await processExec("docker", args)
+  }
+
+  static async runAlpine(command: string[]) {
+    await Docker.run(
+      "ghcr.io/divvun/divvun-actions:builder-alpine-latest",
+      command,
+    )
   }
 
   static async exec(

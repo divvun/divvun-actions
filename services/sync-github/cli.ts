@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-console
 import { parseArgs } from "@std/cli/parse-args"
+import { pooledMap } from "@std/async/pool"
 import { requiredArgs } from "./utils.ts"
 import { listGithubReleases, listGithubRepos } from "./github-client.ts"
 import { listBuildkitePipelines } from "./buildkite-client.ts"
@@ -101,21 +102,29 @@ if (import.meta.main) {
           {}
 
         console.log("\n🔍 Fetching releases for status.json...")
-        for (const result of results) {
-          console.log(`🔍 Checking releases for ${result.repoName}...`)
-          try {
-            const releases = await listGithubReleases(
-              githubProps,
-              result.repoName,
-            )
-            const packages = parseReleasesByPackage(releases)
-            releasesByRepo[result.repoName] = packages
-          } catch (error) {
-            console.warn(
-              `⚠️ Could not fetch releases for ${result.repoName}: ${error}`,
-            )
-            releasesByRepo[result.repoName] = {}
-          }
+        for await (
+          const { repoName, packages } of pooledMap(
+            5,
+            results,
+            async (result) => {
+              console.log(`🔍 Checking releases for ${result.repoName}...`)
+              try {
+                const releases = await listGithubReleases(
+                  githubProps,
+                  result.repoName,
+                )
+                const packages = parseReleasesByPackage(releases)
+                return { repoName: result.repoName, packages }
+              } catch (error) {
+                console.warn(
+                  `⚠️ Could not fetch releases for ${result.repoName}: ${error}`,
+                )
+                return { repoName: result.repoName, packages: {} }
+              }
+            },
+          )
+        ) {
+          releasesByRepo[repoName] = packages
         }
 
         await writeStatusJson(results, releasesByRepo, args.output)

@@ -278,7 +278,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
           targetTriple === "x86_64-unknown-linux-musl")
       ) {
         commands.push(
-          `bsdtar --gzip --options gzip:compression-level=9 -cf target/${library}-build_${targetTriple}.tar.gz -C target/${targetTriple} build/icu`,
+          `bsdtar --gzip --options gzip:compression-level=9 -cf target/${library}-build_${targetTriple}.tar.gz -C build/${targetTriple} icu`,
         )
       }
       // For SLEEF x86_64 glibc (host build), also create build artifact
@@ -288,7 +288,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
         targetTriple === "x86_64-unknown-linux-musl"
       ) {
         commands.push(
-          `bsdtar --gzip --options gzip:compression-level=9 -cf target/${library}-build_${targetTriple}.tar.gz -C target/${targetTriple} build/sleef`,
+          `bsdtar --gzip --options gzip:compression-level=9 -cf target/${library}-build_${targetTriple}.tar.gz -C build/${targetTriple} sleef`,
         )
       }
     }
@@ -398,7 +398,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               "divvun-actions run icu4c-build aarch64-apple-darwin",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin icu4c",
-              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin build/icu",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_aarch64-apple-darwin.tar.gz -C build/aarch64-apple-darwin icu",
             ].join("\n"),
             agents: {
               queue: "macos",
@@ -593,7 +593,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               "divvun-actions run icu4c-build x86_64-unknown-linux-gnu",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu icu4c",
-              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu build/icu",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C build/x86_64-unknown-linux-gnu icu",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -636,7 +636,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               "divvun-actions run sleef-build x86_64-unknown-linux-gnu",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu sleef",
-              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu build/sleef",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C build/x86_64-unknown-linux-gnu sleef",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -683,11 +683,11 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               'buildkite-agent artifact download "target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz" .',
-              "mkdir -p target/x86_64-unknown-linux-gnu",
-              "bsdtar -xf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+              "mkdir -p build/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C .",
               "divvun-actions run icu4c-build aarch64-unknown-linux-gnu",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu icu4c",
-              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu build/icu",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_aarch64-unknown-linux-gnu.tar.gz -C build/aarch64-unknown-linux-gnu icu",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -717,7 +717,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               "divvun-actions run protobuf-build aarch64-unknown-linux-gnu",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu protobuf",
-              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf-build_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu build/protobuf",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf-build_aarch64-unknown-linux-gnu.tar.gz -C build/aarch64-unknown-linux-gnu protobuf",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -734,11 +734,11 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
-              "mkdir -p target/x86_64-unknown-linux-gnu",
-              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+              "mkdir -p build/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C .",
               "divvun-actions run sleef-build aarch64-unknown-linux-gnu",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu sleef",
-              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu build/sleef",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_aarch64-unknown-linux-gnu.tar.gz -C build/aarch64-unknown-linux-gnu sleef",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -790,11 +790,11 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               'buildkite-agent artifact download "target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz" .',
-              "mkdir -p target/x86_64-unknown-linux-gnu",
-              "bsdtar -xf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+              "mkdir -p build/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C .",
               "divvun-actions run icu4c-build x86_64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl icu4c",
-              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl build/icu",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_x86_64-unknown-linux-musl.tar.gz -C build/x86_64-unknown-linux-musl icu",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -824,7 +824,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               "divvun-actions run protobuf-build x86_64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl protobuf",
-              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf-build_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl build/protobuf",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf-build_x86_64-unknown-linux-musl.tar.gz -C build/x86_64-unknown-linux-musl protobuf",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -841,11 +841,11 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
-              "mkdir -p target/x86_64-unknown-linux-gnu",
-              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+              "mkdir -p build/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C .",
               "divvun-actions run sleef-build x86_64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl sleef",
-              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl build/sleef",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_x86_64-unknown-linux-musl.tar.gz -C build/x86_64-unknown-linux-musl sleef",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -900,11 +900,11 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               'buildkite-agent artifact download "target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz" .',
-              "mkdir -p target/x86_64-unknown-linux-gnu",
-              "bsdtar -xf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+              "mkdir -p build/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C .",
               "divvun-actions run icu4c-build aarch64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl icu4c",
-              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl build/icu",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_aarch64-unknown-linux-musl.tar.gz -C build/aarch64-unknown-linux-musl icu",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -934,7 +934,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "set -e",
               "divvun-actions run protobuf-build aarch64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl protobuf",
-              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf-build_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl build/protobuf",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf-build_aarch64-unknown-linux-musl.tar.gz -C build/aarch64-unknown-linux-musl protobuf",
             ].join("\n"),
             agents: {
               queue: "linux",
@@ -951,11 +951,11 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             command: [
               "set -e",
               'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
-              "mkdir -p target/x86_64-unknown-linux-gnu",
-              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+              "mkdir -p build/x86_64-unknown-linux-gnu",
+              "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C .",
               "divvun-actions run sleef-build aarch64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl sleef",
-              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl build/sleef",
+              "bsdtar --gzip --options gzip:compression-level=9 -cf target/sleef-build_aarch64-unknown-linux-musl.tar.gz -C build/aarch64-unknown-linux-musl sleef",
             ].join("\n"),
             agents: {
               queue: "linux",

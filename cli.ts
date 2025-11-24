@@ -415,7 +415,7 @@ async function runCi(_args: any) {
       if (builder.env.repoName.startsWith("keyboard-")) {
         pipeline = pipelineDesktopKeyboard()
       } else if (builder.env.repoName.startsWith("lang-")) {
-        pipeline = pipelineLang()
+        pipeline = await pipelineLang()
       } else {
         throw new Error(`Unknown repo: ${builder.env.repoName}`)
       }

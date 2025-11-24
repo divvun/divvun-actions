@@ -517,13 +517,23 @@ const LARGE_BUILDS = [
   "lang-sme",
 ]
 
-export function pipelineLang() {
+export async function pipelineLang() {
   const isSpellerReleaseTag = SPELLER_RELEASE_TAG.test(builder.env.tag ?? "")
   const isGrammarReleaseTag = GRAMMAR_RELEASE_TAG.test(builder.env.tag ?? "")
   const isReleaseTag = isSpellerReleaseTag || isGrammarReleaseTag
 
   const extra: Record<string, string> =
     LARGE_BUILDS.includes(builder.env.repoName) ? { size: "large" } : {}
+
+  // Read build configuration to check if grammar-checkers are enabled
+  let buildConfig: BuildProps | undefined
+  try {
+    const yml = await Deno.readTextFile(".build-config.yml")
+    const config = await yaml.parse(yml) as any
+    buildConfig = config?.build as BuildProps | undefined
+  } catch {
+    // Config file not found or invalid, buildConfig remains undefined
+  }
 
   // Separate build steps for spellers and grammar checkers
   const spellerBuildStep = command({
@@ -562,7 +572,10 @@ export function pipelineLang() {
   // Build phase steps array
   const buildSteps: CommandStep[] = [spellerBuildStep]
 
-  if (isGrammarReleaseTag || !isSpellerReleaseTag) {
+  if (
+    buildConfig?.["grammar-checkers"] === true &&
+    (isGrammarReleaseTag || !isSpellerReleaseTag)
+  ) {
     buildSteps.push(grammarBuildStep)
   }
 
@@ -582,7 +595,10 @@ export function pipelineLang() {
       },
     }))
 
-    if (isGrammarReleaseTag || !isSpellerReleaseTag) {
+    if (
+      buildConfig?.["grammar-checkers"] === true &&
+      (isGrammarReleaseTag || !isSpellerReleaseTag)
+    ) {
       testSteps.push(command({
         key: "grammar-test",
         label: "Test Grammar Checkers",
@@ -632,7 +648,7 @@ export function pipelineLang() {
     }))
   }
 
-  if (isGrammarDeploy) {
+  if (buildConfig?.["grammar-checkers"] === true && isGrammarDeploy) {
     bundleSteps.push(command({
       label: "Bundle Grammar Checker",
       key: "grammar-bundle",
@@ -662,7 +678,7 @@ export function pipelineLang() {
     }))
   }
 
-  if (isGrammarDeploy) {
+  if (buildConfig?.["grammar-checkers"] === true && isGrammarDeploy) {
     deploySteps.push(command({
       label: `Deploy Grammar Checker (${
         isGrammarReleaseTag ? "Release" : "Dev"

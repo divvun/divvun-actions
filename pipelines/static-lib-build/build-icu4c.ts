@@ -179,7 +179,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   // For non-Windows platforms, use configure/make build
   const icuPlatform = getIcuPlatform(platform)
   const icuSourceDir = path.join(repoRoot, "icu/icu4c/source")
-  const buildRoot = path.join(repoRoot, `target/${target}/build/icu`)
+  const buildRoot = path.join(repoRoot, `build/${target}/icu`)
 
   // Set up compilers
   if (platform === "darwin") {
@@ -383,7 +383,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
 
     const hostBuildDir = path.join(
       repoRoot,
-      "target/aarch64-apple-darwin/build/icu",
+      "build/aarch64-apple-darwin/icu",
     )
     configureArgs.push("--host=aarch64-apple-ios")
     configureArgs.push(`--with-cross-build=${hostBuildDir}`)
@@ -413,7 +413,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     }
     const hostBuildDir = path.join(
       repoRoot,
-      "target/x86_64-unknown-linux-gnu/build/icu",
+      "build/x86_64-unknown-linux-gnu/icu",
     )
     configureArgs.push("--host=aarch64-linux-android")
     configureArgs.push(`--with-cross-build=${hostBuildDir}`)
@@ -428,7 +428,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     // Always use glibc host build (build environment is glibc)
     const hostBuildDir = path.join(
       repoRoot,
-      `target/${hostTriple}/build/icu`,
+      `build/${hostTriple}/icu`,
     )
     configureArgs.push(`--host=${targetTriple}`)
     configureArgs.push(`--with-cross-build=${hostBuildDir}`)
