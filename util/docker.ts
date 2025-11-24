@@ -31,7 +31,7 @@ export default class Docker {
     // Collect BUILDKITE-prefixed environment variables
     const envVars = Object.entries(Deno.env.toObject())
       .filter(([key]) => key.startsWith("BUILDKITE"))
-      .map(([key, value]) => `${key}=${value}`)
+      .map(([key, value]) => `${key}="${value.replace(/"/g, '\\"')}"`)
       .join("\n")
 
     // Create temp file for env vars
