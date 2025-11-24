@@ -117,9 +117,10 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
 
     const artifactName = `${library}_${targetTriple}.tar.gz`
 
+    const runCmd = targetTriple.includes("-musl") ? "run-alpine" : "run"
     const buildCmd = version
-      ? `divvun-actions run ${library}-build ${targetTriple} ${version}`
-      : `divvun-actions run ${library}-build ${targetTriple}`
+      ? `divvun-actions ${runCmd} ${library}-build ${targetTriple} ${version}`
+      : `divvun-actions ${runCmd} ${library}-build ${targetTriple}`
 
     // Determine cross-compilation dependencies for ICU4C
     let dependsOn: string | string[] | undefined
@@ -792,7 +793,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               'buildkite-agent artifact download "target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz" .',
               "mkdir -p build/x86_64-unknown-linux-gnu",
               "bsdtar -xf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C .",
-              "divvun-actions run icu4c-build x86_64-unknown-linux-musl",
+              "divvun-actions run-alpine icu4c-build x86_64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl icu4c",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_x86_64-unknown-linux-musl.tar.gz -C build/x86_64-unknown-linux-musl icu",
             ].join("\n"),
@@ -809,7 +810,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             key: "linux-x86_64-musl-libomp",
             command: [
               "set -e",
-              "divvun-actions run libomp-build x86_64-unknown-linux-musl",
+              "divvun-actions run-alpine libomp-build x86_64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/libomp_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl libomp",
             ].join("\n"),
             agents: {
@@ -822,7 +823,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             key: "linux-x86_64-musl-protobuf",
             command: [
               "set -e",
-              "divvun-actions run protobuf-build x86_64-unknown-linux-musl",
+              "divvun-actions run-alpine protobuf-build x86_64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl protobuf",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf-build_x86_64-unknown-linux-musl.tar.gz -C build/x86_64-unknown-linux-musl protobuf",
             ].join("\n"),
@@ -879,7 +880,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "bsdtar -xf target/sleef_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
               'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
               "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
-              "divvun-actions run pytorch-build x86_64-unknown-linux-musl",
+              "divvun-actions run-alpine pytorch-build x86_64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/pytorch_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl pytorch",
             ].join("\n"),
             agents: {
@@ -902,7 +903,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               'buildkite-agent artifact download "target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz" .',
               "mkdir -p build/x86_64-unknown-linux-gnu",
               "bsdtar -xf target/icu4c-build_x86_64-unknown-linux-gnu.tar.gz -C .",
-              "divvun-actions run icu4c-build aarch64-unknown-linux-musl",
+              "divvun-actions run-alpine icu4c-build aarch64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl icu4c",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/icu4c-build_aarch64-unknown-linux-musl.tar.gz -C build/aarch64-unknown-linux-musl icu",
             ].join("\n"),
@@ -919,7 +920,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             key: "linux-aarch64-musl-libomp",
             command: [
               "set -e",
-              "divvun-actions run libomp-build aarch64-unknown-linux-musl",
+              "divvun-actions run-alpine libomp-build aarch64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/libomp_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl libomp",
             ].join("\n"),
             agents: {
@@ -932,7 +933,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             key: "linux-aarch64-musl-protobuf",
             command: [
               "set -e",
-              "divvun-actions run protobuf-build aarch64-unknown-linux-musl",
+              "divvun-actions run-alpine protobuf-build aarch64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl protobuf",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/protobuf-build_aarch64-unknown-linux-musl.tar.gz -C build/aarch64-unknown-linux-musl protobuf",
             ].join("\n"),
@@ -989,7 +990,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
               "bsdtar -xf target/sleef_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl",
               'buildkite-agent artifact download "target/sleef-build_x86_64-unknown-linux-gnu.tar.gz" .',
               "bsdtar -xf target/sleef-build_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
-              "divvun-actions run pytorch-build aarch64-unknown-linux-musl",
+              "divvun-actions run-alpine pytorch-build aarch64-unknown-linux-musl",
               "bsdtar --gzip --options gzip:compression-level=9 -cf target/pytorch_aarch64-unknown-linux-musl.tar.gz -C target/aarch64-unknown-linux-musl pytorch",
             ].join("\n"),
             agents: {
