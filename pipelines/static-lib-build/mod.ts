@@ -262,13 +262,15 @@ function createPyTorchSetupCommands(targetTriple: string): string[] {
       const hostTriple = "x86_64-unknown-linux-gnu"
       commands.push(
         `buildkite-agent artifact download "target/sleef-build_${hostTriple}.tar.gz" .`,
-        `bsdtar -xf target/sleef-build_${hostTriple}.tar.gz -C target/${hostTriple}`,
+        `mkdir -p build/${hostTriple}`,
+        `bsdtar -xf target/sleef-build_${hostTriple}.tar.gz -C build/${hostTriple}`,
       )
     } else if (targetTriple === "aarch64-unknown-linux-musl") {
       const hostTriple = "x86_64-unknown-linux-musl"
       commands.push(
         `buildkite-agent artifact download "target/sleef-build_${hostTriple}.tar.gz" .`,
-        `bsdtar -xf target/sleef-build_${hostTriple}.tar.gz -C target/${hostTriple}`,
+        `mkdir -p build/${hostTriple}`,
+        `bsdtar -xf target/sleef-build_${hostTriple}.tar.gz -C build/${hostTriple}`,
       )
     }
     // x86_64 targets (gnu and musl) are native builds - no host SLEEF needed
