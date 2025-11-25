@@ -647,7 +647,8 @@ export async function runLangTtsTextprocDeploy() {
       const basename = file.split("/").pop()!
       const ext = basename.includes(".") ? "." + basename.split(".").pop() : ""
       const nameWithoutExt = ext ? basename.slice(0, -ext.length) : basename
-      const versionedName = `${packageName}_${versionWithBuild}_${nameWithoutExt}${ext}`
+      const versionedName =
+        `${packageName}_${versionWithBuild}_${nameWithoutExt}${ext}`
 
       await Deno.rename(file, versionedName)
       versionedFiles.push(versionedName)
@@ -658,7 +659,9 @@ export async function runLangTtsTextprocDeploy() {
       hashFiles.push(hashFile)
     }
 
-    logger.info(`Creating GitHub release for TTS text processor version ${tagVersion}`)
+    logger.info(
+      `Creating GitHub release for TTS text processor version ${tagVersion}`,
+    )
     logger.info(`Pre-release: ${prerelease}`)
     logger.info(`Artifacts: ${versionedFiles.join(", ")}`)
 
@@ -672,7 +675,8 @@ export async function runLangTtsTextprocDeploy() {
     logger.info("TTS text processor GitHub release created successfully")
   } else if (isMainBranch) {
     const devVersion = versionAsDev(
-      manifest.package["tts-textproc"]?.version ?? manifest.package.speller.version,
+      manifest.package["tts-textproc"]?.version ??
+        manifest.package.speller.version,
       builder.env.buildTimestamp,
       builder.env.buildNumber,
     )
@@ -687,7 +691,8 @@ export async function runLangTtsTextprocDeploy() {
       const basename = file.split("/").pop()!
       const ext = basename.includes(".") ? "." + basename.split(".").pop() : ""
       const nameWithoutExt = ext ? basename.slice(0, -ext.length) : basename
-      const versionedName = `${packageName}_${devVersion}_${nameWithoutExt}${ext}`
+      const versionedName =
+        `${packageName}_${devVersion}_${nameWithoutExt}${ext}`
 
       await Deno.rename(file, versionedName)
       versionedFiles.push(versionedName)
@@ -712,7 +717,9 @@ export async function runLangTtsTextprocDeploy() {
       { draft: false, prerelease: true, name: releaseName },
     )
 
-    logger.info("TTS text processor dev-latest GitHub release updated successfully")
+    logger.info(
+      "TTS text processor dev-latest GitHub release updated successfully",
+    )
   }
 }
 
@@ -725,8 +732,11 @@ const LARGE_BUILDS = [
 export async function pipelineLang() {
   const isSpellerReleaseTag = SPELLER_RELEASE_TAG.test(builder.env.tag ?? "")
   const isGrammarReleaseTag = GRAMMAR_RELEASE_TAG.test(builder.env.tag ?? "")
-  const isTtsTextprocReleaseTag = TTS_TEXTPROC_RELEASE_TAG.test(builder.env.tag ?? "")
-  const isReleaseTag = isSpellerReleaseTag || isGrammarReleaseTag || isTtsTextprocReleaseTag
+  const isTtsTextprocReleaseTag = TTS_TEXTPROC_RELEASE_TAG.test(
+    builder.env.tag ?? "",
+  )
+  const isReleaseTag = isSpellerReleaseTag || isGrammarReleaseTag ||
+    isTtsTextprocReleaseTag
 
   const extra: Record<string, string> =
     LARGE_BUILDS.includes(builder.env.repoName) ? { size: "large" } : {}
@@ -788,7 +798,8 @@ export async function pipelineLang() {
   // We only deploy on main branch or release tags
   const isSpellerDeploy = isSpellerReleaseTag || builder.env.branch === "main"
   const isGrammarDeploy = isGrammarReleaseTag || builder.env.branch === "main"
-  const isTtsTextprocDeploy = isTtsTextprocReleaseTag || builder.env.branch === "main"
+  const isTtsTextprocDeploy = isTtsTextprocReleaseTag ||
+    builder.env.branch === "main"
 
   // Build phase steps array
   const buildSteps: CommandStep[] = [spellerBuildStep]

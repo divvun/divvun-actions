@@ -12,14 +12,14 @@ type LibraryType = "icu4c" | "libomp" | "protobuf" | "sleef" | "pytorch"
 
 interface CrossCompilationRule {
   hostTarget: string
-  hostArtifacts?: string[]  // Specific artifacts to download (e.g., for PyTorch)
+  hostArtifacts?: string[] // Specific artifacts to download (e.g., for PyTorch)
 }
 
 interface LibraryConfig {
   platforms: string[]
-  createsBuildArtifacts?: boolean  // Whether this library creates -build artifacts for cross-compilation
+  createsBuildArtifacts?: boolean // Whether this library creates -build artifacts for cross-compilation
   crossCompilationRules?: Record<string, CrossCompilationRule>
-  defaultVersions?: { protobuf?: string; sleef?: string }  // For PyTorch dependencies
+  defaultVersions?: { protobuf?: string; sleef?: string } // For PyTorch dependencies
 }
 
 const LIBRARY_CONFIGS: Record<LibraryType, LibraryConfig> = {
@@ -39,8 +39,7 @@ const LIBRARY_CONFIGS: Record<LibraryType, LibraryConfig> = {
       "aarch64-apple-ios": { hostTarget: "aarch64-apple-darwin" },
       "aarch64-linux-android": { hostTarget: "x86_64-unknown-linux-gnu" },
       "aarch64-unknown-linux-gnu": { hostTarget: "x86_64-unknown-linux-gnu" },
-      "x86_64-unknown-linux-musl": { hostTarget: "x86_64-unknown-linux-gnu" },
-      "aarch64-unknown-linux-musl": { hostTarget: "x86_64-unknown-linux-gnu" },
+      "aarch64-unknown-linux-musl": { hostTarget: "x86_64-unknown-linux-musl" },
     },
   },
   libomp: {
@@ -75,7 +74,6 @@ const LIBRARY_CONFIGS: Record<LibraryType, LibraryConfig> = {
     createsBuildArtifacts: true,
     crossCompilationRules: {
       "aarch64-unknown-linux-gnu": { hostTarget: "x86_64-unknown-linux-gnu" },
-      "x86_64-unknown-linux-musl": { hostTarget: "x86_64-unknown-linux-gnu" },
       "aarch64-unknown-linux-musl": { hostTarget: "x86_64-unknown-linux-musl" },
     },
   },
@@ -137,7 +135,11 @@ function getCrossCompilationInfo(library: LibraryType, targetTriple: string) {
   const rule = config.crossCompilationRules?.[targetTriple]
 
   if (!rule) {
-    return { dependsOn: undefined, hostArtifactName: undefined, hostTargetDir: undefined }
+    return {
+      dependsOn: undefined,
+      hostArtifactName: undefined,
+      hostTargetDir: undefined,
+    }
   }
 
   const hostTarget = rule.hostTarget
@@ -154,7 +156,10 @@ function getCrossCompilationInfo(library: LibraryType, targetTriple: string) {
 }
 
 // Helper to determine if this build should create a -build artifact (for use as host build in cross-compilation)
-function shouldCreateBuildArtifact(library: LibraryType, targetTriple: string): boolean {
+function shouldCreateBuildArtifact(
+  library: LibraryType,
+  targetTriple: string,
+): boolean {
   const config = LIBRARY_CONFIGS[library]
 
   // Only libraries marked as creating build artifacts do so
@@ -187,6 +192,32 @@ interface BuildStepOptions {
   commandPrefix?: string
 }
 
+// Helper to get PyTorch dependencies on protobuf and sleef build steps
+function getPyTorchDependencies(targetTriple: string): string[] {
+  if (!targetTriple.includes("linux") || targetTriple.includes("android")) {
+    return []
+  }
+
+  const deps: string[] = []
+
+  // Target protobuf
+  deps.push(`protobuf-${targetTriple}`)
+
+  // Target sleef
+  deps.push(`sleef-${targetTriple}`)
+
+  // Cross-compilation needs host builds
+  if (targetTriple === "aarch64-unknown-linux-gnu") {
+    deps.push(`protobuf-x86_64-unknown-linux-gnu`)
+    deps.push(`sleef-x86_64-unknown-linux-gnu`)
+  } else if (targetTriple === "aarch64-unknown-linux-musl") {
+    deps.push(`sleef-x86_64-unknown-linux-musl`)
+  }
+  // x86_64-unknown-linux-musl and x86_64-unknown-linux-gnu are native builds - no extra deps
+
+  return deps
+}
+
 // Helper to create PyTorch-specific setup commands (protobuf + SLEEF downloads)
 function createPyTorchSetupCommands(targetTriple: string): string[] {
   const config = LIBRARY_CONFIGS.pytorch
@@ -201,12 +232,14 @@ function createPyTorchSetupCommands(targetTriple: string): string[] {
 
   // For Linux builds, download protobuf and SLEEF dependencies
   if (targetTriple.includes("linux") && !targetTriple.includes("android")) {
-    // Always need x86_64-gnu host protobuf for build tools
-    commands.push(
-      `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
-      "mkdir -p target/x86_64-unknown-linux-gnu",
-      "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
-    )
+    // For GNU cross-compilation (aarch64-gnu), need host protobuf from GitHub release
+    if (targetTriple === "aarch64-unknown-linux-gnu") {
+      commands.push(
+        `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
+        "mkdir -p target/x86_64-unknown-linux-gnu",
+        "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+      )
+    }
 
     // Download target protobuf
     commands.push(
@@ -222,20 +255,34 @@ function createPyTorchSetupCommands(targetTriple: string): string[] {
     )
 
     // For cross-compilation, also need host SLEEF build tools
-    if (targetTriple.includes("-musl") || targetTriple === "aarch64-unknown-linux-gnu") {
+    if (targetTriple === "aarch64-unknown-linux-gnu") {
       const hostTriple = "x86_64-unknown-linux-gnu"
       commands.push(
         `buildkite-agent artifact download "target/sleef-build_${hostTriple}.tar.gz" .`,
         `bsdtar -xf target/sleef-build_${hostTriple}.tar.gz -C target/${hostTriple}`,
       )
+    } else if (targetTriple === "aarch64-unknown-linux-musl") {
+      const hostTriple = "x86_64-unknown-linux-musl"
+      commands.push(
+        `buildkite-agent artifact download "target/sleef-build_${hostTriple}.tar.gz" .`,
+        `bsdtar -xf target/sleef-build_${hostTriple}.tar.gz -C target/${hostTriple}`,
+      )
     }
+    // x86_64 targets (gnu and musl) are native builds - no host SLEEF needed
   }
 
   return commands
 }
 
 function createLibraryBuildStep(options: BuildStepOptions): CommandStep {
-  const { library, target: targetTriple, version, extraDependencies, priority, largeAgent } = options
+  const {
+    library,
+    target: targetTriple,
+    version,
+    extraDependencies,
+    priority,
+    largeAgent,
+  } = options
 
   // Determine queue based on platform
   // musl targets go to dedicated Alpine agents
@@ -252,15 +299,22 @@ function createLibraryBuildStep(options: BuildStepOptions): CommandStep {
     : `divvun-actions run ${library}-build ${targetTriple}`
 
   // Get cross-compilation dependencies
-  const { dependsOn: crossCompDep, hostArtifactName, hostTargetDir } = getCrossCompilationInfo(library, targetTriple)
+  const { dependsOn: crossCompDep, hostArtifactName, hostTargetDir } =
+    getCrossCompilationInfo(library, targetTriple)
 
-  // Combine dependencies
+  // Get PyTorch-specific dependencies (protobuf and sleef)
+  const pytorchDeps = library === "pytorch"
+    ? getPyTorchDependencies(targetTriple)
+    : []
+
+  // Combine all dependencies
+  const allExtraDeps = [...(extraDependencies || []), ...pytorchDeps]
   let dependsOn: string | string[] | undefined = crossCompDep
-  if (extraDependencies && extraDependencies.length > 0) {
+  if (allExtraDeps.length > 0) {
     if (crossCompDep) {
-      dependsOn = [crossCompDep, ...extraDependencies]
+      dependsOn = [crossCompDep, ...allExtraDeps]
     } else {
-      dependsOn = extraDependencies.length === 1 ? extraDependencies[0] : extraDependencies
+      dependsOn = allExtraDeps.length === 1 ? allExtraDeps[0] : allExtraDeps
     }
   }
 
@@ -281,7 +335,9 @@ function createLibraryBuildStep(options: BuildStepOptions): CommandStep {
     )
   }
 
-  commands.push(options.commandPrefix ? `${options.commandPrefix} ${buildCmd}` : buildCmd)
+  commands.push(
+    options.commandPrefix ? `${options.commandPrefix} ${buildCmd}` : buildCmd,
+  )
 
   // Create artifacts
   const artifactName = `${library}_${targetTriple}.tar.gz`
@@ -404,25 +460,44 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
     return generateReleasePipeline(releaseTag)
   }
 
-  type LibBuild = { lib: LibraryType; target: string; deps?: string[]; env?: Record<string, string>; commandPrefix?: string }
+  type LibBuild = {
+    lib: LibraryType
+    target: string
+    deps?: string[]
+    env?: Record<string, string>
+    commandPrefix?: string
+  }
 
   const macosBuilds: LibBuild[] = [
     { lib: "icu4c", target: "aarch64-apple-darwin" },
     { lib: "libomp", target: "aarch64-apple-darwin" },
     { lib: "protobuf", target: "aarch64-apple-darwin" },
-    { lib: "pytorch", target: "aarch64-apple-darwin", deps: ["pytorch-cache-download"] },
+    {
+      lib: "pytorch",
+      target: "aarch64-apple-darwin",
+      deps: ["pytorch-cache-download"],
+    },
   ]
 
   const iosBuilds: LibBuild[] = [
     { lib: "icu4c", target: "aarch64-apple-ios" },
     { lib: "protobuf", target: "aarch64-apple-ios" },
-    { lib: "pytorch", target: "aarch64-apple-ios", deps: ["pytorch-cache-download"] },
+    {
+      lib: "pytorch",
+      target: "aarch64-apple-ios",
+      deps: ["pytorch-cache-download"],
+    },
   ]
 
   const androidBuilds: LibBuild[] = [
     { lib: "icu4c", target: "aarch64-linux-android" },
     { lib: "protobuf", target: "aarch64-linux-android" },
-    { lib: "pytorch", target: "aarch64-linux-android", deps: ["pytorch-cache-download"], commandPrefix: "ANDROID_NDK=$ANDROID_NDK_HOME" },
+    {
+      lib: "pytorch",
+      target: "aarch64-linux-android",
+      deps: ["pytorch-cache-download"],
+      commandPrefix: "ANDROID_NDK=$ANDROID_NDK_HOME",
+    },
   ]
 
   const linuxGnuX64Builds: LibBuild[] = [
@@ -430,7 +505,11 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
     { lib: "libomp", target: "x86_64-unknown-linux-gnu" },
     { lib: "protobuf", target: "x86_64-unknown-linux-gnu" },
     { lib: "sleef", target: "x86_64-unknown-linux-gnu" },
-    { lib: "pytorch", target: "x86_64-unknown-linux-gnu", deps: ["pytorch-cache-download"] },
+    {
+      lib: "pytorch",
+      target: "x86_64-unknown-linux-gnu",
+      deps: ["pytorch-cache-download"],
+    },
   ]
 
   const linuxGnuArm64Builds: LibBuild[] = [
@@ -438,7 +517,11 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
     { lib: "libomp", target: "aarch64-unknown-linux-gnu" },
     { lib: "protobuf", target: "aarch64-unknown-linux-gnu" },
     { lib: "sleef", target: "aarch64-unknown-linux-gnu" },
-    { lib: "pytorch", target: "aarch64-unknown-linux-gnu", deps: ["pytorch-cache-download"] },
+    {
+      lib: "pytorch",
+      target: "aarch64-unknown-linux-gnu",
+      deps: ["pytorch-cache-download"],
+    },
   ]
 
   const linuxMuslX64Builds: LibBuild[] = [
@@ -446,7 +529,11 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
     { lib: "libomp", target: "x86_64-unknown-linux-musl" },
     { lib: "protobuf", target: "x86_64-unknown-linux-musl" },
     { lib: "sleef", target: "x86_64-unknown-linux-musl" },
-    { lib: "pytorch", target: "x86_64-unknown-linux-musl", deps: ["pytorch-cache-download"] },
+    {
+      lib: "pytorch",
+      target: "x86_64-unknown-linux-musl",
+      deps: ["pytorch-cache-download"],
+    },
   ]
 
   const linuxMuslArm64Builds: LibBuild[] = [
@@ -454,11 +541,19 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
     { lib: "libomp", target: "aarch64-unknown-linux-musl" },
     { lib: "protobuf", target: "aarch64-unknown-linux-musl" },
     { lib: "sleef", target: "aarch64-unknown-linux-musl" },
-    { lib: "pytorch", target: "aarch64-unknown-linux-musl", deps: ["pytorch-cache-download"] },
+    {
+      lib: "pytorch",
+      target: "aarch64-unknown-linux-musl",
+      deps: ["pytorch-cache-download"],
+    },
   ]
 
   const windowsBuilds: LibBuild[] = [
-    { lib: "icu4c", target: "x86_64-pc-windows-msvc", env: { MSYSTEM: "CLANG64" } },
+    {
+      lib: "icu4c",
+      target: "x86_64-pc-windows-msvc",
+      env: { MSYSTEM: "CLANG64" },
+    },
   ]
 
   const pipeline: BuildkitePipeline = {
@@ -476,87 +571,103 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       }),
       {
         group: ":apple: macOS Builds",
-        steps: macosBuilds.map((b) => createLibraryBuildStep({
-          library: b.lib,
-          target: b.target,
-          extraDependencies: b.deps,
-          env: b.env,
-          commandPrefix: b.commandPrefix,
-        })),
+        steps: macosBuilds.map((b) =>
+          createLibraryBuildStep({
+            library: b.lib,
+            target: b.target,
+            extraDependencies: b.deps,
+            env: b.env,
+            commandPrefix: b.commandPrefix,
+          })
+        ),
       },
       {
         group: ":iphone: iOS Builds",
-        steps: iosBuilds.map((b) => createLibraryBuildStep({
-          library: b.lib,
-          target: b.target,
-          extraDependencies: b.deps,
-          env: b.env,
-          commandPrefix: b.commandPrefix,
-        })),
+        steps: iosBuilds.map((b) =>
+          createLibraryBuildStep({
+            library: b.lib,
+            target: b.target,
+            extraDependencies: b.deps,
+            env: b.env,
+            commandPrefix: b.commandPrefix,
+          })
+        ),
       },
       {
         group: ":android: Android Builds",
-        steps: androidBuilds.map((b) => createLibraryBuildStep({
-          library: b.lib,
-          target: b.target,
-          extraDependencies: b.deps,
-          env: b.env,
-          commandPrefix: b.commandPrefix,
-        })),
+        steps: androidBuilds.map((b) =>
+          createLibraryBuildStep({
+            library: b.lib,
+            target: b.target,
+            extraDependencies: b.deps,
+            env: b.env,
+            commandPrefix: b.commandPrefix,
+          })
+        ),
       },
       {
         group: ":linux: Linux GNU x86_64 Builds",
-        steps: linuxGnuX64Builds.map((b) => createLibraryBuildStep({
-          library: b.lib,
-          target: b.target,
-          extraDependencies: b.deps,
-          env: b.env,
-          commandPrefix: b.commandPrefix,
-        })),
+        steps: linuxGnuX64Builds.map((b) =>
+          createLibraryBuildStep({
+            library: b.lib,
+            target: b.target,
+            extraDependencies: b.deps,
+            env: b.env,
+            commandPrefix: b.commandPrefix,
+          })
+        ),
       },
       {
         group: ":linux: Linux GNU ARM64 Builds",
-        steps: linuxGnuArm64Builds.map((b) => createLibraryBuildStep({
-          library: b.lib,
-          target: b.target,
-          extraDependencies: b.deps,
-          env: b.env,
-          commandPrefix: b.commandPrefix,
-        })),
+        steps: linuxGnuArm64Builds.map((b) =>
+          createLibraryBuildStep({
+            library: b.lib,
+            target: b.target,
+            extraDependencies: b.deps,
+            env: b.env,
+            commandPrefix: b.commandPrefix,
+          })
+        ),
       },
       {
         group: ":linux: Linux musl x86_64 Builds",
-        steps: linuxMuslX64Builds.map((b) => createLibraryBuildStep({
-          library: b.lib,
-          target: b.target,
-          extraDependencies: b.deps,
-          env: b.env,
-          commandPrefix: b.commandPrefix,
-          priority: b.lib === "pytorch" ? 1 : undefined,
-          largeAgent: b.lib === "pytorch",
-        })),
+        steps: linuxMuslX64Builds.map((b) =>
+          createLibraryBuildStep({
+            library: b.lib,
+            target: b.target,
+            extraDependencies: b.deps,
+            env: b.env,
+            commandPrefix: b.commandPrefix,
+            priority: b.lib === "pytorch" ? 1 : undefined,
+            largeAgent: b.lib === "pytorch",
+          })
+        ),
       },
       {
         group: ":linux: Linux musl ARM64 Builds",
-        steps: linuxMuslArm64Builds.map((b) => createLibraryBuildStep({
-          library: b.lib,
-          target: b.target,
-          extraDependencies: b.deps,
-          env: b.env,
-          commandPrefix: b.commandPrefix,
-          priority: b.lib === "pytorch" ? 1 : undefined,
-          largeAgent: b.lib === "pytorch",
-        })),
+        steps: linuxMuslArm64Builds.map((b) =>
+          createLibraryBuildStep({
+            library: b.lib,
+            target: b.target,
+            extraDependencies: b.deps,
+            env: b.env,
+            commandPrefix: b.commandPrefix,
+            priority: b.lib === "pytorch" ? 1 : undefined,
+            largeAgent: b.lib === "pytorch",
+          })
+        ),
       },
       {
         group: ":windows: Windows Builds",
-        steps: windowsBuilds.map((b) => createLibraryBuildStep({
-          library: b.lib,
-          target: b.target,
-          extraDependencies: b.deps,
-          env: b.env,
-          commandPrefix: b.commandPrefix,
-        })),
+        steps: windowsBuilds.map((b) =>
+          createLibraryBuildStep({
+            library: b.lib,
+            target: b.target,
+            extraDependencies: b.deps,
+            env: b.env,
+            commandPrefix: b.commandPrefix,
+          })
+        ),
       },
     ],
   }
