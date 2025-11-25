@@ -57,12 +57,12 @@ export async function buildLibomp(options: BuildLibompOptions) {
   // Detect cross-compilation
   const targetTriple = target
   const hostArch = Deno.build.arch
-  // Detect if host is musl (Alpine) by checking for musl libc
-  const isMuslHost = Deno.build.os === "linux" &&
-    (await Deno.stat("/lib/ld-musl-x86_64.so.1").catch(() => null)) !== null
+  // Detect if host is Alpine (musl) by checking for /etc/alpine-release
+  const isAlpine = Deno.build.os === "linux" &&
+    (await Deno.stat("/etc/alpine-release").catch(() => null)) !== null
   const hostTriple = hostArch === "aarch64"
-    ? (isMuslHost ? "aarch64-unknown-linux-musl" : "aarch64-unknown-linux-gnu")
-    : (isMuslHost ? "x86_64-unknown-linux-musl" : "x86_64-unknown-linux-gnu")
+    ? (isAlpine ? "aarch64-unknown-linux-musl" : "aarch64-unknown-linux-gnu")
+    : (isAlpine ? "x86_64-unknown-linux-musl" : "x86_64-unknown-linux-gnu")
   const targetArch = targetTriple.split("-")[0]
   // Cross-compilation if target differs from host (arch or libc)
   const isCrossCompile = platform === "linux" && targetTriple !== hostTriple

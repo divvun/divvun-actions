@@ -163,12 +163,12 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
 
   // Determine target triple
   const targetTriple = target
-  // Detect if host is musl (Alpine) by checking for musl libc
-  const isMuslHost = Deno.build.os === "linux" &&
-    (await Deno.stat("/lib/ld-musl-x86_64.so.1").catch(() => null)) !== null
+  // Detect if host is Alpine (musl) by checking for /etc/alpine-release
+  const isAlpine = Deno.build.os === "linux" &&
+    (await Deno.stat("/etc/alpine-release").catch(() => null)) !== null
   const hostTriple = hostArch === "aarch64"
-    ? (isMuslHost ? "aarch64-unknown-linux-musl" : "aarch64-unknown-linux-gnu")
-    : (isMuslHost ? "x86_64-unknown-linux-musl" : "x86_64-unknown-linux-gnu")
+    ? (isAlpine ? "aarch64-unknown-linux-musl" : "aarch64-unknown-linux-gnu")
+    : (isAlpine ? "x86_64-unknown-linux-musl" : "x86_64-unknown-linux-gnu")
 
   // Parse target architecture from triple
   const targetArch = targetTriple.split("-")[0]
