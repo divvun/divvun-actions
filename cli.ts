@@ -34,6 +34,8 @@ import {
   runLangGrammarTest,
   runLangSpellerBuild,
   runLangSpellerTest,
+  runLangTtsTextprocBuild,
+  runLangTtsTextprocDeploy,
 } from "./pipelines/lang/mod.ts"
 import pipelineLibpahkat, {
   runLibpahkatAndroid,
@@ -234,6 +236,14 @@ async function runPipeline(args: any) {
     }
     case "lang-grammar-deploy": {
       await runLangGrammarDeploy()
+      break
+    }
+    case "lang-tts-textproc-build": {
+      await runLangTtsTextprocBuild()
+      break
+    }
+    case "lang-tts-textproc-deploy": {
+      await runLangTtsTextprocDeploy()
       break
     }
     case "kbdgen-deploy": {
