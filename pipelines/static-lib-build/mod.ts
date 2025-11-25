@@ -190,6 +190,7 @@ interface BuildStepOptions {
   largeAgent?: boolean
   env?: Record<string, string>
   commandPrefix?: string
+  isReleaseBuild?: boolean // For release builds, deps are downloaded from GitHub releases, not artifacts
 }
 
 // Helper to get PyTorch dependencies on protobuf, sleef, and libomp build steps
@@ -222,9 +223,13 @@ function getPyTorchDependencies(targetTriple: string): string[] {
 }
 
 // Helper to create PyTorch-specific setup commands (protobuf + SLEEF downloads)
-function createPyTorchSetupCommands(targetTriple: string): string[] {
+function createPyTorchSetupCommands(
+  targetTriple: string,
+  isReleaseBuild: boolean,
+): string[] {
   const config = LIBRARY_CONFIGS.pytorch
   const protobufVersion = config.defaultVersions!.protobuf!
+  const sleefVersion = config.defaultVersions!.sleef!
   const commands: string[] = []
 
   // Download PyTorch cache
@@ -244,34 +249,65 @@ function createPyTorchSetupCommands(targetTriple: string): string[] {
       )
     }
 
-    // Download target protobuf
-    commands.push(
-      `buildkite-agent artifact download "target/protobuf_${targetTriple}.tar.gz" .`,
-      `mkdir -p target/${targetTriple}`,
-      `bsdtar -xf target/protobuf_${targetTriple}.tar.gz -C target/${targetTriple}`,
-    )
+    // Download target protobuf - from GitHub releases for release builds, artifacts otherwise
+    if (isReleaseBuild) {
+      commands.push(
+        `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_${targetTriple}.tar.gz" -o protobuf_${targetTriple}.tar.gz`,
+        `mkdir -p target/${targetTriple}`,
+        `bsdtar -xf protobuf_${targetTriple}.tar.gz -C target/${targetTriple}`,
+      )
+    } else {
+      commands.push(
+        `buildkite-agent artifact download "target/protobuf_${targetTriple}.tar.gz" .`,
+        `mkdir -p target/${targetTriple}`,
+        `bsdtar -xf target/protobuf_${targetTriple}.tar.gz -C target/${targetTriple}`,
+      )
+    }
 
-    // Download target SLEEF
-    commands.push(
-      `buildkite-agent artifact download "target/sleef_${targetTriple}.tar.gz" .`,
-      `bsdtar -xf target/sleef_${targetTriple}.tar.gz -C target/${targetTriple}`,
-    )
+    // Download target SLEEF - from GitHub releases for release builds, artifacts otherwise
+    if (isReleaseBuild) {
+      commands.push(
+        `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/sleef%2F${sleefVersion}/sleef_${sleefVersion}_${targetTriple}.tar.gz" -o sleef_${targetTriple}.tar.gz`,
+        `bsdtar -xf sleef_${targetTriple}.tar.gz -C target/${targetTriple}`,
+      )
+    } else {
+      commands.push(
+        `buildkite-agent artifact download "target/sleef_${targetTriple}.tar.gz" .`,
+        `bsdtar -xf target/sleef_${targetTriple}.tar.gz -C target/${targetTriple}`,
+      )
+    }
 
     // For cross-compilation, also need host SLEEF build tools
     if (targetTriple === "aarch64-unknown-linux-gnu") {
       const hostTriple = "x86_64-unknown-linux-gnu"
-      commands.push(
-        `buildkite-agent artifact download "target/sleef-build_${hostTriple}.tar.gz" .`,
-        `mkdir -p build/${hostTriple}`,
-        `bsdtar -xf target/sleef-build_${hostTriple}.tar.gz -C build/${hostTriple}`,
-      )
+      if (isReleaseBuild) {
+        commands.push(
+          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/sleef%2F${sleefVersion}/sleef-build_${sleefVersion}_${hostTriple}.tar.gz" -o sleef-build_${hostTriple}.tar.gz`,
+          `mkdir -p build/${hostTriple}`,
+          `bsdtar -xf sleef-build_${hostTriple}.tar.gz -C build/${hostTriple}`,
+        )
+      } else {
+        commands.push(
+          `buildkite-agent artifact download "target/sleef-build_${hostTriple}.tar.gz" .`,
+          `mkdir -p build/${hostTriple}`,
+          `bsdtar -xf target/sleef-build_${hostTriple}.tar.gz -C build/${hostTriple}`,
+        )
+      }
     } else if (targetTriple === "aarch64-unknown-linux-musl") {
       const hostTriple = "x86_64-unknown-linux-musl"
-      commands.push(
-        `buildkite-agent artifact download "target/sleef-build_${hostTriple}.tar.gz" .`,
-        `mkdir -p build/${hostTriple}`,
-        `bsdtar -xf target/sleef-build_${hostTriple}.tar.gz -C build/${hostTriple}`,
-      )
+      if (isReleaseBuild) {
+        commands.push(
+          `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/sleef%2F${sleefVersion}/sleef-build_${sleefVersion}_${hostTriple}.tar.gz" -o sleef-build_${hostTriple}.tar.gz`,
+          `mkdir -p build/${hostTriple}`,
+          `bsdtar -xf sleef-build_${hostTriple}.tar.gz -C build/${hostTriple}`,
+        )
+      } else {
+        commands.push(
+          `buildkite-agent artifact download "target/sleef-build_${hostTriple}.tar.gz" .`,
+          `mkdir -p build/${hostTriple}`,
+          `bsdtar -xf target/sleef-build_${hostTriple}.tar.gz -C build/${hostTriple}`,
+        )
+      }
     }
     // x86_64 targets (gnu and musl) are native builds - no host SLEEF needed
   }
@@ -287,6 +323,7 @@ function createLibraryBuildStep(options: BuildStepOptions): CommandStep {
     extraDependencies,
     priority,
     largeAgent,
+    isReleaseBuild,
   } = options
 
   // Determine queue based on platform
@@ -308,7 +345,8 @@ function createLibraryBuildStep(options: BuildStepOptions): CommandStep {
     getCrossCompilationInfo(library, targetTriple)
 
   // Get PyTorch-specific dependencies (protobuf and sleef)
-  const pytorchDeps = library === "pytorch"
+  // For release builds, these are downloaded from GitHub releases, not artifacts
+  const pytorchDeps = library === "pytorch" && !isReleaseBuild
     ? getPyTorchDependencies(targetTriple)
     : []
 
@@ -328,7 +366,7 @@ function createLibraryBuildStep(options: BuildStepOptions): CommandStep {
 
   // PyTorch has special setup requirements
   if (library === "pytorch") {
-    commands.push(...createPyTorchSetupCommands(targetTriple))
+    commands.push(...createPyTorchSetupCommands(targetTriple, !!isReleaseBuild))
   }
 
   // Download and extract host build artifacts if cross-compiling
@@ -424,6 +462,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
       library,
       target: targetTriple,
       version,
+      isReleaseBuild: true,
     }
 
     if (library === "pytorch") {

@@ -8,6 +8,15 @@ export async function publishLibrary(library: string, version: string) {
   // Download all artifacts (both Unix and Windows path separators)
   await builder.downloadArtifacts(`target/${library}_*.tar.gz`, ".")
 
+  // SLEEF needs -build artifacts for cross-compilation
+  if (library === "sleef") {
+    try {
+      await builder.downloadArtifacts(`target/${library}-build_*.tar.gz`, ".")
+    } catch {
+      // -build artifacts may not exist for all targets
+    }
+  }
+
   try {
     await builder.downloadArtifacts(`target\\${library}_*.tar.gz`, ".")
   } catch {
@@ -19,7 +28,8 @@ export async function publishLibrary(library: string, version: string) {
   for await (const entry of Deno.readDir("target")) {
     if (
       entry.isFile &&
-      entry.name.startsWith(`${library}_`) &&
+      (entry.name.startsWith(`${library}_`) ||
+        (library === "sleef" && entry.name.startsWith(`${library}-build_`))) &&
       entry.name.endsWith(".tar.gz")
     ) {
       artifacts.push(path.join("target", entry.name))
@@ -33,7 +43,12 @@ export async function publishLibrary(library: string, version: string) {
 
   for (const artifact of artifacts) {
     // Extract target from artifact name (e.g., icu4c_aarch64-apple-darwin.tar.gz -> aarch64-apple-darwin)
-    const targetMatch = artifact.match(`${library}_(.+)\\.tar\\.gz$`)
+    // Also handle -build artifacts (e.g., sleef-build_x86_64-unknown-linux-gnu.tar.gz)
+    const isBuildArtifact = artifact.includes(`${library}-build_`)
+    const pattern = isBuildArtifact
+      ? `${library}-build_(.+)\\.tar\\.gz$`
+      : `${library}_(.+)\\.tar\\.gz$`
+    const targetMatch = artifact.match(pattern)
     if (!targetMatch) {
       console.log(`Warning: Could not parse target from ${artifact}`)
       continue
@@ -41,7 +56,9 @@ export async function publishLibrary(library: string, version: string) {
     const target = targetMatch[1]
 
     // Create new filename with version
-    const versionedFilename = `${library}_${version}_${target}.tar.gz`
+    const versionedFilename = isBuildArtifact
+      ? `${library}-build_${version}_${target}.tar.gz`
+      : `${library}_${version}_${target}.tar.gz`
     const versionedArtifact = path.join("target", versionedFilename)
 
     // Rename the artifact
