@@ -7,6 +7,8 @@ RUN rustup target add aarch64-unknown-linux-musl
 
 # Install Alpine packages
 RUN apk add --no-cache \
+    autoconf \
+    automake \
     bash \
     boost-dev \
     build-base \
@@ -21,12 +23,17 @@ RUN apk add --no-cache \
     icu-static \
     jq \
     libarchive-tools \
+    libtool \
+    linux-headers \
     make \
     ninja \
     openssl-dev \
+    patch \
     patchelf \
+    perl \
     pkgconf \
     protobuf \
+    python3 \
     rsync \
     sqlite-dev \
     tree \
@@ -53,14 +60,14 @@ RUN curl -fsSL https://raw.githubusercontent.com/buildkite/agent/main/install.sh
     ln -s /root/.buildkite-agent/bin/buildkite-agent /usr/local/bin/buildkite-agent
 
 # Install OpenBao
-RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.2.1/bao_2.2.1_linux_amd64 -o /usr/local/bin/bao && \
+RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.4.4/bao_2.4.4_linux_amd64 -o /usr/local/bin/bao && \
     chmod +x /usr/local/bin/bao
 
 # Install GitHub CLI
-RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.78.0/gh_2.78.0_linux_amd64.tar.gz -o gh.tar.gz && \
-    tar -xzf gh.tar.gz && \
-    mv gh_2.78.0_linux_amd64/bin/gh /usr/local/bin/gh && \
-    rm -rf gh.tar.gz gh_2.78.0_linux_amd64
+RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.83.1/gh_2.83.1_linux_amd64.tar.gz -o gh.tar.gz && \
+    bsdtar -xzf gh.tar.gz && \
+    mv gh_2.83.1_linux_amd64/bin/gh /usr/local/bin/gh && \
+    rm -rf gh.tar.gz gh_2.83.1_linux_amd64
 
 # Install pahkat-uploader
 RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/pahkat-uploader?platform=linux&channel=nightly' -o pahkat-uploader.txz && \

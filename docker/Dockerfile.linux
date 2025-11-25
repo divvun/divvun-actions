@@ -126,7 +126,7 @@ RUN curl -fsSL https://musl.cc/aarch64-linux-musl-cross.tgz -o aarch64-musl-cros
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install GitHub CLI
-RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.78.0/gh_2.78.0_linux_amd64.deb -o gh.deb && \
+RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.83.1/gh_2.83.1_linux_amd64.deb -o gh.deb && \
     dpkg -i gh.deb && \
     rm gh.deb && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
@@ -161,7 +161,7 @@ RUN curl -fsSL https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-de
     rm libtorch.zip
 
 # Install OpenBao
-RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.2.1/bao_2.2.1_linux_amd64.deb -o bao.deb && \
+RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.4.4/bao_2.4.4_linux_amd64.deb -o bao.deb && \
     dpkg -i bao.deb && \
     rm bao.deb && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
