@@ -410,7 +410,6 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   console.log("")
 
   // Set environment variables
-  const isMusl = targetTriple.includes("-musl")
   if (isMusl) {
     if (targetArch === "x86_64") {
       Deno.env.set("CC", "x86_64-linux-musl-gcc")

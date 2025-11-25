@@ -333,8 +333,8 @@ function createLibraryBuildStep(options: BuildStepOptions): CommandStep {
   if (hostArtifactName && hostTargetDir) {
     commands.push(
       `buildkite-agent artifact download "target/${hostArtifactName}" .`,
-      `mkdir -p target/${hostTargetDir}`,
-      `bsdtar -xf target/${hostArtifactName} -C target/${hostTargetDir}`,
+      `mkdir -p build/${hostTargetDir}`,
+      `bsdtar -xf target/${hostArtifactName} -C build/${hostTargetDir}`,
     )
   }
 

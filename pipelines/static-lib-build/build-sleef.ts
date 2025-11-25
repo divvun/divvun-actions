@@ -24,16 +24,6 @@ function detectPlatform(target: string): Platform {
   throw new Error(`Unsupported target triple: ${target}`)
 }
 
-async function detectAlpineVersion(): Promise<string | null> {
-  const out = await output("cat", ["/etc/alpine-release"])
-
-  if (out.status.success) {
-    return out.stdout.trim()
-  }
-
-  return null
-}
-
 export async function buildSleef(options: BuildSleefOptions) {
   const {
     target,
@@ -53,8 +43,9 @@ export async function buildSleef(options: BuildSleefOptions) {
   const buildRoot = path.join(repoRoot, `build/${target}/sleef`)
   const installPrefix = path.join(repoRoot, `target/${target}/sleef`)
 
+  // Detect if host is Alpine (musl) by checking for /etc/alpine-release
   const isAlpine = Deno.build.os === "linux" &&
-    await detectAlpineVersion() != null
+    (await Deno.stat("/etc/alpine-release").catch(() => null)) !== null
 
   // Detect cross-compilation
   const targetTriple = target
