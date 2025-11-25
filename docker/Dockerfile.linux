@@ -161,10 +161,10 @@ RUN curl -fsSL https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-de
     rm libtorch.zip
 
 # Install OpenBao
-RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.4.4/bao_2.4.4_linux_amd64.deb -o bao.deb && \
-    dpkg -i bao.deb && \
-    rm bao.deb && \
-    rm -rf /var/lib/apt/lists/* && apt-get clean
+RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.4.4/bao_2.4.4_Linux_x86_64.tar.gz -o bao.tar.gz && \
+    tar -xzf bao.tar.gz && \
+    mv bao /usr/local/bin/bao && \
+    rm bao.tar.gz
 
 # Install pahkat-uploader
 RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/pahkat-uploader?platform=linux&channel=nightly' -o pahkat-uploader.txz && \
