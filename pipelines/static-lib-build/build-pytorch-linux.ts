@@ -270,6 +270,10 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
       ? "/opt/aarch64-linux-musl-cross/aarch64-linux-musl"
       : "/opt/x86_64-linux-musl-cross/x86_64-linux-musl"
     cmakeArgs.push(`-DCMAKE_SYSROOT=${sysroot}`)
+    // Include dependency prefixes in find root path so CMake can find SLEEF, protobuf, libomp
+    cmakeArgs.push(
+      `-DCMAKE_FIND_ROOT_PATH=${sysroot};${libompPrefix};${protobufPrefix};${sleefPrefix}`,
+    )
     cmakeArgs.push("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
     cmakeArgs.push("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
     cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-static")
