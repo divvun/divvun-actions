@@ -128,7 +128,7 @@ export async function pipelineDivvunRuntime() {
           `mv ${targetFile} ./${artifactName}-${target} && buildkite-agent artifact upload ${artifactName}-${target}`,
         ],
         agents: {
-          queue: os(target),
+          queue: target.includes("-musl") ? "alpine" : os(target),
         },
       }))
     }
