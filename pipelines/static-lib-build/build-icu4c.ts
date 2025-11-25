@@ -68,13 +68,15 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   // Detect cross-compilation
   const targetTriple = target
   const hostArch = Deno.build.arch
+  // Detect if host is musl (Alpine) by checking for musl libc
+  const isMuslHost = Deno.build.os === "linux" &&
+    (await Deno.stat("/lib/ld-musl-x86_64.so.1").catch(() => null)) !== null
   const hostTriple = hostArch === "aarch64"
-    ? "aarch64-unknown-linux-gnu"
-    : "x86_64-unknown-linux-gnu"
+    ? (isMuslHost ? "aarch64-unknown-linux-musl" : "aarch64-unknown-linux-gnu")
+    : (isMuslHost ? "x86_64-unknown-linux-musl" : "x86_64-unknown-linux-gnu")
   const targetArch = targetTriple.split("-")[0]
-  // Cross-compilation if arch differs OR if target is musl (host is always glibc)
-  const isCrossCompile = platform === "linux" &&
-    (targetTriple !== hostTriple || targetTriple.includes("-musl"))
+  // Cross-compilation if target differs from host (arch or libc)
+  const isCrossCompile = platform === "linux" && targetTriple !== hostTriple
 
   if (isCrossCompile) {
     console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
@@ -424,15 +426,13 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     // Note: We don't need to set CFLAGS/CXXFLAGS here since the NDK compiler
     // already knows the correct target and sysroot from its name (aarch64-linux-android21-clang)
   } else if (isCrossCompile) {
-    // Linux cross-compilation
-    // Always use glibc host build (build environment is glibc)
+    // Linux cross-compilation (e.g., aarch64 from x86_64, or musl from glibc)
     const hostBuildDir = path.join(
       repoRoot,
       `build/${hostTriple}/icu`,
     )
     configureArgs.push(`--host=${targetTriple}`)
     configureArgs.push(`--with-cross-build=${hostBuildDir}`)
-    // Note: For glibc, CFLAGS/CXXFLAGS/LDFLAGS were already set above with --target and -fuse-ld=lld
   }
 
   // Check if runConfigureICU exists

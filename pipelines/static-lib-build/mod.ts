@@ -192,13 +192,16 @@ interface BuildStepOptions {
   commandPrefix?: string
 }
 
-// Helper to get PyTorch dependencies on protobuf and sleef build steps
+// Helper to get PyTorch dependencies on protobuf, sleef, and libomp build steps
 function getPyTorchDependencies(targetTriple: string): string[] {
   if (!targetTriple.includes("linux") || targetTriple.includes("android")) {
     return []
   }
 
   const deps: string[] = []
+
+  // Target libomp
+  deps.push(`libomp-${targetTriple}`)
 
   // Target protobuf
   deps.push(`protobuf-${targetTriple}`)
