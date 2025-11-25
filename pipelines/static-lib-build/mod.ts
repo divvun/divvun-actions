@@ -467,6 +467,7 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
 
     if (library === "pytorch") {
       options.extraDependencies = ["pytorch-cache-download"]
+      options.env = { MAX_JOBS: "2" }
       if (targetTriple.includes("-musl")) {
         options.priority = 1
         options.largeAgent = true
@@ -520,6 +521,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       lib: "pytorch",
       target: "aarch64-apple-darwin",
       deps: ["pytorch-cache-download"],
+      env: { MAX_JOBS: "2" },
     },
   ]
 
@@ -530,6 +532,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       lib: "pytorch",
       target: "aarch64-apple-ios",
       deps: ["pytorch-cache-download"],
+      env: { MAX_JOBS: "2" },
     },
   ]
 
@@ -541,6 +544,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       target: "aarch64-linux-android",
       deps: ["pytorch-cache-download"],
       commandPrefix: "ANDROID_NDK=$ANDROID_NDK_HOME",
+      env: { MAX_JOBS: "2" },
     },
   ]
 
@@ -553,6 +557,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       lib: "pytorch",
       target: "x86_64-unknown-linux-gnu",
       deps: ["pytorch-cache-download"],
+      env: { MAX_JOBS: "2" },
     },
   ]
 
@@ -565,6 +570,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       lib: "pytorch",
       target: "aarch64-unknown-linux-gnu",
       deps: ["pytorch-cache-download"],
+      env: { MAX_JOBS: "2" },
     },
   ]
 
@@ -577,6 +583,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       lib: "pytorch",
       target: "x86_64-unknown-linux-musl",
       deps: ["pytorch-cache-download"],
+      env: { MAX_JOBS: "2" },
     },
   ]
 
@@ -589,6 +596,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       lib: "pytorch",
       target: "aarch64-unknown-linux-musl",
       deps: ["pytorch-cache-download"],
+      env: { MAX_JOBS: "2" },
     },
   ]
 
