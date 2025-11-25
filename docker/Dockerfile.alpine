@@ -38,7 +38,9 @@ RUN echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/main" > /etc/apk/r
     sqlite-dev \
     tree \
     unzip \
-    uv
+    uv \
+    zlib-dev \
+    zlib-static
 
 # Install Rust with both musl targets
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \

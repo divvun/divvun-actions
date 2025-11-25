@@ -226,21 +226,33 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
   } else if (platform === "windows") {
     cmakeArgs.push("-DCMAKE_C_COMPILER=cl.exe")
     cmakeArgs.push("-DCMAKE_CXX_COMPILER=cl.exe")
-  } else if (isCrossCompile) {
-    // Linux cross-compilation configuration
+  } else if (platform === "linux") {
     const isMusl = targetTriple.includes("-musl")
 
-    cmakeArgs.push("-DCMAKE_SYSTEM_NAME=Linux")
-    cmakeArgs.push(`-DCMAKE_SYSTEM_PROCESSOR=${targetArch}`)
+    if (isCrossCompile) {
+      // Linux cross-compilation configuration
+      cmakeArgs.push("-DCMAKE_SYSTEM_NAME=Linux")
+      cmakeArgs.push(`-DCMAKE_SYSTEM_PROCESSOR=${targetArch}`)
 
-    if (!isMusl) {
-      // Only use clang-specific flags for glibc cross-compilation
-      cmakeArgs.push(`-DCMAKE_C_COMPILER_TARGET=${targetTriple}`)
-      cmakeArgs.push(`-DCMAKE_CXX_COMPILER_TARGET=${targetTriple}`)
-      cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld")
-      cmakeArgs.push("-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld")
+      if (!isMusl) {
+        // Only use clang-specific flags for glibc cross-compilation
+        cmakeArgs.push(`-DCMAKE_C_COMPILER_TARGET=${targetTriple}`)
+        cmakeArgs.push(`-DCMAKE_CXX_COMPILER_TARGET=${targetTriple}`)
+        cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld")
+        cmakeArgs.push("-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld")
+      }
     }
-    // For musl, the cross-compiler already knows its target, no extra flags needed
+
+    // For musl targets, use cross-compiler sysroot and static linking
+    if (isMusl) {
+      const sysroot = targetArch === "aarch64"
+        ? "/opt/aarch64-linux-musl-cross/aarch64-linux-musl"
+        : "/opt/x86_64-linux-musl-cross/x86_64-linux-musl"
+      cmakeArgs.push(`-DCMAKE_SYSROOT=${sysroot}`)
+      cmakeArgs.push("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
+      cmakeArgs.push("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+      cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-static")
+    }
   }
 
   if (verbose) {

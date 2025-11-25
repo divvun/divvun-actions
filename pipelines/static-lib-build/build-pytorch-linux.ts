@@ -240,11 +240,11 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   cmakeArgs.push(`-DCMAKE_BUILD_TYPE=${buildType}`)
 
   // Cross-compilation configuration
+  const isMusl = targetTriple.includes("-musl")
+
   if (isCrossCompile) {
     cmakeArgs.push("-DCMAKE_SYSTEM_NAME=Linux")
     cmakeArgs.push(`-DCMAKE_SYSTEM_PROCESSOR=${targetArch}`)
-
-    const isMusl = targetTriple.includes("-musl")
 
     // Use cross-compiler based on target
     if (targetArch === "x86_64" && isMusl) {
@@ -262,6 +262,17 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
         cmakeArgs.push("-DCMAKE_ASM_COMPILER=aarch64-linux-gnu-gcc")
       }
     }
+  }
+
+  // For musl targets, use cross-compiler sysroot and static linking
+  if (isMusl) {
+    const sysroot = targetArch === "aarch64"
+      ? "/opt/aarch64-linux-musl-cross/aarch64-linux-musl"
+      : "/opt/x86_64-linux-musl-cross/x86_64-linux-musl"
+    cmakeArgs.push(`-DCMAKE_SYSROOT=${sysroot}`)
+    cmakeArgs.push("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
+    cmakeArgs.push("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+    cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-static")
   }
 
   // Set ARM architecture flags for all aarch64 builds

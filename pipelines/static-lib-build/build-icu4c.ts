@@ -231,6 +231,10 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
 
     // Linux: use musl compilers for musl targets
     if (isMusl) {
+      const sysroot = targetArch === "aarch64"
+        ? "/opt/aarch64-linux-musl-cross/aarch64-linux-musl"
+        : "/opt/x86_64-linux-musl-cross/x86_64-linux-musl"
+
       if (targetArch === "x86_64") {
         Deno.env.set("CC", "x86_64-linux-musl-gcc")
         Deno.env.set("CXX", "x86_64-linux-musl-g++")
@@ -238,6 +242,11 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
         Deno.env.set("CC", "aarch64-linux-musl-gcc")
         Deno.env.set("CXX", "aarch64-linux-musl-g++")
       }
+
+      // Use cross-compiler sysroot to avoid picking up Alpine's shared libs
+      Deno.env.set("CFLAGS", `--sysroot=${sysroot}`)
+      Deno.env.set("CXXFLAGS", `--sysroot=${sysroot}`)
+      Deno.env.set("LDFLAGS", `--sysroot=${sysroot} -static`)
     } else {
       // Linux glibc: prefer clang if available
       try {
@@ -251,16 +260,11 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
 
       // Set cross-compilation flags for Linux glibc
       if (isCrossCompile) {
-        const isMusl = targetTriple.includes("-musl")
-
-        if (!isMusl) {
-          // Only use clang-specific flags for glibc cross-compilation
-          const crossFlags = `--target=${targetTriple} -fuse-ld=lld`
-          Deno.env.set("CFLAGS", crossFlags)
-          Deno.env.set("CXXFLAGS", crossFlags)
-          Deno.env.set("LDFLAGS", "-fuse-ld=lld")
-        }
-        // For musl, the cross-compiler already knows its target, no extra flags needed
+        // Only use clang-specific flags for glibc cross-compilation
+        const crossFlags = `--target=${targetTriple} -fuse-ld=lld`
+        Deno.env.set("CFLAGS", crossFlags)
+        Deno.env.set("CXXFLAGS", crossFlags)
+        Deno.env.set("LDFLAGS", "-fuse-ld=lld")
       }
     }
   }

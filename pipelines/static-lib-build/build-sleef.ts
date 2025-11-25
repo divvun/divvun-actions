@@ -229,26 +229,38 @@ export async function buildSleef(options: BuildSleefOptions) {
   } else if (platform === "windows") {
     cmakeArgs.push("-DCMAKE_C_COMPILER=cl.exe")
     cmakeArgs.push("-DCMAKE_CXX_COMPILER=cl.exe")
-  } else if (isCrossCompile) {
-    // Linux cross-compilation configuration
-    cmakeArgs.push("-DCMAKE_SYSTEM_NAME=Linux")
-    cmakeArgs.push(`-DCMAKE_SYSTEM_PROCESSOR=${targetArch}`)
-
+  } else if (platform === "linux") {
     const isMusl = targetTriple.includes("-musl")
 
-    // Use cross-compiler for aarch64 glibc (musl compilers already set above)
-    if (targetArch === "aarch64" && !isMusl) {
-      cmakeArgs.push("-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc")
-      cmakeArgs.push("-DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++")
+    if (isCrossCompile) {
+      // Linux cross-compilation configuration
+      cmakeArgs.push("-DCMAKE_SYSTEM_NAME=Linux")
+      cmakeArgs.push(`-DCMAKE_SYSTEM_PROCESSOR=${targetArch}`)
+
+      // Use cross-compiler for aarch64 glibc (musl compilers already set above)
+      if (targetArch === "aarch64" && !isMusl) {
+        cmakeArgs.push("-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc")
+        cmakeArgs.push("-DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++")
+      }
+
+      // Point to native build directory for host tools
+      const nativeBuildDir = path.join(
+        repoRoot,
+        `build/${hostTriple}/sleef`,
+      )
+      cmakeArgs.push(`-DNATIVE_BUILD_DIR=${nativeBuildDir}`)
     }
 
-    // Point to native build directory for host tools
-    // Host build is always glibc (since build environment is glibc)
-    const nativeBuildDir = path.join(
-      repoRoot,
-      `build/${hostTriple}/sleef`,
-    )
-    cmakeArgs.push(`-DNATIVE_BUILD_DIR=${nativeBuildDir}`)
+    // For musl targets, use cross-compiler sysroot and static linking
+    if (isMusl) {
+      const sysroot = targetArch === "aarch64"
+        ? "/opt/aarch64-linux-musl-cross/aarch64-linux-musl"
+        : "/opt/x86_64-linux-musl-cross/x86_64-linux-musl"
+      cmakeArgs.push(`-DCMAKE_SYSROOT=${sysroot}`)
+      cmakeArgs.push("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
+      cmakeArgs.push("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+      cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-static")
+    }
   }
 
   if (verbose) {
