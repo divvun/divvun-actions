@@ -1,5 +1,7 @@
 FROM rust:alpine
 
+ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="/var/cache/buildkite"
+
 # Add aarch64 Rust toolchain
 RUN rustup target add aarch64-unknown-linux-musl
 
@@ -17,6 +19,7 @@ RUN apk add --no-cache \
     git \
     git-lfs \
     icu-static \
+    jq \
     libarchive-tools \
     make \
     ninja \
@@ -43,7 +46,36 @@ RUN curl -fsSL https://musl.cc/aarch64-linux-musl-cross.tgz -o aarch64-musl-cros
 # Add musl toolchains to PATH
 ENV PATH="/opt/x86_64-linux-musl-cross/bin:/opt/aarch64-linux-musl-cross/bin:${PATH}"
 
+# Install buildkite-agent
+RUN curl -fsSL https://raw.githubusercontent.com/buildkite/agent/main/install.sh -o install-buildkite.sh && \
+    sh install-buildkite.sh && \
+    rm install-buildkite.sh && \
+    ln -s /root/.buildkite-agent/bin/buildkite-agent /usr/local/bin/buildkite-agent
+
+# Install OpenBao
+RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.2.1/bao_2.2.1_linux_amd64 -o /usr/local/bin/bao && \
+    chmod +x /usr/local/bin/bao
+
+# Install GitHub CLI
+RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.78.0/gh_2.78.0_linux_amd64.tar.gz -o gh.tar.gz && \
+    tar -xzf gh.tar.gz && \
+    mv gh_2.78.0_linux_amd64/bin/gh /usr/local/bin/gh && \
+    rm -rf gh.tar.gz gh_2.78.0_linux_amd64
+
+# Install pahkat-uploader
+RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/pahkat-uploader?platform=linux&channel=nightly' -o pahkat-uploader.txz && \
+    bsdtar -xf pahkat-uploader.txz -C /usr/local && \
+    rm pahkat-uploader.txz
+
 # Configure git-lfs
 RUN git lfs install
 
+# Create cache folder
+RUN mkdir -p $BUILDKITE_PLUGIN_FS_CACHE_FOLDER
+
 WORKDIR /workspace
+
+COPY entrypoint-alpine.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

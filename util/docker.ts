@@ -55,13 +55,6 @@ export default class Docker {
     await processExec("docker", args)
   }
 
-  static async runAlpine(command: string[]) {
-    await Docker.run(
-      "ghcr.io/divvun/divvun-actions:worker-alpine-latest",
-      command,
-    )
-  }
-
   static async exec(
     command: CommandStep,
     config: {

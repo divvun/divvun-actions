@@ -47,14 +47,12 @@ import {
 import { pipelineStaticLibBuild } from "./pipelines/static-lib-build/mod.ts"
 import macosSign from "./services/macos-codesign.ts"
 import sign from "./services/windows-codesign.ts"
-import Docker from "./util/docker.ts"
 import { makeTempFile } from "./util/temp.ts"
 
 enum Command {
   Run = "run",
   Ci = "ci",
   Sign = "sign",
-  RunAlpine = "run-alpine",
 }
 
 const commands: Record<Command, { options: ParseOptions; help: string }> = {
@@ -84,15 +82,6 @@ const commands: Record<Command, { options: ParseOptions; help: string }> = {
       },
     },
     help: "Sign a file",
-  },
-  [Command.RunAlpine]: {
-    options: {
-      boolean: ["help"],
-      alias: {
-        help: "h",
-      },
-    },
-    help: "Run a command in the Alpine container",
   },
 }
 
@@ -163,13 +152,6 @@ export default async function runCli(input: string[]) {
       break
     case Command.Sign:
       await runSign(args)
-      break
-    case Command.RunAlpine:
-      await Docker.runAlpine([
-        "/actions/bin/divvun-actions",
-        "run",
-        ...args._.slice(1).map(String),
-      ])
       break
   }
 }
