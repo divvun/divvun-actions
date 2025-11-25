@@ -60,8 +60,10 @@ RUN curl -fsSL https://raw.githubusercontent.com/buildkite/agent/main/install.sh
     ln -s /root/.buildkite-agent/bin/buildkite-agent /usr/local/bin/buildkite-agent
 
 # Install OpenBao
-RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.4.4/bao_2.4.4_linux_amd64 -o /usr/local/bin/bao && \
-    chmod +x /usr/local/bin/bao
+RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.4.4/bao_2.4.4_Linux_x86_64.tar.gz -o bao.tar.gz && \
+    tar -xzf bao.tar.gz && \
+    mv bao /usr/local/bin/bao && \
+    rm bao.tar.gz
 
 # Install GitHub CLI
 RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.83.1/gh_2.83.1_linux_amd64.tar.gz -o gh.tar.gz && \
