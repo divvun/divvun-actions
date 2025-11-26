@@ -148,7 +148,7 @@ export async function pipelineDivvunRuntime() {
       command: [
         "echo '--- Building UI'",
         `./x build-ui --target ${target}`,
-        `cp -r './playground/src-tauri/target/${target}/release/bundle/macos/Divvun Runtime Playground.app' .`,
+        `cp -r "./playground/src-tauri/target/${target}/release/bundle/macos/Divvun Runtime Playground.app" . 2>/dev/null || cp -r './playground/src-tauri/target/release/bundle/macos/Divvun Runtime Playground.app' .`,
         "echo '--- Updating version'",
         `/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${version}" './Divvun Runtime Playground.app/Contents/Info.plist'`,
         "echo '--- Zipping unsigned app'",
