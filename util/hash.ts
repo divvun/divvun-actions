@@ -6,13 +6,9 @@ function toHex(bytes: Uint8Array): string {
 
 export async function blake3Hash(filePath: string): Promise<string> {
   const file = await Deno.open(filePath, { read: true })
-  try {
-    const hashBuffer = await crypto.subtle.digest(
-      "BLAKE3",
-      file.readable as unknown as AsyncIterable<BufferSource>,
-    )
-    return toHex(new Uint8Array(hashBuffer))
-  } finally {
-    file.close()
-  }
+  const hashBuffer = await crypto.subtle.digest(
+    "BLAKE3",
+    file.readable as unknown as AsyncIterable<BufferSource>,
+  )
+  return toHex(new Uint8Array(hashBuffer))
 }
