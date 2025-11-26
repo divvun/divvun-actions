@@ -80,7 +80,7 @@ function deriveAutogenFlags(_config: BuildProps) {
     "--disable-analysers",
     "--disable-generators",
     "--disable-transcriptors",
-    "--enable-tts-text-processing",
+    "--enable-tts",
   ]
 
   return flags
