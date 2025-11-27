@@ -215,6 +215,7 @@ function getPyTorchDependencies(targetTriple: string): string[] {
     deps.push(`protobuf-x86_64-unknown-linux-gnu`)
     deps.push(`sleef-x86_64-unknown-linux-gnu`)
   } else if (targetTriple === "aarch64-unknown-linux-musl") {
+    deps.push(`protobuf-x86_64-unknown-linux-musl`)
     deps.push(`sleef-x86_64-unknown-linux-musl`)
   }
   // x86_64-unknown-linux-musl and x86_64-unknown-linux-gnu are native builds - no extra deps
@@ -240,12 +241,18 @@ function createPyTorchSetupCommands(
 
   // For Linux builds, download protobuf and SLEEF dependencies
   if (targetTriple.includes("linux") && !targetTriple.includes("android")) {
-    // For GNU cross-compilation (aarch64-gnu), need host protobuf from GitHub release
+    // For cross-compilation (aarch64), need host protobuf from GitHub release
     if (targetTriple === "aarch64-unknown-linux-gnu") {
       commands.push(
         `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_x86_64-unknown-linux-gnu.tar.gz" -o protobuf_x86_64-unknown-linux-gnu.tar.gz`,
         "mkdir -p target/x86_64-unknown-linux-gnu",
         "bsdtar -xf protobuf_x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu",
+      )
+    } else if (targetTriple === "aarch64-unknown-linux-musl") {
+      commands.push(
+        `curl -fsSL "https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/protobuf_${protobufVersion}_x86_64-unknown-linux-musl.tar.gz" -o protobuf_x86_64-unknown-linux-musl.tar.gz`,
+        "mkdir -p target/x86_64-unknown-linux-musl",
+        "bsdtar -xf protobuf_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl",
       )
     }
 
