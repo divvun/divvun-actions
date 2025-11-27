@@ -86,7 +86,7 @@ export async function pipelineDivvunRuntime() {
     const artifactName = `divvun-runtime${
       target.includes("windows") ? ".exe" : ""
     }`
-    const targetFile = `target/${target}/release/${artifactName}`
+    const targetFile = path.join("target", target, "release", artifactName)
 
     if (target.includes("apple")) {
       // macOS targets: Split into build and sign steps
@@ -119,13 +119,27 @@ export async function pipelineDivvunRuntime() {
         },
         depends_on: `cli-build-${target}`,
       }))
+    } else if (os(target) === "windows") {
+      // Non-macOS targets: Build and upload directly
+      buildSteps.push(command({
+        label: `build-${target}`,
+        command: [
+          `.\\x.ps1 build --target ${target}`,
+          `mv ${targetFile} .\\${artifactName}-${target}`,
+          `buildkite-agent artifact upload ${artifactName}-${target}`,
+        ],
+        agents: {
+          queue: target.includes("-musl") ? "alpine" : os(target),
+        },
+      }))
     } else {
       // Non-macOS targets: Build and upload directly
       buildSteps.push(command({
         label: `build-${target}`,
         command: [
           `./x build --target ${target}`,
-          `mv ${targetFile} ./${artifactName}-${target} && buildkite-agent artifact upload ${artifactName}-${target}`,
+          `mv ${targetFile} ./${artifactName}-${target}`,
+          `buildkite-agent artifact upload ${artifactName}-${target}`,
         ],
         agents: {
           queue: target.includes("-musl") ? "alpine" : os(target),
@@ -142,39 +156,55 @@ export async function pipelineDivvunRuntime() {
     }
 
     // Step 1: Build on macOS and upload unsigned app
-    uiBuildSteps.push(command({
-      label: `Playground (${target}) - Build`,
-      key: `playground-build-${target}`,
-      command: [
-        "echo '--- Building UI'",
-        `./x build-ui --target ${target}`,
-        `cp -r "./playground/src-tauri/target/${target}/release/bundle/macos/Divvun Runtime Playground.app" . 2>/dev/null || cp -r './playground/src-tauri/target/release/bundle/macos/Divvun Runtime Playground.app' .`,
-        "echo '--- Updating version'",
-        `/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${version}" './Divvun Runtime Playground.app/Contents/Info.plist'`,
-        "echo '--- Zipping unsigned app'",
-        "ditto -c -k --keepParent './Divvun Runtime Playground.app' divvun-rt-playground-unsigned.zip",
-        "buildkite-agent artifact upload divvun-rt-playground-unsigned.zip",
-      ],
-      agents: { queue: "macos" },
-    }))
+    if (os(target) === "macos") {
+      uiBuildSteps.push(command({
+        label: `Playground (${target}) - Build`,
+        key: `playground-build-${target}`,
+        command: [
+          "echo '--- Building UI'",
+          `./x build-ui --target ${target}`,
+          `cp -r "./playground/src-tauri/target/${target}/release/bundle/macos/Divvun Runtime Playground.app" . 2>/dev/null || cp -r './playground/src-tauri/target/release/bundle/macos/Divvun Runtime Playground.app' .`,
+          "echo '--- Updating version'",
+          `/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${version}" './Divvun Runtime Playground.app/Contents/Info.plist'`,
+          "echo '--- Zipping unsigned app'",
+          "ditto -c -k --keepParent './Divvun Runtime Playground.app' divvun-rt-playground-unsigned.zip",
+          "buildkite-agent artifact upload divvun-rt-playground-unsigned.zip",
+        ],
+        agents: { queue: "macos" },
+      }))
 
-    // Step 2: Sign on Linux and create final artifact
-    uiBuildSteps.push(command({
-      label: `Playground (${target}) - Sign`,
-      command: [
-        "echo '--- Downloading unsigned app'",
-        "buildkite-agent artifact download divvun-rt-playground-unsigned.zip .",
-        "echo '--- Unzipping'",
-        "unzip -q divvun-rt-playground-unsigned.zip",
-        "echo '--- Signing'",
-        `divvun-actions run macos-sign './Divvun Runtime Playground.app' '' ./playground/src-tauri/Entitlements.plist`,
-        "echo '--- Creating final archive'",
-        `bsdtar --gzip --options gzip:compression-level=9 -cf divvun-rt-playground-${target} './Divvun Runtime Playground.app'`,
-        `buildkite-agent artifact upload divvun-rt-playground-${target}`,
-      ],
-      agents: { queue: "linux" },
-      depends_on: `playground-build-${target}`,
-    }))
+      // Step 2: Sign on Linux and create final artifact
+      uiBuildSteps.push(command({
+        label: `Playground (${target}) - Sign`,
+        command: [
+          "echo '--- Downloading unsigned app'",
+          "buildkite-agent artifact download divvun-rt-playground-unsigned.zip .",
+          "echo '--- Unzipping'",
+          "unzip -q divvun-rt-playground-unsigned.zip",
+          "echo '--- Signing'",
+          `divvun-actions run macos-sign './Divvun Runtime Playground.app' '' ./playground/src-tauri/Entitlements.plist`,
+          "echo '--- Creating final archive'",
+          `bsdtar --gzip --options gzip:compression-level=9 -cf divvun-rt-playground-${target} './Divvun Runtime Playground.app'`,
+          `buildkite-agent artifact upload divvun-rt-playground-${target}`,
+        ],
+        agents: { queue: "linux" },
+        depends_on: `playground-build-${target}`,
+      }))
+    }
+
+    if (os(target) === "windows") {
+      uiBuildSteps.push(command({
+        label: `Playground (${target}) - Build`,
+        command: [
+          "echo '--- Building UI'",
+          `.\\x.ps1 build-ui --target ${target}`,
+          `copy ".\\playground\\src-tauri\\target\\${target}\\release\\bundle\\msi\\Divvun Runtime Playground.msi" .`,
+          `ren "Divvun Runtime Playground.msi" "divvun-rt-playground-${target}.msi"`,
+          `buildkite-agent artifact upload divvun-rt-playground-${target}.msi`,
+        ],
+        agents: { queue: "windows" },
+      }))
+    }
   }
 
   const pipeline: BuildkitePipeline = {
