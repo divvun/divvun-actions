@@ -1,0 +1,54 @@
+diff --git a/cmake/Codegen.cmake b/cmake/Codegen.cmake
+index 9a562da..2c594d6 100644
+--- a/cmake/Codegen.cmake
++++ b/cmake/Codegen.cmake
+@@ -395,15 +395,15 @@ if(INTERN_BUILD_ATEN_OPS)
+     LIST(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG}  ${CXX_ZVECTOR_FLAGS}")
+   endif(CXX_ZVECTOR_FOUND)
+ 
+-  if(CXX_SVE_FOUND AND CXX_SVE256_FOUND AND CXX_ARM_BF16_FOUND)
+-    list(APPEND CPU_CAPABILITY_NAMES "SVE256")
+-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_SVE_CPU_DEFINITION -DHAVE_SVE256_CPU_DEFINITION -DHAVE_ARM_BF16_CPU_DEFINITION")
+-    if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
+-      list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG} -O2 -march=armv8-a+sve+bf16 -D__ARM_FEATURE_BF16 -DCPU_CAPABILITY_SVE -msve-vector-bits=256")
+-    else()
+-      list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG} -march=armv8-a+sve+bf16 -D__ARM_FEATURE_BF16 -DCPU_CAPABILITY_SVE -msve-vector-bits=256")
+-    endif()
+-  endif()
++  # if(CXX_SVE_FOUND AND CXX_SVE256_FOUND AND CXX_ARM_BF16_FOUND)
++  #   list(APPEND CPU_CAPABILITY_NAMES "SVE256")
++  #   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_SVE_CPU_DEFINITION -DHAVE_SVE256_CPU_DEFINITION -DHAVE_ARM_BF16_CPU_DEFINITION")
++  #   if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
++  #     list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG} -O2 -march=armv8-a+sve+bf16 -D__ARM_FEATURE_BF16 -DCPU_CAPABILITY_SVE -msve-vector-bits=256")
++  #   else()
++  #     list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG} -march=armv8-a+sve+bf16 -D__ARM_FEATURE_BF16 -DCPU_CAPABILITY_SVE -msve-vector-bits=256")
++  #   endif()
++  # endif()
+ 
+   list(LENGTH CPU_CAPABILITY_NAMES NUM_CPU_CAPABILITY_NAMES)
+   math(EXPR NUM_CPU_CAPABILITY_NAMES "${NUM_CPU_CAPABILITY_NAMES}-1")
+diff --git a/cmake/MiscCheck.cmake b/cmake/MiscCheck.cmake
+index 871a234..8f0527a 100644
+--- a/cmake/MiscCheck.cmake
++++ b/cmake/MiscCheck.cmake
+@@ -101,13 +101,13 @@ endif()
+ 
+ # ---[ Check if the compiler has SVE support.
+ find_package(ARM) # checks SVE
+-if(CXX_SVE_FOUND)
+-  message(STATUS "Compiler supports SVE extension. Will build perfkernels.")
+-  # Also see CMakeLists.txt under caffe2/perfkernels.
+-  add_compile_definitions(CAFFE2_PERF_WITH_SVE=1)
+-else()
+-  message(STATUS "Compiler does not support SVE extension. Will not build perfkernels.")
+-endif()
++# if(CXX_SVE_FOUND)
++#   message(STATUS "Compiler supports SVE extension. Will build perfkernels.")
++#   # Also see CMakeLists.txt under caffe2/perfkernels.
++#   add_compile_definitions(CAFFE2_PERF_WITH_SVE=1)
++# else()
++#   message(STATUS "Compiler does not support SVE extension. Will not build perfkernels.")
++# endif()
+ 
+ if(IOS AND (${IOS_ARCH} MATCHES "armv7*"))
+   add_definitions("-mfpu=neon-fp16")

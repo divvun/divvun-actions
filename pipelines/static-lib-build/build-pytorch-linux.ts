@@ -161,6 +161,18 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     cwd: pytorchRoot,
   })
 
+  // Disable SVE for aarch64 Linux builds
+  if (target.startsWith("aarch64")) {
+    console.log("Applying remove-sve-detect patch for aarch64")
+    const removeSvePatchPath = path.join(
+      import.meta.dirname!,
+      "patches/pytorch/remove-sve-detect.patch",
+    )
+    await builder.exec("patch", ["-p1", "-i", removeSvePatchPath], {
+      cwd: pytorchRoot,
+    })
+  }
+
   // Determine target triple
   const targetTriple = target
   // Detect if host is Alpine (musl) by checking for /etc/alpine-release
