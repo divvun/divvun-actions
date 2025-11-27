@@ -83,7 +83,7 @@ const LIBRARY_CONFIGS: Record<LibraryType, LibraryConfig> = {
       "aarch64-apple-ios",
       "aarch64-linux-android",
       "aarch64-unknown-linux-gnu",
-      // "aarch64-unknown-linux-musl",  // Not yet supported
+      "aarch64-unknown-linux-musl",
       "x86_64-unknown-linux-gnu",
       "x86_64-unknown-linux-musl",
     ],
