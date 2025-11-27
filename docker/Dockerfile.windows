@@ -113,8 +113,8 @@ USER ContainerAdministrator
 
 # Install Node.js LTS and pnpm
 RUN choco install nodejs --version="24.11.1" -y ; \
-    setx /M PATH $($Env:PATH + ';C:\Program Files\nodejs') ; \
-    corepack enable pnpm
+    setx /M PATH $($Env:PATH + ';C:\Program Files\nodejs')
+RUN corepack enable pnpm
 
 # Install Rust using rustup
 RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe; \
