@@ -1,3 +1,133 @@
+diff --git a/aten/src/ATen/cpu/vec/intrinsics.h b/aten/src/ATen/cpu/vec/intrinsics.h
+index f9086f7..afaa886 100644
+--- a/aten/src/ATen/cpu/vec/intrinsics.h
++++ b/aten/src/ATen/cpu/vec/intrinsics.h
+@@ -5,10 +5,10 @@
+ #elif defined(__clang__) && (defined(__ARM_NEON__) || defined(__aarch64__))
+ /* Clang-compatible compiler, targeting arm neon */
+ #include <arm_neon.h>
+-#if defined(__ARM_FEATURE_SVE)
+-/* CLANG-compatible compiler, targeting ARM with SVE */
+-#include <arm_sve.h>
+-#endif
++// #if defined(__ARM_FEATURE_SVE)
++// /* CLANG-compatible compiler, targeting ARM with SVE */
++// #include <arm_sve.h>
++// #endif
+ #elif defined(_MSC_VER)
+ /* Microsoft C/C++-compatible compiler */
+ #include <intrin.h>
+@@ -25,10 +25,10 @@
+ #elif defined(__GNUC__) && (defined(__ARM_NEON__) || defined(__aarch64__))
+ /* GCC-compatible compiler, targeting ARM with NEON */
+ #include <arm_neon.h>
+-#if defined(__ARM_FEATURE_SVE)
+-/* GCC-compatible compiler, targeting ARM with SVE */
+-#include <arm_sve.h>
+-#endif
++// #if defined(__ARM_FEATURE_SVE)
++// /* GCC-compatible compiler, targeting ARM with SVE */
++// #include <arm_sve.h>
++// #endif
+ #if defined(MISSING_ARM_VLD1)
+ #include <ATen/cpu/vec/vec256/missing_vld1_neon.h>
+ #elif defined(MISSING_ARM_VST1)
+diff --git a/aten/src/ATen/cpu/vec/vec_base.h b/aten/src/ATen/cpu/vec/vec_base.h
+index 53cdbcd..25e6ed4 100644
+--- a/aten/src/ATen/cpu/vec/vec_base.h
++++ b/aten/src/ATen/cpu/vec/vec_base.h
+@@ -1,7 +1,7 @@
+ #pragma once
+ #if defined(__GNUC__) && __GNUC__ == 10 && __GNUC_MINOR__ <= 2 && \
+-    defined(__ARM_FEATURE_SVE)
+-// Workaround for https: //gcc.gnu.org/bugzilla/show_bug.cgi?id=117161
++    0
++// Workaround for https://gcc.gnu.org/bugzilla/show_bug.cgi?id=117161
+ #pragma GCC optimize("no-tree-vectorize")
+ #endif
+ 
+@@ -225,7 +225,7 @@ struct Vectorized {
+     return vector;
+   }
+ // Workaround for https: //gcc.gnu.org/bugzilla/show_bug.cgi?id=117001
+-#if __GNUC__ <= 12 && !defined(__clang__) && defined(__ARM_FEATURE_SVE)
++#if __GNUC__ <= 12 && !defined(__clang__) && 0
+   static Vectorized<T> __attribute__((optimize("-fno-tree-loop-vectorize")))
+   blendv(
+       const Vectorized<T>& a,
+diff --git a/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp b/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp
+index ba03472..f065daf 100644
+--- a/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp
++++ b/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp
+@@ -24,7 +24,7 @@ namespace {
+ // out = val * a + b
+ // is_b_stride_zero: If the stride of b is 0 (mask broadcasting case),
+ //                take b as a scalar pointer.
+-#if __GNUC__ == 11 && defined(__ARM_FEATURE_SVE)
++#if __GNUC__ == 11 && 0
+ template <typename T1, typename T2>
+ inline void _scale_attn_mask_fusion_kernel(
+     T1* a,
+@@ -52,7 +52,7 @@ inline void _scale_attn_mask_fusion_kernel(
+   for (; i < size - (size % vec_size2); i += vec_size2) {
+     auto a_n = at::vec::VectorizedN<T1, T1_n>::loadu(a + i);
+     at::vec::VectorizedN<T2, T2_n> b_n;
+-#if __GNUC__ == 11 && defined(__ARM_FEATURE_SVE)
++#if __GNUC__ == 11 && 0
+     if (is_b_stride_zero) {
+ #else
+     if constexpr(is_b_stride_zero) {
+@@ -68,7 +68,7 @@ inline void _scale_attn_mask_fusion_kernel(
+   for (; i < size; i++) {
+     auto tmp0 = a[i];
+     T1 tmp1;
+-#if __GNUC__ == 11 && defined(__ARM_FEATURE_SVE)
++#if __GNUC__ == 11 && 0
+     if (is_b_stride_zero) {
+ #else
+     if constexpr(is_b_stride_zero) {
+@@ -597,7 +597,7 @@ void cpu_flash_attention(
+         // qk <- qk * scaling + attn_mask
+         if (has_attn_mask) {
+           for (int64_t row = 0; row < qBlockSize; ++row) {
+-#if __GNUC__ == 11 && defined(__ARM_FEATURE_SVE)
++#if __GNUC__ == 11 && 0
+               _scale_attn_mask_fusion_kernel(
+                 qk_data + row * kvBlockSize,
+                 mask_data + i * mStrideB + j * mStrideH +
+@@ -915,7 +915,7 @@ void cpu_flash_attention_backward(
+           if (has_attn_mask) {
+             accum_t one = accum_t(1);
+             for (const auto row : c10::irange(qBlockSize)) {
+-#if __GNUC__ == 11 && defined(__ARM_FEATURE_SVE)
++#if __GNUC__ == 11 && 0
+                 _scale_attn_mask_fusion_kernel(
+                   attn_data + row * kvBlockSize,
+                   mask_data + i * mStrideB + j * mStrideH +
+diff --git a/caffe2/perfkernels/common_sve.cc b/caffe2/perfkernels/common_sve.cc
+index 03b0bf9..67b94a3 100644
+--- a/caffe2/perfkernels/common_sve.cc
++++ b/caffe2/perfkernels/common_sve.cc
+@@ -12,11 +12,11 @@
+ #endif // __ARM_FEATURE_SVE
+ #endif // CAFFE2_PERF_WITH_SVE
+ 
+-#ifdef __ARM_FEATURE_SVE
+-#ifndef CAFFE2_PERF_WITH_SVE
+-#error( \
+-    "You found a build system error: __SVE__ is defined \
+-    (via e.g. -march=armv8-a+sve) " \
+-    "but CAFFE2_PERF_WITH_SVE is not defined.");
+-#endif // CAFFE2_PERF_WITH_SVE
+-#endif
++// #ifdef __ARM_FEATURE_SVE
++// #ifndef CAFFE2_PERF_WITH_SVE
++// #error( \
++//     "You found a build system error: __SVE__ is defined \
++//     (via e.g. -march=armv8-a+sve) " \
++//     "but CAFFE2_PERF_WITH_SVE is not defined.");
++// #endif // CAFFE2_PERF_WITH_SVE
++// #endif
 diff --git a/cmake/Codegen.cmake b/cmake/Codegen.cmake
 index 9a562da..2c594d6 100644
 --- a/cmake/Codegen.cmake
