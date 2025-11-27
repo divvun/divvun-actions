@@ -1,3 +1,24 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a5d25e6..b2f04c5 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -915,11 +915,11 @@ if((${CMAKE_SYSTEM_NAME} STREQUAL "Darwin") AND ("${CMAKE_SYSTEM_PROCESSOR}" STR
+ endif()
+ 
+ # Enable sleef on Arm(R) architecture by default (except Android)
+-if((NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Android")
+-  AND("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "aarch64"))
+-  string(APPEND CMAKE_CXX_FLAGS " -DAT_BUILD_ARM_VEC256_WITH_SLEEF")
+-  add_definitions(-DAT_BUILD_ARM_VEC256_WITH_SLEEF)
+-endif()
++# if((NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Android")
++#   AND("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "aarch64"))
++#   string(APPEND CMAKE_CXX_FLAGS " -DAT_BUILD_ARM_VEC256_WITH_SLEEF")
++#   add_definitions(-DAT_BUILD_ARM_VEC256_WITH_SLEEF)
++# endif()
+ 
+ 
+ if(USE_XNNPACK)
 diff --git a/aten/src/ATen/cpu/vec/intrinsics.h b/aten/src/ATen/cpu/vec/intrinsics.h
 index f9086f7..afaa886 100644
 --- a/aten/src/ATen/cpu/vec/intrinsics.h
