@@ -95,10 +95,6 @@ RUN Invoke-WebRequest -Uri https://x.giellalt.org/bsdtar.zip -OutFile bsdtar.zip
 # Install jsign
 RUN choco install jsign -y
 
-# Install Node.js LTS and pnpm
-RUN choco install nodejs --version="24.11.1" -y ; \
-    corepack enable pnpm
-
 # Install MSYS2
 RUN Invoke-WebRequest -Uri "https://github.com/msys2/msys2-installer/releases/download/2025-02-21/msys2-x86_64-20250221.exe" -OutFile msys2-installer.exe ; \
     Start-Process -Wait -FilePath .\msys2-installer.exe -ArgumentList @('install', '--root', 'C:\MSYS2', '--confirm-command') ; \
@@ -114,6 +110,11 @@ RUN sc config ssh-agent start= auto ; \
     sc start ssh-agent
 
 USER ContainerAdministrator
+
+# Install Node.js LTS and pnpm
+RUN choco install nodejs --version="24.11.1" -y ; \
+    setx /M PATH $($Env:PATH + ';C:\Program Files\nodejs') ; \
+    corepack enable pnpm
 
 # Install Rust using rustup
 RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe; \
@@ -150,7 +151,7 @@ RUN Invoke-WebRequest -Uri "https://download.docker.com/win/static/stable/x86_64
 
 # Install gh (GitHub CLI)
 RUN Invoke-WebRequest -Uri "https://github.com/cli/cli/releases/download/v2.78.0/gh_2.78.0_windows_amd64.zip" -OutFile gh.zip ; \
-    Expand-Archive gh.zip -DestinationPath C:\bin -Force ; \
+    Expand-Archive gh.zip -DestinationPath C:\ ; \
     Remove-Item -Force gh.zip
 
 # Install uv
