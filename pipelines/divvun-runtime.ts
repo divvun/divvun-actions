@@ -193,7 +193,7 @@ export async function pipelineDivvunRuntime() {
           `cp ./playground/src-tauri/target/${target}/release/bundle/appimage/*.AppImage ./divvun-rt-playground-${target}.AppImage`,
           `buildkite-agent artifact upload divvun-rt-playground-${target}.AppImage`,
         ],
-        agents: { queue: target.includes("-musl") ? "alpine" : "linux" },
+        agents: { queue: "linux" },
       }))
     }
   }
