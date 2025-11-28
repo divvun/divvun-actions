@@ -106,7 +106,7 @@ export async function pipelineDivvunRuntime() {
       buildSteps.push(command({
         label: `build-${target}`,
         command: [
-          `$$env:PATH = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;" + $$env:PATH; .\\x.ps1 build --target ${target}`,
+          `$$env:PATH = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; .\\x.ps1 build --target ${target}`,
           `mv ${targetFile} .\\${artifactName}-${target}`,
           `buildkite-agent artifact upload ${artifactName}-${target}`,
         ],
@@ -175,7 +175,7 @@ export async function pipelineDivvunRuntime() {
       uiBuildSteps.push(command({
         label: `Playground (${target}) - Build`,
         command: [
-          `$$env:PATH = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;" + $$env:PATH; echo '--- Building UI'; .\\x.ps1 build-ui --target ${target}`,
+          `$$env:PATH = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; echo '--- Building UI'; .\\x.ps1 build-ui --target ${target}`,
           `copy ".\\playground\\src-tauri\\target\\${target}\\release\\bundle\\msi\\Divvun Runtime Playground.msi" .`,
           `ren "Divvun Runtime Playground.msi" "divvun-rt-playground-${target}.msi"`,
           `buildkite-agent artifact upload divvun-rt-playground-${target}.msi`,
