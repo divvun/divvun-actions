@@ -2,56 +2,36 @@ import * as fs from "@std/fs"
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
-import * as target from "~/target.ts"
+import * as targetModule from "~/target.ts"
 import { GitHub } from "~/util/github.ts"
 import { Tar, Zip } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
-type Config = {
-  targets: string[]
-}
+// Main branch builds all targets for testing
+const MAIN_TARGETS = [
+  "aarch64-unknown-linux-musl",
+  "x86_64-unknown-linux-musl",
+  "aarch64-pc-windows-msvc",
+  "x86_64-pc-windows-msvc",
+  "aarch64-apple-darwin",
+  "aarch64-apple-ios",
+]
+
+// Release builds only ship linux and macos
+const RELEASE_TARGETS = [
+  "aarch64-unknown-linux-musl",
+  "x86_64-unknown-linux-musl",
+  "aarch64-apple-darwin",
+]
 
 function command(input: CommandStep): CommandStep {
   return {
     ...input,
     plugins: [
       ...(input.plugins ?? []),
-      `ssh://git@github.com/divvun/divvun-actions.git#${target.gitHash}`,
+      `ssh://git@github.com/divvun/divvun-actions.git#${targetModule.gitHash}`,
     ],
   }
-}
-
-async function config() {
-  let unknown = builder.env.config
-
-  if (unknown == null) {
-    const data = await builder.metadata("divvun-runtime:config")
-    if (data == null) {
-      throw new Error("No config provided")
-    }
-    unknown = JSON.parse(data)
-  }
-
-  if (unknown instanceof Error) {
-    throw unknown
-  }
-
-  if (unknown === null) {
-    throw new Error("No config provided")
-  }
-
-  if (typeof unknown === "object") {
-    if (
-      !(Array.isArray(unknown.targets) &&
-        unknown.targets.every((t) => typeof t === "string"))
-    ) {
-      throw new Error("Invalid or missing 'targets' array in config")
-    }
-
-    return unknown as Config
-  }
-
-  throw new Error("Invalid config provided")
 }
 
 function os(target: string): string {
@@ -67,8 +47,9 @@ function os(target: string): string {
 }
 
 export async function pipelineDivvunRuntime() {
-  const cfg = await config()
-  await builder.setMetadata("divvun-runtime:config", JSON.stringify(cfg))
+  // Use release targets if building a tag, otherwise main targets
+  const isRelease = builder.env.tag && builder.env.tag.match(/^v/)
+  const targets = isRelease ? RELEASE_TARGETS : MAIN_TARGETS
 
   // Load version from Cargo.toml
   const cargoTomlText = await Deno.readTextFile("Cargo.toml")
@@ -82,7 +63,7 @@ export async function pipelineDivvunRuntime() {
 
   const buildSteps: CommandStep[] = []
 
-  for (const target of cfg.targets) {
+  for (const target of targets) {
     const artifactName = `divvun-runtime${
       target.includes("windows") ? ".exe" : ""
     }`
@@ -120,7 +101,7 @@ export async function pipelineDivvunRuntime() {
         depends_on: `cli-build-${target}`,
       }))
     } else if (os(target) === "windows") {
-      // Non-macOS targets: Build and upload directly
+      // Windows targets: Build and upload directly
       buildSteps.push(command({
         label: `build-${target}`,
         command: [
@@ -129,11 +110,11 @@ export async function pipelineDivvunRuntime() {
           `buildkite-agent artifact upload ${artifactName}-${target}`,
         ],
         agents: {
-          queue: target.includes("-musl") ? "alpine" : os(target),
+          queue: "windows",
         },
       }))
     } else {
-      // Non-macOS targets: Build and upload directly
+      // Linux targets: Build and upload directly
       buildSteps.push(command({
         label: `build-${target}`,
         command: [
@@ -142,7 +123,7 @@ export async function pipelineDivvunRuntime() {
           `buildkite-agent artifact upload ${artifactName}-${target}`,
         ],
         agents: {
-          queue: target.includes("-musl") ? "alpine" : os(target),
+          queue: target.includes("-musl") ? "alpine" : "linux",
         },
       }))
     }
@@ -150,13 +131,9 @@ export async function pipelineDivvunRuntime() {
 
   const uiBuildSteps: CommandStep[] = []
 
-  for (const target of cfg.targets) {
-    if (os(target) === "linux") {
-      continue
-    }
-
-    // Step 1: Build on macOS and upload unsigned app
+  for (const target of targets) {
     if (os(target) === "macos") {
+      // macOS: Build and sign
       uiBuildSteps.push(command({
         label: `Playground (${target}) - Build`,
         key: `playground-build-${target}`,
@@ -205,6 +182,19 @@ export async function pipelineDivvunRuntime() {
         agents: { queue: "windows" },
       }))
     }
+
+    if (os(target) === "linux") {
+      uiBuildSteps.push(command({
+        label: `Playground (${target}) - Build`,
+        command: [
+          "echo '--- Building UI'",
+          `./x build-ui --target ${target}`,
+          `cp ./playground/src-tauri/target/${target}/release/bundle/appimage/*.AppImage ./divvun-rt-playground-${target}.AppImage`,
+          `buildkite-agent artifact upload divvun-rt-playground-${target}.AppImage`,
+        ],
+        agents: { queue: target.includes("-musl") ? "alpine" : "linux" },
+      }))
+    }
   }
 
   const pipeline: BuildkitePipeline = {
@@ -242,36 +232,56 @@ export async function runDivvunRuntimePublish() {
     throw new Error("No repo found, cannot publish")
   }
 
-  const cfg = await config()
+  // Release publish always uses RELEASE_TARGETS
+  const targets = RELEASE_TARGETS
+
   using tempDir = await makeTempDir()
   await Promise.all(
-    cfg.targets.map((target) =>
+    targets.map((target) =>
       builder.downloadArtifacts(`divvun-runtime-${target}`, tempDir.path)
     ),
   )
 
-  // Download signed playground artifacts for non-Linux targets
-  const playgroundTargets = cfg.targets.filter((t) => os(t) !== "linux")
+  // Download playground artifacts for all targets
   await Promise.all(
-    playgroundTargets.map((target) =>
-      builder.downloadArtifacts(`divvun-rt-playground-${target}`, tempDir.path)
-    ),
+    targets.map((target) => {
+      if (os(target) === "linux") {
+        return builder.downloadArtifacts(
+          `divvun-rt-playground-${target}.AppImage`,
+          tempDir.path,
+        )
+      }
+      return builder.downloadArtifacts(
+        `divvun-rt-playground-${target}`,
+        tempDir.path,
+      )
+    }),
   )
 
   using archivePath = await makeTempDir({ prefix: "divvun-runtime-" })
 
   // Move playground artifacts to archive path with tag
-  for (const target of playgroundTargets) {
-    const artifactName = `divvun-rt-playground-${target}`
-    const sourcePath = path.join(tempDir.path, artifactName)
-    const destPath = path.join(
-      archivePath.path,
-      `${artifactName}_${builder.env.tag!}.tar.gz`,
-    )
-    await fs.move(sourcePath, destPath, { overwrite: true })
+  for (const target of targets) {
+    if (os(target) === "linux") {
+      const artifactName = `divvun-rt-playground-${target}.AppImage`
+      const sourcePath = path.join(tempDir.path, artifactName)
+      const destPath = path.join(
+        archivePath.path,
+        `divvun-rt-playground-${target}_${builder.env.tag!}.AppImage`,
+      )
+      await fs.move(sourcePath, destPath, { overwrite: true })
+    } else {
+      const artifactName = `divvun-rt-playground-${target}`
+      const sourcePath = path.join(tempDir.path, artifactName)
+      const destPath = path.join(
+        archivePath.path,
+        `${artifactName}_${builder.env.tag!}.tar.gz`,
+      )
+      await fs.move(sourcePath, destPath, { overwrite: true })
+    }
   }
 
-  for (const target of cfg.targets) {
+  for (const target of targets) {
     const ext = target.includes("windows") ? "zip" : "tgz"
     const outPath = `${archivePath.path}/divvun-runtime-${target}-${builder.env
       .tag!}.${ext}`
