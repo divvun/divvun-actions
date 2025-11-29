@@ -15,49 +15,37 @@ RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache install `
     --add Microsoft.VisualStudio.Workload.VCTools `
     --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
     --add Microsoft.VisualStudio.Component.Windows11SDK.26100; `
-    if ($LASTEXITCODE -eq 3010) { $LASTEXITCODE = 0 }; `
-    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id; `
-    foreach ($id in $setupIds) { Wait-Process -Id $id -ErrorAction SilentlyContinue }
+    if ($LASTEXITCODE -notin 0, 3010) { throw "VS installer failed with exit code $LASTEXITCODE" }
 
 # Layer 2: Add ARM64 tools
 RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
     --add Microsoft.VisualStudio.Component.VC.Tools.ARM64; `
-    if ($LASTEXITCODE -eq 3010) { $LASTEXITCODE = 0 }; `
-    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id; `
-    foreach ($id in $setupIds) { Wait-Process -Id $id -ErrorAction SilentlyContinue }
+    if ($LASTEXITCODE -notin 0, 3010) { throw "VS installer failed with exit code $LASTEXITCODE" }
 
 # Layer 3: Add Clang/LLVM toolset
 RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
     --add Microsoft.VisualStudio.Component.VC.Llvm.Clang `
     --add Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset; `
-    if ($LASTEXITCODE -eq 3010) { $LASTEXITCODE = 0 }; `
-    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id; `
-    foreach ($id in $setupIds) { Wait-Process -Id $id -ErrorAction SilentlyContinue }
+    if ($LASTEXITCODE -notin 0, 3010) { throw "VS installer failed with exit code $LASTEXITCODE" }
 
 # Layer 4: Add MSBuild and .NET Core tools
 RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
     --add Microsoft.VisualStudio.Workload.MSBuildTools `
     --add Microsoft.VisualStudio.Workload.NetCoreBuildTools; `
-    if ($LASTEXITCODE -eq 3010) { $LASTEXITCODE = 0 }; `
-    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id; `
-    foreach ($id in $setupIds) { Wait-Process -Id $id -ErrorAction SilentlyContinue }
+    if ($LASTEXITCODE -notin 0, 3010) { throw "VS installer failed with exit code $LASTEXITCODE" }
 
 # Layer 5: Add Desktop workloads
 RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
     --add Microsoft.VisualStudio.Workload.NativeDesktop `
     --add Microsoft.VisualStudio.Workload.ManagedDesktop; `
-    if ($LASTEXITCODE -eq 3010) { $LASTEXITCODE = 0 }; `
-    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id; `
-    foreach ($id in $setupIds) { Wait-Process -Id $id -ErrorAction SilentlyContinue }
+    if ($LASTEXITCODE -notin 0, 3010) { throw "VS installer failed with exit code $LASTEXITCODE" }
 
 # Layer 6: Add CMake support
 RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
     --add Microsoft.VisualStudio.Component.VC.CMake.Project; `
-    if ($LASTEXITCODE -eq 3010) { $LASTEXITCODE = 0 }; `
-    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id; `
-    foreach ($id in $setupIds) { Wait-Process -Id $id -ErrorAction SilentlyContinue }
+    if ($LASTEXITCODE -notin 0, 3010) { throw "VS installer failed with exit code $LASTEXITCODE" }
 
-# Cleanup: Remove installer and caches
+# Cleanup: Remove installer and caches (SilentlyContinue OK here - paths may not exist)
 RUN Remove-Item -Force 'C:\vs_buildtools.exe'; `
     Remove-Item -Recurse -Force 'C:\ProgramData\Package Cache\*' -ErrorAction SilentlyContinue; `
     Remove-Item -Recurse -Force $env:TEMP\* -ErrorAction SilentlyContinue
