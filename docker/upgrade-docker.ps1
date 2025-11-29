@@ -66,9 +66,18 @@ if (-not $dockerService) {
     exit 1
 }
 
-$dockerPath = "$env:ProgramFiles\Docker"
+# Detect Docker installation path
+$dockerExe = (Get-Command docker -ErrorAction SilentlyContinue).Source
+if (-not $dockerExe) {
+    Write-Error "Docker executable not found in PATH"
+    exit 1
+}
+$dockerPath = Split-Path -Parent $dockerExe
+Write-Host "Docker installation path: $dockerPath"
+
 $downloadUrl = "https://download.docker.com/win/static/stable/x86_64/docker-$targetVersion.zip"
 $tempZip = Join-Path $env:TEMP "docker-$targetVersion.zip"
+$tempExtract = Join-Path $env:TEMP "docker-extract"
 
 Write-Host ""
 Write-Host "Downloading Docker $targetVersion..."
@@ -82,16 +91,22 @@ try {
 }
 
 Write-Host "Download complete."
+
+# Extract to temp location first
+Write-Host "Extracting to temp location..."
+if (Test-Path $tempExtract) {
+    Remove-Item -Path $tempExtract -Recurse -Force
+}
+Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
+
 Write-Host ""
 Write-Host "Stopping Docker service..."
 Stop-Service docker -Force
 Write-Host "Docker service stopped."
 
-Write-Host "Removing old binaries from $dockerPath..."
-Remove-Item -Path "$dockerPath\*" -Recurse -Force
-
-Write-Host "Extracting new binaries..."
-Expand-Archive -Path $tempZip -DestinationPath $env:ProgramFiles -Force
+# Copy new binaries over existing ones
+Write-Host "Copying new binaries to $dockerPath..."
+Copy-Item -Path "$tempExtract\docker\*" -Destination $dockerPath -Force
 
 Write-Host "Starting Docker service..."
 Start-Service docker
@@ -99,6 +114,7 @@ Write-Host "Docker service started."
 
 # Cleanup
 Remove-Item -Path $tempZip -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
 
 # Verify
 Write-Host ""

@@ -66,6 +66,7 @@ export type GithubWebhook = {
 }
 
 export type GithubRelease = {
+  id: number
   tag_name: string
   name: string
   draft: boolean

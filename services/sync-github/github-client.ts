@@ -127,6 +127,7 @@ export async function listGithubReleases(
     releases = [
       ...releases,
       ...data.map((release: any) => ({
+        id: release.id,
         tag_name: release.tag_name,
         name: release.name,
         draft: release.draft,
@@ -200,4 +201,33 @@ export function hasWebhookForPipeline(
     webhook.active &&
     webhook.config.url === pipeline.webhook_url
   )
+}
+
+export async function deleteGithubRelease(
+  props: Required<SyncGithubProps["github"]>,
+  repoName: string,
+  releaseId: number,
+): Promise<void> {
+  const [owner, repo] = repoName.split("/")
+
+  const response = await fetchGithub(
+    `https://api.github.com/repos/${owner}/${repo}/releases/${releaseId}`,
+    props.apiKey,
+    {
+      method: "DELETE",
+      headers: {
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    },
+  )
+
+  if (!response.ok && response.status !== 204) {
+    throw new Error(
+      `Failed to delete release ${releaseId} for ${repoName}: ${response.status}`,
+    )
+  }
+}
+
+export function isDevLatestRelease(tagName: string): boolean {
+  return tagName === "dev-latest" || tagName.endsWith("/dev-latest")
 }
