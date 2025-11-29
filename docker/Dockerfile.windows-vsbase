@@ -3,31 +3,62 @@ FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
-# Enable long paths FIRST, before any installations
+# Enable long paths FIRST
 RUN New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
     -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
 
-# Install Visual Studio Build Tools with all components
-RUN $components = @( `
-        'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', `
-        'Microsoft.VisualStudio.Component.VC.Tools.ARM64', `
-        'Microsoft.VisualStudio.Component.VC.Llvm.Clang', `
-        'Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset', `
-        'Microsoft.VisualStudio.Workload.VCTools', `
-        'Microsoft.VisualStudio.Workload.MSBuildTools', `
-        'Microsoft.VisualStudio.Workload.NetCoreBuildTools', `
-        'Microsoft.VisualStudio.Workload.NativeDesktop', `
-        'Microsoft.VisualStudio.Workload.ManagedDesktop', `
-        'Microsoft.VisualStudio.Component.Windows11SDK.26100', `
-        'Microsoft.VisualStudio.Component.VC.CMake.Project' `
-    ); `
-    $args = '--wait --quiet --norestart --nocache install ' + ($components | ForEach-Object { '--add ' + $_ }) -join ' ' + ' --includeRecommended'; `
-    Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vs_buildtools.exe' -OutFile 'vs_buildtools.exe'; `
-    $p = Start-Process -FilePath '.\vs_buildtools.exe' -ArgumentList $args -NoNewWindow -PassThru; `
-    $p.WaitForExit(); `
+# Download VS Build Tools installer (small layer)
+RUN Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vs_buildtools.exe' -OutFile 'C:\vs_buildtools.exe'
+
+# Layer 1: Install base VCTools workload with Windows SDK
+RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache install `
+    --add Microsoft.VisualStudio.Workload.VCTools `
+    --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+    --add Microsoft.VisualStudio.Component.Windows11SDK.26100; `
+    if ($LASTEXITCODE -eq 3010) { $LASTEXITCODE = 0 }; `
     $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id; `
-    foreach ($id in $setupIds) { Wait-Process -Id $id -ErrorAction SilentlyContinue }; `
-    Remove-Item '.\vs_buildtools.exe'; `
+    foreach ($id in $setupIds) { Wait-Process -Id $id -ErrorAction SilentlyContinue }
+
+# Layer 2: Add ARM64 tools
+RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
+    --add Microsoft.VisualStudio.Component.VC.Tools.ARM64; `
+    if ($LASTEXITCODE -eq 3010) { $LASTEXITCODE = 0 }; `
+    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id; `
+    foreach ($id in $setupIds) { Wait-Process -Id $id -ErrorAction SilentlyContinue }
+
+# Layer 3: Add Clang/LLVM toolset
+RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
+    --add Microsoft.VisualStudio.Component.VC.Llvm.Clang `
+    --add Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset; `
+    if ($LASTEXITCODE -eq 3010) { $LASTEXITCODE = 0 }; `
+    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id; `
+    foreach ($id in $setupIds) { Wait-Process -Id $id -ErrorAction SilentlyContinue }
+
+# Layer 4: Add MSBuild and .NET Core tools
+RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
+    --add Microsoft.VisualStudio.Workload.MSBuildTools `
+    --add Microsoft.VisualStudio.Workload.NetCoreBuildTools; `
+    if ($LASTEXITCODE -eq 3010) { $LASTEXITCODE = 0 }; `
+    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id; `
+    foreach ($id in $setupIds) { Wait-Process -Id $id -ErrorAction SilentlyContinue }
+
+# Layer 5: Add Desktop workloads
+RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
+    --add Microsoft.VisualStudio.Workload.NativeDesktop `
+    --add Microsoft.VisualStudio.Workload.ManagedDesktop; `
+    if ($LASTEXITCODE -eq 3010) { $LASTEXITCODE = 0 }; `
+    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id; `
+    foreach ($id in $setupIds) { Wait-Process -Id $id -ErrorAction SilentlyContinue }
+
+# Layer 6: Add CMake support
+RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
+    --add Microsoft.VisualStudio.Component.VC.CMake.Project; `
+    if ($LASTEXITCODE -eq 3010) { $LASTEXITCODE = 0 }; `
+    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id; `
+    foreach ($id in $setupIds) { Wait-Process -Id $id -ErrorAction SilentlyContinue }
+
+# Cleanup: Remove installer and caches
+RUN Remove-Item -Force 'C:\vs_buildtools.exe'; `
     Remove-Item -Recurse -Force 'C:\ProgramData\Package Cache\*' -ErrorAction SilentlyContinue; `
     Remove-Item -Recurse -Force $env:TEMP\* -ErrorAction SilentlyContinue
 
