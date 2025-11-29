@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/powershell:lts-windowsservercore-ltsc2022 AS buildkite-agent
+FROM ghcr.io/divvun/lts-windowsservercore-ltsc2022-vs2022:latest AS buildkite-agent
 
 SHELL ["pwsh", "-command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
@@ -9,6 +9,9 @@ RUN Invoke-WebRequest -Uri https://github.com/git-for-windows/git/releases/downl
 
 # Add Git to PATH
 RUN setx /M PATH $($Env:PATH + 'C:\Program Files\Git\cmd;C:\Program Files\Git\bin;');
+
+# Configure Git for long paths
+RUN git config --global core.longpaths true
 
 ENV buildkiteAgentToken "XXX"
 ENV BUILDKITE_AGENT_TOKEN "XXX"
@@ -21,30 +24,6 @@ RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
 RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
     iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-
-# Install Visual Studio components
-RUN $components = @( \
-        'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', \
-        'Microsoft.VisualStudio.Component.VC.Tools.ARM64', \
-        'Microsoft.VisualStudio.Component.VC.Llvm.Clang', \
-        'Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset', \
-        'Microsoft.VisualStudio.Workload.VCTools', \
-        'Microsoft.VisualStudio.Workload.MSBuildTools', \
-        'Microsoft.VisualStudio.Workload.NetCoreBuildTools', \
-        'Microsoft.VisualStudio.Workload.NativeDesktop', \
-        'Microsoft.VisualStudio.Workload.ManagedDesktop', \
-        'Microsoft.VisualStudio.Component.Windows11SDK.26100', \
-        'Microsoft.VisualStudio.Component.VC.CMake.Project' \
-    ); \
-    $args = '--wait --quiet --norestart --nocache install ' + ($components | ForEach-Object { '--add ' + $_ }) -join ' ' + ' --includeRecommended'; \
-    Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vs_buildtools.exe' -OutFile 'vs_buildtools.exe' ; \
-    $VSId = Start-Process -FilePath '.\vs_buildtools.exe' -ArgumentList $args -NoNewWindow -PassThru ; \
-    $VSId.WaitForExit() ; \
-    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id ; \
-    foreach ($id in $setupIds) { \
-        Wait-Process -Id $id -ErrorAction SilentlyContinue \
-    } ; \
-    Remove-Item '.\vs_buildtools.exe'
 
 # Install Inno Setup
 RUN Invoke-WebRequest -Uri https://jrsoftware.org/download.php/is.exe?site=2 -OutFile innosetup.exe; \
@@ -165,10 +144,6 @@ RUN Invoke-WebRequest -Uri "https://github.com/PowerShell/Win32-OpenSSH/releases
     Start-Process -Wait msiexec -ArgumentList '/i', 'openssh.msi', 'ADDLOCAL=Client', '/quiet', '/norestart' ; \
     Remove-Item -Force openssh.msi ; \
     setx /M PATH $($Env:ProgramFiles + '\OpenSSH' + ';' + $Env:PATH)
-
-# Enable long paths (Windows was a mistake)
-RUN New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
-RUN git config --global core.longpaths true
 
 # Install vcpkg
 RUN git clone --depth 1 --branch 2025.10.17 https://github.com/microsoft/vcpkg.git C:\vcpkg ; \

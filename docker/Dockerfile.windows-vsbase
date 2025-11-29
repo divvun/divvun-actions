@@ -1,0 +1,37 @@
+# escape=`
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Enable long paths FIRST, before any installations
+RUN New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
+    -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+
+# Install Visual Studio Build Tools with all components
+RUN $components = @( `
+        'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', `
+        'Microsoft.VisualStudio.Component.VC.Tools.ARM64', `
+        'Microsoft.VisualStudio.Component.VC.Llvm.Clang', `
+        'Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset', `
+        'Microsoft.VisualStudio.Workload.VCTools', `
+        'Microsoft.VisualStudio.Workload.MSBuildTools', `
+        'Microsoft.VisualStudio.Workload.NetCoreBuildTools', `
+        'Microsoft.VisualStudio.Workload.NativeDesktop', `
+        'Microsoft.VisualStudio.Workload.ManagedDesktop', `
+        'Microsoft.VisualStudio.Component.Windows11SDK.26100', `
+        'Microsoft.VisualStudio.Component.VC.CMake.Project' `
+    ); `
+    $args = '--wait --quiet --norestart --nocache install ' + ($components | ForEach-Object { '--add ' + $_ }) -join ' ' + ' --includeRecommended'; `
+    Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vs_buildtools.exe' -OutFile 'vs_buildtools.exe'; `
+    $p = Start-Process -FilePath '.\vs_buildtools.exe' -ArgumentList $args -NoNewWindow -PassThru; `
+    $p.WaitForExit(); `
+    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id; `
+    foreach ($id in $setupIds) { Wait-Process -Id $id -ErrorAction SilentlyContinue }; `
+    Remove-Item '.\vs_buildtools.exe'; `
+    Remove-Item -Recurse -Force 'C:\ProgramData\Package Cache\*' -ErrorAction SilentlyContinue; `
+    Remove-Item -Recurse -Force $env:TEMP\* -ErrorAction SilentlyContinue
+
+# Install PowerShell Core to match main image expectations
+RUN Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.4.6/PowerShell-7.4.6-win-x64.msi' -OutFile 'pwsh.msi'; `
+    Start-Process msiexec.exe -ArgumentList '/i', 'pwsh.msi', '/quiet', '/norestart' -Wait; `
+    Remove-Item -Force 'pwsh.msi'
