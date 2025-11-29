@@ -15,14 +15,14 @@ RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache install \
     --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 \
     --add Microsoft.VisualStudio.Component.Windows11SDK.26100 ; \
     if ($LASTEXITCODE -notin 0, 3010) { \
-        throw "VS installer failed with exit code $LASTEXITCODE" \
+        throw \"VS installer failed with exit code $LASTEXITCODE\" \
     }
 
 # Layer 2: Add ARM64 tools
 RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify \
     --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 ; \
     if ($LASTEXITCODE -notin 0, 3010) { \
-        throw "VS installer failed with exit code $LASTEXITCODE" \
+        throw \"VS installer failed with exit code $LASTEXITCODE\" \
     }
 
 # Layer 3: Add Clang/LLVM toolset
@@ -30,7 +30,7 @@ RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify \
     --add Microsoft.VisualStudio.Component.VC.Llvm.Clang \
     --add Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset ; \
     if ($LASTEXITCODE -notin 0, 3010) { \
-        throw "VS installer failed with exit code $LASTEXITCODE" \
+        throw \"VS installer failed with exit code $LASTEXITCODE\" \
     }
 
 # Layer 4: Add MSBuild and .NET Core tools
@@ -38,7 +38,7 @@ RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify \
     --add Microsoft.VisualStudio.Workload.MSBuildTools \
     --add Microsoft.VisualStudio.Workload.NetCoreBuildTools ; \
     if ($LASTEXITCODE -notin 0, 3010) { \
-        throw "VS installer failed with exit code $LASTEXITCODE" \
+        throw \"VS installer failed with exit code $LASTEXITCODE\" \
     }
 
 # Layer 5: Add Desktop workloads
@@ -46,14 +46,14 @@ RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify \
     --add Microsoft.VisualStudio.Workload.NativeDesktop \
     --add Microsoft.VisualStudio.Workload.ManagedDesktop ; \
     if ($LASTEXITCODE -notin 0, 3010) { \
-        throw "VS installer failed with exit code $LASTEXITCODE" \
+        throw \"VS installer failed with exit code $LASTEXITCODE\" \
     }
 
 # Layer 6: Add CMake support
 RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify \
     --add Microsoft.VisualStudio.Component.VC.CMake.Project ; \
     if ($LASTEXITCODE -notin 0, 3010) { \
-        throw "VS installer failed with exit code $LASTEXITCODE" \
+        throw \"VS installer failed with exit code $LASTEXITCODE\" \
     }
 
 # Cleanup: Remove installer and caches
