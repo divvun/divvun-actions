@@ -1,56 +1,67 @@
-# escape=`
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 # Enable long paths FIRST
-RUN New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
+RUN New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" \
     -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
 
 # Download VS Build Tools installer (small layer)
 RUN Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vs_buildtools.exe' -OutFile 'C:\vs_buildtools.exe'
 
 # Layer 1: Install base VCTools workload with Windows SDK
-RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache install `
-    --add Microsoft.VisualStudio.Workload.VCTools `
-    --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-    --add Microsoft.VisualStudio.Component.Windows11SDK.26100; `
-    if ($LASTEXITCODE -notin 0, 3010) { throw "VS installer failed with exit code $LASTEXITCODE" }
+RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache install \
+    --add Microsoft.VisualStudio.Workload.VCTools \
+    --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 \
+    --add Microsoft.VisualStudio.Component.Windows11SDK.26100 ; \
+    if ($LASTEXITCODE -notin 0, 3010) { \
+        throw "VS installer failed with exit code $LASTEXITCODE" \
+    }
 
 # Layer 2: Add ARM64 tools
-RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
-    --add Microsoft.VisualStudio.Component.VC.Tools.ARM64; `
-    if ($LASTEXITCODE -notin 0, 3010) { throw "VS installer failed with exit code $LASTEXITCODE" }
+RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify \
+    --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 ; \
+    if ($LASTEXITCODE -notin 0, 3010) { \
+        throw "VS installer failed with exit code $LASTEXITCODE" \
+    }
 
 # Layer 3: Add Clang/LLVM toolset
-RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
-    --add Microsoft.VisualStudio.Component.VC.Llvm.Clang `
-    --add Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset; `
-    if ($LASTEXITCODE -notin 0, 3010) { throw "VS installer failed with exit code $LASTEXITCODE" }
+RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify \
+    --add Microsoft.VisualStudio.Component.VC.Llvm.Clang \
+    --add Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset ; \
+    if ($LASTEXITCODE -notin 0, 3010) { \
+        throw "VS installer failed with exit code $LASTEXITCODE" \
+    }
 
 # Layer 4: Add MSBuild and .NET Core tools
-RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
-    --add Microsoft.VisualStudio.Workload.MSBuildTools `
-    --add Microsoft.VisualStudio.Workload.NetCoreBuildTools; `
-    if ($LASTEXITCODE -notin 0, 3010) { throw "VS installer failed with exit code $LASTEXITCODE" }
+RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify \
+    --add Microsoft.VisualStudio.Workload.MSBuildTools \
+    --add Microsoft.VisualStudio.Workload.NetCoreBuildTools ; \
+    if ($LASTEXITCODE -notin 0, 3010) { \
+        throw "VS installer failed with exit code $LASTEXITCODE" \
+    }
 
 # Layer 5: Add Desktop workloads
-RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
-    --add Microsoft.VisualStudio.Workload.NativeDesktop `
-    --add Microsoft.VisualStudio.Workload.ManagedDesktop; `
-    if ($LASTEXITCODE -notin 0, 3010) { throw "VS installer failed with exit code $LASTEXITCODE" }
+RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify \
+    --add Microsoft.VisualStudio.Workload.NativeDesktop \
+    --add Microsoft.VisualStudio.Workload.ManagedDesktop ; \
+    if ($LASTEXITCODE -notin 0, 3010) { \
+        throw "VS installer failed with exit code $LASTEXITCODE" \
+    }
 
 # Layer 6: Add CMake support
-RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify `
-    --add Microsoft.VisualStudio.Component.VC.CMake.Project; `
-    if ($LASTEXITCODE -notin 0, 3010) { throw "VS installer failed with exit code $LASTEXITCODE" }
+RUN C:\vs_buildtools.exe --wait --quiet --norestart --nocache modify \
+    --add Microsoft.VisualStudio.Component.VC.CMake.Project ; \
+    if ($LASTEXITCODE -notin 0, 3010) { \
+        throw "VS installer failed with exit code $LASTEXITCODE" \
+    }
 
-# Cleanup: Remove installer and caches (SilentlyContinue OK here - paths may not exist)
-RUN Remove-Item -Force 'C:\vs_buildtools.exe'; `
-    Remove-Item -Recurse -Force 'C:\ProgramData\Package Cache\*' -ErrorAction SilentlyContinue; `
+# Cleanup: Remove installer and caches
+RUN Remove-Item -Force 'C:\vs_buildtools.exe' ; \
+    Remove-Item -Recurse -Force 'C:\ProgramData\Package Cache\*' -ErrorAction SilentlyContinue ; \
     Remove-Item -Recurse -Force $env:TEMP\* -ErrorAction SilentlyContinue
 
 # Install PowerShell Core to match main image expectations
-RUN Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.4.6/PowerShell-7.4.6-win-x64.msi' -OutFile 'pwsh.msi'; `
-    Start-Process msiexec.exe -ArgumentList '/i', 'pwsh.msi', '/quiet', '/norestart' -Wait; `
+RUN Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.4.6/PowerShell-7.4.6-win-x64.msi' -OutFile 'pwsh.msi' ; \
+    Start-Process msiexec.exe -ArgumentList '/i', 'pwsh.msi', '/quiet', '/norestart' -Wait ; \
     Remove-Item -Force 'pwsh.msi'
