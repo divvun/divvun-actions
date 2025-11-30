@@ -17,10 +17,15 @@ const MAIN_TARGETS = [
   "aarch64-apple-ios",
 ]
 
-// Release builds only ship linux and macos
-const RELEASE_TARGETS = [
+// CLI release targets
+const CLI_RELEASE_TARGETS = [
   "aarch64-unknown-linux-musl",
   "x86_64-unknown-linux-musl",
+  "aarch64-apple-darwin",
+]
+
+// Playground release targets (just Apple Darwin for now)
+const PLAYGROUND_RELEASE_TARGETS = [
   "aarch64-apple-darwin",
 ]
 
@@ -49,7 +54,8 @@ function os(target: string): string {
 export async function pipelineDivvunRuntime() {
   // Use release targets if building a tag, otherwise main targets
   const isRelease = builder.env.tag && builder.env.tag.match(/^v/)
-  const targets = isRelease ? RELEASE_TARGETS : MAIN_TARGETS
+  const cliTargets = isRelease ? CLI_RELEASE_TARGETS : MAIN_TARGETS
+  const playgroundTargets = isRelease ? PLAYGROUND_RELEASE_TARGETS : MAIN_TARGETS
 
   // Load version from Cargo.toml
   const cargoTomlText = await Deno.readTextFile("Cargo.toml")
@@ -63,7 +69,7 @@ export async function pipelineDivvunRuntime() {
 
   const buildSteps: CommandStep[] = []
 
-  for (const target of targets) {
+  for (const target of cliTargets) {
     const artifactName = `divvun-runtime${
       target.includes("windows") ? ".exe" : ""
     }`
@@ -132,7 +138,7 @@ export async function pipelineDivvunRuntime() {
 
   const uiBuildSteps: CommandStep[] = []
 
-  for (const target of targets) {
+  for (const target of playgroundTargets) {
     if (os(target) === "macos") {
       // macOS: Build and sign
       uiBuildSteps.push(command({
@@ -233,19 +239,18 @@ export async function runDivvunRuntimePublish() {
     throw new Error("No repo found, cannot publish")
   }
 
-  // Release publish always uses RELEASE_TARGETS
-  const targets = RELEASE_TARGETS
-
   using tempDir = await makeTempDir()
+
+  // Download CLI artifacts
   await Promise.all(
-    targets.map((target) =>
+    CLI_RELEASE_TARGETS.map((target) =>
       builder.downloadArtifacts(`divvun-runtime-${target}`, tempDir.path)
     ),
   )
 
-  // Download playground artifacts for all targets
+  // Download playground artifacts
   await Promise.all(
-    targets.map((target) => {
+    PLAYGROUND_RELEASE_TARGETS.map((target) => {
       if (os(target) === "linux") {
         return builder.downloadArtifacts(
           `divvun-rt-playground-${target}.AppImage`,
@@ -262,7 +267,7 @@ export async function runDivvunRuntimePublish() {
   using archivePath = await makeTempDir({ prefix: "divvun-runtime-" })
 
   // Move playground artifacts to archive path with tag
-  for (const target of targets) {
+  for (const target of PLAYGROUND_RELEASE_TARGETS) {
     if (os(target) === "linux") {
       const artifactName = `divvun-rt-playground-${target}.AppImage`
       const sourcePath = path.join(tempDir.path, artifactName)
@@ -282,7 +287,7 @@ export async function runDivvunRuntimePublish() {
     }
   }
 
-  for (const target of targets) {
+  for (const target of CLI_RELEASE_TARGETS) {
     const ext = target.includes("windows") ? "zip" : "tgz"
     const outPath = `${archivePath.path}/divvun-runtime-${target}-${builder.env
       .tag!}.${ext}`
