@@ -325,5 +325,6 @@ export async function runDivvunRuntimePublish() {
   await gh.createRelease(
     builder.env.tag!,
     [`${archivePath.path}/*`],
+    { latest: true },
   )
 }
