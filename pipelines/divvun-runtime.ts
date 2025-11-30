@@ -6,6 +6,7 @@ import * as targetModule from "~/target.ts"
 import { GitHub } from "~/util/github.ts"
 import { Tar, Zip } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
+import { blake3Hash } from "~/util/hash.ts"
 
 // Main branch builds all targets for testing
 const MAIN_TARGETS = [
@@ -276,6 +277,8 @@ export async function runDivvunRuntimePublish() {
         `divvun-rt-playground-${target}_${builder.env.tag!}.AppImage`,
       )
       await fs.move(sourcePath, destPath, { overwrite: true })
+      const hash = await blake3Hash(destPath)
+      await Deno.writeTextFile(`${destPath}.blake3`, hash)
     } else {
       const artifactName = `divvun-rt-playground-${target}`
       const sourcePath = path.join(tempDir.path, artifactName)
@@ -284,6 +287,8 @@ export async function runDivvunRuntimePublish() {
         `${artifactName}_${builder.env.tag!}.tar.gz`,
       )
       await fs.move(sourcePath, destPath, { overwrite: true })
+      const hash = await blake3Hash(destPath)
+      await Deno.writeTextFile(`${destPath}.blake3`, hash)
     }
   }
 
@@ -311,6 +316,9 @@ export async function runDivvunRuntimePublish() {
     } else {
       await Tar.createFlatTgz([stagingDir], outPath)
     }
+
+    const hash = await blake3Hash(outPath)
+    await Deno.writeTextFile(`${outPath}.blake3`, hash)
   }
 
   const gh = new GitHub(builder.env.repo)
