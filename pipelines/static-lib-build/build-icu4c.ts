@@ -497,6 +497,29 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   console.log(`Installing to ${installPrefix}...`)
   await builder.exec("make", ["install"], { cwd: buildRoot })
 
+  // Rewrite pkg-config files to use portable relative paths
+  console.log("Rewriting pkg-config files for portability...")
+  const pkgconfigDir = path.join(installPrefix, "lib/pkgconfig")
+  try {
+    for await (const entry of Deno.readDir(pkgconfigDir)) {
+      if (entry.isFile && entry.name.endsWith(".pc")) {
+        const pcPath = path.join(pkgconfigDir, entry.name)
+        let content = await Deno.readTextFile(pcPath)
+        // Replace absolute prefix with relative path using ${pcfiledir}
+        // ${pcfiledir} is the directory containing the .pc file (lib/pkgconfig)
+        // So prefix should be ${pcfiledir}/../.. to get to the install root
+        content = content.replace(
+          /^prefix\s*=\s*.+$/m,
+          "prefix=${pcfiledir}/../..",
+        )
+        await Deno.writeTextFile(pcPath, content)
+        console.log(`  Rewrote ${entry.name}`)
+      }
+    }
+  } catch (err) {
+    console.log(`  Warning: Could not rewrite pkg-config files: ${err}`)
+  }
+
   console.log("")
   console.log("ICU build completed successfully!")
   console.log("")

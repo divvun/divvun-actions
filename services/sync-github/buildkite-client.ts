@@ -40,6 +40,8 @@ export async function listBuildkitePipelines(
     branch_configuration: pipeline.branch_configuration,
     skip_queued_branch_builds: pipeline.skip_queued_branch_builds,
     skip_queued_branch_builds_filter: pipeline.skip_queued_branch_builds_filter,
+    filter_enabled: pipeline.filter_enabled,
+    filter_condition: pipeline.filter_condition,
     provider: pipeline.provider,
   }))
 }
