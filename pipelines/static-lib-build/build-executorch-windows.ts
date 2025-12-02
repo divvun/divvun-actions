@@ -85,6 +85,7 @@ export async function buildExecutorchWindows(
   // Build configuration
   cmakeArgs.push(`-DCMAKE_INSTALL_PREFIX=${installPrefix}`)
   cmakeArgs.push(`-DCMAKE_BUILD_TYPE=${buildType}`)
+  cmakeArgs.push(`-D_rootdir=${executorchRoot}`)
 
   // ARM64 cross-compilation
   if (isArm64) {
@@ -117,27 +118,31 @@ export async function buildExecutorchWindows(
   console.log("====================================")
   console.log("")
 
-  // Activate venv script
-  const activateScript = path.join(venvPath, "Scripts/Activate.ps1")
+  // Build environment with venv activated (matching Linux approach)
+  const venvBinPath = path.join(venvPath, "Scripts")
+  const currentPath = Deno.env.get("PATH") || ""
+  const buildEnv: Record<string, string> = {
+    ...Object.fromEntries(Object.entries(Deno.env.toObject())),
+    PATH: `${venvBinPath};${currentPath}`,
+    VIRTUAL_ENV: venvPath,
+  }
+
   console.log(`Using venv: ${venvPath}`)
 
-  // Run CMake configuration with activated venv
+  // Run CMake configuration
   console.log("Running CMake configuration")
-  await builder.exec("powershell", [
-    "-Command",
-    `& '${activateScript}'; cmake -B '${buildRoot}' ${cmakeArgs.join(" ")}`,
-  ], {
+  await builder.exec("cmake", ["-B", buildRoot, ...cmakeArgs], {
     cwd: executorchRoot,
+    env: buildEnv,
   })
 
-  // Build and install with activated venv
+  // Build and install
   console.log("Building ExecuTorch")
-  await builder.exec("powershell", [
-    "-Command",
-    `& '${activateScript}'; cmake --build '${buildRoot}' --config ${buildType} --target install`,
-  ], {
-    cwd: executorchRoot,
-  })
+  await builder.exec(
+    "cmake",
+    ["--build", buildRoot, "--config", buildType, "--target", "install"],
+    { cwd: executorchRoot, env: buildEnv },
+  )
 
   console.log("")
   console.log("Windows build completed successfully!")
