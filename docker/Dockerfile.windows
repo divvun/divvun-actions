@@ -38,7 +38,7 @@ RUN Invoke-WebRequest -Uri https://download.microsoft.com/download/6/f/5/6f5ce43
     Remove-Item MSKLC.exe
 
 # Install CMake
-RUN Invoke-WebRequest -UseBasicParsing 'https://github.com/Kitware/CMake/releases/download/v3.28.1/cmake-3.28.1-windows-x86_64.msi' -OutFile cmake.msi ; \
+RUN Invoke-WebRequest -UseBasicParsing 'https://github.com/Kitware/CMake/releases/download/v3.28.1/cmake-3.31.10-windows-x86_64.msi' -OutFile cmake.msi ; \
     Start-Process -Wait msiexec -ArgumentList '/i', 'cmake.msi', '/quiet', '/norestart' ; \
     Remove-Item -Force cmake.msi ; \
     $env:PATH = 'C:\Program Files\CMake\bin;' + $env:PATH ; \
