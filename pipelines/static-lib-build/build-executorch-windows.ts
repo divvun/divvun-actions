@@ -139,11 +139,13 @@ export async function buildExecutorchWindows(
   console.log("")
 
   // Build environment with venv activated (matching Linux approach)
+  // Add VS2022 LLVM tools to PATH for clang-cl
+  const llvmBinPath = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\x64\\bin"
   const venvBinPath = path.join(venvPath, "Scripts")
   const currentPath = Deno.env.get("PATH") || ""
   const buildEnv: Record<string, string> = {
     ...Object.fromEntries(Object.entries(Deno.env.toObject())),
-    PATH: `${venvBinPath};${currentPath}`,
+    PATH: `${llvmBinPath};${venvBinPath};${currentPath}`,
     VIRTUAL_ENV: venvPath,
   }
 
