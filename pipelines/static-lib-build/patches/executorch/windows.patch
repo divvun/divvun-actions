@@ -1,3 +1,18 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f886cf2e86..51e31c1ca7 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -296,7 +296,9 @@ if(EXECUTORCH_BUILD_TESTS)
+ endif()
+ 
+ # TODO(dbort): Fix these warnings and remove this flag.
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++if(NOT MSVC)
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++endif()
+ 
+ # Let files say "include <executorch/path/to/header.h>".
+ # TODO(#6475): This requires/assumes that the repo lives in a directory named
 diff --git a/backends/apple/coreml/CMakeLists.txt b/backends/apple/coreml/CMakeLists.txt
 index 9879a05e3d..a0ad095ebc 100644
 --- a/backends/apple/coreml/CMakeLists.txt
