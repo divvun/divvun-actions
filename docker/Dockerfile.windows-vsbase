@@ -74,18 +74,6 @@ RUN $components = @( \
         Wait-Process -Id $id -ErrorAction SilentlyContinue \
     }
 
-# Layer 6: Add CMake support
-RUN $components = @( \
-        'Microsoft.VisualStudio.Component.VC.CMake.Project' \
-    ); \
-    $args = '--wait --quiet --norestart --nocache modify ' + ($components | ForEach-Object { '--add ' + $_ }) -join ' '; \
-    $VSId = Start-Process -FilePath 'C:\vs_buildtools.exe' -ArgumentList $args -NoNewWindow -PassThru ; \
-    $VSId.WaitForExit() ; \
-    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id ; \
-    foreach ($id in $setupIds) { \
-        Wait-Process -Id $id -ErrorAction SilentlyContinue \
-    }
-
 # Cleanup: Remove installer and caches
 RUN Remove-Item -Force 'C:\vs_buildtools.exe' ; \
     Remove-Item -Recurse -Force 'C:\ProgramData\Package Cache\*' -ErrorAction SilentlyContinue ; \
