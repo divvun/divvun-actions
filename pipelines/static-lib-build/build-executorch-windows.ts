@@ -96,8 +96,11 @@ export async function buildExecutorchWindows(
   // Prepare CMake arguments
   const cmakeArgs: string[] = []
 
-  // Use ClangCL toolset (clang-cl understands both GCC and MSVC flags)
-  cmakeArgs.push("-T", "ClangCL")
+  // Use Ninja with clang-cl
+  cmakeArgs.push("-GNinja")
+  cmakeArgs.push("-DCMAKE_C_COMPILER=clang-cl")
+  cmakeArgs.push("-DCMAKE_CXX_COMPILER=clang-cl")
+  cmakeArgs.push("-DCMAKE_LINKER=lld-link")
 
   // Build configuration
   cmakeArgs.push(`-DCMAKE_INSTALL_PREFIX=${installPrefix}`)
@@ -105,7 +108,8 @@ export async function buildExecutorchWindows(
 
   // ARM64 cross-compilation
   if (isArm64) {
-    cmakeArgs.push("-A", "ARM64")
+    cmakeArgs.push("-DCMAKE_C_COMPILER_TARGET=aarch64-pc-windows-msvc")
+    cmakeArgs.push("-DCMAKE_CXX_COMPILER_TARGET=aarch64-pc-windows-msvc")
   }
 
   // ExecuTorch build flags
