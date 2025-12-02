@@ -1,5 +1,5 @@
 diff --git a/tools/cmake/Codegen.cmake b/tools/cmake/Codegen.cmake
-index 32d3d8b554..636c78a13d 100644
+index 32d3d8b554..705c019402 100644
 --- a/tools/cmake/Codegen.cmake
 +++ b/tools/cmake/Codegen.cmake
 @@ -353,6 +353,7 @@ endfunction()
@@ -10,6 +10,20 @@ index 32d3d8b554..636c78a13d 100644
    # configure_file adds its input to the list of CMAKE_RERUN dependencies
    configure_file(
      ${EXECUTORCH_ROOT}/shim_et/xplat/executorch/build/build_variables.bzl
+@@ -361,10 +362,12 @@ function(executorch_append_filelist name outputvar)
+   if(NOT PYTHON_EXECUTABLE)
+     resolve_python_executable()
+   endif()
++  # Convert to forward slashes for Python compatibility on Windows
++  file(TO_CMAKE_PATH "${EXECUTORCH_ROOT}" _et_root_posix)
+   execute_process(
+     COMMAND
+       "${PYTHON_EXECUTABLE}" -c
+-      "exec(open('${EXECUTORCH_ROOT}/shim_et/xplat/executorch/build/build_variables.bzl').read());print(';'.join(${name}))"
++      "exec(open('${_et_root_posix}/shim_et/xplat/executorch/build/build_variables.bzl').read());print(';'.join(${name}))"
+     WORKING_DIRECTORY "${_rootdir}"
+     RESULT_VARIABLE _retval
+     OUTPUT_VARIABLE _tempvar
 diff --git a/tools/cmake/Utils.cmake b/tools/cmake/Utils.cmake
 index 77918ebbf2..c6c09e8364 100644
 --- a/tools/cmake/Utils.cmake
