@@ -96,6 +96,9 @@ export async function buildExecutorchWindows(
   // Prepare CMake arguments
   const cmakeArgs: string[] = []
 
+  // Use ClangCL toolset (clang-cl understands both GCC and MSVC flags)
+  cmakeArgs.push("-T", "ClangCL")
+
   // Build configuration
   cmakeArgs.push(`-DCMAKE_INSTALL_PREFIX=${installPrefix}`)
   cmakeArgs.push(`-DCMAKE_BUILD_TYPE=${buildType}`)
