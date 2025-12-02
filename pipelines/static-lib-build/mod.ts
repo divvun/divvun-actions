@@ -337,6 +337,19 @@ function createPyTorchSetupCommands(
   return commands
 }
 
+// Helper to create ExecuTorch-specific setup commands (just download the cache)
+function createExecutorchSetupCommands(): string[] {
+  const commands: string[] = []
+
+  // Download ExecuTorch cache
+  commands.push(
+    'buildkite-agent artifact download "executorch.tar.gz" .',
+    "bsdtar -xf executorch.tar.gz",
+  )
+
+  return commands
+}
+
 function createLibraryBuildStep(options: BuildStepOptions): CommandStep {
   const {
     library,
@@ -389,6 +402,11 @@ function createLibraryBuildStep(options: BuildStepOptions): CommandStep {
   // PyTorch has special setup requirements
   if (library === "pytorch") {
     commands.push(...createPyTorchSetupCommands(targetTriple, !!isReleaseBuild))
+  }
+
+  // ExecuTorch has special setup requirements
+  if (library === "executorch") {
+    commands.push(...createExecutorchSetupCommands())
   }
 
   // Download and extract host build artifacts if cross-compiling
