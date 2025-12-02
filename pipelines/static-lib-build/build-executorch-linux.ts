@@ -11,7 +11,9 @@ interface BuildExecutorchLinuxOptions {
   version?: string
 }
 
-export async function buildExecutorchLinux(options: BuildExecutorchLinuxOptions) {
+export async function buildExecutorchLinux(
+  options: BuildExecutorchLinuxOptions,
+) {
   const {
     target,
     buildType = "Release",
@@ -160,10 +162,22 @@ export async function buildExecutorchLinux(options: BuildExecutorchLinuxOptions)
   console.log("====================================")
   console.log("")
 
+  // Build environment with venv activated
+  const venvBinPath = path.join(venvPath, "bin")
+  const currentPath = Deno.env.get("PATH") || ""
+  const buildEnv: Record<string, string> = {
+    ...Object.fromEntries(Object.entries(Deno.env.toObject())),
+    PATH: `${venvBinPath}:${currentPath}`,
+    VIRTUAL_ENV: venvPath,
+  }
+
+  console.log(`Using venv: ${venvPath}`)
+
   // Run CMake configuration
   console.log("Running CMake configuration")
   await builder.exec("cmake", ["-B", buildRoot, ...cmakeArgs], {
     cwd: executorchRoot,
+    env: buildEnv,
   })
 
   // Determine number of parallel jobs
@@ -177,7 +191,7 @@ export async function buildExecutorchLinux(options: BuildExecutorchLinuxOptions)
   await builder.exec(
     "cmake",
     ["--build", buildRoot, "--target", "install", "-j", maxJobs],
-    { cwd: executorchRoot },
+    { cwd: executorchRoot, env: buildEnv },
   )
 
   console.log("")

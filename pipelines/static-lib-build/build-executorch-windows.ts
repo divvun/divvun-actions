@@ -117,10 +117,22 @@ export async function buildExecutorchWindows(
   console.log("====================================")
   console.log("")
 
+  // Build environment with venv activated
+  const venvBinPath = path.join(venvPath, "Scripts")
+  const currentPath = Deno.env.get("PATH") || ""
+  const buildEnv: Record<string, string> = {
+    ...Object.fromEntries(Object.entries(Deno.env.toObject())),
+    PATH: `${venvBinPath};${currentPath}`,
+    VIRTUAL_ENV: venvPath,
+  }
+
+  console.log(`Using venv: ${venvPath}`)
+
   // Run CMake configuration
   console.log("Running CMake configuration")
   await builder.exec("cmake", ["-B", buildRoot, ...cmakeArgs], {
     cwd: executorchRoot,
+    env: buildEnv,
   })
 
   // Build and install
@@ -128,7 +140,7 @@ export async function buildExecutorchWindows(
   await builder.exec(
     "cmake",
     ["--build", buildRoot, "--config", buildType, "--target", "install"],
-    { cwd: executorchRoot },
+    { cwd: executorchRoot, env: buildEnv },
   )
 
   console.log("")

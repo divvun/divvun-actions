@@ -232,7 +232,9 @@ if (import.meta.main) {
                 deleted: devReleases.length,
               }
             } catch (error) {
-              console.warn(`  Warning: Could not process ${repo.name}: ${error}`)
+              console.warn(
+                `  Warning: Could not process ${repo.name}: ${error}`,
+              )
               return { repoName: repo.name, releases: [], deleted: 0 }
             }
           },
@@ -242,7 +244,9 @@ if (import.meta.main) {
           console.log(`${repoName}:`)
           for (const release of releases) {
             console.log(
-              `  ${dryRun ? "[would delete]" : "[deleted]"} ${release.tag_name}`,
+              `  ${
+                dryRun ? "[would delete]" : "[deleted]"
+              } ${release.tag_name}`,
             )
           }
           totalFound += releases.length

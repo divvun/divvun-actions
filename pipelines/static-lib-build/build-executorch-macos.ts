@@ -11,7 +11,9 @@ interface BuildExecutorchMacosOptions {
   version?: string
 }
 
-export async function buildExecutorchMacos(options: BuildExecutorchMacosOptions) {
+export async function buildExecutorchMacos(
+  options: BuildExecutorchMacosOptions,
+) {
   const {
     target,
     buildType = "Release",
@@ -143,16 +145,26 @@ export async function buildExecutorchMacos(options: BuildExecutorchMacosOptions)
   console.log("====================================")
   console.log("")
 
-  // Set environment variables
-  Deno.env.set("CC", "clang")
-  Deno.env.set("CXX", "clang++")
-  Deno.env.set("MACOSX_DEPLOYMENT_TARGET", "11.0")
-  Deno.env.set("CMAKE_MAKE_PROGRAM", ninjaPath)
+  // Build environment with venv activated
+  const venvBinPath = path.join(venvPath, "bin")
+  const currentPath = Deno.env.get("PATH") || ""
+  const buildEnv: Record<string, string> = {
+    ...Object.fromEntries(Object.entries(Deno.env.toObject())),
+    CC: "clang",
+    CXX: "clang++",
+    MACOSX_DEPLOYMENT_TARGET: "11.0",
+    CMAKE_MAKE_PROGRAM: ninjaPath,
+    PATH: `${venvBinPath}:${currentPath}`,
+    VIRTUAL_ENV: venvPath,
+  }
+
+  console.log(`Using venv: ${venvPath}`)
 
   // Run CMake configuration
   console.log("Running CMake configuration")
   await builder.exec(cmakePath, ["-B", buildRoot, ...cmakeArgs], {
     cwd: executorchRoot,
+    env: buildEnv,
   })
 
   // Determine number of parallel jobs
@@ -166,7 +178,7 @@ export async function buildExecutorchMacos(options: BuildExecutorchMacosOptions)
   await builder.exec(
     cmakePath,
     ["--build", buildRoot, "--target", "install", "-j", maxJobs],
-    { cwd: executorchRoot },
+    { cwd: executorchRoot, env: buildEnv },
   )
 
   console.log("")

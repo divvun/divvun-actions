@@ -145,13 +145,23 @@ export async function buildExecutorchIos(options: BuildExecutorchIosOptions) {
   console.log("====================================")
   console.log("")
 
-  // Set environment variables
-  Deno.env.set("CMAKE_MAKE_PROGRAM", ninjaPath)
+  // Build environment with venv activated
+  const venvBinPath = path.join(venvPath, "bin")
+  const currentPath = Deno.env.get("PATH") || ""
+  const buildEnv: Record<string, string> = {
+    ...Object.fromEntries(Object.entries(Deno.env.toObject())),
+    CMAKE_MAKE_PROGRAM: ninjaPath,
+    PATH: `${venvBinPath}:${currentPath}`,
+    VIRTUAL_ENV: venvPath,
+  }
+
+  console.log(`Using venv: ${venvPath}`)
 
   // Run CMake configuration
   console.log("Running CMake configuration")
   await builder.exec(cmakePath, ["-B", buildRoot, ...cmakeArgs], {
     cwd: executorchRoot,
+    env: buildEnv,
   })
 
   // Determine number of parallel jobs
@@ -165,7 +175,7 @@ export async function buildExecutorchIos(options: BuildExecutorchIosOptions) {
   await builder.exec(
     cmakePath,
     ["--build", buildRoot, "--target", "install", "-j", maxJobs],
-    { cwd: executorchRoot },
+    { cwd: executorchRoot, env: buildEnv },
   )
 
   console.log("")

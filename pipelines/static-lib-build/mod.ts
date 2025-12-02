@@ -5,7 +5,13 @@ import * as target from "~/target.ts"
 const PYTORCH_VERSION = "v2.8.0"
 const EXECUTORCH_VERSION = "v1.0.1"
 
-type LibraryType = "icu4c" | "libomp" | "protobuf" | "sleef" | "pytorch" | "executorch"
+type LibraryType =
+  | "icu4c"
+  | "libomp"
+  | "protobuf"
+  | "sleef"
+  | "pytorch"
+  | "executorch"
 
 // ============================================================================
 // CONFIGURATION
@@ -95,14 +101,13 @@ const LIBRARY_CONFIGS: Record<LibraryType, LibraryConfig> = {
     },
   },
   executorch: {
+    // NOTE: musl targets not supported - torch wheels don't exist for Alpine/musl
     platforms: [
       "aarch64-apple-darwin",
       "aarch64-apple-ios",
       "aarch64-linux-android",
       "aarch64-unknown-linux-gnu",
-      "aarch64-unknown-linux-musl",
       "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-linux-musl",
       "x86_64-pc-windows-msvc",
       "aarch64-pc-windows-msvc",
     ],
@@ -121,7 +126,9 @@ interface ReleaseTag {
 
 function parseReleaseTag(tag: string): ReleaseTag | null {
   // Match tags like: icu4c/v77.1, libomp/v21.1.4, protobuf/v33.0, sleef/v3.9.0, pytorch/v2.8.0, executorch/v1.0.1
-  const match = tag.match(/^(icu4c|libomp|protobuf|sleef|pytorch|executorch)\/v?(.+)$/)
+  const match = tag.match(
+    /^(icu4c|libomp|protobuf|sleef|pytorch|executorch)\/v?(.+)$/,
+  )
   if (!match) return null
 
   return {
@@ -678,12 +685,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       deps: ["pytorch-cache-download"],
       env: { MAX_JOBS: "2" },
     },
-    {
-      lib: "executorch",
-      target: "x86_64-unknown-linux-musl",
-      deps: ["executorch-cache-download"],
-      env: { MAX_JOBS: "2" },
-    },
+    // NOTE: executorch not supported on musl - torch wheels don't exist
   ]
 
   const linuxMuslArm64Builds: LibBuild[] = [
@@ -697,12 +699,7 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       deps: ["pytorch-cache-download"],
       env: { MAX_JOBS: "2" },
     },
-    {
-      lib: "executorch",
-      target: "aarch64-unknown-linux-musl",
-      deps: ["executorch-cache-download"],
-      env: { MAX_JOBS: "2" },
-    },
+    // NOTE: executorch not supported on musl - torch wheels don't exist
   ]
 
   const windowsBuilds: LibBuild[] = [
@@ -742,7 +739,8 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       command({
         label: ":package: Download ExecuTorch Cache",
         key: "executorch-cache-download",
-        command: `divvun-actions run executorch-cache-download ${EXECUTORCH_VERSION}`,
+        command:
+          `divvun-actions run executorch-cache-download ${EXECUTORCH_VERSION}`,
         agents: {
           queue: "linux",
         },
@@ -816,7 +814,9 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             extraDependencies: b.deps,
             env: b.env,
             commandPrefix: b.commandPrefix,
-            priority: b.lib === "pytorch" || b.lib === "executorch" ? 1 : undefined,
+            priority: b.lib === "pytorch" || b.lib === "executorch"
+              ? 1
+              : undefined,
             largeAgent: b.lib === "pytorch" || b.lib === "executorch",
           })
         ),
@@ -830,7 +830,9 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             extraDependencies: b.deps,
             env: b.env,
             commandPrefix: b.commandPrefix,
-            priority: b.lib === "pytorch" || b.lib === "executorch" ? 1 : undefined,
+            priority: b.lib === "pytorch" || b.lib === "executorch"
+              ? 1
+              : undefined,
             largeAgent: b.lib === "pytorch" || b.lib === "executorch",
           })
         ),

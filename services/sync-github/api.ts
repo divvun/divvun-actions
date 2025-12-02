@@ -39,8 +39,12 @@ export async function fetchGithub(
 
       if (remaining === "0" && resetTime && attempt < maxAttempts) {
         const resetTimestamp = parseInt(resetTime)
-        const waitMs = Math.max(0, (resetTimestamp - Math.floor(Date.now() / 1000)) * 1000) + 1000
-        console.log(`⏳ Rate limited, waiting ${Math.ceil(waitMs / 1000)}s for reset...`)
+        const waitMs =
+          Math.max(0, (resetTimestamp - Math.floor(Date.now() / 1000)) * 1000) +
+          1000
+        console.log(
+          `⏳ Rate limited, waiting ${Math.ceil(waitMs / 1000)}s for reset...`,
+        )
         await sleep(waitMs)
         continue
       }
@@ -91,12 +95,16 @@ export async function fetchBuildkite(
 
       if (resetSeconds && attempt < maxAttempts) {
         const waitMs = (parseInt(resetSeconds) + 1) * 1000
-        console.log(`⏳ Buildkite rate limited, waiting ${resetSeconds}s for reset...`)
+        console.log(
+          `⏳ Buildkite rate limited, waiting ${resetSeconds}s for reset...`,
+        )
         await sleep(waitMs)
         continue
       }
 
-      throw new Error(`Buildkite rate limited, resets in ${resetSeconds || "?"}s`)
+      throw new Error(
+        `Buildkite rate limited, resets in ${resetSeconds || "?"}s`,
+      )
     }
 
     if (!response.ok) {

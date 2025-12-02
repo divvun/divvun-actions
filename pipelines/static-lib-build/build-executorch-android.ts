@@ -44,8 +44,8 @@ export async function buildExecutorchAndroid(
   const executorchRoot = path.join(repoRoot, "executorch")
 
   // Find Android NDK
-  const androidNdk =
-    Deno.env.get("ANDROID_NDK") || Deno.env.get("ANDROID_NDK_HOME")
+  const androidNdk = Deno.env.get("ANDROID_NDK") ||
+    Deno.env.get("ANDROID_NDK_HOME")
   if (!androidNdk) {
     throw new Error(
       "ANDROID_NDK or ANDROID_NDK_HOME environment variable must be set",
@@ -152,10 +152,22 @@ export async function buildExecutorchAndroid(
   console.log("====================================")
   console.log("")
 
+  // Build environment with venv activated
+  const venvBinPath = path.join(venvPath, "bin")
+  const currentPath = Deno.env.get("PATH") || ""
+  const buildEnv: Record<string, string> = {
+    ...Object.fromEntries(Object.entries(Deno.env.toObject())),
+    PATH: `${venvBinPath}:${currentPath}`,
+    VIRTUAL_ENV: venvPath,
+  }
+
+  console.log(`Using venv: ${venvPath}`)
+
   // Run CMake configuration
   console.log("Running CMake configuration")
   await builder.exec("cmake", ["-B", buildRoot, ...cmakeArgs], {
     cwd: executorchRoot,
+    env: buildEnv,
   })
 
   // Determine number of parallel jobs
@@ -175,7 +187,7 @@ export async function buildExecutorchAndroid(
   await builder.exec(
     "cmake",
     ["--build", buildRoot, "--target", "install", "-j", maxJobs],
-    { cwd: executorchRoot },
+    { cwd: executorchRoot, env: buildEnv },
   )
 
   console.log("")

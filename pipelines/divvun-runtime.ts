@@ -56,7 +56,9 @@ export async function pipelineDivvunRuntime() {
   // Use release targets if building a tag, otherwise main targets
   const isRelease = builder.env.tag && builder.env.tag.match(/^v/)
   const cliTargets = isRelease ? CLI_RELEASE_TARGETS : MAIN_TARGETS
-  const playgroundTargets = isRelease ? PLAYGROUND_RELEASE_TARGETS : MAIN_TARGETS
+  const playgroundTargets = isRelease
+    ? PLAYGROUND_RELEASE_TARGETS
+    : MAIN_TARGETS
 
   // Load version from Cargo.toml
   const cargoTomlText = await Deno.readTextFile("Cargo.toml")

@@ -359,7 +359,9 @@ async function runPipeline(args: any) {
       const { downloadExecutorchCache } = await import(
         "./pipelines/static-lib-build/download-executorch-cache.ts"
       )
-      await downloadExecutorchCache(args._[1] != null ? String(args._[1]) : undefined)
+      await downloadExecutorchCache(
+        args._[1] != null ? String(args._[1]) : undefined,
+      )
       break
     }
     case "executorch-build": {
