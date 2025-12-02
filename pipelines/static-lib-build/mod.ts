@@ -3,8 +3,9 @@ import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 
 const PYTORCH_VERSION = "v2.8.0"
+const EXECUTORCH_VERSION = "v1.0.1"
 
-type LibraryType = "icu4c" | "libomp" | "protobuf" | "sleef" | "pytorch"
+type LibraryType = "icu4c" | "libomp" | "protobuf" | "sleef" | "pytorch" | "executorch"
 
 // ============================================================================
 // CONFIGURATION
@@ -93,6 +94,20 @@ const LIBRARY_CONFIGS: Record<LibraryType, LibraryConfig> = {
       sleef: "v3.9.0",
     },
   },
+  executorch: {
+    platforms: [
+      "aarch64-apple-darwin",
+      "aarch64-apple-ios",
+      "aarch64-linux-android",
+      "aarch64-unknown-linux-gnu",
+      "aarch64-unknown-linux-musl",
+      "x86_64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "x86_64-pc-windows-msvc",
+      "aarch64-pc-windows-msvc",
+    ],
+    createsBuildArtifacts: false,
+  },
 }
 
 // ============================================================================
@@ -105,8 +120,8 @@ interface ReleaseTag {
 }
 
 function parseReleaseTag(tag: string): ReleaseTag | null {
-  // Match tags like: icu4c/v77.1, libomp/v21.1.4, protobuf/v33.0, sleef/v3.9.0, pytorch/v2.8.0
-  const match = tag.match(/^(icu4c|libomp|protobuf|sleef|pytorch)\/v?(.+)$/)
+  // Match tags like: icu4c/v77.1, libomp/v21.1.4, protobuf/v33.0, sleef/v3.9.0, pytorch/v2.8.0, executorch/v1.0.1
+  const match = tag.match(/^(icu4c|libomp|protobuf|sleef|pytorch|executorch)\/v?(.+)$/)
   if (!match) return null
 
   return {
@@ -462,6 +477,19 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
     )
   }
 
+  if (library === "executorch") {
+    pipeline.steps.push(
+      command({
+        label: ":package: Download ExecuTorch Cache",
+        key: "executorch-cache-download",
+        command: `divvun-actions run executorch-cache-download ${version}`,
+        agents: {
+          queue: "linux",
+        },
+      }),
+    )
+  }
+
   const buildSteps: CommandStep[] = []
 
   for (const targetTriple of platforms) {
@@ -474,6 +502,15 @@ function generateReleasePipeline(release: ReleaseTag): BuildkitePipeline {
 
     if (library === "pytorch") {
       options.extraDependencies = ["pytorch-cache-download"]
+      options.env = { MAX_JOBS: "2" }
+      if (targetTriple.includes("-musl")) {
+        options.priority = 1
+        options.largeAgent = true
+      }
+    }
+
+    if (library === "executorch") {
+      options.extraDependencies = ["executorch-cache-download"]
       options.env = { MAX_JOBS: "2" }
       if (targetTriple.includes("-musl")) {
         options.priority = 1
@@ -530,6 +567,12 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       deps: ["pytorch-cache-download"],
       env: { MAX_JOBS: "2" },
     },
+    {
+      lib: "executorch",
+      target: "aarch64-apple-darwin",
+      deps: ["executorch-cache-download"],
+      env: { MAX_JOBS: "2" },
+    },
   ]
 
   const iosBuilds: LibBuild[] = [
@@ -541,6 +584,12 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       deps: ["pytorch-cache-download"],
       env: { MAX_JOBS: "2" },
     },
+    {
+      lib: "executorch",
+      target: "aarch64-apple-ios",
+      deps: ["executorch-cache-download"],
+      env: { MAX_JOBS: "2" },
+    },
   ]
 
   const androidBuilds: LibBuild[] = [
@@ -550,6 +599,13 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       lib: "pytorch",
       target: "aarch64-linux-android",
       deps: ["pytorch-cache-download"],
+      commandPrefix: "ANDROID_NDK=$ANDROID_NDK_HOME",
+      env: { MAX_JOBS: "2" },
+    },
+    {
+      lib: "executorch",
+      target: "aarch64-linux-android",
+      deps: ["executorch-cache-download"],
       commandPrefix: "ANDROID_NDK=$ANDROID_NDK_HOME",
       env: { MAX_JOBS: "2" },
     },
@@ -566,6 +622,12 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       deps: ["pytorch-cache-download"],
       env: { MAX_JOBS: "2" },
     },
+    {
+      lib: "executorch",
+      target: "x86_64-unknown-linux-gnu",
+      deps: ["executorch-cache-download"],
+      env: { MAX_JOBS: "2" },
+    },
   ]
 
   const linuxGnuArm64Builds: LibBuild[] = [
@@ -577,6 +639,12 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       lib: "pytorch",
       target: "aarch64-unknown-linux-gnu",
       deps: ["pytorch-cache-download"],
+      env: { MAX_JOBS: "2" },
+    },
+    {
+      lib: "executorch",
+      target: "aarch64-unknown-linux-gnu",
+      deps: ["executorch-cache-download"],
       env: { MAX_JOBS: "2" },
     },
   ]
@@ -592,6 +660,12 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       deps: ["pytorch-cache-download"],
       env: { MAX_JOBS: "2" },
     },
+    {
+      lib: "executorch",
+      target: "x86_64-unknown-linux-musl",
+      deps: ["executorch-cache-download"],
+      env: { MAX_JOBS: "2" },
+    },
   ]
 
   const linuxMuslArm64Builds: LibBuild[] = [
@@ -605,6 +679,12 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       deps: ["pytorch-cache-download"],
       env: { MAX_JOBS: "2" },
     },
+    {
+      lib: "executorch",
+      target: "aarch64-unknown-linux-musl",
+      deps: ["executorch-cache-download"],
+      env: { MAX_JOBS: "2" },
+    },
   ]
 
   const windowsBuilds: LibBuild[] = [
@@ -613,17 +693,38 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       target: "x86_64-pc-windows-msvc",
       env: { MSYSTEM: "CLANG64" },
     },
+    {
+      lib: "executorch",
+      target: "x86_64-pc-windows-msvc",
+      deps: ["executorch-cache-download"],
+      env: { MAX_JOBS: "2" },
+    },
+    {
+      lib: "executorch",
+      target: "aarch64-pc-windows-msvc",
+      deps: ["executorch-cache-download"],
+      env: { MAX_JOBS: "2" },
+    },
   ]
 
   const pipeline: BuildkitePipeline = {
     env: {
       PYTORCH_VERSION,
+      EXECUTORCH_VERSION,
     },
     steps: [
       command({
         label: ":package: Download PyTorch Cache",
         key: "pytorch-cache-download",
         command: `divvun-actions run pytorch-cache-download ${PYTORCH_VERSION}`,
+        agents: {
+          queue: "linux",
+        },
+      }),
+      command({
+        label: ":package: Download ExecuTorch Cache",
+        key: "executorch-cache-download",
+        command: `divvun-actions run executorch-cache-download ${EXECUTORCH_VERSION}`,
         agents: {
           queue: "linux",
         },
@@ -697,8 +798,8 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             extraDependencies: b.deps,
             env: b.env,
             commandPrefix: b.commandPrefix,
-            priority: b.lib === "pytorch" ? 1 : undefined,
-            largeAgent: b.lib === "pytorch",
+            priority: b.lib === "pytorch" || b.lib === "executorch" ? 1 : undefined,
+            largeAgent: b.lib === "pytorch" || b.lib === "executorch",
           })
         ),
       },
@@ -711,8 +812,8 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
             extraDependencies: b.deps,
             env: b.env,
             commandPrefix: b.commandPrefix,
-            priority: b.lib === "pytorch" ? 1 : undefined,
-            largeAgent: b.lib === "pytorch",
+            priority: b.lib === "pytorch" || b.lib === "executorch" ? 1 : undefined,
+            largeAgent: b.lib === "pytorch" || b.lib === "executorch",
           })
         ),
       },

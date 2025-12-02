@@ -355,6 +355,23 @@ async function runPipeline(args: any) {
       })
       break
     }
+    case "executorch-cache-download": {
+      const { downloadExecutorchCache } = await import(
+        "./pipelines/static-lib-build/download-executorch-cache.ts"
+      )
+      await downloadExecutorchCache(args._[1] != null ? String(args._[1]) : undefined)
+      break
+    }
+    case "executorch-build": {
+      const { buildExecutorch } = await import(
+        "./pipelines/static-lib-build/build-executorch.ts"
+      )
+      await buildExecutorch({
+        target: args._[1] as string,
+        version: args._[2] != null ? String(args._[2]) : undefined,
+      })
+      break
+    }
     case "publish-library": {
       const { publishLibrary } = await import(
         "./pipelines/static-lib-build/publish.ts"
