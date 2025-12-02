@@ -102,6 +102,7 @@ const LIBRARY_CONFIGS: Record<LibraryType, LibraryConfig> = {
   },
   executorch: {
     // NOTE: musl targets not supported - torch wheels don't exist for Alpine/musl
+    // NOTE: Windows ARM64 not supported by ExecuTorch
     platforms: [
       "aarch64-apple-darwin",
       "aarch64-apple-ios",
@@ -109,7 +110,6 @@ const LIBRARY_CONFIGS: Record<LibraryType, LibraryConfig> = {
       "aarch64-unknown-linux-gnu",
       "x86_64-unknown-linux-gnu",
       "x86_64-pc-windows-msvc",
-      "aarch64-pc-windows-msvc",
     ],
     createsBuildArtifacts: false,
   },

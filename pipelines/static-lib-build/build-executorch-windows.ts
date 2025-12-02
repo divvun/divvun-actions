@@ -117,31 +117,27 @@ export async function buildExecutorchWindows(
   console.log("====================================")
   console.log("")
 
-  // Build environment with venv activated
-  const venvBinPath = path.join(venvPath, "Scripts")
-  const currentPath = Deno.env.get("PATH") || ""
-  const buildEnv: Record<string, string> = {
-    ...Object.fromEntries(Object.entries(Deno.env.toObject())),
-    PATH: `${venvBinPath};${currentPath}`,
-    VIRTUAL_ENV: venvPath,
-  }
-
+  // Activate venv script
+  const activateScript = path.join(venvPath, "Scripts/Activate.ps1")
   console.log(`Using venv: ${venvPath}`)
 
-  // Run CMake configuration
+  // Run CMake configuration with activated venv
   console.log("Running CMake configuration")
-  await builder.exec("cmake", ["-B", buildRoot, ...cmakeArgs], {
+  await builder.exec("powershell", [
+    "-Command",
+    `& '${activateScript}'; cmake -B '${buildRoot}' ${cmakeArgs.join(" ")}`,
+  ], {
     cwd: executorchRoot,
-    env: buildEnv,
   })
 
-  // Build and install
+  // Build and install with activated venv
   console.log("Building ExecuTorch")
-  await builder.exec(
-    "cmake",
-    ["--build", buildRoot, "--config", buildType, "--target", "install"],
-    { cwd: executorchRoot, env: buildEnv },
-  )
+  await builder.exec("powershell", [
+    "-Command",
+    `& '${activateScript}'; cmake --build '${buildRoot}' --config ${buildType} --target install`,
+  ], {
+    cwd: executorchRoot,
+  })
 
   console.log("")
   console.log("Windows build completed successfully!")
