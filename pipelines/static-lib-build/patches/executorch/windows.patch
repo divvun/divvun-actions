@@ -1,3 +1,190 @@
+diff --git a/backends/apple/coreml/CMakeLists.txt b/backends/apple/coreml/CMakeLists.txt
+index 17e2d94e33..f087851416 100644
+--- a/backends/apple/coreml/CMakeLists.txt
++++ b/backends/apple/coreml/CMakeLists.txt
+@@ -113,7 +113,7 @@ target_include_directories(
+ if(APPLE)
+   target_link_libraries(coreml_util PRIVATE ${FOUNDATION_FRAMEWORK})
+ endif()
+-target_compile_options(coreml_util PUBLIC -fPIC)
++target_compile_options(coreml_util PUBLIC $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-fPIC>)
+ 
+ install(TARGETS coreml_util DESTINATION ${CMAKE_INSTALL_LIBDIR})
+ 
+@@ -150,7 +150,7 @@ if(APPLE)
+     coreml_inmemoryfs PRIVATE coreml_util ${FOUNDATION_FRAMEWORK}
+   )
+ endif()
+-target_compile_options(coreml_inmemoryfs PUBLIC -fPIC)
++target_compile_options(coreml_inmemoryfs PUBLIC $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-fPIC>)
+ 
+ install(
+   TARGETS coreml_inmemoryfs
+@@ -178,7 +178,7 @@ if(EXECUTORCH_BUILD_PYBIND)
+     executorchcoreml PRIVATE coreml_util coreml_inmemoryfs
+                              nlohmann_json::nlohmann_json
+   )
+-  target_compile_options(executorchcoreml PUBLIC -fPIC)
++  target_compile_options(executorchcoreml PUBLIC $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-fPIC>)
+ endif()
+ 
+ # coremldelegate
+@@ -242,8 +242,8 @@ if(APPLE)
+ 
+   if(EXECUTORCH_BUILD_DEVTOOLS)
+     target_compile_options(executorch_core PUBLIC -DET_EVENT_TRACER_ENABLED)
+-    target_compile_options(coremldelegate PRIVATE "-frtti")
+-    target_compile_options(libprotobuf-lite PRIVATE "-frtti")
++    target_compile_options(coremldelegate PRIVATE $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-frtti> $<$<CXX_COMPILER_ID:MSVC>:/GR>)
++    target_compile_options(libprotobuf-lite PRIVATE $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-frtti> $<$<CXX_COMPILER_ID:MSVC>:/GR>)
+   else()
+     target_compile_options(coremldelegate PRIVATE "-fno-rtti")
+   endif()
+diff --git a/backends/apple/metal/CMakeLists.txt b/backends/apple/metal/CMakeLists.txt
+index 7bdf142041..0bdf9d40cd 100644
+--- a/backends/apple/metal/CMakeLists.txt
++++ b/backends/apple/metal/CMakeLists.txt
+@@ -66,7 +66,10 @@ target_link_libraries(
+          ${METALPERFORMANCESHADERSGRAPH_LIBRARY}
+ )
+ 
+-target_compile_options(metal_backend PUBLIC -fexceptions -frtti -fPIC)
++target_compile_options(metal_backend PUBLIC
++  $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-fexceptions -frtti -fPIC>
++  $<$<CXX_COMPILER_ID:MSVC>:/EHsc /GR>
++)
+ 
+ target_link_options(metal_backend PUBLIC -Wl,-export_dynamic)
+ 
+diff --git a/backends/apple/mps/CMakeLists.txt b/backends/apple/mps/CMakeLists.txt
+index 99a8afa16a..f77015c8d0 100644
+--- a/backends/apple/mps/CMakeLists.txt
++++ b/backends/apple/mps/CMakeLists.txt
+@@ -18,7 +18,11 @@ endif()
+ 
+ include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
+ 
+-set(_common_compile_options -Wno-deprecated-declarations)
++if(MSVC)
++  set(_common_compile_options /wd4996)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations)
++endif()
+ 
+ set(_mps_schema__include_dir "${CMAKE_BINARY_DIR}/schema/include")
+ 
+diff --git a/backends/arm/CMakeLists.txt b/backends/arm/CMakeLists.txt
+index ac9df82315..d28fb07a94 100644
+--- a/backends/arm/CMakeLists.txt
++++ b/backends/arm/CMakeLists.txt
+@@ -22,7 +22,9 @@ add_compile_definitions(C10_USING_CUSTOM_GENERATED_MACROS)
+ # bare metal backend builds
+ if(EXECUTORCH_BUILD_ARM_BAREMETAL)
+ 
+-  add_compile_options("-Wall" "-Werror")
++  if(NOT MSVC)
++    add_compile_options("-Wall" "-Werror")
++  endif()
+ 
+   # Third-party folder and Ethos-U driver inclued
+   set(THIRD_PARTY_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third-party")
+diff --git a/backends/cadence/CMakeLists.txt b/backends/cadence/CMakeLists.txt
+index 271b480661..a53524f0de 100644
+--- a/backends/cadence/CMakeLists.txt
++++ b/backends/cadence/CMakeLists.txt
+@@ -31,7 +31,11 @@ add_compile_definitions(C10_USING_CUSTOM_GENERATED_MACROS)
+ if(EXECUTORCH_CADENCE_CPU_RUNNER)
+   include(${EXECUTORCH_ROOT}/tools/cmake/Codegen.cmake)
+ 
+-  set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++  if(MSVC)
++    set(_common_compile_options /wd4996)
++  else()
++    set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++  endif()
+ 
+   # Find prebuilt libraries. executorch package should contain portable_ops_lib,
+   # etdump, bundled_program.
+diff --git a/backends/mediatek/CMakeLists.txt b/backends/mediatek/CMakeLists.txt
+index 10c28be005..42da5d7eba 100644
+--- a/backends/mediatek/CMakeLists.txt
++++ b/backends/mediatek/CMakeLists.txt
+@@ -23,7 +23,10 @@ include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/runtime/include)
+ 
+ # targets
+ add_library(neuron_backend SHARED)
+-target_compile_options(neuron_backend PRIVATE "-frtti" "-fexceptions")
++target_compile_options(neuron_backend PRIVATE
++  $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-frtti -fexceptions>
++  $<$<CXX_COMPILER_ID:MSVC>:/GR /EHsc>
++)
+ target_link_libraries(
+   neuron_backend PRIVATE executorch_core portable_ops_lib portable_kernels
+                          android log
+diff --git a/backends/openvino/CMakeLists.txt b/backends/openvino/CMakeLists.txt
+index 736ed6d860..193de5d1f0 100644
+--- a/backends/openvino/CMakeLists.txt
++++ b/backends/openvino/CMakeLists.txt
+@@ -35,7 +35,10 @@ find_package(OpenVINO REQUIRED)
+ add_library(openvino_backend STATIC .)
+ 
+ # Enable exceptions and RTTI for OpenVINO backend
+-target_compile_options(openvino_backend PRIVATE -frtti -fexceptions)
++target_compile_options(openvino_backend PRIVATE
++  $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-frtti -fexceptions>
++  $<$<CXX_COMPILER_ID:MSVC>:/GR /EHsc>
++)
+ 
+ # Include Executorch directories
+ target_include_directories(openvino_backend PRIVATE ${COMMON_INCLUDE_DIRS})
+diff --git a/backends/qualcomm/CMakeLists.txt b/backends/qualcomm/CMakeLists.txt
+index cc7957dfdb..997fbfcca9 100644
+--- a/backends/qualcomm/CMakeLists.txt
++++ b/backends/qualcomm/CMakeLists.txt
+@@ -80,7 +80,9 @@ if(${ANDROID})
+   find_library(android_log log)
+ endif()
+ 
+-add_compile_options("-Wall" "-Werror" "-Wno-sign-compare")
++if(NOT MSVC)
++  add_compile_options("-Wall" "-Werror" "-Wno-sign-compare")
++endif()
+ add_compile_definitions(C10_USING_CUSTOM_GENERATED_MACROS)
+ 
+ # GNU emit wanring for ignored attributes Unfortunately, we use [[maybe_unused]]
+@@ -92,10 +94,13 @@ endif()
+ 
+ if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+   # strip symbols
+-  add_link_options("-s")
+-
+-  # --gc-sections is added by torch.
+-  add_compile_options("-O3" "-ffunction-sections" "-fdata-sections" "-frtti")
++  if(NOT MSVC)
++    add_link_options("-s")
++    # --gc-sections is added by torch.
++    add_compile_options("-O3" "-ffunction-sections" "-fdata-sections" "-frtti")
++  else()
++    add_compile_options("/O2" "/Gy" "/Gw" "/GR")
++  endif()
+ endif()
+ 
+ include_directories(
+diff --git a/backends/samsung/CMakeLists.txt b/backends/samsung/CMakeLists.txt
+index 6ea020c097..d105574420 100644
+--- a/backends/samsung/CMakeLists.txt
++++ b/backends/samsung/CMakeLists.txt
+@@ -26,7 +26,9 @@ if(NOT FLATC_EXECUTABLE)
+   set(FLATC_EXECUTABLE flatc)
+ endif()
+ 
+-add_compile_options(-Wall -Werror -fPIC)
++if(NOT MSVC)
++  add_compile_options(-Wall -Werror -fPIC)
++endif()
+ if(CMAKE_BUILD_TYPE STREQUAL "Release")
+   # strip symbols
+   add_link_options("-s")
 diff --git a/codegen/tools/CMakeLists.txt b/codegen/tools/CMakeLists.txt
 index 2d61a4d68c..1eb67a609d 100644
 --- a/codegen/tools/CMakeLists.txt
@@ -37,6 +224,212 @@ index fb154ff88b..1d10f0d7f9 100644
  
  include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
  include(${EXECUTORCH_ROOT}/tools/cmake/Codegen.cmake)
+diff --git a/examples/apple/mps/CMakeLists.txt b/examples/apple/mps/CMakeLists.txt
+index 8a562dd206..2717a072d2 100644
+--- a/examples/apple/mps/CMakeLists.txt
++++ b/examples/apple/mps/CMakeLists.txt
+@@ -29,13 +29,19 @@ if(NOT PYTHON_EXECUTABLE)
+   resolve_python_executable()
+ endif()
+ 
+-add_compile_options("-Wall" "-Werror")
++if(NOT MSVC)
++  add_compile_options("-Wall" "-Werror")
++endif()
+ 
+ include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
+ 
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC
+-                            -DET_EVENT_TRACER_ENABLED
+-)
++if(MSVC)
++  set(_common_compile_options /wd4996 -DET_EVENT_TRACER_ENABLED)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC
++                              -DET_EVENT_TRACER_ENABLED
++  )
++endif()
+ 
+ # Let files say "include <executorch/path/to/header.h>".
+ set(_common_include_directories ${EXECUTORCH_ROOT}/..)
+diff --git a/examples/devtools/CMakeLists.txt b/examples/devtools/CMakeLists.txt
+index f541f70f86..477e916b18 100644
+--- a/examples/devtools/CMakeLists.txt
++++ b/examples/devtools/CMakeLists.txt
+@@ -30,7 +30,11 @@ if(NOT PYTHON_EXECUTABLE)
+   resolve_python_executable()
+ endif()
+ 
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++if(MSVC)
++  set(_common_compile_options /wd4996)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++endif()
+ 
+ # Let files say "include <executorch/path/to/header.h>".
+ set(_common_include_directories ${EXECUTORCH_ROOT}/..)
+diff --git a/examples/mediatek/CMakeLists.txt b/examples/mediatek/CMakeLists.txt
+index f93954bff9..b03f0970d5 100644
+--- a/examples/mediatek/CMakeLists.txt
++++ b/examples/mediatek/CMakeLists.txt
+@@ -26,7 +26,11 @@ if(NOT PYTHON_EXECUTABLE)
+   resolve_python_executable()
+ endif()
+ 
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++if(MSVC)
++  set(_common_compile_options /wd4996)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++endif()
+ 
+ # Let files say "include <executorch/path/to/header.h>".
+ set(_common_include_directories
+diff --git a/examples/models/llama/CMakeLists.txt b/examples/models/llama/CMakeLists.txt
+index db0e38b8b7..e416babccb 100644
+--- a/examples/models/llama/CMakeLists.txt
++++ b/examples/models/llama/CMakeLists.txt
+@@ -63,7 +63,11 @@ else()
+   set(CMAKE_TOOLCHAIN_IOS OFF)
+ endif()
+ 
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++if(MSVC)
++  set(_common_compile_options /wd4996)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++endif()
+ 
+ # Let files say "include <executorch/path/to/header.h>".
+ set(_common_include_directories ${EXECUTORCH_ROOT}/..)
+diff --git a/examples/models/llava/CMakeLists.txt b/examples/models/llava/CMakeLists.txt
+index 1e7cdea22d..7f61ee019d 100644
+--- a/examples/models/llava/CMakeLists.txt
++++ b/examples/models/llava/CMakeLists.txt
+@@ -60,7 +60,11 @@ else()
+   set(CMAKE_TOOLCHAIN_IOS OFF)
+ endif()
+ 
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++if(MSVC)
++  set(_common_compile_options /wd4996)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++endif()
+ 
+ # Let files say "include <executorch/path/to/header.h>".
+ set(_common_include_directories ${EXECUTORCH_ROOT}/..)
+diff --git a/examples/portable/custom_ops/CMakeLists.txt b/examples/portable/custom_ops/CMakeLists.txt
+index 8e679697b4..16d80cb1b7 100644
+--- a/examples/portable/custom_ops/CMakeLists.txt
++++ b/examples/portable/custom_ops/CMakeLists.txt
+@@ -34,7 +34,11 @@ if(NOT PYTHON_EXECUTABLE)
+   resolve_python_executable()
+ endif()
+ 
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++if(MSVC)
++  set(_common_compile_options /wd4996)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++endif()
+ 
+ # Let files say "include <executorch/path/to/header.h>".
+ set(_common_include_directories ${EXECUTORCH_ROOT}/..)
+diff --git a/examples/qualcomm/CMakeLists.txt b/examples/qualcomm/CMakeLists.txt
+index 58897dce99..3f4cc2f69a 100644
+--- a/examples/qualcomm/CMakeLists.txt
++++ b/examples/qualcomm/CMakeLists.txt
+@@ -35,7 +35,11 @@ find_package(absl REQUIRED NO_CMAKE_FIND_ROOT_PATH)
+ find_package(executorch CONFIG REQUIRED)
+ target_compile_options(executorch INTERFACE -DET_EVENT_TRACER_ENABLED)
+ 
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++if(MSVC)
++  set(_common_compile_options /wd4996)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++endif()
+ 
+ #
+ # The `_<target>_srcs` lists are defined by executorch_load_build_variables.
+diff --git a/examples/selective_build/advanced/CMakeLists.txt b/examples/selective_build/advanced/CMakeLists.txt
+index fdef5e6555..bb96febf15 100644
+--- a/examples/selective_build/advanced/CMakeLists.txt
++++ b/examples/selective_build/advanced/CMakeLists.txt
+@@ -33,9 +33,13 @@ if(NOT CMAKE_CXX_STANDARD)
+   # Can't set to 11 due to executor_runner.cpp make_unique
+ endif()
+ 
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC
+-                            -ffunction-sections -fdata-sections
+-)
++if(MSVC)
++  set(_common_compile_options /wd4996 /Gy /Gw)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC
++                              -ffunction-sections -fdata-sections
++  )
++endif()
+ 
+ add_subdirectory(${EXECUTORCH_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/executorch)
+ 
+diff --git a/examples/selective_build/basic/CMakeLists.txt b/examples/selective_build/basic/CMakeLists.txt
+index d74f94d7b3..3df7dcf96a 100644
+--- a/examples/selective_build/basic/CMakeLists.txt
++++ b/examples/selective_build/basic/CMakeLists.txt
+@@ -33,9 +33,13 @@ if(NOT CMAKE_CXX_STANDARD)
+   # Can't set to 11 due to executor_runner.cpp make_unique
+ endif()
+ 
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC
+-                            -ffunction-sections -fdata-sections
+-)
++if(MSVC)
++  set(_common_compile_options /wd4996 /Gy /Gw)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC
++                              -ffunction-sections -fdata-sections
++  )
++endif()
+ 
+ add_subdirectory(${EXECUTORCH_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/executorch)
+ 
+diff --git a/exir/backend/test/demos/rpc/CMakeLists.txt b/exir/backend/test/demos/rpc/CMakeLists.txt
+index af84395460..76294ff8b0 100644
+--- a/exir/backend/test/demos/rpc/CMakeLists.txt
++++ b/exir/backend/test/demos/rpc/CMakeLists.txt
+@@ -24,7 +24,11 @@ include(${EXECUTORCH_ROOT}/tools/cmake/Test.cmake)
+ include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
+ 
+ set(_common_include_directories ${EXECUTORCH_ROOT}/..)
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++if(MSVC)
++  set(_common_compile_options /wd4996)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++endif()
+ 
+ add_library(
+   executor_backend STATIC ExecutorBackendRegister.cpp ExecutorBackend.cpp
+diff --git a/extension/wasm/tokenizers/CMakeLists.txt b/extension/wasm/tokenizers/CMakeLists.txt
+index 03b7ea1ff6..17dad7e9f3 100644
+--- a/extension/wasm/tokenizers/CMakeLists.txt
++++ b/extension/wasm/tokenizers/CMakeLists.txt
+@@ -25,7 +25,11 @@ if(NOT EXECUTORCH_ROOT)
+ endif()
+ 
+ include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC -Wall -Werror)
++if(MSVC)
++  set(_common_compile_options /wd4996 /W4 /WX)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC -Wall -Werror)
++endif()
+ set(_common_include_directories ${EXECUTORCH_ROOT}/..)
+ 
+ set(link_libraries)
 diff --git a/kernels/quantized/CMakeLists.txt b/kernels/quantized/CMakeLists.txt
 index d4fc52af76..8969bd5430 100644
 --- a/kernels/quantized/CMakeLists.txt
@@ -54,10 +447,22 @@ index d4fc52af76..8969bd5430 100644
  include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
  include(${EXECUTORCH_ROOT}/tools/cmake/Codegen.cmake)
 diff --git a/tools/cmake/Codegen.cmake b/tools/cmake/Codegen.cmake
-index 32d3d8b554..dde7c86b3a 100644
+index 32d3d8b554..01e205d42f 100644
 --- a/tools/cmake/Codegen.cmake
 +++ b/tools/cmake/Codegen.cmake
-@@ -232,8 +232,9 @@ function(gen_operators_lib)
+@@ -190,7 +190,10 @@ function(gen_custom_ops_aot_lib)
+   )
+   find_package_torch()
+   # This lib uses ATen lib, so we explicitly enable rtti and exceptions.
+-  target_compile_options(${GEN_LIB_NAME} PRIVATE -frtti -fexceptions)
++  target_compile_options(${GEN_LIB_NAME} PRIVATE
++    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-frtti -fexceptions>
++    $<$<CXX_COMPILER_ID:MSVC>:/GR /EHsc>
++  )
+   target_compile_definitions(${GEN_LIB_NAME} PRIVATE USE_ATEN_LIB=1)
+   include_directories(${TORCH_INCLUDE_DIRS})
+   target_link_libraries(${GEN_LIB_NAME} PRIVATE torch)
+@@ -232,8 +235,9 @@ function(gen_operators_lib)
    set(portable_kernels_check "portable_kernels")
    if(GEN_KERNEL_LIBS)
  
@@ -69,7 +474,7 @@ index 32d3d8b554..dde7c86b3a 100644
      )
  
      if(GEN_DTYPE_SELECTIVE_BUILD)
-@@ -353,6 +354,7 @@ endfunction()
+@@ -353,6 +357,7 @@ endfunction()
  # Append the file list in the variable named `name` in build/build_variables.bzl
  # to the variable named `outputvar` in the caller's scope.
  function(executorch_append_filelist name outputvar)
@@ -77,7 +482,7 @@ index 32d3d8b554..dde7c86b3a 100644
    # configure_file adds its input to the list of CMAKE_RERUN dependencies
    configure_file(
      ${EXECUTORCH_ROOT}/shim_et/xplat/executorch/build/build_variables.bzl
-@@ -361,10 +363,12 @@ function(executorch_append_filelist name outputvar)
+@@ -361,10 +366,12 @@ function(executorch_append_filelist name outputvar)
    if(NOT PYTHON_EXECUTABLE)
      resolve_python_executable()
    endif()
