@@ -96,11 +96,14 @@ export async function buildExecutorchWindows(
   // Prepare CMake arguments
   const cmakeArgs: string[] = []
 
-  // Use Ninja with clang-cl
+  // VS2022 LLVM tools path for clang-cl
+  const llvmBinPath = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\x64\\bin"
+
+  // Use Ninja with clang-cl - use full paths since CMake doesn't search PATH properly
   cmakeArgs.push("-GNinja")
-  cmakeArgs.push("-DCMAKE_C_COMPILER=clang-cl")
-  cmakeArgs.push("-DCMAKE_CXX_COMPILER=clang-cl")
-  cmakeArgs.push("-DCMAKE_LINKER=lld-link")
+  cmakeArgs.push(`-DCMAKE_C_COMPILER=${llvmBinPath}\\clang-cl.exe`)
+  cmakeArgs.push(`-DCMAKE_CXX_COMPILER=${llvmBinPath}\\clang-cl.exe`)
+  cmakeArgs.push(`-DCMAKE_LINKER=${llvmBinPath}\\lld-link.exe`)
 
   // Build configuration
   cmakeArgs.push(`-DCMAKE_INSTALL_PREFIX=${installPrefix}`)
@@ -139,8 +142,7 @@ export async function buildExecutorchWindows(
   console.log("")
 
   // Build environment with venv activated (matching Linux approach)
-  // Add VS2022 LLVM tools to PATH for clang-cl
-  const llvmBinPath = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\x64\\bin"
+  // Also add LLVM tools to PATH for other build tools
   const venvBinPath = path.join(venvPath, "Scripts")
   const currentPath = Deno.env.get("PATH") || ""
   const buildEnv: Record<string, string> = {
