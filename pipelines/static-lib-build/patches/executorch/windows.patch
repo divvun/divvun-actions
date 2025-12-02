@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index f886cf2e86..51e31c1ca7 100644
+index f886cf2e86..7910ed6556 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -296,7 +296,9 @@ if(EXECUTORCH_BUILD_TESTS)
@@ -13,6 +13,34 @@ index f886cf2e86..51e31c1ca7 100644
  
  # Let files say "include <executorch/path/to/header.h>".
  # TODO(#6475): This requires/assumes that the repo lives in a directory named
+@@ -786,7 +788,9 @@ if(EXECUTORCH_BUILD_PYBIND)
+       bundled_module PUBLIC ${_common_include_directories}
+     )
+     target_compile_options(
+-      bundled_module PUBLIC -Wno-deprecated-declarations -fPIC
++      bundled_module PUBLIC
++      $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wno-deprecated-declarations -fPIC>
++      $<$<CXX_COMPILER_ID:MSVC>:/wd4996>
+     )
+   endif()
+ 
+@@ -858,9 +862,13 @@ if(EXECUTORCH_BUILD_PYBIND)
+   endif()
+ 
+   # compile options for pybind
+-  set(_pybind_compile_options -Wno-deprecated-declarations -fPIC -frtti
+-                              -fexceptions
+-  )
++  if(MSVC)
++    set(_pybind_compile_options /wd4996 /GR /EHsc)
++  else()
++    set(_pybind_compile_options -Wno-deprecated-declarations -fPIC -frtti
++                                -fexceptions
++    )
++  endif()
+ 
+   # util lib
+   add_library(
 diff --git a/backends/apple/coreml/CMakeLists.txt b/backends/apple/coreml/CMakeLists.txt
 index 9879a05e3d..a0ad095ebc 100644
 --- a/backends/apple/coreml/CMakeLists.txt
@@ -137,7 +165,7 @@ index 4d32d8932c..5f86624902 100644
  # Include Executorch directories
  target_include_directories(openvino_backend PRIVATE ${COMMON_INCLUDE_DIRS})
 diff --git a/backends/qualcomm/CMakeLists.txt b/backends/qualcomm/CMakeLists.txt
-index 3210559726..6b74f18907 100644
+index 3210559726..7dc5b417c7 100644
 --- a/backends/qualcomm/CMakeLists.txt
 +++ b/backends/qualcomm/CMakeLists.txt
 @@ -39,7 +39,9 @@ if(${ANDROID})
@@ -169,8 +197,25 @@ index 3210559726..6b74f18907 100644
  endif()
  
  include_directories(
+@@ -260,9 +265,13 @@ if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86_64")
+ 
+   if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+     # need to allow exceptions in pybind
+-    set(_pybind_compile_options -Wno-deprecated-declarations -fPIC -frtti
+-                                -fexceptions
+-    )
++    if(MSVC)
++      set(_pybind_compile_options /wd4996 /GR /EHsc)
++    else()
++      set(_pybind_compile_options -Wno-deprecated-declarations -fPIC -frtti
++                                  -fexceptions
++      )
++    endif()
+     target_compile_options(
+       PyQnnManagerAdaptor PUBLIC ${_pybind_compile_options}
+     )
 diff --git a/backends/samsung/CMakeLists.txt b/backends/samsung/CMakeLists.txt
-index fff3ece523..50b13d4fa6 100644
+index fff3ece523..be83b7ef9b 100644
 --- a/backends/samsung/CMakeLists.txt
 +++ b/backends/samsung/CMakeLists.txt
 @@ -26,7 +26,9 @@ if(NOT FLATC_EXECUTABLE)
@@ -184,6 +229,35 @@ index fff3ece523..50b13d4fa6 100644
  if(CMAKE_BUILD_TYPE STREQUAL "Release")
    # strip symbols
    add_link_options("-s")
+@@ -144,7 +146,10 @@ if(${ANDROID})
+   add_library(enn_backend STATIC)
+   target_link_libraries(enn_backend PRIVATE enn_logging)
+   executorch_target_link_options_shared_lib(enn_backend)
+-  target_compile_options(enn_backend PRIVATE -Wno-deprecated-declarations)
++  target_compile_options(enn_backend PRIVATE
++    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wno-deprecated-declarations>
++    $<$<CXX_COMPILER_ID:MSVC>:/wd4996>
++  )
+ 
+   set(__enn_executor_runner_srcs
+       ${EXECUTORCH_SOURCE_DIR}/examples/samsung/executor_runner/enn_executor_runner.cpp
+diff --git a/backends/xnnpack/CMakeLists.txt b/backends/xnnpack/CMakeLists.txt
+index 33bf84b906..acf9535e2d 100644
+--- a/backends/xnnpack/CMakeLists.txt
++++ b/backends/xnnpack/CMakeLists.txt
+@@ -35,7 +35,11 @@ if(EXECUTORCH_XNNPACK_ENABLE_KLEIDI)
+   add_definitions(-DENABLE_XNNPACK_KLEIDI)
+ endif()
+ 
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++if(MSVC)
++  set(_common_compile_options /wd4996)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++endif()
+ 
+ set(_xnnpack_schema__include_dir "${CMAKE_BINARY_DIR}/schema/include")
+ # Paths to headers generated from the .fbs files.
 diff --git a/codegen/tools/CMakeLists.txt b/codegen/tools/CMakeLists.txt
 index 489a96aafb..f83607aefe 100644
 --- a/codegen/tools/CMakeLists.txt
@@ -404,6 +478,111 @@ index 97f90ea9ba..0bb96128e0 100644
  
  add_library(
    executor_backend STATIC ExecutorBackendRegister.cpp ExecutorBackend.cpp
+diff --git a/extension/android/CMakeLists.txt b/extension/android/CMakeLists.txt
+index 4755fed7bc..a6c0bfd08a 100644
+--- a/extension/android/CMakeLists.txt
++++ b/extension/android/CMakeLists.txt
+@@ -18,7 +18,11 @@ endif()
+ 
+ set(EXECUTORCH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+ include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++if(MSVC)
++  set(_common_compile_options /wd4996)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++endif()
+ if(NOT ANDROID_PLATFORM)
+   set(ANDROID_PLATFORM android-30)
+ endif()
+diff --git a/extension/llm/custom_ops/CMakeLists.txt b/extension/llm/custom_ops/CMakeLists.txt
+index 1678dc8029..50825bee43 100644
+--- a/extension/llm/custom_ops/CMakeLists.txt
++++ b/extension/llm/custom_ops/CMakeLists.txt
+@@ -16,7 +16,11 @@ if(NOT EXECUTORCH_ROOT)
+   set(EXECUTORCH_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
+ endif()
+ 
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++if(MSVC)
++  set(_common_compile_options /wd4996)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC)
++endif()
+ if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+   list(APPEND _common_compile_options "-march=armv8.2-a+dotprod")
+ endif()
+@@ -135,8 +139,10 @@ if(EXECUTORCH_BUILD_KERNELS_LLM_AOT)
+     target_link_libraries(custom_ops_aot_lib PUBLIC pthreadpool cpuinfo)
+   endif()
+   target_compile_options(
+-    custom_ops_aot_lib PUBLIC -Wno-deprecated-declarations -fPIC -frtti
+-                              -fexceptions ${_common_compile_options}
++    custom_ops_aot_lib PUBLIC
++    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wno-deprecated-declarations -fPIC -frtti -fexceptions>
++    $<$<CXX_COMPILER_ID:MSVC>:/wd4996 /GR /EHsc>
++    ${_common_compile_options}
+   )
+ 
+   install(
+diff --git a/extension/module/CMakeLists.txt b/extension/module/CMakeLists.txt
+index 5f114f1bef..79323dc512 100644
+--- a/extension/module/CMakeLists.txt
++++ b/extension/module/CMakeLists.txt
+@@ -35,7 +35,9 @@ target_include_directories(
+   extension_module PUBLIC ${_common_include_directories}
+ )
+ target_compile_options(
+-  extension_module PUBLIC -Wno-deprecated-declarations -fPIC
++  extension_module PUBLIC
++  $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wno-deprecated-declarations -fPIC>
++  $<$<CXX_COMPILER_ID:MSVC>:/wd4996>
+ )
+ 
+ # Module extension built as a static library. TODO(gjcomer) Remove this target
+@@ -49,7 +51,9 @@ target_include_directories(
+   extension_module_static PUBLIC ${_common_include_directories}
+ )
+ target_compile_options(
+-  extension_module_static PUBLIC -Wno-deprecated-declarations -fPIC
++  extension_module_static PUBLIC
++  $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wno-deprecated-declarations -fPIC>
++  $<$<CXX_COMPILER_ID:MSVC>:/wd4996>
+ )
+ 
+ # Install libraries
+diff --git a/extension/training/CMakeLists.txt b/extension/training/CMakeLists.txt
+index 1e17913141..dc8980076f 100644
+--- a/extension/training/CMakeLists.txt
++++ b/extension/training/CMakeLists.txt
+@@ -70,7 +70,9 @@ if(EXECUTORCH_BUILD_PYBIND)
+ 
+   target_include_directories(_training_lib PRIVATE ${TORCH_INCLUDE_DIRS})
+   target_compile_options(
+-    _training_lib PUBLIC -Wno-deprecated-declarations -fPIC -frtti -fexceptions
++    _training_lib PUBLIC
++    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wno-deprecated-declarations -fPIC -frtti -fexceptions>
++    $<$<CXX_COMPILER_ID:MSVC>:/wd4996 /GR /EHsc>
+   )
+   target_link_libraries(_training_lib PRIVATE ${_pybind_training_dep_libs})
+ 
+diff --git a/extension/wasm/CMakeLists.txt b/extension/wasm/CMakeLists.txt
+index 36c336e17c..7ca22e31fc 100644
+--- a/extension/wasm/CMakeLists.txt
++++ b/extension/wasm/CMakeLists.txt
+@@ -27,7 +27,11 @@ if(NOT EXECUTORCH_ROOT)
+ endif()
+ 
+ include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
+-set(_common_compile_options -Wno-deprecated-declarations -fPIC -Wall -Werror)
++if(MSVC)
++  set(_common_compile_options /wd4996 /W4 /WX)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations -fPIC -Wall -Werror)
++endif()
+ set(_common_include_directories ${EXECUTORCH_ROOT}/..)
+ 
+ set(link_libraries)
 diff --git a/extension/wasm/tokenizers/CMakeLists.txt b/extension/wasm/tokenizers/CMakeLists.txt
 index 03b7ea1ff6..17dad7e9f3 100644
 --- a/extension/wasm/tokenizers/CMakeLists.txt
@@ -421,6 +600,57 @@ index 03b7ea1ff6..17dad7e9f3 100644
  set(_common_include_directories ${EXECUTORCH_ROOT}/..)
  
  set(link_libraries)
+diff --git a/kernels/optimized/CMakeLists.txt b/kernels/optimized/CMakeLists.txt
+index 32ae865bfd..555d129b6e 100644
+--- a/kernels/optimized/CMakeLists.txt
++++ b/kernels/optimized/CMakeLists.txt
+@@ -21,7 +21,11 @@ if(NOT EXECUTORCH_ROOT)
+   set(EXECUTORCH_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+ endif()
+ 
+-set(_common_compile_options -Wno-deprecated-declarations)
++if(MSVC)
++  set(_common_compile_options /wd4996)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations)
++endif()
+ 
+ # Note for apple platform we can rely on Accelerate framework Will come back to
+ # this
+diff --git a/kernels/portable/CMakeLists.txt b/kernels/portable/CMakeLists.txt
+index eb8475b8d5..07286ef534 100644
+--- a/kernels/portable/CMakeLists.txt
++++ b/kernels/portable/CMakeLists.txt
+@@ -21,7 +21,11 @@ if(NOT EXECUTORCH_ROOT)
+   set(EXECUTORCH_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+ endif()
+ 
+-set(_common_compile_options -Wno-deprecated-declarations)
++if(MSVC)
++  set(_common_compile_options /wd4996)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations)
++endif()
+ 
+ include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
+ include(${EXECUTORCH_ROOT}/tools/cmake/Codegen.cmake)
+diff --git a/kernels/portable/cpu/util/CMakeLists.txt b/kernels/portable/cpu/util/CMakeLists.txt
+index 047760f321..c1d8d19e86 100644
+--- a/kernels/portable/cpu/util/CMakeLists.txt
++++ b/kernels/portable/cpu/util/CMakeLists.txt
+@@ -21,7 +21,11 @@ endif()
+ 
+ list(TRANSFORM _kernels_util_all_deps__srcs PREPEND "${EXECUTORCH_ROOT}/")
+ 
+-set(_common_compile_options -Wno-deprecated-declarations)
++if(MSVC)
++  set(_common_compile_options /wd4996)
++else()
++  set(_common_compile_options -Wno-deprecated-declarations)
++endif()
+ 
+ add_library(kernels_util_all_deps ${_kernels_util_all_deps__srcs})
+ target_link_libraries(kernels_util_all_deps PRIVATE executorch_core)
 diff --git a/kernels/quantized/CMakeLists.txt b/kernels/quantized/CMakeLists.txt
 index b0c837cdef..75a5e80b18 100644
 --- a/kernels/quantized/CMakeLists.txt
