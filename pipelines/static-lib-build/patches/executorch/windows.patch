@@ -1,8 +1,75 @@
+diff --git a/codegen/tools/CMakeLists.txt b/codegen/tools/CMakeLists.txt
+index 2d61a4d68c..1eb67a609d 100644
+--- a/codegen/tools/CMakeLists.txt
++++ b/codegen/tools/CMakeLists.txt
+@@ -26,16 +26,9 @@ target_include_directories(
+ # Compile options
+ target_compile_options(
+   selective_build
+-  PUBLIC -Wno-deprecated-declarations
+-         -fPIC
+-         -frtti
+-         -fexceptions
+-         -Werror
+-         -Wunused-variable
+-         -Wno-unknown-argument
++  PUBLIC $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wno-deprecated-declarations -fPIC -frtti -fexceptions -Werror -Wunused-variable -Wno-unknown-argument>
++         $<$<CXX_COMPILER_ID:MSVC>:/wd4996 /GR /EHsc /WX>
+ )
+-# We suppress -Wno-unknown-argument because our build system passes -fPIC for
+-# Unix builds, but we also build on Windows where it's ignored
+ 
+ # Link against required libraries
+ if(TARGET bundled_program)
+diff --git a/configurations/CMakeLists.txt b/configurations/CMakeLists.txt
+index fb154ff88b..1d10f0d7f9 100644
+--- a/configurations/CMakeLists.txt
++++ b/configurations/CMakeLists.txt
+@@ -18,7 +18,10 @@ endif()
+ 
+ include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
+ 
+-set(_common_compile_options -Wno-deprecated-declarations)
++set(_common_compile_options
++    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wno-deprecated-declarations>
++    $<$<CXX_COMPILER_ID:MSVC>:/wd4996>
++)
+ 
+ include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
+ include(${EXECUTORCH_ROOT}/tools/cmake/Codegen.cmake)
+diff --git a/kernels/quantized/CMakeLists.txt b/kernels/quantized/CMakeLists.txt
+index d4fc52af76..8969bd5430 100644
+--- a/kernels/quantized/CMakeLists.txt
++++ b/kernels/quantized/CMakeLists.txt
+@@ -20,7 +20,10 @@ if(NOT EXECUTORCH_ROOT)
+   set(EXECUTORCH_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+ endif()
+ 
+-set(_common_compile_options -Wno-deprecated-declarations)
++set(_common_compile_options
++    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wno-deprecated-declarations>
++    $<$<CXX_COMPILER_ID:MSVC>:/wd4996>
++)
+ 
+ include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
+ include(${EXECUTORCH_ROOT}/tools/cmake/Codegen.cmake)
 diff --git a/tools/cmake/Codegen.cmake b/tools/cmake/Codegen.cmake
-index 32d3d8b554..705c019402 100644
+index 32d3d8b554..dde7c86b3a 100644
 --- a/tools/cmake/Codegen.cmake
 +++ b/tools/cmake/Codegen.cmake
-@@ -353,6 +353,7 @@ endfunction()
+@@ -232,8 +232,9 @@ function(gen_operators_lib)
+   set(portable_kernels_check "portable_kernels")
+   if(GEN_KERNEL_LIBS)
+ 
+-    set(_common_compile_options -Wno-deprecated-declarations
+-                                -ffunction-sections -fdata-sections -Os
++    set(_common_compile_options
++        $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wno-deprecated-declarations -ffunction-sections -fdata-sections -Os>
++        $<$<CXX_COMPILER_ID:MSVC>:/wd4996 /Gy /Gw /Os>
+     )
+ 
+     if(GEN_DTYPE_SELECTIVE_BUILD)
+@@ -353,6 +354,7 @@ endfunction()
  # Append the file list in the variable named `name` in build/build_variables.bzl
  # to the variable named `outputvar` in the caller's scope.
  function(executorch_append_filelist name outputvar)
@@ -10,7 +77,7 @@ index 32d3d8b554..705c019402 100644
    # configure_file adds its input to the list of CMAKE_RERUN dependencies
    configure_file(
      ${EXECUTORCH_ROOT}/shim_et/xplat/executorch/build/build_variables.bzl
-@@ -361,10 +362,12 @@ function(executorch_append_filelist name outputvar)
+@@ -361,10 +363,12 @@ function(executorch_append_filelist name outputvar)
    if(NOT PYTHON_EXECUTABLE)
      resolve_python_executable()
    endif()
