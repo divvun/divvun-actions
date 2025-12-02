@@ -96,9 +96,6 @@ export async function buildExecutorchWindows(
   // Prepare CMake arguments
   const cmakeArgs: string[] = []
 
-  // Use Ninja
-  cmakeArgs.push("-GNinja")
-
   // Build configuration
   cmakeArgs.push(`-DCMAKE_INSTALL_PREFIX=${installPrefix}`)
   cmakeArgs.push(`-DCMAKE_BUILD_TYPE=${buildType}`)
