@@ -65,9 +65,13 @@ export async function buildExecutorchWindows(
     import.meta.dirname!,
     "patches/executorch/windows.patch",
   )
-  await builder.exec("git", ["apply", windowsPatchPath], {
+  const patchResult = await builder.output("C:\\msys2\\usr\\bin\\patch.exe", ["-p1", "-i", windowsPatchPath], {
     cwd: executorchRoot,
   })
+  console.log(patchResult.stdout)
+  if (patchResult.stderr) {
+    console.log(patchResult.stderr)
+  }
 
   // Set up directories
   const installPrefix = path.join(repoRoot, `target/${target}/executorch`)
