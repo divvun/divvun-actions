@@ -1,0 +1,38 @@
+diff --git a/tools/cmake/Codegen.cmake b/tools/cmake/Codegen.cmake
+index 32d3d8b554..636c78a13d 100644
+--- a/tools/cmake/Codegen.cmake
++++ b/tools/cmake/Codegen.cmake
+@@ -353,6 +353,7 @@ endfunction()
+ # Append the file list in the variable named `name` in build/build_variables.bzl
+ # to the variable named `outputvar` in the caller's scope.
+ function(executorch_append_filelist name outputvar)
++  set(_rootdir "${EXECUTORCH_ROOT}")
+   # configure_file adds its input to the list of CMAKE_RERUN dependencies
+   configure_file(
+     ${EXECUTORCH_ROOT}/shim_et/xplat/executorch/build/build_variables.bzl
+diff --git a/tools/cmake/Utils.cmake b/tools/cmake/Utils.cmake
+index 77918ebbf2..c6c09e8364 100644
+--- a/tools/cmake/Utils.cmake
++++ b/tools/cmake/Utils.cmake
+@@ -84,10 +84,17 @@ function(resolve_python_executable)
+         PARENT_SCOPE
+     )
+   elseif(DEFINED ENV{VIRTUAL_ENV})
+-    set(PYTHON_EXECUTABLE
+-        $ENV{VIRTUAL_ENV}/bin/python3
+-        PARENT_SCOPE
+-    )
++    if(WIN32)
++      set(PYTHON_EXECUTABLE
++          $ENV{VIRTUAL_ENV}/Scripts/python.exe
++          PARENT_SCOPE
++      )
++    else()
++      set(PYTHON_EXECUTABLE
++          $ENV{VIRTUAL_ENV}/bin/python3
++          PARENT_SCOPE
++      )
++    endif()
+   else()
+     set(PYTHON_EXECUTABLE
+         python3

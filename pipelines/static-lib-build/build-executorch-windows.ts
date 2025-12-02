@@ -59,6 +59,16 @@ export async function buildExecutorchWindows(
     { cwd: executorchRoot },
   )
 
+  // Apply Windows patch
+  console.log("Applying Windows patch")
+  const windowsPatchPath = path.join(
+    import.meta.dirname!,
+    "patches/executorch/windows.patch",
+  )
+  await builder.exec("git", ["apply", windowsPatchPath], {
+    cwd: executorchRoot,
+  })
+
   // Set up directories
   const installPrefix = path.join(repoRoot, `target/${target}/executorch`)
   const buildRoot = path.join(repoRoot, `build/${target}/executorch`)
@@ -85,7 +95,6 @@ export async function buildExecutorchWindows(
   // Build configuration
   cmakeArgs.push(`-DCMAKE_INSTALL_PREFIX=${installPrefix}`)
   cmakeArgs.push(`-DCMAKE_BUILD_TYPE=${buildType}`)
-  cmakeArgs.push(`-D_rootdir=${executorchRoot}`)
 
   // ARM64 cross-compilation
   if (isArm64) {
