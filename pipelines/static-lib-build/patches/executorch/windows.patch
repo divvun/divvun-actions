@@ -667,6 +667,61 @@ index b0c837cdef..75a5e80b18 100644
  
  include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
  include(${EXECUTORCH_ROOT}/tools/cmake/Codegen.cmake)
+diff --git a/third-party/CMakeLists.txt b/third-party/CMakeLists.txt
+index 767ac367e1..376826c049 100644
+--- a/third-party/CMakeLists.txt
++++ b/third-party/CMakeLists.txt
+@@ -27,6 +27,11 @@ endif()
+ 
+ # We use ExternalProject to build flatc from source to force it target the host.
+ # Otherwise, flatc will target the project's toolchain (i.e. iOS, or Android).
++if(WIN32)
++  set(_flatc_executable flatc.exe)
++else()
++  set(_flatc_executable flatc)
++endif()
+ ExternalProject_Add(
+   flatbuffers_ep
+   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/flatc_ep
+@@ -44,7 +49,7 @@ ExternalProject_Add(
+              # If building for iOS, "unset" these variables to rely on the host (macOS) defaults.
+              $<$<AND:$<BOOL:${APPLE}>,$<BOOL:$<FILTER:${PLATFORM},EXCLUDE,^MAC>>>:-DCMAKE_OSX_SYSROOT=>
+              -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=${CMAKE_OSX_DEPLOYMENT_TARGET}
+-  BUILD_BYPRODUCTS <INSTALL_DIR>/bin/flatc
++  BUILD_BYPRODUCTS <INSTALL_DIR>/bin/${_flatc_executable}
+   ${_executorch_external_project_additional_args}
+ )
+ ExternalProject_Get_Property(flatbuffers_ep INSTALL_DIR)
+@@ -79,6 +84,11 @@ endif()
+ 
+ # Similar to flatbuffers, we want to build flatcc for the host. See inline comments
+ # in the flatbuffers ExternalProject_Add for more details.
++if(WIN32)
++  set(_flatcc_executable flatcc.exe)
++else()
++  set(_flatcc_executable flatcc)
++endif()
+ ExternalProject_Add(
+   flatcc_ep
+   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/flatcc_ep
+@@ -96,8 +106,8 @@ ExternalProject_Add(
+              $<$<AND:$<BOOL:${APPLE}>,$<BOOL:$<FILTER:${PLATFORM},EXCLUDE,^MAC>>>:-DCMAKE_OSX_SYSROOT=>
+              -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=${CMAKE_OSX_DEPLOYMENT_TARGET}
+              ${_flatcc_extra_cmake_args}
+-  BUILD_BYPRODUCTS <INSTALL_DIR>/bin/flatcc
+-  {_executorch_external_project_additional_args}
++  BUILD_BYPRODUCTS <INSTALL_DIR>/bin/${_flatcc_executable}
++  ${_executorch_external_project_additional_args}
+ )
+ file(REMOVE_RECURSE ${PROJECT_SOURCE_DIR}/third-party/flatcc/lib)
+ ExternalProject_Get_Property(flatcc_ep INSTALL_DIR)
+diff --git a/third-party/ao b/third-party/ao
+index 02941240fd..01849b2b19 160000
+--- a/third-party/ao
++++ b/third-party/ao
+@@ -1 +1 @@
+-Subproject commit 02941240fd182fc3f37ffcb47a64084904428d1d
++Subproject commit 01849b2b19cb923cb739a1fc02297ba418ddf715
 diff --git a/tools/cmake/Codegen.cmake b/tools/cmake/Codegen.cmake
 index 32d3d8b554..01e205d42f 100644
 --- a/tools/cmake/Codegen.cmake
