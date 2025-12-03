@@ -1,85 +1,46 @@
+# escape=`
+
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
-SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+SHELL ["cmd", "/S", "/C"]
 
-# Enable long paths FIRST
-RUN New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" \
-    -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+# Enable long paths
+RUN reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
 
-# Download VS Build Tools installer
-RUN Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vs_buildtools.exe' -OutFile 'C:\vs_buildtools.exe'
+# Copy install helper script
+COPY install-vsbase.cmd C:\TEMP\
 
-# Layer 1: Install base VCTools workload with Windows SDK
-RUN $components = @( \
-        'Microsoft.VisualStudio.Workload.VCTools', \
-        'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', \
-        'Microsoft.VisualStudio.Component.Windows11SDK.26100' \
-    ); \
-    $args = '--wait --quiet --norestart --nocache install ' + ($components | ForEach-Object { '--add ' + $_ }) -join ' '; \
-    $VSId = Start-Process -FilePath 'C:\vs_buildtools.exe' -ArgumentList $args -NoNewWindow -PassThru ; \
-    $VSId.WaitForExit() ; \
-    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id ; \
-    foreach ($id in $setupIds) { \
-        Wait-Process -Id $id -ErrorAction SilentlyContinue \
-    }
+# Download VS log collector for debugging failed installs
+ADD https://aka.ms/vscollect.exe C:\TEMP\collect.exe
 
-# Layer 2: Add ARM64 tools
-RUN $components = @( \
-        'Microsoft.VisualStudio.Component.VC.Tools.ARM64' \
-    ); \
-    $args = '--wait --quiet --norestart --nocache modify ' + ($components | ForEach-Object { '--add ' + $_ }) -join ' '; \
-    $VSId = Start-Process -FilePath 'C:\vs_buildtools.exe' -ArgumentList $args -NoNewWindow -PassThru ; \
-    $VSId.WaitForExit() ; \
-    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id ; \
-    foreach ($id in $setupIds) { \
-        Wait-Process -Id $id -ErrorAction SilentlyContinue \
-    }
+# Download channel manifest for reproducible installs
+ARG CHANNEL_URL=https://aka.ms/vs/17/release/channel
+ADD ${CHANNEL_URL} C:\TEMP\VisualStudio.chman
 
-# Layer 3: Add Clang/LLVM toolset
-RUN $components = @( \
-        'Microsoft.VisualStudio.Component.VC.Llvm.Clang', \
-        'Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset' \
-    ); \
-    $args = '--wait --quiet --norestart --nocache modify ' + ($components | ForEach-Object { '--add ' + $_ }) -join ' '; \
-    $VSId = Start-Process -FilePath 'C:\vs_buildtools.exe' -ArgumentList $args -NoNewWindow -PassThru ; \
-    $VSId.WaitForExit() ; \
-    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id ; \
-    foreach ($id in $setupIds) { \
-        Wait-Process -Id $id -ErrorAction SilentlyContinue \
-    }
+# Install Visual Studio Build Tools with all required components
+RUN powershell -Command "$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vs_buildtools.exe' -OutFile 'vs_buildtools.exe'" `
+    && (call C:\TEMP\install-vsbase.cmd vs_buildtools.exe --quiet --wait --norestart --nocache install `
+        --installPath "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\BuildTools" `
+        --channelUri C:\TEMP\VisualStudio.chman `
+        --installChannelUri C:\TEMP\VisualStudio.chman `
+        --add Microsoft.VisualStudio.Workload.VCTools `
+        --add Microsoft.VisualStudio.Workload.MSBuildTools `
+        --add Microsoft.VisualStudio.Workload.NetCoreBuildTools `
+        --add Microsoft.VisualStudio.Workload.NativeDesktop `
+        --add Microsoft.VisualStudio.Workload.ManagedDesktop `
+        --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+        --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 `
+        --add Microsoft.VisualStudio.Component.VC.Llvm.Clang `
+        --add Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset `
+        --add Microsoft.VisualStudio.Component.Windows11SDK.26100 `
+        --remove Microsoft.VisualStudio.Component.Windows10SDK.10240 `
+        --remove Microsoft.VisualStudio.Component.Windows10SDK.10586 `
+        --remove Microsoft.VisualStudio.Component.Windows10SDK.14393 `
+        --remove Microsoft.VisualStudio.Component.Windows81SDK) `
+    && del /q vs_buildtools.exe `
+    && (rmdir /s /q "C:\ProgramData\Package Cache" 2>nul || exit /b 0)
 
-# Layer 4: Add MSBuild and .NET Core tools
-RUN $components = @( \
-        'Microsoft.VisualStudio.Workload.MSBuildTools', \
-        'Microsoft.VisualStudio.Workload.NetCoreBuildTools' \
-    ); \
-    $args = '--wait --quiet --norestart --nocache modify ' + ($components | ForEach-Object { '--add ' + $_ }) -join ' '; \
-    $VSId = Start-Process -FilePath 'C:\vs_buildtools.exe' -ArgumentList $args -NoNewWindow -PassThru ; \
-    $VSId.WaitForExit() ; \
-    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id ; \
-    foreach ($id in $setupIds) { \
-        Wait-Process -Id $id -ErrorAction SilentlyContinue \
-    }
-
-# Layer 5: Add Desktop workloads
-RUN $components = @( \
-        'Microsoft.VisualStudio.Workload.NativeDesktop', \
-        'Microsoft.VisualStudio.Workload.ManagedDesktop' \
-    ); \
-    $args = '--wait --quiet --norestart --nocache modify ' + ($components | ForEach-Object { '--add ' + $_ }) -join ' '; \
-    $VSId = Start-Process -FilePath 'C:\vs_buildtools.exe' -ArgumentList $args -NoNewWindow -PassThru ; \
-    $VSId.WaitForExit() ; \
-    $setupIds = (Get-Process -name 'setup' -ErrorAction SilentlyContinue).id ; \
-    foreach ($id in $setupIds) { \
-        Wait-Process -Id $id -ErrorAction SilentlyContinue \
-    }
-
-# Cleanup: Remove installer and caches
-RUN Remove-Item -Force 'C:\vs_buildtools.exe' ; \
-    Remove-Item -Recurse -Force 'C:\ProgramData\Package Cache\*' -ErrorAction SilentlyContinue ; \
-    Remove-Item -Recurse -Force $env:TEMP\* -ErrorAction SilentlyContinue
-
-# Install PowerShell Core to match main image expectations
-RUN Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.4.6/PowerShell-7.4.6-win-x64.msi' -OutFile 'pwsh.msi' ; \
-    Start-Process msiexec.exe -ArgumentList '/i', 'pwsh.msi', '/quiet', '/norestart' -Wait ; \
-    Remove-Item -Force 'pwsh.msi'
+# Install PowerShell Core
+RUN powershell -Command "$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.5.4/PowerShell-7.5.4-win-x64.msi' -OutFile 'pwsh.msi'" `
+    && msiexec /i pwsh.msi /quiet /norestart `
+    && del /q pwsh.msi
