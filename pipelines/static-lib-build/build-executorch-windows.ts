@@ -123,6 +123,7 @@ export async function buildExecutorchWindows(
   // ExecuTorch build flags
   cmakeArgs.push("-DEXECUTORCH_BUILD_XNNPACK=ON")
   cmakeArgs.push("-DEXECUTORCH_BUILD_EXECUTOR_RUNNER=OFF")
+  cmakeArgs.push("-DEXECUTORCH_BUILD_EXTENSION_NAMED_DATA_MAP=ON")
   cmakeArgs.push("-DEXECUTORCH_BUILD_EXTENSION_DATA_LOADER=ON")
   cmakeArgs.push("-DEXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR=ON")
   cmakeArgs.push("-DEXECUTORCH_BUILD_EXTENSION_MODULE=ON")
