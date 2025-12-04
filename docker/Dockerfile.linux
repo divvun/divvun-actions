@@ -136,10 +136,9 @@ RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.83.1/gh_2.83.1_li
     rm gh.deb && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
-# Install jsign
-RUN curl -fsSL https://github.com/ebourg/jsign/releases/download/7.4/jsign_7.4_all.deb -o jsign.deb && \
-    dpkg -i jsign.deb && \
-    rm jsign.deb && \
+# Install osslsigncode
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y osslsigncode && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
 # Install Rust compiler and targets

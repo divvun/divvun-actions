@@ -65,7 +65,11 @@ export async function buildExecutorchWindows(
     import.meta.dirname!,
     "patches/executorch/windows.patch",
   )
-  const patchResult = await builder.output("C:\\msys2\\usr\\bin\\patch.exe", ["-p1", "-i", windowsPatchPath], {
+  const patchResult = await builder.output("C:\\msys2\\usr\\bin\\patch.exe", [
+    "-p1",
+    "-i",
+    windowsPatchPath,
+  ], {
     cwd: executorchRoot,
   })
   console.log(patchResult.stdout)
@@ -97,7 +101,8 @@ export async function buildExecutorchWindows(
   const cmakeArgs: string[] = []
 
   // VS2022 LLVM tools path for clang-cl
-  const llvmBinPath = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\x64\\bin"
+  const llvmBinPath =
+    "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\x64\\bin"
 
   // Use Ninja with clang-cl - use full paths since CMake doesn't search PATH properly
   cmakeArgs.push("-GNinja")

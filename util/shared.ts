@@ -16,8 +16,6 @@ import {
   makeTempFileSync,
 } from "./temp.ts"
 
-// export const WINDOWS_SIGNING_HASH_ALGORITHM = "sha256"
-export const RFC3161_URL = "http://ts.ssl.com"
 const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(() => resolve(), ms))
 
