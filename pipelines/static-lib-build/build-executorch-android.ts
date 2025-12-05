@@ -127,6 +127,7 @@ export async function buildExecutorchAndroid(
 
   // ExecuTorch build flags
   cmakeArgs.push("-DEXECUTORCH_BUILD_XNNPACK=ON")
+  cmakeArgs.push("-DEXECUTORCH_BUILD_VULKAN=ON")
   cmakeArgs.push("-DEXECUTORCH_BUILD_EXECUTOR_RUNNER=OFF")
   cmakeArgs.push("-DEXECUTORCH_BUILD_EXTENSION_DATA_LOADER=ON")
   cmakeArgs.push("-DEXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR=ON")
