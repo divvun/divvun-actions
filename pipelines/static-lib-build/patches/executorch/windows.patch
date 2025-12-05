@@ -269,6 +269,34 @@ index 29ff90e729..a847fcd1cc 100644
  
  target_include_directories(
    vulkan_schema
+diff --git a/backends/vulkan/cmake/ShaderLibrary.cmake b/backends/vulkan/cmake/ShaderLibrary.cmake
+index 16a60abf6f..63ce8c1eea 100644
+--- a/backends/vulkan/cmake/ShaderLibrary.cmake
++++ b/backends/vulkan/cmake/ShaderLibrary.cmake
+@@ -53,6 +53,14 @@ function(gen_vulkan_shader_lib_cpp shaders_path)
+     endif()
+   endif()
+ 
++  # Glob shader sources explicitly for Ninja compatibility (wildcards don't work)
++  set(ET_VK_GLSL_DIR ${EXECUTORCH_ROOT}/backends/vulkan/runtime/graph/ops/glsl)
++  file(GLOB VULKAN_GLSL_SOURCES
++    "${ET_VK_GLSL_DIR}/*.glsl"
++    "${ET_VK_GLSL_DIR}/*.glslh"
++    "${ET_VK_GLSL_DIR}/*.comp"
++  )
++
+   add_custom_command(
+     COMMENT "Generating Vulkan Compute Shaders"
+     OUTPUT ${VULKAN_SHADERGEN_OUT_PATH}/spv.cpp
+@@ -63,7 +71,7 @@ function(gen_vulkan_shader_lib_cpp shaders_path)
+       --glslc-path=${GLSLC_PATH}
+       --tmp-dir-path=${VULKAN_SHADERGEN_OUT_PATH}/shader_cache/ --env
+       ${VULKAN_GEN_ARG_ENV} ${GEN_SPV_ARGS}
+-    DEPENDS ${shaders_path}/*
++    DEPENDS ${VULKAN_GLSL_SOURCES}
+             ${EXECUTORCH_ROOT}/backends/vulkan/runtime/gen_vulkan_spv.py
+   )
+ 
 diff --git a/backends/xnnpack/CMakeLists.txt b/backends/xnnpack/CMakeLists.txt
 index 33bf84b906..2b69188d37 100644
 --- a/backends/xnnpack/CMakeLists.txt

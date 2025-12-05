@@ -106,6 +106,16 @@ export async function buildExecutorchAndroid(
 
   await Deno.mkdir(buildRoot, { recursive: true })
 
+  // Apply patch
+  console.log("Applying patch")
+  const patchPath = path.join(
+    import.meta.dirname!,
+    "patches/executorch/windows.patch",
+  )
+  await builder.exec("patch", ["-p1", "-i", patchPath], {
+    cwd: executorchRoot,
+  })
+
   // Prepare CMake arguments
   const cmakeArgs: string[] = []
 
