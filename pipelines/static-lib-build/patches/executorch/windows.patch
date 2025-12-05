@@ -338,14 +338,28 @@ index e9c5e0e424..adf6c9b76a 100644
  target_include_directories(
    bundled_program
 diff --git a/devtools/etdump/CMakeLists.txt b/devtools/etdump/CMakeLists.txt
-index ca4df1d2a8..5b7ac238d9 100644
+index ca4df1d2a8..62d786f79c 100644
 --- a/devtools/etdump/CMakeLists.txt
 +++ b/devtools/etdump/CMakeLists.txt
-@@ -49,6 +49,7 @@ add_library(
+@@ -39,6 +39,13 @@ add_custom_command(
+   COMMENT "Generating etdump headers"
+ )
+ 
++# Create a custom target for the schema outputs to ensure proper dependency
++# tracking with the flatcc external project on Windows/Ninja builds
++add_custom_target(etdump_schema_headers DEPENDS ${_schema_outputs})
++if(TARGET flatcc_ep-install)
++  add_dependencies(etdump_schema_headers flatcc_ep-install)
++endif()
++
+ add_library(
+   etdump
+   ${_schema_outputs}
+@@ -49,6 +56,7 @@ add_library(
    ${CMAKE_CURRENT_SOURCE_DIR}/data_sinks/file_data_sink.cpp
    ${CMAKE_CURRENT_SOURCE_DIR}/data_sinks/file_data_sink.h
  )
-+add_dependencies(etdump flatcc_cli)
++add_dependencies(etdump etdump_schema_headers)
  target_link_libraries(
    etdump
    PUBLIC flatccrt
