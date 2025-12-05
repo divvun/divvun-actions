@@ -337,6 +337,18 @@ index e9c5e0e424..adf6c9b76a 100644
  target_link_libraries(bundled_program PUBLIC executorch)
  target_include_directories(
    bundled_program
+diff --git a/devtools/etdump/CMakeLists.txt b/devtools/etdump/CMakeLists.txt
+index ca4df1d2a8..5b7ac238d9 100644
+--- a/devtools/etdump/CMakeLists.txt
++++ b/devtools/etdump/CMakeLists.txt
+@@ -49,6 +49,7 @@ add_library(
+   ${CMAKE_CURRENT_SOURCE_DIR}/data_sinks/file_data_sink.cpp
+   ${CMAKE_CURRENT_SOURCE_DIR}/data_sinks/file_data_sink.h
+ )
++add_dependencies(etdump flatcc_cli)
+ target_link_libraries(
+   etdump
+   PUBLIC flatccrt
 diff --git a/examples/apple/mps/CMakeLists.txt b/examples/apple/mps/CMakeLists.txt
 index 8a562dd206..2717a072d2 100644
 --- a/examples/apple/mps/CMakeLists.txt
