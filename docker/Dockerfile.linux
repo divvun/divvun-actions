@@ -209,6 +209,14 @@ RUN curl -fsSL https://x.giellalt.org/rcodesign-0.29.0-x86_64-unknown-linux-gnu.
     mv rcodesign /usr/local/bin/rcodesign && \
     rm rcodesign.tar.gz
 
+# Install Vulkan SDK (required for ExecuTorch Vulkan backend)
+ENV VULKAN_SDK="/opt/vulkan/1.4.321.0/x86_64"
+RUN curl -fsSL https://sdk.lunarg.com/sdk/download/1.4.321.0/linux/vulkansdk-linux-x86_64-1.4.321.0.tar.xz -o vulkansdk.tar.xz && \
+    mkdir -p /opt/vulkan && \
+    tar -xf vulkansdk.tar.xz -C /opt/vulkan && \
+    rm vulkansdk.tar.xz
+ENV PATH="$VULKAN_SDK/bin:$PATH"
+
 # Configure git-lfs
 RUN git lfs install
 
