@@ -752,7 +752,7 @@ index fc844bbf3a..d9ac68fd45 100644
    # exir lets users set the alignment of tensor data embedded in the flatbuffer,
    # and some users need an alignment larger than the default, which is typically
 diff --git a/third-party/CMakeLists.txt b/third-party/CMakeLists.txt
-index 767ac367e1..376826c049 100644
+index 767ac367e1..3586f14d27 100644
 --- a/third-party/CMakeLists.txt
 +++ b/third-party/CMakeLists.txt
 @@ -27,6 +27,11 @@ endif()
@@ -767,7 +767,7 @@ index 767ac367e1..376826c049 100644
  ExternalProject_Add(
    flatbuffers_ep
    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/flatc_ep
-@@ -44,7 +49,7 @@ ExternalProject_Add(
+@@ -44,12 +49,15 @@ ExternalProject_Add(
               # If building for iOS, "unset" these variables to rely on the host (macOS) defaults.
               $<$<AND:$<BOOL:${APPLE}>,$<BOOL:$<FILTER:${PLATFORM},EXCLUDE,^MAC>>>:-DCMAKE_OSX_SYSROOT=>
               -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=${CMAKE_OSX_DEPLOYMENT_TARGET}
@@ -775,8 +775,17 @@ index 767ac367e1..376826c049 100644
 +  BUILD_BYPRODUCTS <INSTALL_DIR>/bin/${_flatc_executable}
    ${_executorch_external_project_additional_args}
  )
++# Create explicit step targets so Ninja can properly track dependencies
++ExternalProject_Add_StepTargets(flatbuffers_ep install)
  ExternalProject_Get_Property(flatbuffers_ep INSTALL_DIR)
-@@ -79,6 +84,11 @@ endif()
+ add_executable(flatc IMPORTED GLOBAL)
+-add_dependencies(flatc flatbuffers_ep)
++# Depend on the install step to ensure flatc.exe exists before use
++add_dependencies(flatc flatbuffers_ep-install)
+ if(WIN32 AND NOT CMAKE_CROSSCOMPILING)
+   # flatbuffers does not use CMAKE_BUILD_TYPE. Internally, the build forces Release
+   # config, but from CMake's perspective the build type is always Debug.
+@@ -79,6 +87,11 @@ endif()
  
  # Similar to flatbuffers, we want to build flatcc for the host. See inline comments
  # in the flatbuffers ExternalProject_Add for more details.
@@ -788,7 +797,7 @@ index 767ac367e1..376826c049 100644
  ExternalProject_Add(
    flatcc_ep
    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/flatcc_ep
-@@ -96,8 +106,8 @@ ExternalProject_Add(
+@@ -96,13 +109,16 @@ ExternalProject_Add(
               $<$<AND:$<BOOL:${APPLE}>,$<BOOL:$<FILTER:${PLATFORM},EXCLUDE,^MAC>>>:-DCMAKE_OSX_SYSROOT=>
               -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=${CMAKE_OSX_DEPLOYMENT_TARGET}
               ${_flatcc_extra_cmake_args}
@@ -797,8 +806,17 @@ index 767ac367e1..376826c049 100644
 +  BUILD_BYPRODUCTS <INSTALL_DIR>/bin/${_flatcc_executable}
 +  ${_executorch_external_project_additional_args}
  )
++# Create explicit step targets so Ninja can properly track dependencies
++ExternalProject_Add_StepTargets(flatcc_ep install)
  file(REMOVE_RECURSE ${PROJECT_SOURCE_DIR}/third-party/flatcc/lib)
  ExternalProject_Get_Property(flatcc_ep INSTALL_DIR)
+ add_executable(flatcc_cli IMPORTED GLOBAL)
+-add_dependencies(flatcc_cli flatcc_ep)
++# Depend on the install step to ensure flatcc.exe exists before use
++add_dependencies(flatcc_cli flatcc_ep-install)
+ if(WIN32 AND NOT CMAKE_CROSSCOMPILING)
+   set_target_properties(flatcc_cli PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/bin/flatcc.exe)
+ else()
 diff --git a/tools/cmake/Codegen.cmake b/tools/cmake/Codegen.cmake
 index 32d3d8b554..01e205d42f 100644
 --- a/tools/cmake/Codegen.cmake
