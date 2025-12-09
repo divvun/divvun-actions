@@ -564,12 +564,11 @@ export async function runLangTtsTextprocDeploy() {
   const isTtsReleaseTag = TTS_TEXTPROC_RELEASE_TAG.test(builder.env.tag ?? "")
   const isMainBranch = builder.env.branch === "main"
 
-  await builder.downloadArtifacts("build/tools/tts/*", ".")
+  await builder.downloadArtifacts("build/tools/tts/bundle.drb", ".")
 
-  const ttsFiles = await globFiles("build/tools/tts/*")
-
-  if (ttsFiles.length === 0) {
-    throw new Error("No TTS text processor files found for deployment")
+  const bundlePath = "build/tools/tts/bundle.drb"
+  if (!await fs.exists(bundlePath)) {
+    throw new Error("TTS bundle.drb not found for deployment")
   }
 
   if (!builder.env.repo) {
@@ -611,22 +610,11 @@ export async function runLangTtsTextprocDeploy() {
       ? `${tagVersion}+build.${builder.env.buildNumber}`
       : tagVersion
 
-    // Create versioned filenames for all TTS files
-    const versionedFiles: string[] = []
-
-    for (const file of ttsFiles) {
-      const basename = file.split("/").pop()!
-      const ext = basename.includes(".") ? "." + basename.split(".").pop() : ""
-      const nameWithoutExt = ext ? basename.slice(0, -ext.length) : basename
-      const versionedName =
-        `${packageName}_${versionWithBuild}_${nameWithoutExt}${ext}`
-
-      await Deno.rename(file, versionedName)
-      versionedFiles.push(versionedName)
-    }
+    const versionedFile = `${packageName}_${versionWithBuild}_noarch-all.drb`
+    await Deno.rename(bundlePath, versionedFile)
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
-      versionedFiles,
+      [versionedFile],
       await builder.secrets(),
     )
 
@@ -634,12 +622,12 @@ export async function runLangTtsTextprocDeploy() {
       `Creating GitHub release for TTS text processor version ${tagVersion}`,
     )
     logger.info(`Pre-release: ${prerelease}`)
-    logger.info(`Artifacts: ${versionedFiles.join(", ")}`)
+    logger.info(`Artifact: ${versionedFile}`)
 
     const gh = new GitHub(builder.env.repo)
     await gh.createRelease(
       builder.env.tag,
-      [...versionedFiles, checksumFile, signatureFile],
+      [versionedFile, checksumFile, signatureFile],
       { prerelease },
     )
 
@@ -654,22 +642,11 @@ export async function runLangTtsTextprocDeploy() {
 
     const releaseTag = `tts-textproc-${langCode}/dev-latest`
 
-    // Create versioned filenames for all TTS files
-    const versionedFiles: string[] = []
-
-    for (const file of ttsFiles) {
-      const basename = file.split("/").pop()!
-      const ext = basename.includes(".") ? "." + basename.split(".").pop() : ""
-      const nameWithoutExt = ext ? basename.slice(0, -ext.length) : basename
-      const versionedName =
-        `${packageName}_${devVersion}_${nameWithoutExt}${ext}`
-
-      await Deno.rename(file, versionedName)
-      versionedFiles.push(versionedName)
-    }
+    const versionedFile = `${packageName}_${devVersion}_noarch-all.drb`
+    await Deno.rename(bundlePath, versionedFile)
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
-      versionedFiles,
+      [versionedFile],
       await builder.secrets(),
     )
 
@@ -677,13 +654,13 @@ export async function runLangTtsTextprocDeploy() {
       `Creating dev-latest GitHub release for TTS text processor version ${devVersion}`,
     )
     logger.info(`Release tag: ${releaseTag}`)
-    logger.info(`Artifacts: ${versionedFiles.join(", ")}`)
+    logger.info(`Artifact: ${versionedFile}`)
 
     const releaseName = `${packageName}/v${devVersion}`
     const gh = new GitHub(builder.env.repo)
     await gh.updateRelease(
       releaseTag,
-      [...versionedFiles, checksumFile, signatureFile],
+      [versionedFile, checksumFile, signatureFile],
       { draft: false, prerelease: true, name: releaseName },
     )
 

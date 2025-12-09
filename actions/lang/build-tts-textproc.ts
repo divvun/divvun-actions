@@ -100,33 +100,20 @@ export default async function langTtsTextprocBuild(
   logger.debug(`Flags: ${flags}`)
   await autotoolsBuilder.build(flags)
 
-  // Upload the build directory
-  await builder.uploadArtifacts("build/**/*")
-
-  // Glob the TTS files in the tts directory
-  const out: string[] = []
-
-  const files = await fs.expandGlob(
-    path.join("build/tools/tts/*"),
-    { followSymlinks: false },
-  )
-
-  for await (const file of files) {
-    if (file.isFile) {
-      out.push(path.join("build/tools/tts", path.basename(file.path)))
-    }
+  // Check for bundle.drb
+  const bundlePath = "build/tools/tts/bundle.drb"
+  if (!await fs.exists(bundlePath)) {
+    throw new Error("TTS bundle.drb not found!")
   }
 
-  if (out.length === 0) {
-    throw new Error("No TTS text processor files found!")
-  }
+  // Upload just the bundle
+  await builder.uploadArtifacts(bundlePath)
 
-  logger.info("TTS text processor paths:")
-  logger.info(JSON.stringify(out, null, 2))
+  logger.info(`TTS text processor bundle: ${bundlePath}`)
 
-  await builder.setMetadata("tts-textproc-paths", JSON.stringify(out))
+  await builder.setMetadata("tts-textproc-paths", JSON.stringify([bundlePath]))
 
   return {
-    ttsTextprocPaths: out,
+    ttsTextprocPaths: [bundlePath],
   }
 }
