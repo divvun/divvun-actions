@@ -154,6 +154,10 @@ RUN ~/.cargo/bin/cargo install cross --git https://github.com/cross-rs/cross && 
     ~/.cargo/bin/cargo binstall -y just && \
     ~/.cargo/bin/cargo binstall -y cargo-ndk
 
+# Install b3sum
+RUN curl -fsSL "https://github.com/BLAKE3-team/BLAKE3/releases/latest/download/b3sum_linux_x64_bin" -o /usr/local/bin/b3sum && \
+    chmod +x /usr/local/bin/b3sum
+
 # Install Node.js and pnpm
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs && \
