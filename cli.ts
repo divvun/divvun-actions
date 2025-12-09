@@ -198,20 +198,12 @@ async function runPipeline(args: any) {
       await runDesktopKeyboardMacOS(kbdgenBundlePath)
       break
     }
-    case "lang-build": {
-      await runLangBuild()
-      break
-    }
     case "lang-speller-build": {
       await runLangSpellerBuild()
       break
     }
     case "lang-grammar-build": {
       await runLangGrammarBuild()
-      break
-    }
-    case "lang-test": {
-      await runLangTest()
       break
     }
     case "lang-speller-test": {

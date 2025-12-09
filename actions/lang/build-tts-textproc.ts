@@ -77,8 +77,8 @@ function deriveAutogenFlags(_config: BuildProps) {
     "--without-forrest",
     "--disable-silent-rules",
     "--disable-spellers",
-    "--disable-analysers",
-    "--disable-generators",
+    "--enable-analysers",
+    "--enable-generators",
     "--disable-transcriptors",
     "--enable-tts",
   ]
