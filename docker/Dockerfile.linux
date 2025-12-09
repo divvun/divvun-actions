@@ -198,7 +198,7 @@ RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "aw
     rm awscliv2.zip
 
 # Install divvun-runtime
-RUN curl -fsSL "https://github.com/divvun/divvun-runtime/releases/download/v0.1.1/divvun-runtime-x86_64-unknown-linux-gnu-v0.1.1.tgz" -o "divvun-runtime.tgz" && \
+RUN curl -fsSL "https://github.com/divvun/divvun-runtime/releases/download/v0.3.1/divvun-runtime-x86_64-unknown-linux-musl-v0.3.1.tgz" -o "divvun-runtime.tgz" && \
     bsdtar -xf divvun-runtime.tgz && \
     cp divvun-runtime-x86_64*/divvun-runtime /usr/local/bin/divvun-runtime && \
     rm divvun-runtime.tgz
