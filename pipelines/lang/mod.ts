@@ -14,7 +14,7 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import { GitHub } from "~/util/github.ts"
-import { blake3Hash } from "~/util/hash.ts"
+import { createSignedChecksums } from "~/util/hash.ts"
 import { versionAsDev } from "~/util/shared.ts"
 import spellerBundle from "../../actions/speller/bundle.ts"
 import { SpellerManifest, SpellerType } from "../../actions/speller/manifest.ts"
@@ -327,35 +327,24 @@ export async function runLangDeploy() {
     await Deno.rename(macosFiles, versionedMacosFile)
     await Deno.rename(mobileFiles, versionedMobileFile)
 
-    const windowsHash = await blake3Hash(versionedWindowsFile)
-    const macosHash = await blake3Hash(versionedMacosFile)
-    const mobileHash = await blake3Hash(versionedMobileFile)
-
-    const windowsHashFile = `${versionedWindowsFile}.blake3`
-    const macosHashFile = `${versionedMacosFile}.blake3`
-    const mobileHashFile = `${versionedMobileFile}.blake3`
-
-    await Deno.writeTextFile(windowsHashFile, windowsHash)
-    await Deno.writeTextFile(macosHashFile, macosHash)
-    await Deno.writeTextFile(mobileHashFile, mobileHash)
+    const artifacts = [
+      versionedWindowsFile,
+      versionedMacosFile,
+      versionedMobileFile,
+    ]
+    const { checksumFile, signatureFile } = await createSignedChecksums(
+      artifacts,
+      await builder.secrets(),
+    )
 
     logger.info(`Creating GitHub release for speller version ${tagVersion}`)
     logger.info(`Pre-release: ${prerelease}`)
-    logger.info(
-      `Artifacts: ${versionedWindowsFile}, ${versionedMacosFile}, ${versionedMobileFile}`,
-    )
+    logger.info(`Artifacts: ${artifacts.join(", ")}`)
 
     const gh = new GitHub(builder.env.repo)
     await gh.createRelease(
       builder.env.tag,
-      [
-        versionedWindowsFile,
-        versionedMacosFile,
-        versionedMobileFile,
-        windowsHashFile,
-        macosHashFile,
-        mobileHashFile,
-      ],
+      [...artifacts, checksumFile, signatureFile],
       { prerelease },
     )
 
@@ -391,38 +380,27 @@ export async function runLangDeploy() {
     await Deno.rename(macosFiles, versionedMacosFile)
     await Deno.rename(mobileFiles, versionedMobileFile)
 
-    const windowsHash = await blake3Hash(versionedWindowsFile)
-    const macosHash = await blake3Hash(versionedMacosFile)
-    const mobileHash = await blake3Hash(versionedMobileFile)
-
-    const windowsHashFile = `${versionedWindowsFile}.blake3`
-    const macosHashFile = `${versionedMacosFile}.blake3`
-    const mobileHashFile = `${versionedMobileFile}.blake3`
-
-    await Deno.writeTextFile(windowsHashFile, windowsHash)
-    await Deno.writeTextFile(macosHashFile, macosHash)
-    await Deno.writeTextFile(mobileHashFile, mobileHash)
+    const artifacts = [
+      versionedWindowsFile,
+      versionedMacosFile,
+      versionedMobileFile,
+    ]
+    const { checksumFile, signatureFile } = await createSignedChecksums(
+      artifacts,
+      await builder.secrets(),
+    )
 
     logger.info(
       `Creating dev-latest GitHub release for speller version ${devVersion}`,
     )
     logger.info(`Release tag: ${releaseTag}`)
-    logger.info(
-      `Artifacts: ${versionedWindowsFile}, ${versionedMacosFile}, ${versionedMobileFile}`,
-    )
+    logger.info(`Artifacts: ${artifacts.join(", ")}`)
 
     const releaseName = `${packageName}/v${devVersion}`
     const gh = new GitHub(builder.env.repo)
     await gh.updateRelease(
       releaseTag,
-      [
-        versionedWindowsFile,
-        versionedMacosFile,
-        versionedMobileFile,
-        windowsHashFile,
-        macosHashFile,
-        mobileHashFile,
-      ],
+      [...artifacts, checksumFile, signatureFile],
       { draft: false, prerelease: true, name: releaseName },
     )
 
@@ -522,23 +500,20 @@ export async function runLangGrammarDeploy() {
     await Deno.rename(drbFile, versionedDrbFile)
     await Deno.rename(zcheckFile, versionedZcheckFile)
 
-    const drbHash = await blake3Hash(versionedDrbFile)
-    const zcheckHash = await blake3Hash(versionedZcheckFile)
-
-    const drbHashFile = `${versionedDrbFile}.blake3`
-    const zcheckHashFile = `${versionedZcheckFile}.blake3`
-
-    await Deno.writeTextFile(drbHashFile, drbHash)
-    await Deno.writeTextFile(zcheckHashFile, zcheckHash)
+    const artifacts = [versionedDrbFile, versionedZcheckFile]
+    const { checksumFile, signatureFile } = await createSignedChecksums(
+      artifacts,
+      await builder.secrets(),
+    )
 
     logger.info(`Creating GitHub release for grammar version ${tagVersion}`)
     logger.info(`Pre-release: ${prerelease}`)
-    logger.info(`Artifacts: ${versionedDrbFile}, ${versionedZcheckFile}`)
+    logger.info(`Artifacts: ${artifacts.join(", ")}`)
 
     const gh = new GitHub(builder.env.repo)
     await gh.createRelease(
       builder.env.tag,
-      [versionedDrbFile, versionedZcheckFile, drbHashFile, zcheckHashFile],
+      [...artifacts, checksumFile, signatureFile],
       { prerelease },
     )
 
@@ -559,26 +534,23 @@ export async function runLangGrammarDeploy() {
     await Deno.rename(drbFile, versionedDrbFile)
     await Deno.rename(zcheckFile, versionedZcheckFile)
 
-    const drbHash = await blake3Hash(versionedDrbFile)
-    const zcheckHash = await blake3Hash(versionedZcheckFile)
-
-    const drbHashFile = `${versionedDrbFile}.blake3`
-    const zcheckHashFile = `${versionedZcheckFile}.blake3`
-
-    await Deno.writeTextFile(drbHashFile, drbHash)
-    await Deno.writeTextFile(zcheckHashFile, zcheckHash)
+    const artifacts = [versionedDrbFile, versionedZcheckFile]
+    const { checksumFile, signatureFile } = await createSignedChecksums(
+      artifacts,
+      await builder.secrets(),
+    )
 
     logger.info(
       `Creating dev-latest GitHub release for grammar version ${devVersion}`,
     )
     logger.info(`Release tag: ${releaseTag}`)
-    logger.info(`Artifacts: ${versionedDrbFile}, ${versionedZcheckFile}`)
+    logger.info(`Artifacts: ${artifacts.join(", ")}`)
 
     const releaseName = `${packageName}/v${devVersion}`
     const gh = new GitHub(builder.env.repo)
     await gh.updateRelease(
       releaseTag,
-      [versionedDrbFile, versionedZcheckFile, drbHashFile, zcheckHashFile],
+      [...artifacts, checksumFile, signatureFile],
       { draft: false, prerelease: true, name: releaseName },
     )
 
@@ -641,7 +613,6 @@ export async function runLangTtsTextprocDeploy() {
 
     // Create versioned filenames for all TTS files
     const versionedFiles: string[] = []
-    const hashFiles: string[] = []
 
     for (const file of ttsFiles) {
       const basename = file.split("/").pop()!
@@ -652,12 +623,12 @@ export async function runLangTtsTextprocDeploy() {
 
       await Deno.rename(file, versionedName)
       versionedFiles.push(versionedName)
-
-      const hash = await blake3Hash(versionedName)
-      const hashFile = `${versionedName}.blake3`
-      await Deno.writeTextFile(hashFile, hash)
-      hashFiles.push(hashFile)
     }
+
+    const { checksumFile, signatureFile } = await createSignedChecksums(
+      versionedFiles,
+      await builder.secrets(),
+    )
 
     logger.info(
       `Creating GitHub release for TTS text processor version ${tagVersion}`,
@@ -668,7 +639,7 @@ export async function runLangTtsTextprocDeploy() {
     const gh = new GitHub(builder.env.repo)
     await gh.createRelease(
       builder.env.tag,
-      [...versionedFiles, ...hashFiles],
+      [...versionedFiles, checksumFile, signatureFile],
       { prerelease },
     )
 
@@ -685,7 +656,6 @@ export async function runLangTtsTextprocDeploy() {
 
     // Create versioned filenames for all TTS files
     const versionedFiles: string[] = []
-    const hashFiles: string[] = []
 
     for (const file of ttsFiles) {
       const basename = file.split("/").pop()!
@@ -696,12 +666,12 @@ export async function runLangTtsTextprocDeploy() {
 
       await Deno.rename(file, versionedName)
       versionedFiles.push(versionedName)
-
-      const hash = await blake3Hash(versionedName)
-      const hashFile = `${versionedName}.blake3`
-      await Deno.writeTextFile(hashFile, hash)
-      hashFiles.push(hashFile)
     }
+
+    const { checksumFile, signatureFile } = await createSignedChecksums(
+      versionedFiles,
+      await builder.secrets(),
+    )
 
     logger.info(
       `Creating dev-latest GitHub release for TTS text processor version ${devVersion}`,
@@ -713,7 +683,7 @@ export async function runLangTtsTextprocDeploy() {
     const gh = new GitHub(builder.env.repo)
     await gh.updateRelease(
       releaseTag,
-      [...versionedFiles, ...hashFiles],
+      [...versionedFiles, checksumFile, signatureFile],
       { draft: false, prerelease: true, name: releaseName },
     )
 

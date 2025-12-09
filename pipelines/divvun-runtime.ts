@@ -6,7 +6,7 @@ import * as targetModule from "~/target.ts"
 import { GitHub } from "~/util/github.ts"
 import { Tar, Zip } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
-import { blake3Hash } from "~/util/hash.ts"
+import { createSignedChecksums } from "~/util/hash.ts"
 
 // Main branch builds all targets for testing
 const MAIN_TARGETS = [
@@ -269,6 +269,8 @@ export async function runDivvunRuntimePublish() {
 
   using archivePath = await makeTempDir({ prefix: "divvun-runtime-" })
 
+  const allArtifacts: string[] = []
+
   // Move playground artifacts to archive path with tag
   for (const target of PLAYGROUND_RELEASE_TARGETS) {
     if (os(target) === "linux") {
@@ -279,8 +281,7 @@ export async function runDivvunRuntimePublish() {
         `divvun-rt-playground-${target}_${builder.env.tag!}.AppImage`,
       )
       await fs.move(sourcePath, destPath, { overwrite: true })
-      const hash = await blake3Hash(destPath)
-      await Deno.writeTextFile(`${destPath}.blake3`, hash)
+      allArtifacts.push(destPath)
     } else {
       const artifactName = `divvun-rt-playground-${target}`
       const sourcePath = path.join(tempDir.path, artifactName)
@@ -289,8 +290,7 @@ export async function runDivvunRuntimePublish() {
         `${artifactName}_${builder.env.tag!}.tar.gz`,
       )
       await fs.move(sourcePath, destPath, { overwrite: true })
-      const hash = await blake3Hash(destPath)
-      await Deno.writeTextFile(`${destPath}.blake3`, hash)
+      allArtifacts.push(destPath)
     }
   }
 
@@ -319,9 +319,20 @@ export async function runDivvunRuntimePublish() {
       await Tar.createFlatTgz([stagingDir], outPath)
     }
 
-    const hash = await blake3Hash(outPath)
-    await Deno.writeTextFile(`${outPath}.blake3`, hash)
+    allArtifacts.push(outPath)
   }
+
+  // Create signed checksums for all artifacts
+  const { checksumFile, signatureFile } = await createSignedChecksums(
+    allArtifacts,
+    await builder.secrets(),
+  )
+
+  // Move checksum files to archive path
+  const checksumDest = path.join(archivePath.path, checksumFile)
+  const signatureDest = path.join(archivePath.path, signatureFile)
+  await fs.move(checksumFile, checksumDest, { overwrite: true })
+  await fs.move(signatureFile, signatureDest, { overwrite: true })
 
   const gh = new GitHub(builder.env.repo)
   await gh.createRelease(
