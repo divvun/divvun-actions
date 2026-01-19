@@ -132,15 +132,6 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
       cwd: pytorchRoot,
     })
 
-    console.log("Applying mimalloc prctl.h patch for musl")
-    const mimallocPatchPath = path.join(
-      import.meta.dirname!,
-      "patches/pytorch/mimalloc-prctl.patch",
-    )
-    await builder.exec("patch", ["-p1", "-i", mimallocPatchPath], {
-      cwd: pytorchRoot,
-    })
-
     console.log("Applying c10 __assert_fail patch for musl")
     const c10PatchPath = path.join(
       import.meta.dirname!,
