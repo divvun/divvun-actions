@@ -1,10 +1,10 @@
-FROM buildkite/agent:alpine
+FROM buildkite/agent:3-alpine-3.23
 
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="/var/cache/buildkite"
 
 # Set up Alpine repositories and install packages
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/main" > /etc/apk/repositories && \
-    echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/community" >> /etc/apk/repositories && \
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositories && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories && \
     apk update && apk upgrade && apk add --no-cache \
     autoconf \
     automake \
@@ -13,7 +13,12 @@ RUN echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/main" > /etc/apk/r
     build-base \
     bison \
     ca-certificates \
+    clang21 \
+    clang21-dev \
+    clang21-extra-tools \
+    clang21-static \
     cmake \
+    compiler-rt \
     curl \
     deno \
     flex \
@@ -22,8 +27,13 @@ RUN echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/main" > /etc/apk/r
     icu-static \
     jq \
     libarchive-tools \
+    libc++-dev \
+    libc++abi-dev \
     libtool \
     linux-headers \
+    lld21 \
+    llvm21 \
+    llvm21-dev \
     make \
     ninja \
     openssh \
@@ -41,6 +51,12 @@ RUN echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/main" > /etc/apk/r
     uv \
     zlib-dev \
     zlib-static
+
+# Set clang-21 as default
+RUN ln -sf /usr/bin/clang-21 /usr/local/bin/clang && \
+    ln -sf /usr/bin/clang++-21 /usr/local/bin/clang++ && \
+    ln -sf /usr/bin/lld21 /usr/local/bin/lld && \
+    ln -sf /usr/bin/ld.lld21 /usr/local/bin/ld.lld
 
 # Install Rust with both musl targets
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
