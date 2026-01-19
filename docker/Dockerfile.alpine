@@ -28,7 +28,6 @@ RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositor
     jq \
     libarchive-tools \
     libc++-dev \
-    libc++abi-dev \
     libtool \
     linux-headers \
     lld21 \
