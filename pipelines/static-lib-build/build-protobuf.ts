@@ -245,6 +245,8 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
       cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
       cmakeArgs.push("-DCMAKE_AR=/usr/lib/llvm21/bin/llvm-ar")
       cmakeArgs.push("-DCMAKE_RANLIB=/usr/lib/llvm21/bin/llvm-ranlib")
+      // Disable zlib - Alpine only has shared libz.so which can't be used with -static
+      cmakeArgs.push("-Dprotobuf_WITH_ZLIB=OFF")
     }
   }
 
