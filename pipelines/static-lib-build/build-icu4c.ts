@@ -235,6 +235,9 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
         ? "/opt/aarch64-linux-musl-cross/aarch64-linux-musl"
         : "/opt/x86_64-linux-musl-cross/x86_64-linux-musl"
       const muslTarget = `${targetArch}-linux-musl`
+      // GCC runtime library path for crtbeginT.o, crtend.o, libgcc.a, libgcc_eh.a
+      const gccLibPath =
+        `/opt/${targetArch}-linux-musl-cross/lib/gcc/${targetArch}-linux-musl/14.2.0`
 
       // Use clang with Thin LTO to avoid GCC bitcode (.ao) files
       Deno.env.set("CC", "clang")
@@ -251,7 +254,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       )
       Deno.env.set(
         "LDFLAGS",
-        `--target=${muslTarget} --sysroot=${sysroot} -flto=thin -fuse-ld=lld -static`,
+        `--target=${muslTarget} --sysroot=${sysroot} -L${gccLibPath} -flto=thin -fuse-ld=lld -static`,
       )
     } else {
       // Linux glibc: prefer clang if available

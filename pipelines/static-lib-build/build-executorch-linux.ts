@@ -109,13 +109,16 @@ export async function buildExecutorchLinux(
 
     if (isMusl) {
       // Use clang with Thin LTO to avoid GCC bitcode (.ao) files
+      // GCC runtime library path for crtbeginT.o, crtend.o, libgcc.a, libgcc_eh.a
+      const gccLibPath =
+        "/opt/aarch64-linux-musl-cross/lib/gcc/aarch64-linux-musl/14.2.0"
       cmakeArgs.push("-DCMAKE_C_COMPILER=clang")
       cmakeArgs.push("-DCMAKE_CXX_COMPILER=clang++")
       cmakeArgs.push("-DCMAKE_C_COMPILER_TARGET=aarch64-linux-musl")
       cmakeArgs.push("-DCMAKE_CXX_COMPILER_TARGET=aarch64-linux-musl")
       cmakeArgs.push("-DCMAKE_C_FLAGS=-flto=thin -fPIC")
       cmakeArgs.push("-DCMAKE_CXX_FLAGS=-flto=thin -fPIC")
-      cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
+      cmakeArgs.push(`-DCMAKE_EXE_LINKER_FLAGS=-L${gccLibPath} -flto=thin -fuse-ld=lld -static`)
       cmakeArgs.push("-DCMAKE_AR=/usr/bin/llvm-ar")
       cmakeArgs.push("-DCMAKE_RANLIB=/usr/bin/llvm-ranlib")
       cmakeArgs.push(
@@ -131,13 +134,16 @@ export async function buildExecutorchLinux(
     }
   } else if (isMusl && targetArch === "x86_64") {
     // Use clang with Thin LTO to avoid GCC bitcode (.ao) files
+    // GCC runtime library path for crtbeginT.o, crtend.o, libgcc.a, libgcc_eh.a
+    const gccLibPath =
+      "/opt/x86_64-linux-musl-cross/lib/gcc/x86_64-linux-musl/14.2.0"
     cmakeArgs.push("-DCMAKE_C_COMPILER=clang")
     cmakeArgs.push("-DCMAKE_CXX_COMPILER=clang++")
     cmakeArgs.push("-DCMAKE_C_COMPILER_TARGET=x86_64-linux-musl")
     cmakeArgs.push("-DCMAKE_CXX_COMPILER_TARGET=x86_64-linux-musl")
     cmakeArgs.push("-DCMAKE_C_FLAGS=-flto=thin -fPIC")
     cmakeArgs.push("-DCMAKE_CXX_FLAGS=-flto=thin -fPIC")
-    cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
+    cmakeArgs.push(`-DCMAKE_EXE_LINKER_FLAGS=-L${gccLibPath} -flto=thin -fuse-ld=lld -static`)
     cmakeArgs.push("-DCMAKE_AR=/usr/bin/llvm-ar")
     cmakeArgs.push("-DCMAKE_RANLIB=/usr/bin/llvm-ranlib")
     cmakeArgs.push(
