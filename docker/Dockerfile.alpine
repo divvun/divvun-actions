@@ -1,4 +1,4 @@
-FROM buildkite/agent:3-alpine
+FROM buildkite/agent:alpine
 
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="/var/cache/buildkite"
 
