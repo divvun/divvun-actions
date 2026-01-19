@@ -442,29 +442,55 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     hasRunConfigureIcu = false
   }
 
+  // Helper to print config.log on failure
+  const printConfigLogOnFailure = async (error: unknown) => {
+    const configLogPath = path.join(buildRoot, "config.log")
+    console.error("\n=== ICU configure failed! Printing config.log ===\n")
+    try {
+      const configLog = await Deno.readTextFile(configLogPath)
+      console.error(configLog)
+    } catch {
+      console.error(`Could not read ${configLogPath}`)
+    }
+    console.error("\n=== End of config.log ===\n")
+    throw error
+  }
+
   // For cross-compilation (iOS/Android), always use configure directly
   // runConfigureICU doesn't handle cross-compilation well
   if (platform === "ios" || platform === "android") {
     console.log("Cross-compiling: using configure directly")
-    await builder.exec(
-      path.join(icuSourceDir, "configure"),
-      configureArgs,
-      { cwd: buildRoot },
-    )
+    try {
+      await builder.exec(
+        path.join(icuSourceDir, "configure"),
+        configureArgs,
+        { cwd: buildRoot },
+      )
+    } catch (e) {
+      await printConfigLogOnFailure(e)
+    }
   } else if (hasRunConfigureIcu) {
     console.log(`Using runConfigureICU for platform: ${icuPlatform}`)
-    await builder.exec(
-      runConfigureIcu,
-      [icuPlatform, ...configureArgs],
-      { cwd: buildRoot },
-    )
+    try {
+      await builder.exec(
+        runConfigureIcu,
+        [icuPlatform, ...configureArgs],
+        { cwd: buildRoot },
+      )
+    } catch (e) {
+      await printConfigLogOnFailure(e)
+    }
   } else {
     console.log("Using configure directly")
-    await builder.exec(
-      path.join(icuSourceDir, "configure"),
-      configureArgs,
-      { cwd: buildRoot },
-    )
+    try {
+      await builder.exec(
+        path.join(icuSourceDir, "configure"),
+        configureArgs,
+        { cwd: buildRoot },
+      )
+    } catch (e) {
+      await printConfigLogOnFailure(e)
+    }
   }
 
   // Determine number of parallel jobs

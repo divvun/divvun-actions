@@ -115,8 +115,8 @@ export async function buildExecutorchLinux(
       cmakeArgs.push("-DCMAKE_C_FLAGS=-flto=thin -fPIC")
       cmakeArgs.push("-DCMAKE_CXX_FLAGS=-flto=thin -fPIC")
       cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
-      cmakeArgs.push("-DCMAKE_AR=/usr/bin/llvm-ar")
-      cmakeArgs.push("-DCMAKE_RANLIB=/usr/bin/llvm-ranlib")
+      cmakeArgs.push("-DCMAKE_AR=/usr/lib/llvm21/bin/llvm-ar")
+      cmakeArgs.push("-DCMAKE_RANLIB=/usr/lib/llvm21/bin/llvm-ranlib")
       cmakeArgs.push(
         "-DCMAKE_SYSROOT=/opt/aarch64-linux-musl-cross/aarch64-linux-musl",
       )
@@ -136,8 +136,8 @@ export async function buildExecutorchLinux(
     cmakeArgs.push("-DCMAKE_C_FLAGS=-flto=thin -fPIC")
     cmakeArgs.push("-DCMAKE_CXX_FLAGS=-flto=thin -fPIC")
     cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
-    cmakeArgs.push("-DCMAKE_AR=/usr/bin/llvm-ar")
-    cmakeArgs.push("-DCMAKE_RANLIB=/usr/bin/llvm-ranlib")
+    cmakeArgs.push("-DCMAKE_AR=/usr/lib/llvm21/bin/llvm-ar")
+    cmakeArgs.push("-DCMAKE_RANLIB=/usr/lib/llvm21/bin/llvm-ranlib")
     cmakeArgs.push(
       "-DCMAKE_SYSROOT=/opt/x86_64-linux-musl-cross/x86_64-linux-musl",
     )
