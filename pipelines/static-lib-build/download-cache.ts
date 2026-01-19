@@ -1,7 +1,7 @@
 import * as builder from "~/builder.ts"
 import { GitHub } from "~/util/github.ts"
 
-const DEFAULT_PYTORCH_VERSION = "v2.8.0"
+const DEFAULT_PYTORCH_VERSION = "v2.9.1"
 const PYTORCH_REPO = "https://github.com/pytorch/pytorch.git"
 const PYTORCH_DIR = "pytorch"
 

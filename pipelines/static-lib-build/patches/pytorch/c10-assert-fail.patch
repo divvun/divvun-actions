@@ -1,59 +1,31 @@
-diff --git a/c10/macros/Macros.h b/c10/macros/Macros.h
---- a/c10/macros/Macros.h
-+++ b/c10/macros/Macros.h
-@@ -380,7 +380,11 @@ extern "C" {
- extern SYCL_EXTERNAL void __assert_fail(
-     const char* expr,
+--- a/torch/headeronly/macros/Macros.h
++++ b/torch/headeronly/macros/Macros.h
+@@ -420,6 +420,13 @@
      const char* file,
-+#ifdef __GLIBC__
-     unsigned int line,
-+#else
-+    int line,
-+#endif
+     int line,
      const char* func);
++#elif !defined(__GLIBC__) && !defined(_WIN32)
++// musl libc: uses int for line, no noexcept
++void __assert_fail(
++    const char* expr,
++    const char* file,
++    int line,
++    const char* func) __attribute__((__noreturn__));
  #else // __SYCL_DEVICE_ONLY__
  #if (defined(__CUDA_ARCH__) && !(defined(__clang__) && defined(__CUDA__)))
-@@ -393,11 +397,19 @@ __host__ __device__
-     // exactly how it is in glibc in case parts of the program are compiled with
-     // different NDEBUG settings. Otherwise we might get 'ambiguous declaration'
-     // error. Note: On ROCm - this declaration serves for host side compilation.
-+    // Note: musl libc uses 'int' for line parameter and has no noexcept spec.
-+#ifdef __GLIBC__
-     void
-     __assert_fail(
-         const char* assertion,
-         const char* file,
-         unsigned int line,
-         const char* function) noexcept __attribute__((__noreturn__));
-+#else
-+    void
-+    __assert_fail(
-+        const char* assertion,
-+        const char* file,
-+        int line,
-+        const char* function) __attribute__((__noreturn__));
-+#endif
-
- #endif // __SYCL_DEVICE_ONLY__
- #endif // __APPLE__
-@@ -422,6 +434,7 @@ __host__ __device__
+ // CUDA supports __assert_fail function which are common for both device
+@@ -458,7 +465,24 @@
+ #define SYCL_KERNEL_ASSERT(cond) \
+   if C10_UNLIKELY (!(cond)) {    \
      abort();                     \
-   }
- #else
-+#ifdef __GLIBC__
- #define CUDA_KERNEL_ASSERT(cond)                                         \
-   if (C10_UNLIKELY(!(cond))) {                                           \
-     __assert_fail(                                                       \
-@@ -437,6 +450,23 @@ __host__ __device__
-     __assert_fail(                                                       \
-         #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
-   }
-+#else
++  }
++#elif !defined(__GLIBC__) && !defined(_WIN32)
++// musl libc: uses int for line parameter
 +#define CUDA_KERNEL_ASSERT(cond)                                  \
 +  if (C10_UNLIKELY(!(cond))) {                                    \
 +    __assert_fail(                                                \
 +        #cond, __FILE__, static_cast<int>(__LINE__), __func__);   \
-+  }
+   }
 +#define CUDA_KERNEL_ASSERT_MSG(cond, msg)                       \
 +  if (C10_UNLIKELY(!(cond))) {                                  \
 +    __assert_fail(                                              \
@@ -64,7 +36,6 @@ diff --git a/c10/macros/Macros.h b/c10/macros/Macros.h
 +    __assert_fail(                                                \
 +        #cond, __FILE__, static_cast<int>(__LINE__), __func__);   \
 +  }
-+#endif
- #endif //  C10_USE_ROCM_KERNEL_ASSERT and USE_ROCM
- #endif // __APPLE__
-
+ #else
+ #define CUDA_KERNEL_ASSERT(cond)                                         \
+   if (C10_UNLIKELY(!(cond))) {                                           \

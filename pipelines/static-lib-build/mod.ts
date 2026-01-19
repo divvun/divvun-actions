@@ -2,7 +2,7 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 
-const PYTORCH_VERSION = "v2.8.0"
+const PYTORCH_VERSION = "v2.9.1"
 const EXECUTORCH_VERSION = "v1.0.1"
 
 type LibraryType =
