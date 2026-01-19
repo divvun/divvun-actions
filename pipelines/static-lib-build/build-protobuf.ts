@@ -105,9 +105,10 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
     const isMusl = targetTriple.includes("-musl")
 
     if (isMusl) {
-      // Use clang with Thin LTO to avoid GCC bitcode (.ao) files
-      cc = "clang"
-      cxx = "clang++"
+      // Use musl-clang wrapper scripts
+      const scriptsDir = path.join(import.meta.dirname!, "../../scripts")
+      cc = `${scriptsDir}/${targetArch}-linux-musl-clang`
+      cxx = `${scriptsDir}/${targetArch}-linux-musl-clang++`
     } else {
       try {
         await builder.exec("which", ["clang"])
@@ -237,25 +238,13 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
       }
     }
 
-    // For musl targets, use clang with Thin LTO and cross-compiler sysroot
+    // For musl targets, wrapper scripts handle sysroot/target/library paths
     if (isMusl) {
-      const sysroot = targetArch === "aarch64"
-        ? "/opt/aarch64-linux-musl-cross/aarch64-linux-musl"
-        : "/opt/x86_64-linux-musl-cross/x86_64-linux-musl"
-      const muslTarget = `${targetArch}-linux-musl`
-      // GCC runtime library path for crtbeginT.o, crtend.o, libgcc.a, libgcc_eh.a
-      const gccLibPath =
-        `/opt/${targetArch}-linux-musl-cross/lib/gcc/${targetArch}-linux-musl/14.2.0`
-      cmakeArgs.push(`-DCMAKE_SYSROOT=${sysroot}`)
-      cmakeArgs.push(`-DCMAKE_C_COMPILER_TARGET=${muslTarget}`)
-      cmakeArgs.push(`-DCMAKE_CXX_COMPILER_TARGET=${muslTarget}`)
       cmakeArgs.push("-DCMAKE_C_FLAGS=-flto=thin -fPIC")
       cmakeArgs.push("-DCMAKE_CXX_FLAGS=-flto=thin -fPIC")
-      cmakeArgs.push(`-DCMAKE_EXE_LINKER_FLAGS=-L${gccLibPath} -flto=thin -fuse-ld=lld -static`)
+      cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
       cmakeArgs.push("-DCMAKE_AR=/usr/bin/llvm-ar")
       cmakeArgs.push("-DCMAKE_RANLIB=/usr/bin/llvm-ranlib")
-      cmakeArgs.push("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
-      cmakeArgs.push("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
     }
   }
 

@@ -229,33 +229,17 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   } else if (platform === "linux") {
     const isMusl = targetTriple.includes("-musl")
 
-    // Linux: use clang for musl targets with Thin LTO
+    // Linux: use musl-clang wrapper scripts for musl targets
     if (isMusl) {
-      const sysroot = targetArch === "aarch64"
-        ? "/opt/aarch64-linux-musl-cross/aarch64-linux-musl"
-        : "/opt/x86_64-linux-musl-cross/x86_64-linux-musl"
-      const muslTarget = `${targetArch}-linux-musl`
-      // GCC runtime library path for crtbeginT.o, crtend.o, libgcc.a, libgcc_eh.a
-      const gccLibPath =
-        `/opt/${targetArch}-linux-musl-cross/lib/gcc/${targetArch}-linux-musl/14.2.0`
-
-      // Use clang with Thin LTO to avoid GCC bitcode (.ao) files
-      Deno.env.set("CC", "clang")
-      Deno.env.set("CXX", "clang++")
+      // Wrapper scripts handle --target, --sysroot, -B, -L flags
+      const scriptsDir = path.join(import.meta.dirname!, "../../scripts")
+      Deno.env.set("CC", `${scriptsDir}/${targetArch}-linux-musl-clang`)
+      Deno.env.set("CXX", `${scriptsDir}/${targetArch}-linux-musl-clang++`)
       Deno.env.set("AR", "llvm-ar")
       Deno.env.set("RANLIB", "llvm-ranlib")
-      Deno.env.set(
-        "CFLAGS",
-        `--target=${muslTarget} --sysroot=${sysroot} -flto=thin -fPIC`,
-      )
-      Deno.env.set(
-        "CXXFLAGS",
-        `--target=${muslTarget} --sysroot=${sysroot} -flto=thin -fPIC`,
-      )
-      Deno.env.set(
-        "LDFLAGS",
-        `--target=${muslTarget} --sysroot=${sysroot} -L${gccLibPath} -flto=thin -fuse-ld=lld -static`,
-      )
+      Deno.env.set("CFLAGS", "-flto=thin -fPIC")
+      Deno.env.set("CXXFLAGS", "-flto=thin -fPIC")
+      Deno.env.set("LDFLAGS", "-flto=thin -fuse-ld=lld -static")
     } else {
       // Linux glibc: prefer clang if available
       try {

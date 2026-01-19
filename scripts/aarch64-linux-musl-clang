@@ -1,0 +1,12 @@
+#!/bin/sh
+MUSL_ROOT="/opt/aarch64-linux-musl-cross"
+MUSL_TARGET="aarch64-linux-musl"
+GCC_VER="11.2.1"
+
+exec clang \
+    --target=${MUSL_TARGET} \
+    --sysroot=${MUSL_ROOT}/${MUSL_TARGET} \
+    -B${MUSL_ROOT}/lib/gcc/${MUSL_TARGET}/${GCC_VER} \
+    -L${MUSL_ROOT}/lib/gcc/${MUSL_TARGET}/${GCC_VER} \
+    -L${MUSL_ROOT}/${MUSL_TARGET}/lib \
+    "$@"
