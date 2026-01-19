@@ -108,15 +108,9 @@ export async function buildSleef(options: BuildSleefOptions) {
     const isMusl = targetTriple.includes("-musl")
 
     if (isMusl) {
-      if (targetArch === "x86_64") {
-        cc = "x86_64-linux-musl-gcc"
-        cxx = "x86_64-linux-musl-g++"
-      } else if (targetArch === "aarch64") {
-        cc = "aarch64-linux-musl-gcc"
-        cxx = "aarch64-linux-musl-g++"
-      } else {
-        throw new Error(`Unsupported musl architecture: ${targetArch}`)
-      }
+      // Use clang with Thin LTO to avoid GCC bitcode (.ao) files
+      cc = "clang"
+      cxx = "clang++"
     } else {
       try {
         await exec("which", ["clang"])
@@ -242,15 +236,23 @@ export async function buildSleef(options: BuildSleefOptions) {
       cmakeArgs.push(`-DNATIVE_BUILD_DIR=${nativeBuildDir}`)
     }
 
-    // For musl targets, use cross-compiler sysroot and static linking
+    // For musl targets, use clang with Thin LTO and cross-compiler sysroot
     if (isMusl) {
       const sysroot = targetArch === "aarch64"
         ? "/opt/aarch64-linux-musl-cross/aarch64-linux-musl"
         : "/opt/x86_64-linux-musl-cross/x86_64-linux-musl"
+      const muslTarget = `${targetArch}-linux-musl`
+      const archFlags = targetArch === "aarch64" ? " -march=armv8-a" : ""
       cmakeArgs.push(`-DCMAKE_SYSROOT=${sysroot}`)
+      cmakeArgs.push(`-DCMAKE_C_COMPILER_TARGET=${muslTarget}`)
+      cmakeArgs.push(`-DCMAKE_CXX_COMPILER_TARGET=${muslTarget}`)
+      cmakeArgs.push(`-DCMAKE_C_FLAGS=-flto=thin -fPIC${archFlags}`)
+      cmakeArgs.push(`-DCMAKE_CXX_FLAGS=-flto=thin -fPIC${archFlags}`)
+      cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
+      cmakeArgs.push("-DCMAKE_AR=/usr/bin/llvm-ar")
+      cmakeArgs.push("-DCMAKE_RANLIB=/usr/bin/llvm-ranlib")
       cmakeArgs.push("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
       cmakeArgs.push("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
-      cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-static")
     }
   }
 

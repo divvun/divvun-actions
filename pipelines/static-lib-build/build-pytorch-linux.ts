@@ -260,14 +260,16 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
 
     // Use cross-compiler based on target
     if (targetArch === "x86_64" && isMusl) {
-      cmakeArgs.push("-DCMAKE_C_COMPILER=x86_64-linux-musl-gcc")
-      cmakeArgs.push("-DCMAKE_CXX_COMPILER=x86_64-linux-musl-g++")
-      cmakeArgs.push("-DCMAKE_ASM_COMPILER=x86_64-linux-musl-gcc")
+      // Use clang with Thin LTO to avoid GCC bitcode (.ao) files
+      cmakeArgs.push("-DCMAKE_C_COMPILER=clang")
+      cmakeArgs.push("-DCMAKE_CXX_COMPILER=clang++")
+      cmakeArgs.push("-DCMAKE_ASM_COMPILER=clang")
     } else if (targetArch === "aarch64") {
       if (isMusl) {
-        cmakeArgs.push("-DCMAKE_C_COMPILER=aarch64-linux-musl-gcc")
-        cmakeArgs.push("-DCMAKE_CXX_COMPILER=aarch64-linux-musl-g++")
-        cmakeArgs.push("-DCMAKE_ASM_COMPILER=aarch64-linux-musl-gcc")
+        // Use clang with Thin LTO to avoid GCC bitcode (.ao) files
+        cmakeArgs.push("-DCMAKE_C_COMPILER=clang")
+        cmakeArgs.push("-DCMAKE_CXX_COMPILER=clang++")
+        cmakeArgs.push("-DCMAKE_ASM_COMPILER=clang")
       } else {
         cmakeArgs.push("-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc")
         cmakeArgs.push("-DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++")
@@ -276,23 +278,31 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     }
   }
 
-  // For musl targets, use cross-compiler sysroot and static linking
+  // For musl targets, use clang with Thin LTO and cross-compiler sysroot
   if (isMusl) {
     const sysroot = targetArch === "aarch64"
       ? "/opt/aarch64-linux-musl-cross/aarch64-linux-musl"
       : "/opt/x86_64-linux-musl-cross/x86_64-linux-musl"
+    const muslTarget = `${targetArch}-linux-musl`
+    const archFlags = targetArch === "aarch64" ? " -march=armv8-a" : ""
     cmakeArgs.push(`-DCMAKE_SYSROOT=${sysroot}`)
+    cmakeArgs.push(`-DCMAKE_C_COMPILER_TARGET=${muslTarget}`)
+    cmakeArgs.push(`-DCMAKE_CXX_COMPILER_TARGET=${muslTarget}`)
+    cmakeArgs.push(`-DCMAKE_ASM_COMPILER_TARGET=${muslTarget}`)
+    cmakeArgs.push(`-DCMAKE_C_FLAGS=-flto=thin -fPIC${archFlags}`)
+    cmakeArgs.push(`-DCMAKE_CXX_FLAGS=-flto=thin -fPIC${archFlags}`)
+    cmakeArgs.push(`-DCMAKE_ASM_FLAGS=--target=${muslTarget}`)
+    cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
+    cmakeArgs.push("-DCMAKE_AR=/usr/bin/llvm-ar")
+    cmakeArgs.push("-DCMAKE_RANLIB=/usr/bin/llvm-ranlib")
     // Include dependency prefixes in find root path so CMake can find SLEEF, protobuf, libomp
     cmakeArgs.push(
       `-DCMAKE_FIND_ROOT_PATH=${sysroot};${libompPrefix};${protobufPrefix};${sleefPrefix}`,
     )
     cmakeArgs.push("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
     cmakeArgs.push("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
-    cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-static")
-  }
-
-  // Set ARM architecture flags for all aarch64 builds
-  if (targetArch === "aarch64") {
+  } else if (targetArch === "aarch64") {
+    // Set ARM architecture flags for glibc aarch64 builds
     cmakeArgs.push("-DCMAKE_C_FLAGS=-march=armv8-a")
     cmakeArgs.push("-DCMAKE_CXX_FLAGS=-march=armv8-a")
   }
@@ -427,13 +437,9 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
 
   // Set environment variables
   if (isMusl) {
-    if (targetArch === "x86_64") {
-      Deno.env.set("CC", "x86_64-linux-musl-gcc")
-      Deno.env.set("CXX", "x86_64-linux-musl-g++")
-    } else if (targetArch === "aarch64") {
-      Deno.env.set("CC", "aarch64-linux-musl-gcc")
-      Deno.env.set("CXX", "aarch64-linux-musl-g++")
-    }
+    // Use clang with Thin LTO to avoid GCC bitcode (.ao) files
+    Deno.env.set("CC", "clang")
+    Deno.env.set("CXX", "clang++")
   } else {
     Deno.env.set("CC", "gcc")
     Deno.env.set("CXX", "g++")

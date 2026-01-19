@@ -229,24 +229,30 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   } else if (platform === "linux") {
     const isMusl = targetTriple.includes("-musl")
 
-    // Linux: use musl compilers for musl targets
+    // Linux: use clang for musl targets with Thin LTO
     if (isMusl) {
       const sysroot = targetArch === "aarch64"
         ? "/opt/aarch64-linux-musl-cross/aarch64-linux-musl"
         : "/opt/x86_64-linux-musl-cross/x86_64-linux-musl"
+      const muslTarget = `${targetArch}-linux-musl`
 
-      if (targetArch === "x86_64") {
-        Deno.env.set("CC", "x86_64-linux-musl-gcc")
-        Deno.env.set("CXX", "x86_64-linux-musl-g++")
-      } else if (targetArch === "aarch64") {
-        Deno.env.set("CC", "aarch64-linux-musl-gcc")
-        Deno.env.set("CXX", "aarch64-linux-musl-g++")
-      }
-
-      // Use cross-compiler sysroot to avoid picking up Alpine's shared libs
-      Deno.env.set("CFLAGS", `--sysroot=${sysroot}`)
-      Deno.env.set("CXXFLAGS", `--sysroot=${sysroot}`)
-      Deno.env.set("LDFLAGS", `--sysroot=${sysroot} -static`)
+      // Use clang with Thin LTO to avoid GCC bitcode (.ao) files
+      Deno.env.set("CC", "clang")
+      Deno.env.set("CXX", "clang++")
+      Deno.env.set("AR", "llvm-ar")
+      Deno.env.set("RANLIB", "llvm-ranlib")
+      Deno.env.set(
+        "CFLAGS",
+        `--target=${muslTarget} --sysroot=${sysroot} -flto=thin -fPIC`,
+      )
+      Deno.env.set(
+        "CXXFLAGS",
+        `--target=${muslTarget} --sysroot=${sysroot} -flto=thin -fPIC`,
+      )
+      Deno.env.set(
+        "LDFLAGS",
+        `--target=${muslTarget} --sysroot=${sysroot} -flto=thin -fuse-ld=lld -static`,
+      )
     } else {
       // Linux glibc: prefer clang if available
       try {

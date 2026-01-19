@@ -108,9 +108,16 @@ export async function buildExecutorchLinux(
     cmakeArgs.push("-DCMAKE_SYSTEM_PROCESSOR=aarch64")
 
     if (isMusl) {
-      // musl cross-compiler
-      cmakeArgs.push("-DCMAKE_C_COMPILER=aarch64-linux-musl-gcc")
-      cmakeArgs.push("-DCMAKE_CXX_COMPILER=aarch64-linux-musl-g++")
+      // Use clang with Thin LTO to avoid GCC bitcode (.ao) files
+      cmakeArgs.push("-DCMAKE_C_COMPILER=clang")
+      cmakeArgs.push("-DCMAKE_CXX_COMPILER=clang++")
+      cmakeArgs.push("-DCMAKE_C_COMPILER_TARGET=aarch64-linux-musl")
+      cmakeArgs.push("-DCMAKE_CXX_COMPILER_TARGET=aarch64-linux-musl")
+      cmakeArgs.push("-DCMAKE_C_FLAGS=-flto=thin -fPIC")
+      cmakeArgs.push("-DCMAKE_CXX_FLAGS=-flto=thin -fPIC")
+      cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
+      cmakeArgs.push("-DCMAKE_AR=/usr/bin/llvm-ar")
+      cmakeArgs.push("-DCMAKE_RANLIB=/usr/bin/llvm-ranlib")
       cmakeArgs.push(
         "-DCMAKE_SYSROOT=/opt/aarch64-linux-musl-cross/aarch64-linux-musl",
       )
@@ -123,9 +130,16 @@ export async function buildExecutorchLinux(
       cmakeArgs.push("-DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++")
     }
   } else if (isMusl && targetArch === "x86_64") {
-    // x86_64 musl native build
-    cmakeArgs.push("-DCMAKE_C_COMPILER=x86_64-linux-musl-gcc")
-    cmakeArgs.push("-DCMAKE_CXX_COMPILER=x86_64-linux-musl-g++")
+    // Use clang with Thin LTO to avoid GCC bitcode (.ao) files
+    cmakeArgs.push("-DCMAKE_C_COMPILER=clang")
+    cmakeArgs.push("-DCMAKE_CXX_COMPILER=clang++")
+    cmakeArgs.push("-DCMAKE_C_COMPILER_TARGET=x86_64-linux-musl")
+    cmakeArgs.push("-DCMAKE_CXX_COMPILER_TARGET=x86_64-linux-musl")
+    cmakeArgs.push("-DCMAKE_C_FLAGS=-flto=thin -fPIC")
+    cmakeArgs.push("-DCMAKE_CXX_FLAGS=-flto=thin -fPIC")
+    cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
+    cmakeArgs.push("-DCMAKE_AR=/usr/bin/llvm-ar")
+    cmakeArgs.push("-DCMAKE_RANLIB=/usr/bin/llvm-ranlib")
     cmakeArgs.push(
       "-DCMAKE_SYSROOT=/opt/x86_64-linux-musl-cross/x86_64-linux-musl",
     )
