@@ -69,9 +69,10 @@ RUN curl -fsSL "https://github.com/BLAKE3-team/BLAKE3/releases/latest/download/b
 
 # Create aarch64 musl sysroot from Alpine packages (for cross-compilation)
 # x86_64 musl uses the host Alpine root filesystem directly
+# --no-scripts: post-install scripts would fail (can't run aarch64 on x86_64)
 RUN mkdir -p /opt/sysroot-aarch64 && \
     apk --arch aarch64 --root /opt/sysroot-aarch64 --initdb \
-    --repositories-file /etc/apk/repositories --allow-untrusted \
+    --repositories-file /etc/apk/repositories --allow-untrusted --no-scripts \
     add \
     boost-dev \
     icu-static \
