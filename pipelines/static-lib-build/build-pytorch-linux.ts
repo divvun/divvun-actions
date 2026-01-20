@@ -230,6 +230,8 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     `-DCMAKE_PREFIX_PATH=${installPrefix};${libompPrefix};${protobufPrefix};${sleefPrefix};${pythonPrefixPath}`,
   )
   cmakeArgs.push(`-DPython_EXECUTABLE=${pythonExecutable}`)
+  // NNPACK uses old FindPythonInterp which needs PYTHON_EXECUTABLE (old-style variable)
+  cmakeArgs.push(`-DPYTHON_EXECUTABLE=${pythonExecutable}`)
 
   // Use Ninja
   cmakeArgs.push("-GNinja")
