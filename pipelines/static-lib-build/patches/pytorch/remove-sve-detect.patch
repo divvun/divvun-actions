@@ -1,4 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 0000000..0000001 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -946,11 +946,11 @@ endif()
@@ -18,6 +19,7 @@ diff --git a/CMakeLists.txt b/CMakeLists.txt
 
  if(USE_XNNPACK)
 diff --git a/torch/headeronly/cpu/vec/intrinsics.h b/torch/headeronly/cpu/vec/intrinsics.h
+index 0000000..0000001 100644
 --- a/torch/headeronly/cpu/vec/intrinsics.h
 +++ b/torch/headeronly/cpu/vec/intrinsics.h
 @@ -5,10 +5,10 @@
@@ -51,6 +53,7 @@ diff --git a/torch/headeronly/cpu/vec/intrinsics.h b/torch/headeronly/cpu/vec/in
  #include <torch/headeronly/cpu/vec/vec256/missing_vld1_neon.h>
  #elif defined(MISSING_ARM_VST1)
 diff --git a/aten/src/ATen/cpu/vec/vec_base.h b/aten/src/ATen/cpu/vec/vec_base.h
+index 0000000..0000001 100644
 --- a/aten/src/ATen/cpu/vec/vec_base.h
 +++ b/aten/src/ATen/cpu/vec/vec_base.h
 @@ -1,7 +1,7 @@
@@ -75,6 +78,7 @@ diff --git a/aten/src/ATen/cpu/vec/vec_base.h b/aten/src/ATen/cpu/vec/vec_base.h
    blendv(
        const Vectorized<T>& a,
 diff --git a/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp b/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp
+index 0000000..0000001 100644
 --- a/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp
 +++ b/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp
 @@ -24,7 +24,7 @@ namespace {
@@ -123,6 +127,7 @@ diff --git a/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp b/aten/src/ATen/n
                      attn_data + row * kvBlockSize,
                      mask_data + i * mStrideB + j * mStrideH +
 diff --git a/caffe2/perfkernels/common_sve.cc b/caffe2/perfkernels/common_sve.cc
+index 0000000..0000001 100644
 --- a/caffe2/perfkernels/common_sve.cc
 +++ b/caffe2/perfkernels/common_sve.cc
 @@ -12,11 +12,11 @@
@@ -146,6 +151,7 @@ diff --git a/caffe2/perfkernels/common_sve.cc b/caffe2/perfkernels/common_sve.cc
 +// #endif // CAFFE2_PERF_WITH_SVE
 +// #endif
 diff --git a/cmake/Codegen.cmake b/cmake/Codegen.cmake
+index 0000000..0000001 100644
 --- a/cmake/Codegen.cmake
 +++ b/cmake/Codegen.cmake
 @@ -393,15 +393,15 @@ if(INTERN_BUILD_ATEN_OPS)
@@ -174,6 +180,7 @@ diff --git a/cmake/Codegen.cmake b/cmake/Codegen.cmake
    list(LENGTH CPU_CAPABILITY_NAMES NUM_CPU_CAPABILITY_NAMES)
    math(EXPR NUM_CPU_CAPABILITY_NAMES "${NUM_CPU_CAPABILITY_NAMES}-1")
 diff --git a/cmake/MiscCheck.cmake b/cmake/MiscCheck.cmake
+index 0000000..0000001 100644
 --- a/cmake/MiscCheck.cmake
 +++ b/cmake/MiscCheck.cmake
 @@ -43,13 +43,13 @@
