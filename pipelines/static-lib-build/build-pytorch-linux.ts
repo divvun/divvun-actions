@@ -112,8 +112,12 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     cwd: pytorchRoot,
   })
 
-  // Apply tensorpipe prctl.h patch for musl builds
+  // Apply patches and install dependencies for musl builds
   if (target.includes("-musl")) {
+    // Install six module needed by peachpy (used by NNPACK)
+    console.log("Installing six Python module for peachpy...")
+    await builder.exec("pip", ["install", "six"])
+
     console.log("Applying tensorpipe prctl.h patch for musl")
     const tensorpipePatchPath = path.join(
       import.meta.dirname!,
