@@ -1,10 +1,8 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a5d25e6..b2f04c5 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -915,11 +915,11 @@ if((${CMAKE_SYSTEM_NAME} STREQUAL "Darwin") AND ("${CMAKE_SYSTEM_PROCESSOR}" STR
- endif()
- 
+@@ -946,11 +946,11 @@ endif()
+
  # Enable sleef on Arm(R) architecture by default (except Android)
 -if((NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Android")
 -  AND("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "aarch64"))
@@ -16,13 +14,12 @@ index a5d25e6..b2f04c5 100644
 +#   string(APPEND CMAKE_CXX_FLAGS " -DAT_BUILD_ARM_VEC256_WITH_SLEEF")
 +#   add_definitions(-DAT_BUILD_ARM_VEC256_WITH_SLEEF)
 +# endif()
- 
- 
+
+
  if(USE_XNNPACK)
-diff --git a/aten/src/ATen/cpu/vec/intrinsics.h b/aten/src/ATen/cpu/vec/intrinsics.h
-index f9086f7..afaa886 100644
---- a/aten/src/ATen/cpu/vec/intrinsics.h
-+++ b/aten/src/ATen/cpu/vec/intrinsics.h
+diff --git a/torch/headeronly/cpu/vec/intrinsics.h b/torch/headeronly/cpu/vec/intrinsics.h
+--- a/torch/headeronly/cpu/vec/intrinsics.h
++++ b/torch/headeronly/cpu/vec/intrinsics.h
 @@ -5,10 +5,10 @@
  #elif defined(__clang__) && (defined(__ARM_NEON__) || defined(__aarch64__))
  /* Clang-compatible compiler, targeting arm neon */
@@ -51,10 +48,9 @@ index f9086f7..afaa886 100644
 +// #include <arm_sve.h>
 +// #endif
  #if defined(MISSING_ARM_VLD1)
- #include <ATen/cpu/vec/vec256/missing_vld1_neon.h>
+ #include <torch/headeronly/cpu/vec/vec256/missing_vld1_neon.h>
  #elif defined(MISSING_ARM_VST1)
 diff --git a/aten/src/ATen/cpu/vec/vec_base.h b/aten/src/ATen/cpu/vec/vec_base.h
-index 53cdbcd..25e6ed4 100644
 --- a/aten/src/ATen/cpu/vec/vec_base.h
 +++ b/aten/src/ATen/cpu/vec/vec_base.h
 @@ -1,7 +1,7 @@
@@ -66,18 +62,19 @@ index 53cdbcd..25e6ed4 100644
 +// Workaround for https://gcc.gnu.org/bugzilla/show_bug.cgi?id=117161
  #pragma GCC optimize("no-tree-vectorize")
  #endif
- 
-@@ -225,7 +225,7 @@ struct Vectorized {
+
+@@ -224,8 +224,8 @@
+     }
      return vector;
    }
- // Workaround for https: //gcc.gnu.org/bugzilla/show_bug.cgi?id=117001
+-// Workaround for https: //gcc.gnu.org/bugzilla/show_bug.cgi?id=117001
 -#if __GNUC__ <= 12 && !defined(__clang__) && defined(__ARM_FEATURE_SVE)
++// Workaround for https://gcc.gnu.org/bugzilla/show_bug.cgi?id=117001
 +#if __GNUC__ <= 12 && !defined(__clang__) && 0
    static Vectorized<T> __attribute__((optimize("-fno-tree-loop-vectorize")))
    blendv(
        const Vectorized<T>& a,
 diff --git a/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp b/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp
-index ba03472..f065daf 100644
 --- a/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp
 +++ b/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp
 @@ -24,7 +24,7 @@ namespace {
@@ -107,7 +104,7 @@ index ba03472..f065daf 100644
      if (is_b_stride_zero) {
  #else
      if constexpr(is_b_stride_zero) {
-@@ -597,7 +597,7 @@ void cpu_flash_attention(
+@@ -607,7 +607,7 @@ void cpu_flash_attention(
          // qk <- qk * scaling + attn_mask
          if (has_attn_mask) {
            for (int64_t row = 0; row < qBlockSize; ++row) {
@@ -116,23 +113,22 @@ index ba03472..f065daf 100644
                _scale_attn_mask_fusion_kernel(
                  qk_data + row * kvBlockSize,
                  mask_data + i * mStrideB + j * mStrideH +
-@@ -915,7 +915,7 @@ void cpu_flash_attention_backward(
-           if (has_attn_mask) {
-             accum_t one = accum_t(1);
-             for (const auto row : c10::irange(qBlockSize)) {
--#if __GNUC__ == 11 && defined(__ARM_FEATURE_SVE)
-+#if __GNUC__ == 11 && 0
-                 _scale_attn_mask_fusion_kernel(
-                   attn_data + row * kvBlockSize,
-                   mask_data + i * mStrideB + j * mStrideH +
+@@ -929,7 +929,7 @@ void cpu_flash_attention_backward(
+             if (has_attn_mask) {
+               accum_t one = accum_t(1);
+               for (const auto row : c10::irange(qBlockSize)) {
+-  #if __GNUC__ == 11 && defined(__ARM_FEATURE_SVE)
++  #if __GNUC__ == 11 && 0
+                   _scale_attn_mask_fusion_kernel(
+                     attn_data + row * kvBlockSize,
+                     mask_data + i * mStrideB + j * mStrideH +
 diff --git a/caffe2/perfkernels/common_sve.cc b/caffe2/perfkernels/common_sve.cc
-index 03b0bf9..67b94a3 100644
 --- a/caffe2/perfkernels/common_sve.cc
 +++ b/caffe2/perfkernels/common_sve.cc
 @@ -12,11 +12,11 @@
  #endif // __ARM_FEATURE_SVE
  #endif // CAFFE2_PERF_WITH_SVE
- 
+
 -#ifdef __ARM_FEATURE_SVE
 -#ifndef CAFFE2_PERF_WITH_SVE
 -#error( \
@@ -150,13 +146,12 @@ index 03b0bf9..67b94a3 100644
 +// #endif // CAFFE2_PERF_WITH_SVE
 +// #endif
 diff --git a/cmake/Codegen.cmake b/cmake/Codegen.cmake
-index 9a562da..2c594d6 100644
 --- a/cmake/Codegen.cmake
 +++ b/cmake/Codegen.cmake
-@@ -395,15 +395,15 @@ if(INTERN_BUILD_ATEN_OPS)
+@@ -393,15 +393,15 @@ if(INTERN_BUILD_ATEN_OPS)
      LIST(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG}  ${CXX_ZVECTOR_FLAGS}")
    endif(CXX_ZVECTOR_FOUND)
- 
+
 -  if(CXX_SVE_FOUND AND CXX_SVE256_FOUND AND CXX_ARM_BF16_FOUND)
 -    list(APPEND CPU_CAPABILITY_NAMES "SVE256")
 -    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_SVE_CPU_DEFINITION -DHAVE_SVE256_CPU_DEFINITION -DHAVE_ARM_BF16_CPU_DEFINITION")
@@ -175,15 +170,14 @@ index 9a562da..2c594d6 100644
 +  #     list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG} -march=armv8-a+sve+bf16 -D__ARM_FEATURE_BF16 -DCPU_CAPABILITY_SVE -msve-vector-bits=256")
 +  #   endif()
 +  # endif()
- 
+
    list(LENGTH CPU_CAPABILITY_NAMES NUM_CPU_CAPABILITY_NAMES)
    math(EXPR NUM_CPU_CAPABILITY_NAMES "${NUM_CPU_CAPABILITY_NAMES}-1")
 diff --git a/cmake/MiscCheck.cmake b/cmake/MiscCheck.cmake
-index 871a234..8f0527a 100644
 --- a/cmake/MiscCheck.cmake
 +++ b/cmake/MiscCheck.cmake
-@@ -101,13 +101,13 @@ endif()
- 
+@@ -43,13 +43,13 @@
+
  # ---[ Check if the compiler has SVE support.
  find_package(ARM) # checks SVE
 -if(CXX_SVE_FOUND)
@@ -200,6 +194,6 @@ index 871a234..8f0527a 100644
 +# else()
 +#   message(STATUS "Compiler does not support SVE extension. Will not build perfkernels.")
 +# endif()
- 
+
  if(IOS AND (${IOS_ARCH} MATCHES "armv7*"))
    add_definitions("-mfpu=neon-fp16")

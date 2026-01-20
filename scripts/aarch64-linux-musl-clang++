@@ -12,4 +12,5 @@ exec clang++ \
     -B${MUSL_ROOT}/lib/gcc/${MUSL_TARGET}/${GCC_VER} \
     -L${MUSL_ROOT}/lib/gcc/${MUSL_TARGET}/${GCC_VER} \
     -L${MUSL_ROOT}/${MUSL_TARGET}/lib \
+    -Wno-unused-command-line-argument \
     "$@"

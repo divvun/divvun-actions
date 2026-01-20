@@ -426,6 +426,9 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     Deno.env.set("CXX", "g++")
   }
   Deno.env.set("CMAKE_MAKE_PROGRAM", ninjaPath)
+  // Set Python for NNPACK/confu builds that don't respect CMake's Python_EXECUTABLE
+  Deno.env.set("PYTHON_EXECUTABLE", pythonExecutable)
+  Deno.env.set("PYTHON", pythonExecutable)
 
   // Run CMake configuration
   console.log("Running CMake configuration")
