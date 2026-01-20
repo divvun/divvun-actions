@@ -265,15 +265,16 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     }
   }
 
-  // For musl targets, wrapper scripts handle sysroot/target/library paths
+  // For musl targets, use Alpine-based sysroot with libc++
   if (isMusl) {
-    const sysroot = targetArch === "aarch64"
-      ? "/opt/aarch64-linux-musl-cross/aarch64-linux-musl"
-      : "/opt/x86_64-linux-musl-cross/x86_64-linux-musl"
+    // aarch64 uses Alpine sysroot; x86_64 uses host root (Alpine is already musl)
+    const sysroot = targetArch === "aarch64" ? "/opt/sysroot-aarch64" : "/"
     const archFlags = targetArch === "aarch64" ? " -march=armv8-a" : ""
+    // Include nativert API headers - PyTorch's CMake doesn't set this up correctly for cross-builds
+    const nativertInclude = `-I${pytorchRoot}/torch/csrc/api/include`
     cmakeArgs.push(`-DCMAKE_SYSROOT=${sysroot}`)
     cmakeArgs.push(`-DCMAKE_C_FLAGS=-flto=thin -fPIC${archFlags}`)
-    cmakeArgs.push(`-DCMAKE_CXX_FLAGS=-flto=thin -fPIC${archFlags}`)
+    cmakeArgs.push(`-DCMAKE_CXX_FLAGS=-flto=thin -fPIC -stdlib=libc++${archFlags} ${nativertInclude}`)
     cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
     cmakeArgs.push("-DCMAKE_AR=/usr/lib/llvm21/bin/llvm-ar")
     cmakeArgs.push("-DCMAKE_RANLIB=/usr/lib/llvm21/bin/llvm-ranlib")
