@@ -5,5 +5,7 @@ MUSL_TARGET="aarch64-linux-musl"
 exec clang \
     --target=${MUSL_TARGET} \
     --sysroot=${SYSROOT} \
+    --rtlib=compiler-rt \
+    --unwindlib=libunwind \
     -Wno-unused-command-line-argument \
     "$@"

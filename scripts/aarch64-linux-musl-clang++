@@ -6,5 +6,7 @@ exec clang++ \
     --target=${MUSL_TARGET} \
     --sysroot=${SYSROOT} \
     -stdlib=libc++ \
+    --rtlib=compiler-rt \
+    --unwindlib=libunwind \
     -Wno-unused-command-line-argument \
     "$@"

@@ -28,6 +28,8 @@ RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositor
     jq \
     libarchive-tools \
     libc++-dev \
+    libc++-static \
+    llvm-libunwind-static \
     libtool \
     linux-headers \
     lld21 \
@@ -75,9 +77,11 @@ RUN mkdir -p /opt/sysroot-aarch64 && \
     --repositories-file /etc/apk/repositories --allow-untrusted --no-scripts \
     add \
     boost-dev \
+    compiler-rt \
     icu-static \
     libc++-dev \
     libc++-static \
+    llvm-libunwind-static \
     linux-headers \
     musl-dev \
     openssl-dev \
