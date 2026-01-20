@@ -7,6 +7,7 @@ exec clang++ \
     --sysroot=${SYSROOT} \
     -resource-dir=${SYSROOT}/usr/lib/llvm21/lib/clang/21 \
     -isystem ${SYSROOT}/usr/include/c++/v1 \
+    -isystem ${SYSROOT}/usr/include \
     -isystem /usr/lib/llvm21/lib/clang/21/include \
     -stdlib=libc++ \
     --rtlib=compiler-rt \
