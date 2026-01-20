@@ -1,9 +1,10 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 0000000..0000001 100644
+index ce7890f..041528f 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -946,11 +946,11 @@ endif()
-
+@@ -944,11 +944,11 @@ if((${CMAKE_SYSTEM_NAME} STREQUAL "Darwin") AND ("${CMAKE_SYSTEM_PROCESSOR}" STR
+ endif()
+ 
  # Enable sleef on Arm(R) architecture by default (except Android)
 -if((NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Android")
 -  AND("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "aarch64"))
@@ -15,45 +16,11 @@ index 0000000..0000001 100644
 +#   string(APPEND CMAKE_CXX_FLAGS " -DAT_BUILD_ARM_VEC256_WITH_SLEEF")
 +#   add_definitions(-DAT_BUILD_ARM_VEC256_WITH_SLEEF)
 +# endif()
-
-
+ 
+ 
  if(USE_XNNPACK)
-diff --git a/torch/headeronly/cpu/vec/intrinsics.h b/torch/headeronly/cpu/vec/intrinsics.h
-index 0000000..0000001 100644
---- a/torch/headeronly/cpu/vec/intrinsics.h
-+++ b/torch/headeronly/cpu/vec/intrinsics.h
-@@ -5,10 +5,10 @@
- #elif defined(__clang__) && (defined(__ARM_NEON__) || defined(__aarch64__))
- /* Clang-compatible compiler, targeting arm neon */
- #include <arm_neon.h>
--#if defined(__ARM_FEATURE_SVE)
--/* CLANG-compatible compiler, targeting ARM with SVE */
--#include <arm_sve.h>
--#endif
-+// #if defined(__ARM_FEATURE_SVE)
-+// /* CLANG-compatible compiler, targeting ARM with SVE */
-+// #include <arm_sve.h>
-+// #endif
- #elif defined(_MSC_VER)
- /* Microsoft C/C++-compatible compiler */
- #include <intrin.h>
-@@ -25,10 +25,10 @@
- #elif defined(__GNUC__) && (defined(__ARM_NEON__) || defined(__aarch64__))
- /* GCC-compatible compiler, targeting ARM with NEON */
- #include <arm_neon.h>
--#if defined(__ARM_FEATURE_SVE)
--/* GCC-compatible compiler, targeting ARM with SVE */
--#include <arm_sve.h>
--#endif
-+// #if defined(__ARM_FEATURE_SVE)
-+// /* GCC-compatible compiler, targeting ARM with SVE */
-+// #include <arm_sve.h>
-+// #endif
- #if defined(MISSING_ARM_VLD1)
- #include <torch/headeronly/cpu/vec/vec256/missing_vld1_neon.h>
- #elif defined(MISSING_ARM_VST1)
 diff --git a/aten/src/ATen/cpu/vec/vec_base.h b/aten/src/ATen/cpu/vec/vec_base.h
-index 0000000..0000001 100644
+index bfecfa3..0991e27 100644
 --- a/aten/src/ATen/cpu/vec/vec_base.h
 +++ b/aten/src/ATen/cpu/vec/vec_base.h
 @@ -1,7 +1,7 @@
@@ -65,8 +32,8 @@ index 0000000..0000001 100644
 +// Workaround for https://gcc.gnu.org/bugzilla/show_bug.cgi?id=117161
  #pragma GCC optimize("no-tree-vectorize")
  #endif
-
-@@ -224,8 +224,8 @@
+ 
+@@ -224,8 +224,8 @@ struct Vectorized {
      }
      return vector;
    }
@@ -78,7 +45,7 @@ index 0000000..0000001 100644
    blendv(
        const Vectorized<T>& a,
 diff --git a/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp b/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp
-index 0000000..0000001 100644
+index 4432b9a..645060e 100644
 --- a/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp
 +++ b/aten/src/ATen/native/cpu/FlashAttentionKernel.cpp
 @@ -24,7 +24,7 @@ namespace {
@@ -127,13 +94,13 @@ index 0000000..0000001 100644
                      attn_data + row * kvBlockSize,
                      mask_data + i * mStrideB + j * mStrideH +
 diff --git a/caffe2/perfkernels/common_sve.cc b/caffe2/perfkernels/common_sve.cc
-index 0000000..0000001 100644
+index 03b0bf9..67b94a3 100644
 --- a/caffe2/perfkernels/common_sve.cc
 +++ b/caffe2/perfkernels/common_sve.cc
 @@ -12,11 +12,11 @@
  #endif // __ARM_FEATURE_SVE
  #endif // CAFFE2_PERF_WITH_SVE
-
+ 
 -#ifdef __ARM_FEATURE_SVE
 -#ifndef CAFFE2_PERF_WITH_SVE
 -#error( \
@@ -151,13 +118,13 @@ index 0000000..0000001 100644
 +// #endif // CAFFE2_PERF_WITH_SVE
 +// #endif
 diff --git a/cmake/Codegen.cmake b/cmake/Codegen.cmake
-index 0000000..0000001 100644
+index e4973c8..58e6fa5 100644
 --- a/cmake/Codegen.cmake
 +++ b/cmake/Codegen.cmake
 @@ -393,15 +393,15 @@ if(INTERN_BUILD_ATEN_OPS)
      LIST(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG}  ${CXX_ZVECTOR_FLAGS}")
    endif(CXX_ZVECTOR_FOUND)
-
+ 
 -  if(CXX_SVE_FOUND AND CXX_SVE256_FOUND AND CXX_ARM_BF16_FOUND)
 -    list(APPEND CPU_CAPABILITY_NAMES "SVE256")
 -    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_SVE_CPU_DEFINITION -DHAVE_SVE256_CPU_DEFINITION -DHAVE_ARM_BF16_CPU_DEFINITION")
@@ -176,15 +143,15 @@ index 0000000..0000001 100644
 +  #     list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG} -march=armv8-a+sve+bf16 -D__ARM_FEATURE_BF16 -DCPU_CAPABILITY_SVE -msve-vector-bits=256")
 +  #   endif()
 +  # endif()
-
+ 
    list(LENGTH CPU_CAPABILITY_NAMES NUM_CPU_CAPABILITY_NAMES)
    math(EXPR NUM_CPU_CAPABILITY_NAMES "${NUM_CPU_CAPABILITY_NAMES}-1")
 diff --git a/cmake/MiscCheck.cmake b/cmake/MiscCheck.cmake
-index 0000000..0000001 100644
+index 54126b1..0f8d24e 100644
 --- a/cmake/MiscCheck.cmake
 +++ b/cmake/MiscCheck.cmake
-@@ -43,13 +43,13 @@
-
+@@ -43,13 +43,13 @@ endif()
+ 
  # ---[ Check if the compiler has SVE support.
  find_package(ARM) # checks SVE
 -if(CXX_SVE_FOUND)
@@ -201,6 +168,40 @@ index 0000000..0000001 100644
 +# else()
 +#   message(STATUS "Compiler does not support SVE extension. Will not build perfkernels.")
 +# endif()
-
+ 
  if(IOS AND (${IOS_ARCH} MATCHES "armv7*"))
    add_definitions("-mfpu=neon-fp16")
+diff --git a/torch/headeronly/cpu/vec/intrinsics.h b/torch/headeronly/cpu/vec/intrinsics.h
+index 4342005..582f68d 100644
+--- a/torch/headeronly/cpu/vec/intrinsics.h
++++ b/torch/headeronly/cpu/vec/intrinsics.h
+@@ -5,10 +5,10 @@
+ #elif defined(__clang__) && (defined(__ARM_NEON__) || defined(__aarch64__))
+ /* Clang-compatible compiler, targeting arm neon */
+ #include <arm_neon.h>
+-#if defined(__ARM_FEATURE_SVE)
+-/* CLANG-compatible compiler, targeting ARM with SVE */
+-#include <arm_sve.h>
+-#endif
++// #if defined(__ARM_FEATURE_SVE)
++// /* CLANG-compatible compiler, targeting ARM with SVE */
++// #include <arm_sve.h>
++// #endif
+ #elif defined(_MSC_VER)
+ /* Microsoft C/C++-compatible compiler */
+ #include <intrin.h>
+@@ -25,10 +25,10 @@
+ #elif defined(__GNUC__) && (defined(__ARM_NEON__) || defined(__aarch64__))
+ /* GCC-compatible compiler, targeting ARM with NEON */
+ #include <arm_neon.h>
+-#if defined(__ARM_FEATURE_SVE)
+-/* GCC-compatible compiler, targeting ARM with SVE */
+-#include <arm_sve.h>
+-#endif
++// #if defined(__ARM_FEATURE_SVE)
++// /* GCC-compatible compiler, targeting ARM with SVE */
++// #include <arm_sve.h>
++// #endif
+ #if defined(MISSING_ARM_VLD1)
+ #include <torch/headeronly/cpu/vec/vec256/missing_vld1_neon.h>
+ #elif defined(MISSING_ARM_VST1)
