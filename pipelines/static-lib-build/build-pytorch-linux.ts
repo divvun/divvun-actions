@@ -339,7 +339,8 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   cmakeArgs.push("-DUSE_SYSTEM_SLEEF=ON")
   cmakeArgs.push(`-DSleef_DIR=${sleefPrefix}/lib/cmake/sleef`)
 
-  if (distributed) {
+  // Disable distributed for musl due to clang+libstdc++ valarray noexcept incompatibility
+  if (distributed && !isMusl) {
     cmakeArgs.push("-DUSE_DISTRIBUTED=ON")
   } else {
     cmakeArgs.push("-DUSE_DISTRIBUTED=OFF")
