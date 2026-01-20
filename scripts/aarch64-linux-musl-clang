@@ -5,8 +5,6 @@ MUSL_TARGET="aarch64-linux-musl"
 exec clang \
     --target=${MUSL_TARGET} \
     --sysroot=${SYSROOT} \
-    -resource-dir=${SYSROOT}/usr/lib/llvm21/lib/clang/21 \
-    -isystem /usr/lib/llvm21/lib/clang/21/include \
     --rtlib=compiler-rt \
     --unwindlib=libunwind \
     -Wno-unused-command-line-argument \
