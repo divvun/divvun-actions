@@ -275,7 +275,9 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     cmakeArgs.push(`-DCMAKE_SYSROOT=${sysroot}`)
     cmakeArgs.push(`-DCMAKE_C_FLAGS=-flto=thin -fPIC${archFlags}`)
     cmakeArgs.push(`-DCMAKE_CXX_FLAGS=-flto=thin -fPIC -stdlib=libc++${archFlags} ${nativertInclude}`)
-    cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
+    // Add compiler-rt library path so linker can find aarch64 runtime libs in sysroot
+    const compilerRtLibPath = `${sysroot}/usr/lib/llvm21/lib/clang/21/lib/linux`
+    cmakeArgs.push(`-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static -L${compilerRtLibPath}`)
     cmakeArgs.push("-DCMAKE_AR=/usr/lib/llvm21/bin/llvm-ar")
     cmakeArgs.push("-DCMAKE_RANLIB=/usr/lib/llvm21/bin/llvm-ranlib")
     // Include dependency prefixes in find root path so CMake can find SLEEF, protobuf, libomp
