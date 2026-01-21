@@ -326,6 +326,10 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
   // Set C++17 standard explicitly
   cmakeArgs.push("-DCMAKE_CXX_STANDARD=17")
 
+  // Include nativert API headers - PyTorch's CMake doesn't set this up correctly for cross-builds
+  const nativertInclude = `-I${pytorchRoot}/torch/csrc/api/include`
+  cmakeArgs.push(`-DCMAKE_CXX_FLAGS=${nativertInclude}`)
+
   // Enable position independent code for static libraries
   cmakeArgs.push("-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
 
