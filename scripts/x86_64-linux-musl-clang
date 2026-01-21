@@ -1,5 +1,8 @@
 #!/bin/sh
 # x86_64 musl uses host Alpine root filesystem directly
 exec clang \
+    --rtlib=compiler-rt \
+    --unwindlib=libunwind \
+    -lc++abi \
     -Wno-unused-command-line-argument \
     "$@"

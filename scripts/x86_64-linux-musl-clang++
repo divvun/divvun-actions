@@ -2,5 +2,8 @@
 # x86_64 musl uses host Alpine root filesystem directly with libc++
 exec clang++ \
     -stdlib=libc++ \
+    --rtlib=compiler-rt \
+    --unwindlib=libunwind \
+    -lc++abi \
     -Wno-unused-command-line-argument \
     "$@"

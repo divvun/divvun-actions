@@ -9,5 +9,6 @@ exec clang++ \
     -stdlib=libc++ \
     --rtlib=compiler-rt \
     --unwindlib=libunwind \
+    -lc++abi \
     -Wno-unused-command-line-argument \
     "$@"

@@ -8,5 +8,6 @@ exec clang \
     -resource-dir=${SYSROOT}/usr/lib/llvm21/lib/clang/21 \
     --rtlib=compiler-rt \
     --unwindlib=libunwind \
+    -lc++abi \
     -Wno-unused-command-line-argument \
     "$@"
