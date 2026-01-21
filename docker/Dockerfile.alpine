@@ -76,16 +76,50 @@ RUN mkdir -p /opt/sysroot-aarch64 && \
     apk --arch aarch64 --root /opt/sysroot-aarch64 --initdb \
     --repositories-file /etc/apk/repositories --allow-untrusted --no-scripts \
     add \
+    autoconf \
+    automake \
+    bash \
     boost-dev \
+    build-base \
+    bison \
+    ca-certificates \
+    clang21 \
+    clang21-dev \
+    clang21-extra-tools \
+    clang21-static \
+    cmake \
     compiler-rt \
+    curl \
+    deno \
+    flex \
+    git \
+    git-lfs \
     icu-static \
+    jq \
+    libarchive-tools \
     libc++-dev \
     libc++-static \
     llvm-libunwind-static \
+    libtool \
     linux-headers \
-    musl-dev \
+    lld21 \
+    llvm21 \
+    llvm21-dev \
+    make \
+    ninja \
+    openssh \
     openssl-dev \
+    patch \
+    patchelf \
+    perl \
+    pkgconf \
+    protobuf \
+    python3 \
+    rsync \
     sqlite-dev \
+    tree \
+    unzip \
+    uv \
     zlib-dev \
     zlib-static
 
