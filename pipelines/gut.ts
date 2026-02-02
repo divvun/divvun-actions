@@ -36,31 +36,35 @@ export async function pipelineGut(): Promise<BuildkitePipeline> {
     steps: [],
   }
 
-  // Lint and format check step
-  pipeline.steps.push(command({
-    label: "Lint & Format",
-    key: "lint",
-    command: [
-      "echo '--- Checking formatting'",
-      "cargo fmt --check",
-      "echo '--- Running clippy'",
-      "cargo clippy -- -D warnings",
-    ],
-    agents: {
-      queue: "linux",
-    },
-    plugins: [
-      {
-        "cache#v1.7.0": {
-          manifest: "Cargo.lock",
-          path: "target",
-          restore: "file",
-          save: "file",
-          "key-extra": "lint",
-        },
+  const isRelease = builder.env.tag && builder.env.tag.match(/^v/)
+
+  // Lint and format check step (skip on release tags - code already reviewed)
+  if (!isRelease) {
+    pipeline.steps.push(command({
+      label: "Lint & Format",
+      key: "lint",
+      command: [
+        "echo '--- Checking formatting'",
+        "cargo fmt --check",
+        "echo '--- Running clippy'",
+        "cargo clippy -- -D warnings",
+      ],
+      agents: {
+        queue: "linux",
       },
-    ],
-  }))
+      plugins: [
+        {
+          "cache#v1.7.0": {
+            manifest: "Cargo.lock",
+            path: "target",
+            restore: "file",
+            save: "file",
+            "key-extra": "lint",
+          },
+        },
+      ],
+    }))
+  }
 
   // Test step
   pipeline.steps.push(command({
@@ -73,7 +77,7 @@ export async function pipelineGut(): Promise<BuildkitePipeline> {
     agents: {
       queue: "linux",
     },
-    depends_on: "lint",
+    depends_on: isRelease ? undefined : "lint",
     plugins: [
       {
         "cache#v1.7.0": {
