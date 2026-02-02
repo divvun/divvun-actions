@@ -6,12 +6,13 @@ import { GitHub } from "~/util/github.ts"
 import { Tar, Zip } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
-const TARGETS = [
-  "x86_64-unknown-linux-musl",
-  "x86_64-apple-darwin",
-  "aarch64-apple-darwin",
-  "x86_64-pc-windows-msvc",
-]
+const platforms = {
+  macos: ["x86_64-apple-darwin", "aarch64-apple-darwin"],
+  linux: ["x86_64-unknown-linux-musl"],
+  windows: ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"],
+}
+
+const ALL_TARGETS = Object.values(platforms).flat()
 
 function command(input: CommandStep): CommandStep {
   return {
@@ -23,32 +24,20 @@ function command(input: CommandStep): CommandStep {
   }
 }
 
-function os(target: string): string {
-  if (target.includes("windows")) {
-    return "windows"
-  } else if (target.includes("apple")) {
-    return "macos"
-  } else if (target.includes("linux")) {
-    return "linux"
+const msvcEnvCmd = (arch: string) => {
+  if (arch.startsWith("aarch64")) {
+    return "arm64"
   }
-
-  throw new Error(`Unknown OS for target: ${target}`)
+  return "x64"
 }
 
 export async function pipelineGut(): Promise<BuildkitePipeline> {
-  // Load version from Cargo.toml
-  const cargoTomlText = await Deno.readTextFile("Cargo.toml")
-  const versionMatch = cargoTomlText.match(/version\s*=\s*"(.*?)"/)
-  const version = versionMatch?.[1]
-
-  if (typeof version !== "string") {
-    throw new Error("Could not determine version from Cargo.toml")
+  const pipeline: BuildkitePipeline = {
+    steps: [],
   }
 
-  const steps: CommandStep[] = []
-
   // Lint and format check step
-  steps.push(command({
+  pipeline.steps.push(command({
     label: "Lint & Format",
     key: "lint",
     command: [
@@ -60,10 +49,21 @@ export async function pipelineGut(): Promise<BuildkitePipeline> {
     agents: {
       queue: "linux",
     },
+    plugins: [
+      {
+        "cache#v1.7.0": {
+          manifest: "Cargo.lock",
+          path: "target",
+          restore: "file",
+          save: "file",
+          "key-extra": "lint",
+        },
+      },
+    ],
   }))
 
   // Test step
-  steps.push(command({
+  pipeline.steps.push(command({
     label: "Test",
     key: "test",
     command: [
@@ -74,93 +74,116 @@ export async function pipelineGut(): Promise<BuildkitePipeline> {
       queue: "linux",
     },
     depends_on: "lint",
-  }))
-
-  // Build steps for each target
-  for (const target of TARGETS) {
-    const artifactName = `gut${target.includes("windows") ? ".exe" : ""}`
-    const targetFile = path.join("target", target, "release", artifactName)
-
-    if (target.includes("apple")) {
-      // macOS targets: Split into build and sign steps
-      steps.push(command({
-        label: `Build (${target})`,
-        key: `build-${target}`,
-        command: [
-          "echo '--- Installing target'",
-          `rustup target add ${target}`,
-          "echo '--- Building'",
-          `cargo build --release --target ${target}`,
-          `mv ${targetFile} ./gut-unsigned-${target}`,
-          `buildkite-agent artifact upload gut-unsigned-${target}`,
-        ],
-        agents: {
-          queue: "macos",
-        },
-        depends_on: "test",
-      }))
-
-      steps.push(command({
-        label: `Sign (${target})`,
-        key: `sign-${target}`,
-        command: [
-          "echo '--- Downloading unsigned binary'",
-          `buildkite-agent artifact download gut-unsigned-${target} .`,
-          "echo '--- Signing'",
-          `divvun-actions run macos-sign ./gut-unsigned-${target}`,
-          "echo '--- Uploading signed binary'",
-          `mv ./gut-unsigned-${target} ./gut-${target}`,
-          `buildkite-agent artifact upload gut-${target}`,
-        ],
-        agents: {
-          queue: "linux",
-        },
-        depends_on: `build-${target}`,
-      }))
-    } else if (os(target) === "windows") {
-      // Windows targets: Build and upload directly
-      steps.push(command({
-        label: `Build (${target})`,
-        key: `build-${target}`,
-        command: [
-          `$$env:PATH = "C:\\MSYS2\\usr\\bin;" + $$env:PATH; rustup target add ${target}; cargo build --release --target ${target}`,
-          `mv ${targetFile} .\\${artifactName}-${target}`,
-          `buildkite-agent artifact upload ${artifactName}-${target}`,
-        ],
-        agents: {
-          queue: "windows",
-        },
-        depends_on: "test",
-      }))
-    } else {
-      // Linux targets: Build and upload directly
-      steps.push(command({
-        label: `Build (${target})`,
-        key: `build-${target}`,
-        command: [
-          "echo '--- Installing target'",
-          `rustup target add ${target}`,
-          "echo '--- Building'",
-          `cargo build --release --target ${target}`,
-          `mv ${targetFile} ./gut-${target}`,
-          `buildkite-agent artifact upload gut-${target}`,
-        ],
-        agents: {
-          queue: target.includes("-musl") ? "alpine" : "linux",
-        },
-        depends_on: "test",
-      }))
-    }
-  }
-
-  const pipeline: BuildkitePipeline = {
-    steps: [
+    plugins: [
       {
-        group: "Build",
-        key: "build",
-        steps,
+        "cache#v1.7.0": {
+          manifest: "Cargo.lock",
+          path: "target",
+          restore: "file",
+          save: "file",
+          "key-extra": "test",
+        },
       },
     ],
+  }))
+
+  const buildStepKeys: string[] = []
+
+  for (const [platform, archs] of Object.entries(platforms)) {
+    for (const arch of archs) {
+      const ext = platform === "windows" ? ".exe" : ""
+      const buildKey = `build-${platform}-${arch}`
+      buildStepKeys.push(buildKey)
+
+      if (platform === "windows") {
+        pipeline.steps.push(command({
+          key: buildKey,
+          label: `Build (${arch})`,
+          agents: {
+            queue: "windows",
+          },
+          command: [
+            `msvc-env ${
+              msvcEnvCmd(arch)
+            } | Invoke-Expression; cargo build --release --target ${arch}`,
+            `buildkite-agent artifact upload target/${arch}/release/gut${ext}`,
+          ],
+          depends_on: "test",
+          plugins: [
+            {
+              "cache#v1.7.0": {
+                manifest: "Cargo.lock",
+                path: "target",
+                restore: "file",
+                save: "file",
+                "key-extra": arch,
+              },
+            },
+          ],
+        }))
+      } else if (platform === "macos") {
+        // macOS: Build and sign
+        pipeline.steps.push(command({
+          key: buildKey,
+          label: `Build (${arch})`,
+          agents: {
+            queue: "macos",
+          },
+          command: [
+            `rustup target add ${arch}`,
+            `cargo build --release --target ${arch}`,
+            `buildkite-agent artifact upload target/${arch}/release/gut`,
+          ],
+          depends_on: "test",
+        }))
+
+        const signKey = `sign-${platform}-${arch}`
+        buildStepKeys.push(signKey)
+
+        pipeline.steps.push(command({
+          key: signKey,
+          label: `Sign (${arch})`,
+          agents: {
+            queue: "linux",
+          },
+          command: [
+            "echo '--- Downloading unsigned binary'",
+            `buildkite-agent artifact download target/${arch}/release/gut .`,
+            "echo '--- Signing'",
+            `divvun-actions run macos-sign target/${arch}/release/gut`,
+            "echo '--- Uploading signed binary'",
+            `buildkite-agent artifact upload target/${arch}/release/gut`,
+          ],
+          depends_on: buildKey,
+        }))
+      } else {
+        // Linux
+        pipeline.steps.push(command({
+          key: buildKey,
+          label: `Build (${arch})`,
+          agents: {
+            queue: arch.includes("-musl") ? "alpine" : "linux",
+          },
+          command: [
+            `rustup target add ${arch}`,
+            `cargo build --release --target ${arch}`,
+            `buildkite-agent artifact upload target/${arch}/release/gut`,
+          ],
+          depends_on: "test",
+          plugins: [
+            {
+              "cache#v1.7.0": {
+                manifest: "Cargo.lock",
+                path: "target",
+                restore: "file",
+                save: "file",
+                "key-extra": arch,
+              },
+            },
+          ],
+        }))
+      }
+    }
   }
 
   // Add publish step for releases
@@ -172,7 +195,7 @@ export async function pipelineGut(): Promise<BuildkitePipeline> {
         agents: {
           queue: "linux",
         },
-        depends_on: "build",
+        depends_on: buildStepKeys,
       }),
     )
   }
@@ -192,28 +215,35 @@ export async function runGutPublish() {
   using tempDir = await makeTempDir()
 
   // Download all artifacts
-  await Promise.all(
-    TARGETS.map((target) => {
-      if (target.includes("windows")) {
-        return builder.downloadArtifacts(`gut.exe-${target}`, tempDir.path)
-      }
-      return builder.downloadArtifacts(`gut-${target}`, tempDir.path)
-    }),
-  )
+  await builder.downloadArtifacts("target/*/release/gut", tempDir.path)
+  await builder.downloadArtifacts("target\\*\\release\\gut.exe", tempDir.path)
+  // Try forward slash pattern for Windows as fallback
+  try {
+    await builder.downloadArtifacts("target/*/release/gut.exe", tempDir.path)
+  } catch (_e) {
+    // Already downloaded with backslash pattern
+  }
 
   using archivePath = await makeTempDir({ prefix: "gut-" })
 
   const allArtifacts: string[] = []
 
-  for (const target of TARGETS) {
-    const ext = target.includes("windows") ? "zip" : "tgz"
-    const outPath = path.join(
-      archivePath.path,
-      `gut-${target}-${builder.env.tag!}.${ext}`,
-    )
+  for (const target of ALL_TARGETS) {
+    const ext = target.includes("windows") ? ".exe" : ""
+    const archiveExt = target.includes("windows") ? "zip" : "tgz"
+    const binaryName = `gut${ext}`
+
     const inputPath = path.join(
       tempDir.path,
-      target.includes("windows") ? `gut.exe-${target}` : `gut-${target}`,
+      "target",
+      target,
+      "release",
+      binaryName,
+    )
+
+    const outPath = path.join(
+      archivePath.path,
+      `gut-${target}-${builder.env.tag!}.${archiveExt}`,
     )
 
     if (!target.includes("windows")) {
@@ -221,12 +251,12 @@ export async function runGutPublish() {
     }
 
     // Create staging directory with the binary inside
-    const stagingDir = `gut-${target}-${builder.env.tag!}`
-    await Deno.mkdir(stagingDir)
-    await Deno.copyFile(
-      inputPath,
-      path.join(stagingDir, target.includes("windows") ? "gut.exe" : "gut"),
+    const stagingDir = path.join(
+      archivePath.path,
+      `gut-${target}-${builder.env.tag!}`,
     )
+    await Deno.mkdir(stagingDir)
+    await Deno.copyFile(inputPath, path.join(stagingDir, binaryName))
 
     if (target.includes("windows")) {
       await Zip.create([stagingDir], outPath)
