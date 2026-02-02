@@ -157,7 +157,9 @@ export async function pipelineGut(): Promise<BuildkitePipeline> {
             "echo '--- Signing'",
             `divvun-actions run macos-sign target/${arch}/release/gut`,
             "echo '--- Uploading signed binary'",
-            `buildkite-agent artifact upload target/${arch}/release/gut`,
+            `mkdir -p signed/target/${arch}/release`,
+            `mv target/${arch}/release/gut signed/target/${arch}/release/gut`,
+            `buildkite-agent artifact upload signed/target/${arch}/release/gut`,
           ],
           depends_on: buildKey,
         }))
@@ -220,7 +222,14 @@ export async function runGutPublish() {
   using tempDir = await makeTempDir()
 
   // Download all artifacts
-  await builder.downloadArtifacts("target/*/release/gut", tempDir.path)
+  // macOS: download signed binaries (unsigned ones are at target/*/release/gut)
+  await builder.downloadArtifacts(
+    "signed/target/*-apple-darwin/release/gut",
+    tempDir.path,
+  )
+  // Linux: download from regular path (no signing step)
+  await builder.downloadArtifacts("target/*-linux-*/release/gut", tempDir.path)
+  // Windows
   await builder.downloadArtifacts("target\\*\\release\\gut.exe", tempDir.path)
   // Try forward slash pattern for Windows as fallback
   try {
@@ -237,10 +246,12 @@ export async function runGutPublish() {
     const ext = target.includes("windows") ? ".exe" : ""
     const archiveExt = target.includes("windows") ? "zip" : "tgz"
     const binaryName = `gut${ext}`
+    const isMacOS = target.includes("apple-darwin")
 
+    // macOS binaries are under signed/ prefix, others are under target/
     const inputPath = path.join(
       tempDir.path,
-      "target",
+      ...(isMacOS ? ["signed", "target"] : ["target"]),
       target,
       "release",
       binaryName,
