@@ -19,10 +19,7 @@ import {
   pipelineDivvunRuntime,
   runDivvunRuntimePublish,
 } from "./pipelines/divvun-runtime.ts"
-import {
-  pipelineGut,
-  runGutPublish,
-} from "./pipelines/gut.ts"
+import { pipelineGut, runGutPublish } from "./pipelines/gut.ts"
 import {
   pipelineDivvunWorkerTts,
   runDivvunWorkerTtsPublish,
