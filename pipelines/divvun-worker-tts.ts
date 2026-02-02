@@ -9,7 +9,6 @@ import { makeTempDir } from "~/util/temp.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
 
 const TARGETS = [
-  "x86_64-unknown-linux-musl",
   "x86_64-unknown-linux-gnu",
 ]
 
@@ -154,32 +153,5 @@ export async function runDivvunWorkerTtsPublish() {
   await builder.exec("docker", [
     "push",
     "ghcr.io/divvun/divvun-worker-tts:latest",
-  ])
-
-  // Build and push musl image
-  const muslBinaryPath = path.join(
-    tempDir.path,
-    "divvun-worker-tts-x86_64-unknown-linux-musl",
-  )
-  await Deno.copyFile(muslBinaryPath, "./divvun-worker-tts")
-  await Deno.chmod("./divvun-worker-tts", 0o755)
-
-  await builder.exec("docker", [
-    "build",
-    "-f",
-    "Dockerfile.musl",
-    "-t",
-    `ghcr.io/divvun/divvun-worker-tts:${version}-musl`,
-    "-t",
-    "ghcr.io/divvun/divvun-worker-tts:latest-musl",
-    ".",
-  ])
-  await builder.exec("docker", [
-    "push",
-    `ghcr.io/divvun/divvun-worker-tts:${version}-musl`,
-  ])
-  await builder.exec("docker", [
-    "push",
-    "ghcr.io/divvun/divvun-worker-tts:latest-musl",
   ])
 }
