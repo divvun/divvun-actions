@@ -117,8 +117,10 @@ export async function runDivvunWorkerTtsPublish() {
 
   const checksumDest = path.join(archivePath.path, checksumFile)
   const signatureDest = path.join(archivePath.path, signatureFile)
-  await fs.move(checksumFile, checksumDest, { overwrite: true })
-  await fs.move(signatureFile, signatureDest, { overwrite: true })
+  await fs.copy(checksumFile, checksumDest, { overwrite: true })
+  await fs.copy(signatureFile, signatureDest, { overwrite: true })
+  await Deno.remove(checksumFile)
+  await Deno.remove(signatureFile)
 
   const gh = new GitHub(builder.env.repo)
   await gh.createRelease(builder.env.tag, [`${archivePath.path}/*`], {
