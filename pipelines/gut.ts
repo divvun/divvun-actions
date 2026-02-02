@@ -106,6 +106,7 @@ export async function pipelineGut(): Promise<BuildkitePipeline> {
             `msvc-env ${
               msvcEnvCmd(arch)
             } | Invoke-Expression; cargo build --release --target ${arch}`,
+            `divvun-actions sign target/${arch}/release/gut${ext}`,
             `buildkite-agent artifact upload target/${arch}/release/gut${ext}`,
           ],
           depends_on: "test",
