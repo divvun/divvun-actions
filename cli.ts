@@ -20,6 +20,10 @@ import {
   runDivvunRuntimePublish,
 } from "./pipelines/divvun-runtime.ts"
 import {
+  pipelineDivvunWorkerTts,
+  runDivvunWorkerTtsPublish,
+} from "./pipelines/divvun-worker-tts.ts"
+import {
   pipelineDivvunspell,
   runLibdivvunspellPublish,
 } from "./pipelines/divvunspell/mod.ts"
@@ -254,6 +258,10 @@ async function runPipeline(args: any) {
       await runDivvunRuntimePublish()
       break
     }
+    case "divvun-worker-tts-publish": {
+      await runDivvunWorkerTtsPublish()
+      break
+    }
     case "libpahkat-android": {
       await runLibpahkatAndroid()
       break
@@ -403,6 +411,10 @@ async function runCi(_args: any) {
     }
     case "divvun-runtime": {
       pipeline = await pipelineDivvunRuntime()
+      break
+    }
+    case "divvun-worker-tts": {
+      pipeline = pipelineDivvunWorkerTts()
       break
     }
     case "pahkat": {
