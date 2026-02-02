@@ -265,7 +265,7 @@ async function runPipeline(args: any) {
     }
     case "gut-publish": {
       await runGutPublish()
-	  break
+      break
     }
     case "divvun-worker-tts-publish": {
       await runDivvunWorkerTtsPublish()
