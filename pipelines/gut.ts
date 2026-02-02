@@ -275,7 +275,7 @@ export async function runGutPublish() {
   const gh = new GitHub(builder.env.repo)
   await gh.createRelease(
     builder.env.tag!,
-    [`${archivePath.path}/*`],
+    allArtifacts,
     { latest: true },
   )
 }
