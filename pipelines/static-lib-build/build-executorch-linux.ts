@@ -110,8 +110,12 @@ export async function buildExecutorchLinux(
     if (isMusl) {
       // Use musl-clang wrapper scripts for cross-compilation
       const scriptsDir = path.join(import.meta.dirname!, "../../scripts")
-      cmakeArgs.push(`-DCMAKE_C_COMPILER=${scriptsDir}/aarch64-linux-musl-clang`)
-      cmakeArgs.push(`-DCMAKE_CXX_COMPILER=${scriptsDir}/aarch64-linux-musl-clang++`)
+      cmakeArgs.push(
+        `-DCMAKE_C_COMPILER=${scriptsDir}/aarch64-linux-musl-clang`,
+      )
+      cmakeArgs.push(
+        `-DCMAKE_CXX_COMPILER=${scriptsDir}/aarch64-linux-musl-clang++`,
+      )
       cmakeArgs.push("-DCMAKE_C_FLAGS=-flto=thin -fPIC")
       cmakeArgs.push("-DCMAKE_CXX_FLAGS=-flto=thin -fPIC")
       cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
@@ -132,7 +136,9 @@ export async function buildExecutorchLinux(
     // Use musl-clang wrapper scripts
     const scriptsDir = path.join(import.meta.dirname!, "../../scripts")
     cmakeArgs.push(`-DCMAKE_C_COMPILER=${scriptsDir}/x86_64-linux-musl-clang`)
-    cmakeArgs.push(`-DCMAKE_CXX_COMPILER=${scriptsDir}/x86_64-linux-musl-clang++`)
+    cmakeArgs.push(
+      `-DCMAKE_CXX_COMPILER=${scriptsDir}/x86_64-linux-musl-clang++`,
+    )
     cmakeArgs.push("-DCMAKE_C_FLAGS=-flto=thin -fPIC")
     cmakeArgs.push("-DCMAKE_CXX_FLAGS=-flto=thin -fPIC")
     cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
