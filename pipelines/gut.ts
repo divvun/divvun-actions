@@ -110,7 +110,6 @@ export async function pipelineGut(): Promise<BuildkitePipeline> {
             `msvc-env ${
               msvcEnvCmd(arch)
             } | Invoke-Expression; cargo build --release --target ${arch}`,
-            `divvun-actions sign target/${arch}/release/gut${ext}`,
             `buildkite-agent artifact upload target/${arch}/release/gut${ext}`,
           ],
           depends_on: "test",
@@ -125,6 +124,29 @@ export async function pipelineGut(): Promise<BuildkitePipeline> {
               },
             },
           ],
+        }))
+
+        // Windows: Sign on Linux (osslsigncode is available there)
+        const signKey = `sign-${platform}-${arch}`
+        buildStepKeys.push(signKey)
+
+        pipeline.steps.push(command({
+          key: signKey,
+          label: `Sign (${arch})`,
+          agents: {
+            queue: "linux",
+          },
+          command: [
+            "echo '--- Downloading unsigned binary'",
+            `buildkite-agent artifact download target/${arch}/release/gut${ext} .`,
+            "echo '--- Signing'",
+            `divvun-actions sign target/${arch}/release/gut${ext}`,
+            "echo '--- Uploading signed binary'",
+            `mkdir -p signed/target/${arch}/release`,
+            `mv target/${arch}/release/gut${ext} signed/target/${arch}/release/gut${ext}`,
+            `buildkite-agent artifact upload signed/target/${arch}/release/gut${ext}`,
+          ],
+          depends_on: buildKey,
         }))
       } else if (platform === "macos") {
         // macOS: Build and sign
@@ -222,21 +244,18 @@ export async function runGutPublish() {
   using tempDir = await makeTempDir()
 
   // Download all artifacts
-  // macOS: download signed binaries (unsigned ones are at target/*/release/gut)
+  // macOS: download signed binaries
   await builder.downloadArtifacts(
     "signed/target/*-apple-darwin/release/gut",
     tempDir.path,
   )
   // Linux: download from regular path (no signing step)
   await builder.downloadArtifacts("target/*-linux-*/release/gut", tempDir.path)
-  // Windows
-  await builder.downloadArtifacts("target\\*\\release\\gut.exe", tempDir.path)
-  // Try forward slash pattern for Windows as fallback
-  try {
-    await builder.downloadArtifacts("target/*/release/gut.exe", tempDir.path)
-  } catch (_e) {
-    // Already downloaded with backslash pattern
-  }
+  // Windows: download signed binaries
+  await builder.downloadArtifacts(
+    "signed/target/*-pc-windows-msvc/release/gut.exe",
+    tempDir.path,
+  )
 
   using archivePath = await makeTempDir({ prefix: "gut-" })
 
@@ -246,12 +265,13 @@ export async function runGutPublish() {
     const ext = target.includes("windows") ? ".exe" : ""
     const archiveExt = target.includes("windows") ? "zip" : "tgz"
     const binaryName = `gut${ext}`
-    const isMacOS = target.includes("apple-darwin")
+    const isSigned = target.includes("apple-darwin") ||
+      target.includes("windows")
 
-    // macOS binaries are under signed/ prefix, others are under target/
+    // macOS and Windows binaries are under signed/ prefix, Linux is under target/
     const inputPath = path.join(
       tempDir.path,
-      ...(isMacOS ? ["signed", "target"] : ["target"]),
+      ...(isSigned ? ["signed", "target"] : ["target"]),
       target,
       "release",
       binaryName,
