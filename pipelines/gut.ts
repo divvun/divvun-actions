@@ -130,6 +130,9 @@ export async function pipelineGut(): Promise<BuildkitePipeline> {
         const signKey = `sign-${platform}-${arch}`
         buildStepKeys.push(signKey)
 
+        // Windows agents upload with backslash paths
+        const winArtifactPath = `target\\${arch}\\release\\gut${ext}`
+
         pipeline.steps.push(command({
           key: signKey,
           label: `Sign (${arch})`,
@@ -138,7 +141,7 @@ export async function pipelineGut(): Promise<BuildkitePipeline> {
           },
           command: [
             "echo '--- Downloading unsigned binary'",
-            `buildkite-agent artifact download target/${arch}/release/gut${ext} .`,
+            `buildkite-agent artifact download '${winArtifactPath}' .`,
             "echo '--- Signing'",
             `divvun-actions sign target/${arch}/release/gut${ext}`,
             "echo '--- Uploading signed binary'",
