@@ -100,6 +100,7 @@ export async function pipelineGut(): Promise<BuildkitePipeline> {
       buildStepKeys.push(buildKey)
 
       if (platform === "windows") {
+        // Windows: Build
         pipeline.steps.push(command({
           key: buildKey,
           label: `Build (${arch})`,
@@ -126,33 +127,35 @@ export async function pipelineGut(): Promise<BuildkitePipeline> {
           ],
         }))
 
-        // Windows: Sign on Linux (osslsigncode is available there)
-        const signKey = `sign-${platform}-${arch}`
-        buildStepKeys.push(signKey)
+        // Windows: Sign on Linux (only for releases)
+        if (isRelease) {
+          const signKey = `sign-${platform}-${arch}`
+          buildStepKeys.push(signKey)
 
-        // Windows agents upload with backslash paths
-        const winArtifactPath = `target\\${arch}\\release\\gut${ext}`
+          // Windows agents upload with backslash paths
+          const winArtifactPath = `target\\${arch}\\release\\gut${ext}`
 
-        pipeline.steps.push(command({
-          key: signKey,
-          label: `Sign (${arch})`,
-          agents: {
-            queue: "linux",
-          },
-          command: [
-            "echo '--- Downloading unsigned binary'",
-            `buildkite-agent artifact download '${winArtifactPath}' .`,
-            "echo '--- Signing'",
-            `divvun-actions sign target/${arch}/release/gut${ext}`,
-            "echo '--- Uploading signed binary'",
-            `mkdir -p signed/target/${arch}/release`,
-            `mv target/${arch}/release/gut${ext} signed/target/${arch}/release/gut${ext}`,
-            `buildkite-agent artifact upload signed/target/${arch}/release/gut${ext}`,
-          ],
-          depends_on: buildKey,
-        }))
+          pipeline.steps.push(command({
+            key: signKey,
+            label: `Sign (${arch})`,
+            agents: {
+              queue: "linux",
+            },
+            command: [
+              "echo '--- Downloading unsigned binary'",
+              `buildkite-agent artifact download '${winArtifactPath}' .`,
+              "echo '--- Signing'",
+              `divvun-actions sign target/${arch}/release/gut${ext}`,
+              "echo '--- Uploading signed binary'",
+              `mkdir -p signed/target/${arch}/release`,
+              `mv target/${arch}/release/gut${ext} signed/target/${arch}/release/gut${ext}`,
+              `buildkite-agent artifact upload signed/target/${arch}/release/gut${ext}`,
+            ],
+            depends_on: buildKey,
+          }))
+        }
       } else if (platform === "macos") {
-        // macOS: Build and sign
+        // macOS: Build
         pipeline.steps.push(command({
           key: buildKey,
           label: `Build (${arch})`,
@@ -167,27 +170,30 @@ export async function pipelineGut(): Promise<BuildkitePipeline> {
           depends_on: "test",
         }))
 
-        const signKey = `sign-${platform}-${arch}`
-        buildStepKeys.push(signKey)
+        // macOS: Sign on Linux (only for releases)
+        if (isRelease) {
+          const signKey = `sign-${platform}-${arch}`
+          buildStepKeys.push(signKey)
 
-        pipeline.steps.push(command({
-          key: signKey,
-          label: `Sign (${arch})`,
-          agents: {
-            queue: "linux",
-          },
-          command: [
-            "echo '--- Downloading unsigned binary'",
-            `buildkite-agent artifact download target/${arch}/release/gut .`,
-            "echo '--- Signing'",
-            `divvun-actions run macos-sign target/${arch}/release/gut`,
-            "echo '--- Uploading signed binary'",
-            `mkdir -p signed/target/${arch}/release`,
-            `mv target/${arch}/release/gut signed/target/${arch}/release/gut`,
-            `buildkite-agent artifact upload signed/target/${arch}/release/gut`,
-          ],
-          depends_on: buildKey,
-        }))
+          pipeline.steps.push(command({
+            key: signKey,
+            label: `Sign (${arch})`,
+            agents: {
+              queue: "linux",
+            },
+            command: [
+              "echo '--- Downloading unsigned binary'",
+              `buildkite-agent artifact download target/${arch}/release/gut .`,
+              "echo '--- Signing'",
+              `divvun-actions run macos-sign target/${arch}/release/gut`,
+              "echo '--- Uploading signed binary'",
+              `mkdir -p signed/target/${arch}/release`,
+              `mv target/${arch}/release/gut signed/target/${arch}/release/gut`,
+              `buildkite-agent artifact upload signed/target/${arch}/release/gut`,
+            ],
+            depends_on: buildKey,
+          }))
+        }
       } else {
         // Linux
         pipeline.steps.push(command({
