@@ -46,5 +46,5 @@ export async function necessaryCodeSign(
     throw new Error("osslsigncode attach-signature failed")
   }
 
-  await Deno.rename(outputFile, inputFile)
+  await Deno.copyFile(outputFile, inputFile)
 }
