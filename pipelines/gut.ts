@@ -274,13 +274,13 @@ export async function runGutPublish() {
     const ext = target.includes("windows") ? ".exe" : ""
     const archiveExt = target.includes("windows") ? "zip" : "tgz"
     const binaryName = `gut${ext}`
-    const isSigned = target.includes("apple-darwin") ||
+    const useSignedPath = target.includes("apple-darwin") ||
       target.includes("windows")
 
     // macOS and Windows binaries are under signed/ prefix, Linux is under target/
     const inputPath = path.join(
       tempDir.path,
-      ...(isSigned ? ["signed", "target"] : ["target"]),
+      ...(useSignedPath ? ["signed", "target"] : ["target"]),
       target,
       "release",
       binaryName,
