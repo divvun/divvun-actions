@@ -206,7 +206,8 @@ export function pipelineGut(): BuildkitePipeline {
           key: buildKey,
           label: `Build (${arch})`,
           agents: {
-            queue: arch.includes("-musl") ? "alpine" : "linux",
+            // queue: arch.includes("-musl") ? "alpine" : "linux",
+            queue: "linux",
           },
           command: [
             `rustup target add ${arch}`,
