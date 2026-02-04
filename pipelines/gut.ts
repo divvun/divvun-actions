@@ -225,7 +225,7 @@ export function pipelineGut(): BuildkitePipeline {
   }
 
   // Add publish step for releases
-  if (builder.env.tag && builder.env.tag.match(/^v/)) {
+  if (isRelease) {
     pipeline.steps.push(
       command({
         label: "Publish",
