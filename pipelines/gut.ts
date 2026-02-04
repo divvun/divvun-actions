@@ -31,7 +31,7 @@ const msvcEnvCmd = (arch: string) => {
   return "x64"
 }
 
-export async function pipelineGut(): Promise<BuildkitePipeline> {
+export function pipelineGut(): BuildkitePipeline {
   const pipeline: BuildkitePipeline = {
     steps: [],
   }
