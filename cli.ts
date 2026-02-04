@@ -24,6 +24,10 @@ import {
   runDivvunWorkerTtsPublish,
 } from "./pipelines/divvun-worker-tts.ts"
 import {
+  pipelineBorealium,
+  runBorealiumDeploy,
+} from "./pipelines/borealium.ts"
+import {
   pipelineDivvunspell,
   runLibdivvunspellPublish,
 } from "./pipelines/divvunspell/mod.ts"
@@ -262,6 +266,10 @@ async function runPipeline(args: any) {
       await runDivvunWorkerTtsPublish()
       break
     }
+    case "borealium-deploy": {
+      await runBorealiumDeploy()
+      break
+    }
     case "libpahkat-android": {
       await runLibpahkatAndroid()
       break
@@ -415,6 +423,10 @@ async function runCi(_args: any) {
     }
     case "divvun-worker-tts": {
       pipeline = pipelineDivvunWorkerTts()
+      break
+    }
+    case "borealium.org": {
+      pipeline = pipelineBorealium()
       break
     }
     case "pahkat": {
