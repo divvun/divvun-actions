@@ -8,7 +8,7 @@ import { makeTempDir } from "~/util/temp.ts"
 
 const platforms = {
   macos: ["x86_64-apple-darwin", "aarch64-apple-darwin"],
-  linux: ["x86_64-unknown-linux-musl"],
+  linux: ["x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl"],
   windows: ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"],
 }
 
