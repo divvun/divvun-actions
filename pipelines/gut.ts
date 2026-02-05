@@ -203,12 +203,18 @@ export function pipelineGut(): BuildkitePipeline {
         }
       } else {
         // Linux
+        const isAarch64Musl = arch === "aarch64-unknown-linux-musl"
         pipeline.steps.push(command({
           key: buildKey,
           label: `Build (${arch})`,
           agents: {
             queue: arch.includes("-musl") ? "alpine" : "linux",
           },
+          env: isAarch64Musl
+            ? {
+              CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: "rust-lld",
+            }
+            : undefined,
           command: [
             `rustup target add ${arch}`,
             `cargo build --release --target ${arch}`,
