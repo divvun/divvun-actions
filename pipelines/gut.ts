@@ -202,16 +202,16 @@ export function pipelineGut(): BuildkitePipeline {
           }))
         }
       } else {
-        // Linux
-        const isAarch64Musl = arch === "aarch64-unknown-linux-musl"
+        // Linux: use rust-lld for musl targets to ensure static linking
         pipeline.steps.push(command({
           key: buildKey,
           label: `Build (${arch})`,
           agents: {
             queue: arch.includes("-musl") ? "alpine" : "linux",
           },
-          env: isAarch64Musl
+          env: arch.includes("-musl")
             ? {
+              CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: "rust-lld",
               CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: "rust-lld",
             }
             : undefined,
