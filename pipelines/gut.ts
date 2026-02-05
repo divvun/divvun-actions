@@ -14,24 +14,86 @@ const platforms = {
 
 const ALL_TARGETS = Object.values(platforms).flat()
 
-function command(input: CommandStep): CommandStep {
-  return {
-    ...input,
-    plugins: [
-      ...(input.plugins ?? []),
-      `ssh://git@github.com/divvun/divvun-actions.git#${targetModule.gitHash}`,
+// ─────────────────────────────────────────────────────────────────────────────
+// Main pipeline function
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function pipelineGut(): BuildkitePipeline {
+  const steps: CommandStep[] = []
+  const isRelease = builder.env.tag?.match(/^v/) != null
+
+  if (!isRelease) {
+    steps.push(createLintStep())
+  }
+
+  steps.push(createTestStep(!isRelease))
+
+  const buildStepKeys: string[] = []
+
+  for (const [platform, archs] of Object.entries(platforms)) {
+    for (const arch of archs) {
+      const buildKey = `build-${platform}-${arch}`
+      buildStepKeys.push(buildKey)
+
+      if (platform === "windows") {
+        steps.push(createWindowsBuildStep(arch))
+        if (isRelease) {
+          buildStepKeys.push(`sign-windows-${arch}`)
+          steps.push(createWindowsSignStep(arch, buildKey))
+        }
+      } else if (platform === "macos") {
+        steps.push(createMacosBuildStep(arch))
+        if (isRelease) {
+          buildStepKeys.push(`sign-macos-${arch}`)
+          steps.push(createMacosSignStep(arch, buildKey))
+        }
+      } else {
+        steps.push(createLinuxBuildStep(arch))
+      }
+    }
+  }
+
+  if (isRelease) {
+    steps.push(createPublishStep(buildStepKeys))
+  }
+
+  return { steps }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step creation functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+function createLintStep(): CommandStep {
+  return command({
+    label: "Lint & Format",
+    key: "lint",
+    command: [
+      "echo '--- Checking formatting'",
+      "cargo fmt --check",
+      "echo '--- Running clippy'",
+      "cargo clippy -- -D warnings",
     ],
-  }
+    agents: { queue: "linux" },
+    plugins: [cachePlugin("lint")],
+  })
 }
 
-const msvcEnvCmd = (arch: string) => {
-  if (arch.startsWith("aarch64")) {
-    return "arm64"
-  }
-  return "x64"
+function createTestStep(dependsOnLint: boolean): CommandStep {
+  return command({
+    label: "Test",
+    key: "test",
+    command: [
+      "echo '--- Running tests'",
+      "cargo test",
+    ],
+    agents: { queue: "linux" },
+    depends_on: dependsOnLint ? "lint" : undefined,
+    plugins: [cachePlugin("test")],
+  })
 }
 
-function signStep(opts: {
+function createSignStep(opts: {
   platform: string
   arch: string
   ext: string
@@ -46,9 +108,7 @@ function signStep(opts: {
   return command({
     key: `sign-${platform}-${arch}`,
     label: `Sign (${arch})`,
-    agents: {
-      queue: "linux",
-    },
+    agents: { queue: "linux" },
     command: [
       "echo '--- Downloading unsigned binary'",
       `buildkite-agent artifact download '${downloadPath}' .`,
@@ -63,266 +123,192 @@ function signStep(opts: {
   })
 }
 
-export function pipelineGut(): BuildkitePipeline {
-  const pipeline: BuildkitePipeline = {
-    steps: [],
-  }
-
-  const isRelease = builder.env.tag && builder.env.tag.match(/^v/)
-
-  // Lint and format check step (skip on release tags - code already reviewed)
-  if (!isRelease) {
-    pipeline.steps.push(command({
-      label: "Lint & Format",
-      key: "lint",
-      command: [
-        "echo '--- Checking formatting'",
-        "cargo fmt --check",
-        "echo '--- Running clippy'",
-        "cargo clippy -- -D warnings",
-      ],
-      agents: {
-        queue: "linux",
-      },
-      plugins: [
-        {
-          "cache#v1.7.0": {
-            manifest: "Cargo.lock",
-            path: "target",
-            restore: "file",
-            save: "file",
-            "key-extra": "lint",
-          },
-        },
-      ],
-    }))
-  }
-
-  // Test step
-  pipeline.steps.push(command({
-    label: "Test",
-    key: "test",
+function createWindowsBuildStep(arch: string): CommandStep {
+  return command({
+    key: `build-windows-${arch}`,
+    label: `Build (${arch})`,
+    agents: { queue: "windows" },
     command: [
-      "echo '--- Running tests'",
-      "cargo test",
+      `msvc-env ${
+        msvcEnvCmd(arch)
+      } | Invoke-Expression; cargo build --release --target ${arch}`,
+      `buildkite-agent artifact upload target/${arch}/release/gut.exe`,
     ],
-    agents: {
-      queue: "linux",
-    },
-    depends_on: isRelease ? undefined : "lint",
-    plugins: [
-      {
-        "cache#v1.7.0": {
-          manifest: "Cargo.lock",
-          path: "target",
-          restore: "file",
-          save: "file",
-          "key-extra": "test",
-        },
-      },
+    depends_on: "test",
+    plugins: [cachePlugin(arch)],
+  })
+}
+
+function createWindowsSignStep(arch: string, buildKey: string): CommandStep {
+  return createSignStep({
+    platform: "windows",
+    arch,
+    ext: ".exe",
+    downloadPath: `target\\${arch}\\release\\gut.exe`,
+    signCommand: `divvun-actions sign target/${arch}/release/gut.exe`,
+    buildKey,
+  })
+}
+
+function createMacosBuildStep(arch: string): CommandStep {
+  return command({
+    key: `build-macos-${arch}`,
+    label: `Build (${arch})`,
+    agents: { queue: "macos" },
+    command: [
+      `rustup target add ${arch}`,
+      `cargo build --release --target ${arch}`,
+      `buildkite-agent artifact upload target/${arch}/release/gut`,
     ],
-  }))
+    depends_on: "test",
+  })
+}
 
-  const buildStepKeys: string[] = []
+function createMacosSignStep(arch: string, buildKey: string): CommandStep {
+  return createSignStep({
+    platform: "macos",
+    arch,
+    ext: "",
+    downloadPath: `target/${arch}/release/gut`,
+    signCommand: `divvun-actions run macos-sign target/${arch}/release/gut`,
+    buildKey,
+  })
+}
 
-  for (const [platform, archs] of Object.entries(platforms)) {
-    for (const arch of archs) {
-      const ext = platform === "windows" ? ".exe" : ""
-      const buildKey = `build-${platform}-${arch}`
-      buildStepKeys.push(buildKey)
+function createLinuxBuildStep(arch: string): CommandStep {
+  return command({
+    key: `build-linux-${arch}`,
+    label: `Build (${arch})`,
+    agents: { queue: arch.includes("-musl") ? "alpine" : "linux" },
+    command: [
+      `rustup target add ${arch}`,
+      `cargo build --release --target ${arch}`,
+      `buildkite-agent artifact upload target/${arch}/release/gut`,
+    ],
+    depends_on: "test",
+    plugins: [cachePlugin(arch)],
+  })
+}
 
-      if (platform === "windows") {
-        // Windows: Build
-        pipeline.steps.push(command({
-          key: buildKey,
-          label: `Build (${arch})`,
-          agents: {
-            queue: "windows",
-          },
-          command: [
-            `msvc-env ${
-              msvcEnvCmd(arch)
-            } | Invoke-Expression; cargo build --release --target ${arch}`,
-            `buildkite-agent artifact upload target/${arch}/release/gut${ext}`,
-          ],
-          depends_on: "test",
-          plugins: [
-            {
-              "cache#v1.7.0": {
-                manifest: "Cargo.lock",
-                path: "target",
-                restore: "file",
-                save: "file",
-                "key-extra": arch,
-              },
-            },
-          ],
-        }))
+function createPublishStep(dependsOn: string[]): CommandStep {
+  return command({
+    label: "Publish",
+    command: "divvun-actions run gut-publish",
+    agents: { queue: "linux" },
+    depends_on: dependsOn,
+  })
+}
 
-        // Windows: Sign on Linux (only for releases)
-        if (isRelease) {
-          buildStepKeys.push(`sign-${platform}-${arch}`)
-          // Windows agents upload with backslash paths
-          pipeline.steps.push(signStep({
-            platform,
-            arch,
-            ext,
-            downloadPath: `target\\${arch}\\release\\gut${ext}`,
-            signCommand: `divvun-actions sign target/${arch}/release/gut${ext}`,
-            buildKey,
-          }))
-        }
-      } else if (platform === "macos") {
-        // macOS: Build
-        pipeline.steps.push(command({
-          key: buildKey,
-          label: `Build (${arch})`,
-          agents: {
-            queue: "macos",
-          },
-          command: [
-            `rustup target add ${arch}`,
-            `cargo build --release --target ${arch}`,
-            `buildkite-agent artifact upload target/${arch}/release/gut`,
-          ],
-          depends_on: "test",
-        }))
+// ─────────────────────────────────────────────────────────────────────────────
+// Publishing functions
+// ─────────────────────────────────────────────────────────────────────────────
 
-        // macOS: Sign on Linux (only for releases)
-        if (isRelease) {
-          buildStepKeys.push(`sign-${platform}-${arch}`)
-          pipeline.steps.push(signStep({
-            platform,
-            arch,
-            ext,
-            downloadPath: `target/${arch}/release/gut`,
-            signCommand:
-              `divvun-actions run macos-sign target/${arch}/release/gut`,
-            buildKey,
-          }))
-        }
-      } else {
-        // Linux
-        pipeline.steps.push(command({
-          key: buildKey,
-          label: `Build (${arch})`,
-          agents: {
-            queue: arch.includes("-musl") ? "alpine" : "linux",
-          },
-          command: [
-            `rustup target add ${arch}`,
-            `cargo build --release --target ${arch}`,
-            `buildkite-agent artifact upload target/${arch}/release/gut`,
-          ],
-          depends_on: "test",
-          plugins: [
-            {
-              "cache#v1.7.0": {
-                manifest: "Cargo.lock",
-                path: "target",
-                restore: "file",
-                save: "file",
-                "key-extra": arch,
-              },
-            },
-          ],
-        }))
-      }
-    }
+async function downloadAllArtifacts(tempDir: string): Promise<void> {
+  await builder.downloadArtifacts(
+    "signed/target/*-apple-darwin/release/gut",
+    tempDir,
+  )
+  await builder.downloadArtifacts("target/*-linux-*/release/gut", tempDir)
+  await builder.downloadArtifacts(
+    "signed/target/*-pc-windows-msvc/release/gut.exe",
+    tempDir,
+  )
+}
+
+async function createArchiveForTarget(
+  target: string,
+  tempDir: string,
+  archiveDir: string,
+  tag: string,
+): Promise<string> {
+  const isWindows = target.includes("windows")
+  const ext = isWindows ? ".exe" : ""
+  const archiveExt = isWindows ? "zip" : "tgz"
+  const binaryName = `gut${ext}`
+  const useSignedPath = target.includes("apple-darwin") || isWindows
+
+  const inputPath = path.join(
+    tempDir,
+    ...(useSignedPath ? ["signed", "target"] : ["target"]),
+    target,
+    "release",
+    binaryName,
+  )
+
+  const archiveName = `gut-${target}-${tag}`
+  const outPath = path.join(archiveDir, `${archiveName}.${archiveExt}`)
+
+  if (!isWindows) {
+    await Deno.chmod(inputPath, 0o755)
   }
 
-  // Add publish step for releases
-  if (isRelease) {
-    pipeline.steps.push(
-      command({
-        label: "Publish",
-        command: "divvun-actions run gut-publish",
-        agents: {
-          queue: "linux",
-        },
-        depends_on: buildStepKeys,
-      }),
-    )
+  const stagingDir = path.join(archiveDir, archiveName)
+  await Deno.mkdir(stagingDir)
+  await Deno.copyFile(inputPath, path.join(stagingDir, binaryName))
+
+  if (isWindows) {
+    await Zip.create([stagingDir], outPath)
+  } else {
+    await Tar.createFlatTgz([stagingDir], outPath)
   }
 
-  return pipeline
+  return outPath
 }
 
 export async function runGutPublish() {
   if (!builder.env.tag) {
     throw new Error("No tag found, cannot publish")
   }
-
   if (!builder.env.repo) {
     throw new Error("No repo found, cannot publish")
   }
 
   using tempDir = await makeTempDir()
+  using archiveDir = await makeTempDir({ prefix: "gut-" })
 
-  // Download all artifacts
-  // macOS: download signed binaries
-  await builder.downloadArtifacts(
-    "signed/target/*-apple-darwin/release/gut",
-    tempDir.path,
+  await downloadAllArtifacts(tempDir.path)
+
+  const allArtifacts = await Promise.all(
+    ALL_TARGETS.map((target) =>
+      createArchiveForTarget(
+        target,
+        tempDir.path,
+        archiveDir.path,
+        builder.env.tag!,
+      )
+    ),
   )
-  // Linux: download from regular path (no signing step)
-  await builder.downloadArtifacts("target/*-linux-*/release/gut", tempDir.path)
-  // Windows: download signed binaries
-  await builder.downloadArtifacts(
-    "signed/target/*-pc-windows-msvc/release/gut.exe",
-    tempDir.path,
-  )
-
-  using archivePath = await makeTempDir({ prefix: "gut-" })
-
-  const allArtifacts: string[] = []
-
-  for (const target of ALL_TARGETS) {
-    const ext = target.includes("windows") ? ".exe" : ""
-    const archiveExt = target.includes("windows") ? "zip" : "tgz"
-    const binaryName = `gut${ext}`
-    const useSignedPath = target.includes("apple-darwin") ||
-      target.includes("windows")
-
-    // macOS and Windows binaries are under signed/ prefix, Linux is under target/
-    const inputPath = path.join(
-      tempDir.path,
-      ...(useSignedPath ? ["signed", "target"] : ["target"]),
-      target,
-      "release",
-      binaryName,
-    )
-
-    const outPath = path.join(
-      archivePath.path,
-      `gut-${target}-${builder.env.tag!}.${archiveExt}`,
-    )
-
-    if (!target.includes("windows")) {
-      await Deno.chmod(inputPath, 0o755)
-    }
-
-    // Create staging directory with the binary inside
-    const stagingDir = path.join(
-      archivePath.path,
-      `gut-${target}-${builder.env.tag!}`,
-    )
-    await Deno.mkdir(stagingDir)
-    await Deno.copyFile(inputPath, path.join(stagingDir, binaryName))
-
-    if (target.includes("windows")) {
-      await Zip.create([stagingDir], outPath)
-    } else {
-      await Tar.createFlatTgz([stagingDir], outPath)
-    }
-
-    allArtifacts.push(outPath)
-  }
 
   const gh = new GitHub(builder.env.repo)
-  await gh.createRelease(
-    builder.env.tag!,
-    allArtifacts,
-    { latest: true },
-  )
+  await gh.createRelease(builder.env.tag!, allArtifacts, { latest: true })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Utility functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+function command(input: CommandStep): CommandStep {
+  return {
+    ...input,
+    plugins: [
+      ...(input.plugins ?? []),
+      `ssh://git@github.com/divvun/divvun-actions.git#${targetModule.gitHash}`,
+    ],
+  }
+}
+
+function msvcEnvCmd(arch: string): string {
+  return arch.startsWith("aarch64") ? "arm64" : "x64"
+}
+
+function cachePlugin(keyExtra: string) {
+  return {
+    "cache#v1.7.0": {
+      manifest: "Cargo.lock",
+      path: "target",
+      restore: "file",
+      save: "file",
+      "key-extra": keyExtra,
+    },
+  }
 }
