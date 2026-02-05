@@ -196,7 +196,8 @@ export function pipelineGut(): BuildkitePipeline {
             arch,
             ext,
             downloadPath: `target/${arch}/release/gut`,
-            signCommand: `divvun-actions run macos-sign target/${arch}/release/gut`,
+            signCommand:
+              `divvun-actions run macos-sign target/${arch}/release/gut`,
             buildKey,
           }))
         }
