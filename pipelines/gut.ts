@@ -19,7 +19,7 @@ const ALL_TARGETS = Object.values(platforms).flat()
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function pipelineGut(): BuildkitePipeline {
-  const steps: CommandStep[] = []
+  const steps: BuildkitePipeline["steps"] = []
   const isRelease = builder.env.tag?.match(/^v/) != null
 
   if (!isRelease) {
@@ -35,21 +35,28 @@ export function pipelineGut(): BuildkitePipeline {
       const buildKey = `build-${platform}-${arch}`
       buildStepKeys.push(buildKey)
 
+      const groupSteps: CommandStep[] = []
+
       if (platform === "windows") {
-        steps.push(createWindowsBuildStep(arch))
+        groupSteps.push(createWindowsBuildStep(arch))
         if (isRelease) {
           buildStepKeys.push(`sign-windows-${arch}`)
-          steps.push(createWindowsSignStep(arch, buildKey))
+          groupSteps.push(createWindowsSignStep(arch, buildKey))
         }
       } else if (platform === "macos") {
-        steps.push(createMacosBuildStep(arch))
+        groupSteps.push(createMacosBuildStep(arch))
         if (isRelease) {
           buildStepKeys.push(`sign-macos-${arch}`)
-          steps.push(createMacosSignStep(arch, buildKey))
+          groupSteps.push(createMacosSignStep(arch, buildKey))
         }
       } else {
-        steps.push(createLinuxBuildStep(arch))
+        groupSteps.push(createLinuxBuildStep(arch))
       }
+
+      steps.push({
+        group: `${platform} ${arch}`,
+        steps: groupSteps,
+      })
     }
   }
 
@@ -107,7 +114,7 @@ function createSignStep(opts: {
 
   return command({
     key: `sign-${platform}-${arch}`,
-    label: `Sign (${arch})`,
+    label: "Sign (on Linux)",
     agents: { queue: "linux" },
     command: [
       "echo '--- Downloading unsigned binary'",
@@ -126,7 +133,7 @@ function createSignStep(opts: {
 function createWindowsBuildStep(arch: string): CommandStep {
   return command({
     key: `build-windows-${arch}`,
-    label: `Build (${arch})`,
+    label: "Build",
     agents: { queue: "windows" },
     command: [
       `msvc-env ${
@@ -153,7 +160,7 @@ function createWindowsSignStep(arch: string, buildKey: string): CommandStep {
 function createMacosBuildStep(arch: string): CommandStep {
   return command({
     key: `build-macos-${arch}`,
-    label: `Build (${arch})`,
+    label: "Build",
     agents: { queue: "macos" },
     command: [
       `rustup target add ${arch}`,
@@ -178,7 +185,7 @@ function createMacosSignStep(arch: string, buildKey: string): CommandStep {
 function createLinuxBuildStep(arch: string): CommandStep {
   return command({
     key: `build-linux-${arch}`,
-    label: `Build (${arch})`,
+    label: "Build",
     agents: { queue: arch.includes("-musl") ? "alpine" : "linux" },
     command: [
       `rustup target add ${arch}`,
