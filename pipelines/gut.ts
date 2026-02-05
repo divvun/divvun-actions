@@ -55,6 +55,7 @@ export function pipelineGut(): BuildkitePipeline {
 
       steps.push({
         group: `${platform} ${arch}`,
+        depends_on: "test",
         steps: groupSteps,
       })
     }
@@ -141,7 +142,6 @@ function createWindowsBuildStep(arch: string): CommandStep {
       } | Invoke-Expression; cargo build --release --target ${arch}`,
       `buildkite-agent artifact upload target/${arch}/release/gut.exe`,
     ],
-    depends_on: "test",
     plugins: [cachePlugin(arch)],
   })
 }
@@ -167,7 +167,6 @@ function createMacosBuildStep(arch: string): CommandStep {
       `cargo build --release --target ${arch}`,
       `buildkite-agent artifact upload target/${arch}/release/gut`,
     ],
-    depends_on: "test",
   })
 }
 
@@ -192,7 +191,6 @@ function createLinuxBuildStep(arch: string): CommandStep {
       `cargo build --release --target ${arch}`,
       `buildkite-agent artifact upload target/${arch}/release/gut`,
     ],
-    depends_on: "test",
     plugins: [cachePlugin(arch)],
   })
 }
