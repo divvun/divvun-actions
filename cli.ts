@@ -19,6 +19,7 @@ import {
   pipelineDivvunRuntime,
   runDivvunRuntimePublish,
 } from "./pipelines/divvun-runtime.ts"
+import { pipelineGut, runGutPublish } from "./pipelines/gut.ts"
 import {
   pipelineDivvunWorkerTts,
   runDivvunWorkerTtsPublish,
@@ -262,6 +263,10 @@ async function runPipeline(args: any) {
       await runDivvunRuntimePublish()
       break
     }
+    case "gut-publish": {
+      await runGutPublish()
+      break
+    }
     case "divvun-worker-tts-publish": {
       await runDivvunWorkerTtsPublish()
       break
@@ -419,6 +424,10 @@ async function runCi(_args: any) {
     }
     case "divvun-runtime": {
       pipeline = await pipelineDivvunRuntime()
+      break
+    }
+    case "gut": {
+      pipeline = await pipelineGut()
       break
     }
     case "divvun-worker-tts": {
