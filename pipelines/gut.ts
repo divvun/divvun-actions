@@ -167,7 +167,6 @@ function createMacosBuildStep(arch: string): CommandStep {
       `cargo build --release --target ${arch}`,
       `buildkite-agent artifact upload target/${arch}/release/gut`,
     ],
-    plugins: [cachePlugin(arch)],
   })
 }
 
