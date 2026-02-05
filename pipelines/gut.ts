@@ -115,7 +115,7 @@ function createSignStep(opts: {
 
   return command({
     key: `sign-${platform}-${arch}`,
-    label: "Sign (on Linux)",
+    label: "Sign",
     agents: { queue: "linux" },
     command: [
       "echo '--- Downloading unsigned binary'",
