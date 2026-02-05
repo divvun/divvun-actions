@@ -101,17 +101,23 @@ function createTestStep(dependsOnLint: boolean): CommandStep {
   })
 }
 
-function createSignStep(opts: {
-  platform: string
-  arch: string
-  ext: string
-  downloadPath: string
-  signCommand: string
-  buildKey: string
-}): CommandStep {
-  const { platform, arch, ext, downloadPath, signCommand, buildKey } = opts
+function createSignStep(
+  platform: "windows" | "macos",
+  arch: string,
+  buildKey: string,
+): CommandStep {
+  const ext = platform === "windows" ? ".exe" : ""
   const binaryPath = `target/${arch}/release/gut${ext}`
   const signedPath = `signed/${binaryPath}`
+
+  // Windows artifacts are uploaded with backslash paths
+  const downloadPath = platform === "windows"
+    ? `target\\${arch}\\release\\gut${ext}`
+    : binaryPath
+
+  const signCommand = platform === "windows"
+    ? `divvun-actions sign ${binaryPath}`
+    : `divvun-actions run macos-sign ${binaryPath}`
 
   return command({
     key: `sign-${platform}-${arch}`,
@@ -147,14 +153,7 @@ function createWindowsBuildStep(arch: string): CommandStep {
 }
 
 function createWindowsSignStep(arch: string, buildKey: string): CommandStep {
-  return createSignStep({
-    platform: "windows",
-    arch,
-    ext: ".exe",
-    downloadPath: `target\\${arch}\\release\\gut.exe`,
-    signCommand: `divvun-actions sign target/${arch}/release/gut.exe`,
-    buildKey,
-  })
+  return createSignStep("windows", arch, buildKey)
 }
 
 function createMacosBuildStep(arch: string): CommandStep {
@@ -171,14 +170,7 @@ function createMacosBuildStep(arch: string): CommandStep {
 }
 
 function createMacosSignStep(arch: string, buildKey: string): CommandStep {
-  return createSignStep({
-    platform: "macos",
-    arch,
-    ext: "",
-    downloadPath: `target/${arch}/release/gut`,
-    signCommand: `divvun-actions run macos-sign target/${arch}/release/gut`,
-    buildKey,
-  })
+  return createSignStep("macos", arch, buildKey)
 }
 
 function createLinuxBuildStep(arch: string): CommandStep {
@@ -198,7 +190,7 @@ function createLinuxBuildStep(arch: string): CommandStep {
 function createPublishStep(dependsOn: string[]): CommandStep {
   return command({
     label: "Publish",
-    command: "divvun-actions run gut-publish",
+    command: `divvun-actions run gut-publish`,
     agents: { queue: "linux" },
     depends_on: dependsOn,
   })
@@ -210,12 +202,15 @@ function createPublishStep(dependsOn: string[]): CommandStep {
 
 async function downloadAllArtifacts(tempDir: string): Promise<void> {
   await builder.downloadArtifacts(
-    "signed/target/*-apple-darwin/release/gut",
+    `signed/target/*-apple-darwin/release/gut`,
     tempDir,
   )
-  await builder.downloadArtifacts("target/*-linux-*/release/gut", tempDir)
   await builder.downloadArtifacts(
-    "signed/target/*-pc-windows-msvc/release/gut.exe",
+    `target/*-linux-*/release/gut`,
+    tempDir,
+  )
+  await builder.downloadArtifacts(
+    `signed/target/*-pc-windows-msvc/release/gut.exe`,
     tempDir,
   )
 }
@@ -269,7 +264,7 @@ export async function runGutPublish() {
   }
 
   using tempDir = await makeTempDir()
-  using archiveDir = await makeTempDir({ prefix: "gut-" })
+  using archiveDir = await makeTempDir({ prefix: `gut-` })
 
   await downloadAllArtifacts(tempDir.path)
 
