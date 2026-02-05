@@ -202,19 +202,13 @@ export function pipelineGut(): BuildkitePipeline {
           }))
         }
       } else {
-        // Linux: use rust-lld for musl targets to ensure static linking
+        // Linux
         pipeline.steps.push(command({
           key: buildKey,
           label: `Build (${arch})`,
           agents: {
             queue: arch.includes("-musl") ? "alpine" : "linux",
           },
-          env: arch.includes("-musl")
-            ? {
-              CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: "rust-lld",
-              CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: "rust-lld",
-            }
-            : undefined,
           command: [
             `rustup target add ${arch}`,
             `cargo build --release --target ${arch}`,
