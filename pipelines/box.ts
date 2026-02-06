@@ -94,23 +94,40 @@ export function pipelineBox(): BuildkitePipeline {
 }
 
 function muslCrossEnv(target: string): { env: Record<string, string> } | Record<string, never> {
-  if (target !== "aarch64-unknown-linux-musl") return {}
-  const sysroot = "/opt/sysroot-aarch64"
-  const linkerArgs = [
-    `--target=aarch64-linux-musl`,
-    `--sysroot=${sysroot}`,
-    `-fuse-ld=lld`,
-    `--rtlib=compiler-rt`,
-    `--unwindlib=libunwind`,
-  ].map((arg) => `-C link-arg=${arg}`).join(" ")
-  return {
-    env: {
-      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: "clang",
-      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: linkerArgs,
-      CC_aarch64_unknown_linux_musl: "clang",
-      CFLAGS_aarch64_unknown_linux_musl: `--target=aarch64-linux-musl --sysroot=${sysroot}`,
-    },
+  if (target === "aarch64-unknown-linux-musl") {
+    const sysroot = "/opt/sysroot-aarch64"
+    const linkerArgs = [
+      `--target=aarch64-linux-musl`,
+      `--sysroot=${sysroot}`,
+      `-fuse-ld=lld`,
+      `--rtlib=compiler-rt`,
+      `--unwindlib=libunwind`,
+    ].map((arg) => `-C link-arg=${arg}`).join(" ")
+    return {
+      env: {
+        CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: "clang",
+        CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: linkerArgs,
+        CC_aarch64_unknown_linux_musl: "clang",
+        CFLAGS_aarch64_unknown_linux_musl:
+          `--target=aarch64-linux-musl --sysroot=${sysroot}`,
+      },
+    }
   }
+  if (target === "x86_64-unknown-linux-musl") {
+    const linkerArgs = [
+      `-fuse-ld=lld`,
+      `--rtlib=compiler-rt`,
+      `--unwindlib=libunwind`,
+    ].map((arg) => `-C link-arg=${arg}`).join(" ")
+    return {
+      env: {
+        CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: "clang",
+        CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: linkerArgs,
+        CC_x86_64_unknown_linux_musl: "clang",
+      },
+    }
+  }
+  return {}
 }
 
 export async function runBoxPublish() {
