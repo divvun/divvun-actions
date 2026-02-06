@@ -24,6 +24,7 @@ import {
   pipelineDivvunWorkerTts,
   runDivvunWorkerTtsPublish,
 } from "./pipelines/divvun-worker-tts.ts"
+import { pipelineBox, runBoxPublish } from "./pipelines/box.ts"
 import {
   pipelineBorealium,
   runBorealiumDeploy,
@@ -259,6 +260,10 @@ async function runPipeline(args: any) {
       await runDesktopKeyboardDeploy(KeyboardType.MacOS)
       break
     }
+    case "box-publish": {
+      await runBoxPublish()
+      break
+    }
     case "divvun-runtime-publish": {
       await runDivvunRuntimePublish()
       break
@@ -432,6 +437,10 @@ async function runCi(_args: any) {
     }
     case "divvun-worker-tts": {
       pipeline = pipelineDivvunWorkerTts()
+      break
+    }
+    case "box": {
+      pipeline = pipelineBox()
       break
     }
     case "borealium.org": {
