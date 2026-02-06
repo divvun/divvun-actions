@@ -50,6 +50,8 @@ RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositor
     tree \
     unzip \
     uv \
+    xz-dev \
+    xz-static \
     zlib-dev \
     zlib-static
 
@@ -120,6 +122,8 @@ RUN mkdir -p /opt/sysroot-aarch64 && \
     tree \
     unzip \
     uv \
+    xz-dev \
+    xz-static \
     zlib-dev \
     zlib-static
 
