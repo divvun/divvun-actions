@@ -193,17 +193,18 @@ function muslCrossEnv(
 ): { env: Record<string, string> } | Record<string, never> {
   if (target === "aarch64-unknown-linux-musl") {
     const sysroot = "/opt/sysroot-aarch64"
-    const linkerArgs = [
-      `--target=aarch64-linux-musl`,
-      `--sysroot=${sysroot}`,
-      `-fuse-ld=lld`,
-      `--rtlib=compiler-rt`,
-      `--unwindlib=libunwind`,
-    ].map((arg) => `-C link-arg=${arg}`).join(" ")
+    const rustflags = [
+      `-C relocation-model=pie`,
+      `-C link-arg=--target=aarch64-linux-musl`,
+      `-C link-arg=--sysroot=${sysroot}`,
+      `-C link-arg=-fuse-ld=lld`,
+      `-C link-arg=--rtlib=compiler-rt`,
+      `-C link-arg=--unwindlib=libunwind`,
+    ].join(" ")
     return {
       env: {
         CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: "clang",
-        CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: linkerArgs,
+        CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: rustflags,
         CC_aarch64_unknown_linux_musl: "clang",
         CFLAGS_aarch64_unknown_linux_musl:
           `--target=aarch64-linux-musl --sysroot=${sysroot}`,
@@ -211,15 +212,16 @@ function muslCrossEnv(
     }
   }
   if (target === "x86_64-unknown-linux-musl") {
-    const linkerArgs = [
-      `-fuse-ld=lld`,
-      `--rtlib=compiler-rt`,
-      `--unwindlib=libunwind`,
-    ].map((arg) => `-C link-arg=${arg}`).join(" ")
+    const rustflags = [
+      `-C relocation-model=pie`,
+      `-C link-arg=-fuse-ld=lld`,
+      `-C link-arg=--rtlib=compiler-rt`,
+      `-C link-arg=--unwindlib=libunwind`,
+    ].join(" ")
     return {
       env: {
         CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: "clang",
-        CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: linkerArgs,
+        CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: rustflags,
         CC_x86_64_unknown_linux_musl: "clang",
       },
     }
