@@ -3,7 +3,7 @@ import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 
 const PYTORCH_VERSION = "v2.9.1"
-const EXECUTORCH_VERSION = "v1.0.1"
+const EXECUTORCH_VERSION = "v1.1.0"
 
 type LibraryType =
   | "icu4c"
