@@ -59,6 +59,24 @@ export async function buildExecutorchWindows(
     { cwd: executorchRoot },
   )
 
+  // Apply Windows patch (Ninja ExternalProject fixes for flatc/flatcc)
+  console.log("Applying Windows patch")
+  const windowsPatchPath = path.join(
+    import.meta.dirname!,
+    "patches/executorch/windows.patch",
+  )
+  const patchResult = await builder.output("C:\\msys2\\usr\\bin\\patch.exe", [
+    "-p1",
+    "-i",
+    windowsPatchPath,
+  ], {
+    cwd: executorchRoot,
+  })
+  console.log(patchResult.stdout)
+  if (patchResult.stderr) {
+    console.log(patchResult.stderr)
+  }
+
   // Set up directories
   const installPrefix = path.join(repoRoot, `target/${target}/executorch`)
   const buildRoot = path.join(repoRoot, `build/${target}/executorch`)
