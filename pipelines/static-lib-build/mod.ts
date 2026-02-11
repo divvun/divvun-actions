@@ -714,12 +714,6 @@ export function pipelineStaticLibBuild(): BuildkitePipeline {
       deps: ["executorch-cache-download"],
       env: { MAX_JOBS: "2" },
     },
-    {
-      lib: "executorch",
-      target: "aarch64-pc-windows-msvc",
-      deps: ["executorch-cache-download"],
-      env: { MAX_JOBS: "2" },
-    },
   ]
 
   const pipeline: BuildkitePipeline = {
