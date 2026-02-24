@@ -130,7 +130,7 @@ RUN curl -fsSL https://musl.cc/aarch64-linux-musl-cross.tgz -o aarch64-musl-cros
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install GiellaLTLexTools via pipx to get CLI tools (gtlemmatest, gtspelltest, etc.)
-RUN pipx install GiellaLTLexTools
+RUN pipx install git+https://github.com/divvun/GiellaLTLexTools
 ENV PATH="/root/.local/bin:$PATH"
 
 # Install GitHub CLI
