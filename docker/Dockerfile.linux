@@ -79,7 +79,6 @@ RUN apt-get update && \
     pkg-config \
     protobuf-compiler \
     python3-gtgramtools \
-    python3-gtltlextools \
     python3-gtmorphtest \
     rsync \
     socat \
@@ -129,6 +128,10 @@ RUN curl -fsSL https://musl.cc/aarch64-linux-musl-cross.tgz -o aarch64-musl-cros
 
 # Install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install GiellaLTLexTools via pipx to get CLI tools (gtlemmatest, gtspelltest, etc.)
+RUN pipx install GiellaLTLexTools
+ENV PATH="/root/.local/bin:$PATH"
 
 # Install GitHub CLI
 RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.83.1/gh_2.83.1_linux_amd64.deb -o gh.deb && \
