@@ -22,13 +22,13 @@ export default async function langGrammarTest() {
   // build/ artifacts, the generated source files will always appear older than
   // the build outputs, and no cascade can fire regardless of download ordering.
   //
-  // The chains are: configure.ac → aclocal.m4 → configure → config.status → Makefile
-  //                Makefile.am → Makefile.in → Makefile
+  // The chains are:  configure.ac / m4/*.m4 → aclocal.m4 → configure → config.status → Makefile
+  //                 Makefile.am → Makefile.in → Makefile
   await new Deno.Command("bash", {
     args: [
       "-c",
       "touch -r configure.ac configure aclocal.m4 build/config.status && " +
-        "find . -name Makefile.in -not -path './build/*' -exec touch -r configure.ac {} +",
+        "find . -not -path './build/*' -not -path './.git/*' -newer configure.ac -exec touch -r configure.ac {} +",
     ],
     cwd: Deno.cwd(),
   }).spawn().status
