@@ -16,14 +16,19 @@ export default async function langSpellerTest() {
   // Artifact downloads give each file the current timestamp, so later-downloaded
   // files appear newer than earlier ones. This causes make to see false staleness
   // and trigger the autotools cascade (autoconf, automake, config.status).
-  // Fix: set configure, aclocal.m4, and all Makefile.in files to match
-  // build/config.status's timestamp, which is logically the end of the chain
-  // (aclocal.m4 → configure → config.status → Makefile).
+  //
+  // Fix: set all autotools-generated source files to the timestamp of configure.ac
+  // (a committed file with T_checkout). Since T_checkout < T_download for all
+  // build/ artifacts, the generated source files will always appear older than
+  // the build outputs, and no cascade can fire regardless of download ordering.
+  //
+  // The chains are: configure.ac → aclocal.m4 → configure → config.status → Makefile
+  //                Makefile.am → Makefile.in → Makefile
   await new Deno.Command("bash", {
     args: [
       "-c",
-      "touch -r build/config.status configure aclocal.m4 && " +
-        "find . -name Makefile.in -not -path './build/*' -exec touch -r build/config.status {} +",
+      "touch -r configure.ac configure aclocal.m4 build/config.status && " +
+      "find . -name Makefile.in -not -path './build/*' -exec touch -r configure.ac {} +",
     ],
     cwd: Deno.cwd(),
   }).spawn().status
