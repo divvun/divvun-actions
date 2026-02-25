@@ -133,6 +133,7 @@ export default async function langGrammarBuild(
   await setupGiellaCoreDependencies()
 
   const flags = deriveAutogenFlags(buildConfig)
+  await builder.setMetadata("grammar-configure-flags", flags.join(" "))
   const autotoolsBuilder = new Autotools(Deno.cwd())
 
   logger.debug(`Flags: ${flags}`)
