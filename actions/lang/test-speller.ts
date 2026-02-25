@@ -1,37 +1,43 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
+import { setupGiellaCoreDependencies } from "./common.ts"
 
 export default async function langSpellerTest() {
   logger.info("Downloading speller build artifacts for testing")
 
   await builder.downloadArtifacts("build/**/*", ".")
   await builder.downloadArtifacts("build/*", ".")
-  await builder.downloadArtifacts("build-aux/*", ".")
-  await builder.downloadArtifacts("aclocal.m4", ".")
-  await builder.downloadArtifacts("configure", ".")
-  await builder.downloadArtifacts("**/Makefile.in", ".")
-  await builder.downloadArtifacts("Makefile.in", ".")
 
-  // Artifact downloads give each file the current timestamp, so later-downloaded
-  // files appear newer than earlier ones. This causes make to see false staleness
-  // and trigger the autotools cascade (autoconf, automake, config.status).
-  //
-  // Fix: set all autotools-generated source files to the timestamp of configure.ac
-  // (a committed file with T_checkout). Since T_checkout < T_download for all
-  // build/ artifacts, the generated source files will always appear older than
-  // the build outputs, and no cascade can fire regardless of download ordering.
-  //
-  // The chains are:  configure.ac / m4/*.m4 → aclocal.m4 → configure → config.status → Makefile
-  //                 Makefile.am → Makefile.in → Makefile
-  await new Deno.Command("bash", {
-    args: [
-      "-c",
-      "touch -r configure.ac configure aclocal.m4 build/config.status && " +
-        "find . -not -path './build/*' -not -path './.git/*' -newer configure.ac -exec touch -r configure.ac {} +",
-    ],
+  await setupGiellaCoreDependencies()
+
+  // Re-run autogen.sh and configure on this agent to regenerate Makefiles with
+  // correct absolute paths. The compiled artifacts are already present so make
+  // will not recompile anything — it will only run the test suite.
+  logger.info("Running autogen.sh")
+  const autogenProc = new Deno.Command("bash", {
+    args: ["-c", "./autogen.sh"],
     cwd: Deno.cwd(),
-  }).spawn().status
+    stdout: "inherit",
+    stderr: "inherit",
+  }).spawn()
+  const autogenStatus = await autogenProc.status
+  if (autogenStatus.code !== 0) {
+    throw new Error(`autogen.sh failed with exit code ${autogenStatus.code}`)
+  }
+
+  const configureFlags = await builder.metadata("speller-configure-flags")
+  logger.info("Running configure")
+  const configureProc = new Deno.Command("bash", {
+    args: ["-c", `../configure ${configureFlags}`],
+    cwd: path.join(Deno.cwd(), "build"),
+    stdout: "inherit",
+    stderr: "inherit",
+  }).spawn()
+  const configureStatus = await configureProc.status
+  if (configureStatus.code !== 0) {
+    throw new Error(`configure failed with exit code ${configureStatus.code}`)
+  }
 
   logger.info("Running speller tests")
 
