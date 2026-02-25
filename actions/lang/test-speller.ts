@@ -11,12 +11,15 @@ export default async function langSpellerTest() {
   await builder.downloadArtifacts("aclocal.m4", ".")
   await builder.downloadArtifacts("configure", ".")
 
-  // aclocal.m4 is downloaded with the current timestamp, making it appear newer
-  // than the committed 'configure' (which has the git checkout timestamp). This
-  // causes make to trigger an autoconf → automake → config.status cascade on the
-  // test agent. Matching aclocal.m4's mtime to configure prevents this.
+  // Artifact downloads give each file the current timestamp, so later-downloaded
+  // files appear newer than earlier ones. This causes make to see:
+  //   aclocal.m4 > configure → run autoconf
+  //   configure > build/config.status → run config.status --recheck
+  // Fix: set configure and aclocal.m4 to match build/config.status, which was
+  // generated from configure during the build and is logically the newest in
+  // the autotools chain (aclocal.m4 → configure → config.status).
   await new Deno.Command("bash", {
-    args: ["-c", "touch -r configure aclocal.m4"],
+    args: ["-c", "touch -r build/config.status configure aclocal.m4"],
     cwd: Deno.cwd(),
   }).spawn().status
 
