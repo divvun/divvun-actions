@@ -10,6 +10,15 @@ export default async function langSpellerTest() {
   await builder.downloadArtifacts("build-aux/*", ".")
   await builder.downloadArtifacts("aclocal.m4", ".")
 
+  // aclocal.m4 is downloaded with the current timestamp, making it appear newer
+  // than the committed 'configure' (which has the git checkout timestamp). This
+  // causes make to trigger an autoconf → automake → config.status cascade on the
+  // test agent. Matching aclocal.m4's mtime to configure prevents this.
+  await new Deno.Command("bash", {
+    args: ["-c", "touch -r configure aclocal.m4"],
+    cwd: Deno.cwd(),
+  }).spawn().status
+
   logger.info("Running speller tests")
 
   // Run make check in the build directory
