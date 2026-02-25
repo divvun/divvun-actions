@@ -145,6 +145,7 @@ export default async function langSpellerBuild(
   await builder.uploadArtifacts("build/**/*")
   await builder.uploadArtifacts("build-aux/*")
   await builder.uploadArtifacts("aclocal.m4")
+  await builder.uploadArtifacts("configure")
 
   // Glob the zhfst files made available in the spellcheckers directory.
   // Associate their prefixes as their lang code.

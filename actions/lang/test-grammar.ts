@@ -9,6 +9,7 @@ export default async function langGrammarTest() {
   await builder.downloadArtifacts("build/*", ".")
   await builder.downloadArtifacts("build-aux/*", ".")
   await builder.downloadArtifacts("aclocal.m4", ".")
+  await builder.downloadArtifacts("configure", ".")
 
   // aclocal.m4 is downloaded with the current timestamp, making it appear newer
   // than the committed 'configure' (which has the git checkout timestamp). This
