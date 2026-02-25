@@ -25,10 +25,7 @@ import {
   runDivvunWorkerTtsPublish,
 } from "./pipelines/divvun-worker-tts.ts"
 import { pipelineBox, runBoxPublish } from "./pipelines/box.ts"
-import {
-  pipelineBorealium,
-  runBorealiumDeploy,
-} from "./pipelines/borealium.ts"
+import { pipelineBorealium, runBorealiumDeploy } from "./pipelines/borealium.ts"
 import {
   pipelineDivvunspell,
   runLibdivvunspellPublish,

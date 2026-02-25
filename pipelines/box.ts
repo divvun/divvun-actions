@@ -5,7 +5,7 @@ import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
-import { Tar, Zip, versionAsDev } from "~/util/shared.ts"
+import { Tar, versionAsDev, Zip } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
 const TARGETS = [
@@ -93,7 +93,9 @@ export function pipelineBox(): BuildkitePipeline {
   return pipeline
 }
 
-function muslCrossEnv(target: string): { env: Record<string, string> } | Record<string, never> {
+function muslCrossEnv(
+  target: string,
+): { env: Record<string, string> } | Record<string, never> {
   if (target === "aarch64-unknown-linux-musl") {
     const sysroot = "/opt/sysroot-aarch64"
     const linkerArgs = [
