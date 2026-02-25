@@ -7,6 +7,7 @@ export default async function langGrammarTest() {
 
   // Download the build directory artifacts from the grammar build step
   await builder.downloadArtifacts("build/**/*", ".")
+  await builder.downloadArtifacts("build/*", ".")
 
   logger.info("Running grammar checker tests")
 

@@ -7,6 +7,7 @@ export default async function langSpellerTest() {
 
   // Download the build directory artifacts from the speller build step
   await builder.downloadArtifacts("build/**/*", ".")
+  await builder.downloadArtifacts("build/*", ".")
 
   logger.info("Running speller tests")
 
