@@ -138,12 +138,12 @@ export default async function langSpellerBuild(
 
   const flags = deriveAutogenFlags(buildConfig)
   await builder.setMetadata("speller-configure-flags", flags.join(" "))
-
   const autotoolsBuilder = new Autotools(Deno.cwd())
 
   logger.debug(`Flags: ${flags}`)
   await autotoolsBuilder.build(flags)
 
+  // Upload the build directory
   await builder.uploadArtifacts("build/**/*")
 
   // Glob the zhfst files made available in the spellcheckers directory.

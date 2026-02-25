@@ -6,6 +6,7 @@ import { setupGiellaCoreDependencies } from "./common.ts"
 export default async function langGrammarTest() {
   logger.info("Downloading grammar checker build artifacts for testing")
 
+  // Download the build directory artifacts from the grammar build step
   await builder.downloadArtifacts("build/**/*", ".")
   await builder.downloadArtifacts("build/*", ".")
 

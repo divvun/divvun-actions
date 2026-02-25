@@ -6,6 +6,7 @@ import { setupGiellaCoreDependencies } from "./common.ts"
 export default async function langSpellerTest() {
   logger.info("Downloading speller build artifacts for testing")
 
+  // Download the build directory artifacts from the speller build step
   await builder.downloadArtifacts("build/**/*", ".")
   await builder.downloadArtifacts("build/*", ".")
 
