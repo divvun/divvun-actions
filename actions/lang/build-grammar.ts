@@ -73,6 +73,7 @@ function deriveAutogenFlags(config: BuildProps) {
   const flags = [
     "--without-forrest",
     "--disable-silent-rules",
+    "--disable-maintainer-mode",
   ]
 
   if (config.generators) {
