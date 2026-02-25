@@ -5,9 +5,10 @@ import logger from "~/util/log.ts"
 export default async function langSpellerTest() {
   logger.info("Downloading speller build artifacts for testing")
 
-  // Download the build directory artifacts from the speller build step
   await builder.downloadArtifacts("build/**/*", ".")
   await builder.downloadArtifacts("build/*", ".")
+  await builder.downloadArtifacts("build-aux/*", ".")
+  await builder.downloadArtifacts("aclocal.m4", ".")
 
   logger.info("Running speller tests")
 
