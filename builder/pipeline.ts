@@ -385,12 +385,6 @@ export type CommandStep = BaseStep & {
   soft_fail?: boolean | SoftFailConfig[]
   /** The higher the priority, the higher the priority. */
   priority?: number
-  /**
-   * Whether to skip the git checkout for this step. Use "skip" to disable checkout entirely.
-   * Useful when the step retrieves its workspace from artifacts rather than git.
-   * @example "skip"
-   */
-  checkout?: boolean | "skip"
 }
 
 /**
