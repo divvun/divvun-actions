@@ -41,35 +41,41 @@ export async function setupGiellaCoreDependencies(): Promise<void> {
   }
 }
 
+export async function downloadAndExtractSpellerSnapshot(): Promise<void> {
+  // Download the workspace snapshot produced by the speller-build step and
+  // extract it. tar -p restores mtimes, so make sees build artifacts as newer
+  // than sources and will not attempt to recompile anything.
+  await builder.downloadArtifacts("workspace-speller.tar.gz", ".")
+  logger.info("Extracting speller workspace snapshot")
+  const extractProc = new Deno.Command("tar", {
+    args: ["-xpf", "workspace-speller.tar.gz"],
+    cwd: Deno.cwd(),
+    stdout: "inherit",
+    stderr: "inherit",
+  }).spawn()
+  const extractStatus = await extractProc.status
+  if (extractStatus.code !== 0) {
+    throw new Error(
+      `tar extraction failed with exit code ${extractStatus.code}`,
+    )
+  }
+  await Deno.remove("workspace-speller.tar.gz")
+}
+
 export async function runLangTests(opts: {
   metadataKey: string
   label: string
 }) {
   const { metadataKey, label } = opts
 
-  logger.info(`Downloading ${label} build artifacts for testing`)
-
-  // Download the build directory artifacts from the build step
-  await builder.downloadArtifacts("build/**/*", ".")
-  await builder.downloadArtifacts("build/*", ".")
+  logger.info(`Downloading ${label} workspace snapshot`)
+  await downloadAndExtractSpellerSnapshot()
 
   await setupGiellaCoreDependencies()
 
-  // Re-run autogen.sh and configure on this agent to regenerate Makefiles with
-  // correct absolute paths. The compiled artifacts are already present so make
-  // will not recompile anything — it will only run the test suite.
-  logger.info("Running autogen.sh")
-  const autogenProc = new Deno.Command("bash", {
-    args: ["-c", "./autogen.sh"],
-    cwd: Deno.cwd(),
-    stdout: "inherit",
-    stderr: "inherit",
-  }).spawn()
-  const autogenStatus = await autogenProc.status
-  if (autogenStatus.code !== 0) {
-    throw new Error(`autogen.sh failed with exit code ${autogenStatus.code}`)
-  }
-
+  // Re-run configure (not autogen) to regenerate Makefiles with the correct
+  // absolute paths for this agent. The compiled artifacts already have their
+  // original mtimes from the build machine, so make will not recompile them.
   const configureFlags = await builder.metadata(metadataKey)
   logger.info("Running configure")
   const configureProc = new Deno.Command("bash", {

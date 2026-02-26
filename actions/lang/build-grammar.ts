@@ -2,7 +2,7 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
-import { setupGiellaCoreDependencies } from "./common.ts"
+import { downloadAndExtractSpellerSnapshot, setupGiellaCoreDependencies } from "./common.ts"
 
 class Autotools {
   private directory: string
@@ -126,9 +126,10 @@ export default async function langGrammarBuild(
   logger.info("Building grammar checkers")
   logger.info(JSON.stringify(buildConfig, null, 2))
 
-  // Download speller artifacts first (grammar checkers depend on them)
-  logger.info("Downloading speller build artifacts...")
-  await builder.downloadArtifacts("build/**/*", ".")
+  // Download and extract the speller workspace snapshot so that speller
+  // artifacts are present with their original mtimes before we configure and
+  // build. This prevents make from trying to rebuild speller targets.
+  await downloadAndExtractSpellerSnapshot()
 
   await setupGiellaCoreDependencies()
 
