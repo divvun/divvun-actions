@@ -153,6 +153,7 @@ export default async function langSpellerBuild(
       "-cpf",
       "../workspace-speller.tar.gz",
       "--exclude=./.git",
+      "--exclude=./build/docs",
       ".",
     ],
     cwd: Deno.cwd(),
