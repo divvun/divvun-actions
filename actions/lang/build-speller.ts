@@ -149,10 +149,11 @@ export default async function langSpellerBuild(
   logger.info("Creating workspace snapshot tarball")
   const tarProc = new Deno.Command("tar", {
     args: [
-      "--zstd",
+      "-I", "gzip -1",
       "-cpf",
-      "../workspace-speller.tar.zst",
+      "../workspace-speller.tar.gz",
       "--exclude=./.git",
+      "--exclude=./build/docs",
       ".",
     ],
     cwd: Deno.cwd(),
@@ -163,7 +164,7 @@ export default async function langSpellerBuild(
   if (tarStatus.code !== 0) {
     throw new Error(`tar failed with exit code ${tarStatus.code}`)
   }
-  await builder.uploadArtifacts("workspace-speller.tar.zst", {
+  await builder.uploadArtifacts("workspace-speller.tar.gz", {
     cwd: path.resolve(Deno.cwd(), ".."),
   })
 

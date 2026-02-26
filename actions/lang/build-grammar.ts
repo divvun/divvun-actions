@@ -130,10 +130,10 @@ export default async function langGrammarBuild(
   // artifacts are present with their original mtimes before we configure and
   // build. This prevents make from trying to rebuild speller targets.
   logger.info("Downloading speller workspace snapshot...")
-  await builder.downloadArtifacts("workspace-speller.tar.zst", ".")
+  await builder.downloadArtifacts("workspace-speller.tar.gz", ".")
   logger.info("Extracting speller workspace snapshot")
   const extractProc = new Deno.Command("tar", {
-    args: ["-xpf", "workspace-speller.tar.zst"],
+    args: ["-xpf", "workspace-speller.tar.gz"],
     cwd: Deno.cwd(),
     stdout: "inherit",
     stderr: "inherit",
@@ -144,7 +144,7 @@ export default async function langGrammarBuild(
       `tar extraction failed with exit code ${extractStatus.code}`,
     )
   }
-  await Deno.remove("workspace-speller.tar.zst")
+  await Deno.remove("workspace-speller.tar.gz")
 
   await setupGiellaCoreDependencies()
 
