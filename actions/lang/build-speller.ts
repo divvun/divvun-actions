@@ -168,8 +168,6 @@ export default async function langSpellerBuild(
     cwd: path.resolve(Deno.cwd(), ".."),
   })
 
-  // Upload .zhfst files individually — consumed by the bundle steps which run
-  // on Windows and macOS agents where extracting a Linux workspace tar is awkward.
   await builder.uploadArtifacts("build/tools/spellcheckers/*.zhfst")
 
   // Glob the zhfst files made available in the spellcheckers directory.
