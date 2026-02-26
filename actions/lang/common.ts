@@ -51,10 +51,10 @@ export async function runLangTests(opts: {
   // tar -p restores mtimes, so make sees build artifacts as newer than sources
   // and will not attempt to recompile anything.
   logger.info(`Downloading ${label} workspace snapshot`)
-  await builder.downloadArtifacts("workspace-speller.tar.gz", ".")
+  await builder.downloadArtifacts("workspace-speller.tar.zst", ".")
   logger.info("Extracting workspace snapshot")
   const extractProc = new Deno.Command("tar", {
-    args: ["-xzpf", "workspace-speller.tar.gz"],
+    args: ["-xpf", "workspace-speller.tar.zst"],
     cwd: Deno.cwd(),
     stdout: "inherit",
     stderr: "inherit",
@@ -65,7 +65,7 @@ export async function runLangTests(opts: {
       `tar extraction failed with exit code ${extractStatus.code}`,
     )
   }
-  await Deno.remove("workspace-speller.tar.gz")
+  await Deno.remove("workspace-speller.tar.zst")
 
   await setupGiellaCoreDependencies()
 

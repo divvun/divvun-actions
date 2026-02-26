@@ -148,7 +148,13 @@ export default async function langSpellerBuild(
   // avoids conflicts when the downstream step has already done a git checkout.
   logger.info("Creating workspace snapshot tarball")
   const tarProc = new Deno.Command("tar", {
-    args: ["-czpf", "../workspace-speller.tar.gz", "--exclude=./.git", "."],
+    args: [
+      "--zstd",
+      "-cpf",
+      "../workspace-speller.tar.zst",
+      "--exclude=./.git",
+      ".",
+    ],
     cwd: Deno.cwd(),
     stdout: "inherit",
     stderr: "inherit",
@@ -157,7 +163,7 @@ export default async function langSpellerBuild(
   if (tarStatus.code !== 0) {
     throw new Error(`tar failed with exit code ${tarStatus.code}`)
   }
-  await builder.uploadArtifacts("workspace-speller.tar.gz", {
+  await builder.uploadArtifacts("workspace-speller.tar.zst", {
     cwd: path.resolve(Deno.cwd(), ".."),
   })
 
