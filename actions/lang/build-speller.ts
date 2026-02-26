@@ -149,7 +149,8 @@ export default async function langSpellerBuild(
   logger.info("Creating workspace snapshot tarball")
   const tarProc = new Deno.Command("tar", {
     args: [
-      "-I", "gzip -1",
+      "-I",
+      "gzip -1",
       "-cpf",
       "../workspace-speller.tar.gz",
       "--exclude=./.git",
