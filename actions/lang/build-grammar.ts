@@ -2,7 +2,7 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
-import { setupGiellaCoreDependencies } from "./common.ts"
+import { downloadAndExtractSpellerSnapshot, setupGiellaCoreDependencies } from "./common.ts"
 
 class Autotools {
   private directory: string
@@ -129,22 +129,7 @@ export default async function langGrammarBuild(
   // Download and extract the speller workspace snapshot so that speller
   // artifacts are present with their original mtimes before we configure and
   // build. This prevents make from trying to rebuild speller targets.
-  logger.info("Downloading speller workspace snapshot...")
-  await builder.downloadArtifacts("workspace-speller.tar.gz", ".")
-  logger.info("Extracting speller workspace snapshot")
-  const extractProc = new Deno.Command("tar", {
-    args: ["-xpf", "workspace-speller.tar.gz"],
-    cwd: Deno.cwd(),
-    stdout: "inherit",
-    stderr: "inherit",
-  }).spawn()
-  const extractStatus = await extractProc.status
-  if (extractStatus.code !== 0) {
-    throw new Error(
-      `tar extraction failed with exit code ${extractStatus.code}`,
-    )
-  }
-  await Deno.remove("workspace-speller.tar.gz")
+  await downloadAndExtractSpellerSnapshot()
 
   await setupGiellaCoreDependencies()
 

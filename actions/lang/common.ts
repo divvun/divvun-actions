@@ -41,18 +41,12 @@ export async function setupGiellaCoreDependencies(): Promise<void> {
   }
 }
 
-export async function runLangTests(opts: {
-  metadataKey: string
-  label: string
-}) {
-  const { metadataKey, label } = opts
-
-  // Download the workspace snapshot produced by the build step and extract it.
-  // tar -p restores mtimes, so make sees build artifacts as newer than sources
-  // and will not attempt to recompile anything.
-  logger.info(`Downloading ${label} workspace snapshot`)
+export async function downloadAndExtractSpellerSnapshot(): Promise<void> {
+  // Download the workspace snapshot produced by the speller-build step and
+  // extract it. tar -p restores mtimes, so make sees build artifacts as newer
+  // than sources and will not attempt to recompile anything.
   await builder.downloadArtifacts("workspace-speller.tar.gz", ".")
-  logger.info("Extracting workspace snapshot")
+  logger.info("Extracting speller workspace snapshot")
   const extractProc = new Deno.Command("tar", {
     args: ["-xpf", "workspace-speller.tar.gz"],
     cwd: Deno.cwd(),
@@ -66,6 +60,16 @@ export async function runLangTests(opts: {
     )
   }
   await Deno.remove("workspace-speller.tar.gz")
+}
+
+export async function runLangTests(opts: {
+  metadataKey: string
+  label: string
+}) {
+  const { metadataKey, label } = opts
+
+  logger.info(`Downloading ${label} workspace snapshot`)
+  await downloadAndExtractSpellerSnapshot()
 
   await setupGiellaCoreDependencies()
 
