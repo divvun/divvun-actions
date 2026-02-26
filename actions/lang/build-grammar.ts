@@ -126,9 +126,25 @@ export default async function langGrammarBuild(
   logger.info("Building grammar checkers")
   logger.info(JSON.stringify(buildConfig, null, 2))
 
-  // Download speller artifacts first (grammar checkers depend on them)
-  logger.info("Downloading speller build artifacts...")
-  await builder.downloadArtifacts("build/**/*", ".")
+  // Download and extract the speller workspace snapshot so that speller
+  // artifacts are present with their original mtimes before we configure and
+  // build. This prevents make from trying to rebuild speller targets.
+  logger.info("Downloading speller workspace snapshot...")
+  await builder.downloadArtifacts("workspace-speller.tar.gz", ".")
+  logger.info("Extracting speller workspace snapshot")
+  const extractProc = new Deno.Command("tar", {
+    args: ["-xzpf", "workspace-speller.tar.gz"],
+    cwd: Deno.cwd(),
+    stdout: "inherit",
+    stderr: "inherit",
+  }).spawn()
+  const extractStatus = await extractProc.status
+  if (extractStatus.code !== 0) {
+    throw new Error(
+      `tar extraction failed with exit code ${extractStatus.code}`,
+    )
+  }
+  await Deno.remove("workspace-speller.tar.gz")
 
   await setupGiellaCoreDependencies()
 
