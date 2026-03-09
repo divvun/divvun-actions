@@ -101,7 +101,7 @@ export function pipelineDivvunspell() {
 
   let isPublishLib = false
 
-  if (builder.env.tag?.startsWith("libdivvunspell/v")) {
+  if (builder.env.tag?.startsWith("libdivvun-fst-ffi/v")) {
     isPublishLib = true
   }
 
@@ -151,13 +151,13 @@ export function pipelineDivvunspell() {
           label: arch,
           command: [
             `${cmd} ${args.join(" ")}`,
-            `mv target/${arch}/release/divvunspell.dll divvunspell-${arch}.dll`,
-            `buildkite-agent artifact upload divvunspell-${arch}.dll`,
+            `mv target/${arch}/release/divvun_fst_ffi.dll divvun_fst_ffi-${arch}.dll`,
+            `buildkite-agent artifact upload divvun_fst_ffi-${arch}.dll`,
           ],
         }))
       } else {
         const ext = os === "linux" ? "so" : "dylib"
-        const libName = `libdivvunspell-${arch}.${ext}`
+        const libName = `libdivvun_fst_ffi-${arch}.${ext}`
 
         let stripCmd
         if (arch.includes("android")) {
@@ -173,7 +173,7 @@ export function pipelineDivvunspell() {
 
         const commands = [
           `${cmd} ${args.join(" ")}`,
-          `mv target/${arch}/release/libdivvunspell.${ext} ${libName}`,
+          `mv target/${arch}/release/libdivvun_fst_ffi.${ext} ${libName}`,
           stripCmd ? `${stripCmd} ${libName}` : undefined,
           `buildkite-agent artifact upload ${libName}`,
         ].filter((c) => c !== undefined) as string[]
@@ -210,7 +210,7 @@ export function pipelineDivvunspell() {
   if (isPublishLib) {
     pipeline.steps.push(command({
       label: "Publish",
-      command: "divvun-actions run libdivvunspell-publish",
+      command: "divvun-actions run libdivvun-fst-ffi-publish",
       agents: {
         queue: "linux",
       },
@@ -221,26 +221,26 @@ export function pipelineDivvunspell() {
   return pipeline
 }
 
-export async function runLibdivvunspellPublish() {
+export async function runLibdivvunFstFfiPublish() {
   if (!builder.env.tag) {
-    throw new Error("No tag found, cannot publish libdivvunspell")
+    throw new Error("No tag found, cannot publish libdivvun-fst-ffi")
   }
 
-  if (!builder.env.tag.startsWith("libdivvunspell/v")) {
+  if (!builder.env.tag.startsWith("libdivvun-fst-ffi/v")) {
     throw new Error(
-      `Tag ${builder.env.tag} does not start with libdivvunspell/v, cannot publish libdivvunspell`,
+      `Tag ${builder.env.tag} does not start with libdivvun-fst-ffi/v, cannot publish libdivvun-fst-ffi`,
     )
   }
 
   if (!builder.env.repo) {
-    throw new Error("No repo found, cannot publish libdivvunspell")
+    throw new Error("No repo found, cannot publish libdivvun-fst-ffi")
   }
 
   using tempDir = await makeTempDir()
-  await builder.downloadArtifacts(`libdivvunspell-*`, tempDir.path)
-  await builder.downloadArtifacts(`divvunspell-*`, tempDir.path)
+  await builder.downloadArtifacts(`libdivvun_fst_ffi-*`, tempDir.path)
+  await builder.downloadArtifacts(`divvun_fst_ffi-*`, tempDir.path)
 
-  using archivePath = await makeTempDir({ prefix: "libdivvunspell-" })
+  using archivePath = await makeTempDir({ prefix: "libdivvun-fst-ffi-" })
   const [_tag, version] = builder.env.tag.split("/")
 
   const artifacts = []
@@ -249,12 +249,12 @@ export async function runLibdivvunspellPublish() {
     for (const target of targets) {
       const libExt = os === "linux" ? "so" : os === "macos" ? "dylib" : "dll"
       const libFileName = os === "windows"
-        ? `divvunspell.dll`
-        : `libdivvunspell.${libExt}`
+        ? `divvun_fst_ffi.dll`
+        : `libdivvun_fst_ffi.${libExt}`
 
       const artifactName = `${
         os === "windows" ? "" : "lib"
-      }divvunspell-${target}.${libExt}`
+      }divvun_fst_ffi-${target}.${libExt}`
       const inputPath = `${tempDir.path}/${artifactName}`
 
       const archiveFilePath = tempDir.path + "/" + target
@@ -264,7 +264,7 @@ export async function runLibdivvunspellPublish() {
 
       const ext = os === "windows" ? "zip" : "tgz"
       const outPath =
-        `${archivePath.path}/libdivvunspell-${target}-${version}.${ext}`
+        `${archivePath.path}/libdivvun-fst-ffi-${target}-${version}.${ext}`
 
       if (ext === "zip") {
         await Zip.create([libPath], outPath)
@@ -287,7 +287,7 @@ export async function runLibdivvunspellPublish() {
   const androidPackagePaths: string[] = []
   const hasAndroidArtifacts = androidArchs.every((arch) => {
     // Look for the packaged tgz instead of raw .so files
-    const packageName = `libdivvunspell-${arch}-${version}.tgz`
+    const packageName = `libdivvun-fst-ffi-${arch}-${version}.tgz`
     const packagePath = `${archivePath.path}/${packageName}`
     try {
       const stat = Deno.statSync(packagePath)
@@ -321,11 +321,11 @@ export async function runLibdivvunspellPublish() {
       logger.info(`Extracting ${packagePath}`)
       await Tar.extractTar(packagePath, tempExtractDir.path)
 
-      const libPath = `${tempExtractDir.path}/lib/libdivvunspell.so`
+      const libPath = `${tempExtractDir.path}/lib/libdivvun_fst_ffi.so`
       const targetDir = arch === "aarch64-linux-android"
         ? "arm64-v8a"
         : "armeabi-v7a"
-      const targetPath = `${jniLibsDir}/${targetDir}/libdivvunspell.so`
+      const targetPath = `${jniLibsDir}/${targetDir}/libdivvun_fst_ffi.so`
 
       logger.info(`Copying extracted lib: ${libPath} -> ${targetPath}`)
       await Deno.copyFile(libPath, targetPath)
@@ -340,7 +340,7 @@ export async function runLibdivvunspellPublish() {
 
     // Create Android package tgz
     const androidPackagePath =
-      `${archivePath.path}/libdivvunspell-android-jniLibs-${version}.tgz`
+      `${archivePath.path}/libdivvun-fst-ffi-android-jniLibs-${version}.tgz`
     logger.info(`Creating Android package: ${androidPackagePath}`)
     await Tar.createFlatTgz([jniLibsDir], androidPackagePath)
 
