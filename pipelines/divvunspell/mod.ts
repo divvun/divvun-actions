@@ -38,6 +38,8 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
         "--target",
         arch,
         "build",
+        "-p",
+        "divvun-fst-ffi",
         "--lib",
         "--release",
         "-v",
@@ -50,6 +52,8 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
       cmd: "cross",
       args: [
         "build",
+        "-p",
+        "divvun-fst-ffi",
         "--lib",
         "--release",
         "--target",
@@ -63,6 +67,8 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
     args: [
       "build",
       "--lib",
+      "-p",
+      "divvun-fst-ffi",
       "--release",
       "--target",
       arch
