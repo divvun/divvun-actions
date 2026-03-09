@@ -40,8 +40,6 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
         "build",
         "--lib",
         "--release",
-        "--features",
-        "internal_ffi",
         "-v",
       ],
     }
@@ -55,9 +53,7 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
         "--lib",
         "--release",
         "--target",
-        arch,
-        "--features",
-        "internal_ffi",
+        arch
       ],
     }
   }
@@ -69,9 +65,7 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
       "--lib",
       "--release",
       "--target",
-      arch,
-      "--features",
-      "internal_ffi",
+      arch
     ],
   }
 }
