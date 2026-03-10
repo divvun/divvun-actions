@@ -5,7 +5,6 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import logger from "~/util/log.ts"
-import { Security } from "~/util/security.ts"
 import { makeTempDir, makeTempFile } from "~/util/temp.ts"
 
 const BUNDLE_ID = "no.uit.divvun.donate-your-speech"
@@ -50,37 +49,11 @@ export function pipelineDonateSpeech(): BuildkitePipeline {
 
 export async function runDonateSpeechBuildIOS() {
   const secrets = await builder.secrets()
+  const apiKey = JSON.parse(secrets.get("macos/appStoreKeyJson"))
 
-  await builder.group("Setting up signing", async () => {
-    await Security.unlockKeychain("login", secrets.get("macos/adminPassword"))
-
-    using appStoreKeyJsonPath = await makeTempFile({ suffix: ".json" })
-    await Deno.writeTextFile(
-      appStoreKeyJsonPath.path,
-      secrets.get("macos/appStoreKeyJson"),
-    )
-
-    // Run fastlane match to download certs and provisioning profiles
-    await builder.exec("fastlane", [
-      "match",
-      "appstore",
-      "--app_identifier",
-      BUNDLE_ID,
-      "--readonly",
-      "true",
-    ], {
-      env: {
-        GITHUB_USERNAME: secrets.get("github/username"),
-        GITHUB_TOKEN: secrets.get("github/token"),
-        MATCH_GIT_URL: secrets.get("ios/matchGitUrl"),
-        MATCH_PASSWORD: secrets.get("ios/matchPassword"),
-        MATCH_KEYCHAIN_NAME: "login.keychain",
-        MATCH_KEYCHAIN_PASSWORD: secrets.get("macos/adminPassword"),
-        APP_STORE_KEY_JSON: appStoreKeyJsonPath.path,
-        LANG: "en_US.UTF-8",
-      },
-    })
-  })
+  // Write the App Store Connect API private key to a .p8 file
+  using apiKeyFile = await makeTempFile({ suffix: ".p8" })
+  await Deno.writeTextFile(apiKeyFile.path, apiKey.key)
 
   await builder.group("Installing dependencies", async () => {
     await builder.exec("pnpm", ["install", "--frozen-lockfile"])
@@ -89,8 +62,6 @@ export async function runDonateSpeechBuildIOS() {
   await builder.group("Initializing iOS project", async () => {
     await builder.exec("pnpm", ["tauri", "ios", "init"])
   })
-
-  const provisioningProfile = `match AppStore ${BUNDLE_ID}`
 
   await builder.group("Building iOS app", async () => {
     await builder.exec("pnpm", [
@@ -101,14 +72,11 @@ export async function runDonateSpeechBuildIOS() {
       "app-store-connect",
       "--config",
       "src-tauri/tauri.conf.release.json",
-      "--",
-      `CODE_SIGN_STYLE=Manual`,
-      `CODE_SIGN_IDENTITY=iPhone Distribution`,
-      `PROVISIONING_PROFILE_SPECIFIER=${provisioningProfile}`,
-      `DEVELOPMENT_TEAM=${secrets.get("macos/teamId")}`,
     ], {
       env: {
-        APPLE_DEVELOPMENT_TEAM: secrets.get("macos/teamId"),
+        APPLE_API_KEY: apiKey.key_id,
+        APPLE_API_ISSUER: apiKey.issuer_id,
+        APPLE_API_KEY_PATH: apiKeyFile.path,
       },
     })
   })
