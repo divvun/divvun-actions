@@ -86,6 +86,10 @@ export async function runDonateSpeechBuildIOS() {
     await builder.exec("pnpm", ["install", "--frozen-lockfile"])
   })
 
+  await builder.group("Initializing iOS project", async () => {
+    await builder.exec("pnpm", ["tauri", "ios", "init"])
+  })
+
   await builder.group("Building iOS app", async () => {
     await builder.exec("pnpm", [
       "tauri",
@@ -93,7 +97,11 @@ export async function runDonateSpeechBuildIOS() {
       "build",
       "--config",
       "src-tauri/tauri.conf.release.json",
-    ])
+    ], {
+      env: {
+        APPLE_DEVELOPMENT_TEAM: secrets.get("macos/teamId"),
+      },
+    })
   })
 
   await builder.group("Uploading artifacts", async () => {
