@@ -57,7 +57,7 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
         "--lib",
         "--release",
         "--target",
-        arch
+        arch,
       ],
     }
   }
@@ -71,7 +71,7 @@ function buildLib(arch: string): { cmd: string; args: string[] } {
       "divvun-fst-ffi",
       "--release",
       "--target",
-      arch
+      arch,
     ],
   }
 }
