@@ -90,13 +90,22 @@ export async function runDonateSpeechBuildIOS() {
     await builder.exec("pnpm", ["tauri", "ios", "init"])
   })
 
+  const provisioningProfile = `match AppStore ${BUNDLE_ID}`
+
   await builder.group("Building iOS app", async () => {
     await builder.exec("pnpm", [
       "tauri",
       "ios",
       "build",
+      "--export-method",
+      "app-store-connect",
       "--config",
       "src-tauri/tauri.conf.release.json",
+      "--",
+      `CODE_SIGN_STYLE=Manual`,
+      `CODE_SIGN_IDENTITY=iPhone Distribution`,
+      `PROVISIONING_PROFILE_SPECIFIER=${provisioningProfile}`,
+      `DEVELOPMENT_TEAM=${secrets.get("macos/teamId")}`,
     ], {
       env: {
         APPLE_DEVELOPMENT_TEAM: secrets.get("macos/teamId"),
