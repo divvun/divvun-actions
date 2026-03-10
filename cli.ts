@@ -469,7 +469,7 @@ async function runCi(_args: any) {
       pipeline = pipelinePdfStrings()
       break
     }
-    case "donate-speech": {
+    case "Kielipankki-donatespeech-app": {
       pipeline = pipelineDonateSpeech()
       break
     }
