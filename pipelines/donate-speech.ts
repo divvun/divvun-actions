@@ -55,12 +55,6 @@ export async function runDonateSpeechBuildIOS() {
   using apiKeyFile = await makeTempFile({ suffix: ".p8" })
   await Deno.writeTextFile(apiKeyFile.path, apiKey.key)
 
-  // Log non-sensitive API key identifiers for debugging
-  logger.info(`App Store Connect API Key ID: ${apiKey.key_id}`)
-  logger.info(`App Store Connect API Issuer ID: ${apiKey.issuer_id}`)
-  logger.info(`API key file written to: ${apiKeyFile.path}`)
-  logger.info(`API key JSON keys: ${Object.keys(apiKey).join(", ")}`)
-
   await builder.group("Installing dependencies", async () => {
     await builder.exec("pnpm", ["install", "--frozen-lockfile"])
   })
@@ -83,6 +77,7 @@ export async function runDonateSpeechBuildIOS() {
         APPLE_API_KEY: apiKey.key_id,
         APPLE_API_ISSUER: apiKey.issuer_id,
         APPLE_API_KEY_PATH: apiKeyFile.path,
+        APPLE_DEVELOPMENT_TEAM: secrets.get("macos/teamId"),
       },
     })
   })
