@@ -257,18 +257,44 @@ async function findFile(pattern: string): Promise<string | null> {
   return null
 }
 
-// Decrypt a fastlane match v2 encrypted file (AES-256-GCM with PBKDF2).
-// Format: salt (8 bytes) | iv (12 bytes) | auth tag (16 bytes) | ciphertext
+// Decrypt a fastlane match encrypted file.
+// v2 format (binary): salt (8) | iv (12) | auth tag (16) | ciphertext — AES-256-GCM
+// v1 format (base64 text): openssl enc -aes-256-cbc output
 async function decryptMatchFile(
   data: Uint8Array,
   password: string,
+): Promise<Uint8Array> {
+  logger.info(`Encrypted file: ${data.byteLength} bytes, first bytes: ${Array.from(data.slice(0, 16)).map(b => b.toString(16).padStart(2, "0")).join(" ")}`)
+
+  // Check if this is v1 (base64-encoded openssl output) — text files start with printable ASCII
+  const isText = data.every(b => (b >= 0x20 && b <= 0x7e) || b === 0x0a || b === 0x0d)
+  if (isText) {
+    logger.info("Detected v1 (openssl CBC) format — decrypting with openssl")
+    return await decryptMatchV1(data, password)
+  }
+
+  // v2: try SHA-256 first, then SHA-1
+  for (const hash of ["SHA-256", "SHA-1"] as const) {
+    try {
+      return await decryptMatchV2(data, password, hash)
+    } catch {
+      logger.info(`v2 decryption with ${hash} failed, trying next...`)
+    }
+  }
+
+  throw new Error("Failed to decrypt match file with all methods (v2 SHA-256, v2 SHA-1, v1 openssl)")
+}
+
+async function decryptMatchV2(
+  data: Uint8Array,
+  password: string,
+  hash: "SHA-256" | "SHA-1",
 ): Promise<Uint8Array> {
   const salt = data.slice(0, 8)
   const iv = data.slice(8, 20)
   const authTag = data.slice(20, 36)
   const ciphertext = data.slice(36)
 
-  // Derive key using PBKDF2-SHA256
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
@@ -278,7 +304,7 @@ async function decryptMatchFile(
   )
 
   const key = await crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations: 10000, hash: "SHA-256" },
+    { name: "PBKDF2", salt, iterations: 10000, hash },
     keyMaterial,
     { name: "AES-GCM", length: 256 },
     false,
@@ -297,4 +323,28 @@ async function decryptMatchFile(
   )
 
   return new Uint8Array(decrypted)
+}
+
+async function decryptMatchV1(
+  data: Uint8Array,
+  password: string,
+): Promise<Uint8Array> {
+  // v1 is openssl enc -aes-256-cbc -k <password> -a -d
+  const child = new Deno.Command("openssl", {
+    args: ["enc", "-aes-256-cbc", "-d", "-a", "-k", password],
+    stdin: "piped",
+    stdout: "piped",
+    stderr: "piped",
+  }).spawn()
+
+  const writer = child.stdin.getWriter()
+  await writer.write(data)
+  await writer.close()
+
+  const output = await child.output()
+  if (!output.success) {
+    const stderr = new TextDecoder().decode(output.stderr)
+    throw new Error(`openssl decryption failed: ${stderr}`)
+  }
+  return output.stdout
 }
