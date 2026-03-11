@@ -204,42 +204,24 @@ async function setupSigningFromMatch(
     logger.info(`Exported certificate from keychain (${certData.length} bytes)`)
 
     // Find the provisioning profile installed by match.
-    // Match installs profiles as <UUID>.mobileprovision, so search by content.
+    // Match installs profiles as <UUID>.mobileprovision, so search for our
+    // bundle ID in the raw file content (it appears as a plain string).
     let profilePath: string | null = null
-    const profileFiles: string[] = []
     for await (const entry of Deno.readDir(profilesDir)) {
       if (!entry.name.endsWith(".mobileprovision")) continue
-      profileFiles.push(entry.name)
 
       const fullPath = path.join(profilesDir, entry.name)
-      const result = await new Deno.Command("security", {
-        args: ["cms", "-D", "-i", fullPath],
-        stdout: "piped",
-        stderr: "piped",
-      }).output()
-
-      if (!result.success) {
-        const stderr = new TextDecoder().decode(result.stderr)
-        logger.info(`security cms failed for ${entry.name}: ${stderr.trim()}`)
-        continue
-      }
-
-      const plist = new TextDecoder().decode(result.stdout)
-      // Look for the bundle ID in the profile's application-identifier
-      if (plist.includes(BUNDLE_ID)) {
+      const data = await Deno.readFile(fullPath)
+      const text = new TextDecoder("utf-8", { fatal: false }).decode(data)
+      if (text.includes(BUNDLE_ID)) {
         profilePath = fullPath
         break
-      } else {
-        // Log which app ID this profile is for (for debugging)
-        const appIdMatch = plist.match(/<key>application-identifier<\/key>\s*<string>([^<]+)<\/string>/)
-        logger.info(`Profile ${entry.name} is for: ${appIdMatch?.[1] ?? "unknown"}`)
       }
     }
 
     if (!profilePath) {
       throw new Error(
-        `No provisioning profile for ${BUNDLE_ID} found in ${profilesDir}. ` +
-        `Found ${profileFiles.length} profiles: ${profileFiles.join(", ")}`,
+        `No provisioning profile for ${BUNDLE_ID} found in ${profilesDir}`,
       )
     }
 
