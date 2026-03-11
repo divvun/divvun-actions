@@ -153,12 +153,7 @@ async function setupSigningFromMatch(
     const wwdrCertPath = await downloadAppleWWDRCA("G3")
     await Security.import(KEYCHAIN_NAME, wwdrCertPath)
 
-    const profilesDir = path.join(
-      Deno.env.get("HOME")!,
-      "Library/MobileDevice/Provisioning Profiles",
-    )
-
-    // Run fastlane match to install cert + provisioning profile
+    // Run fastlane match to install cert into keychain
     await builder.exec("fastlane", [
       "match",
       "appstore",
@@ -203,31 +198,53 @@ async function setupSigningFromMatch(
     const certificate = encodeBase64(certData)
     logger.info(`Exported certificate from keychain (${certData.length} bytes)`)
 
-    // Find the provisioning profile installed by match.
-    // Match installs profiles as <UUID>.mobileprovision, so search for our
-    // bundle ID in the raw file content (it appears as a plain string).
-    let profilePath: string | null = null
-    for await (const entry of Deno.readDir(profilesDir)) {
-      if (!entry.name.endsWith(".mobileprovision")) continue
+    // Decrypt the provisioning profile directly from the match git repo.
+    // Searching ~/Library/MobileDevice/Provisioning Profiles/ is unreliable
+    // on CI — the profile may not be installed there by match on all machines.
+    using matchParentDir = await makeTempDir()
+    const matchDir = path.join(matchParentDir.path, "match")
+    const matchGitUrl = secrets.get("ios/matchGitUrl")
+    const matchPassword = secrets.get("ios/matchPassword")
 
-      const fullPath = path.join(profilesDir, entry.name)
-      const data = await Deno.readFile(fullPath)
-      const text = new TextDecoder("utf-8", { fatal: false }).decode(data)
-      if (text.includes(BUNDLE_ID)) {
-        profilePath = fullPath
-        break
-      }
+    await builder.exec("git", ["clone", "--depth", "1", matchGitUrl, matchDir])
+
+    const encryptedProfilePath = path.join(
+      matchDir,
+      "profiles/appstore/AppStore_no.uit.divvun.donate-your-speech.mobileprovision",
+    )
+
+    try {
+      await Deno.stat(encryptedProfilePath)
+    } catch {
+      throw new Error(`Encrypted profile not found in match repo at: profiles/appstore/AppStore_no.uit.divvun.donate-your-speech.mobileprovision`)
     }
 
-    if (!profilePath) {
-      throw new Error(
-        `No provisioning profile for ${BUNDLE_ID} found in ${profilesDir}`,
-      )
+    const decryptResult = await new Deno.Command("ruby", {
+      args: [
+        "-e",
+        [
+          `require "fastlane"`,
+          `e = Match::Encryption::MatchDataEncryption.new`,
+          `$stdout.write(e.decrypt(File.binread(ARGV[0]), ARGV[1]))`,
+        ].join("; "),
+        encryptedProfilePath,
+        matchPassword,
+      ],
+      stdout: "piped",
+      stderr: "piped",
+    }).output()
+
+    if (!decryptResult.success) {
+      const stderr = new TextDecoder().decode(decryptResult.stderr)
+      throw new Error(`Failed to decrypt provisioning profile: ${stderr}`)
     }
 
-    logger.info(`Found provisioning profile: ${profilePath}`)
-    const profileData = await Deno.readFile(profilePath)
-    const mobileProvision = encodeBase64(profileData)
+    if (decryptResult.stdout.length === 0) {
+      throw new Error("Decrypted provisioning profile is empty")
+    }
+
+    logger.info(`Decrypted provisioning profile (${decryptResult.stdout.length} bytes)`)
+    const mobileProvision = encodeBase64(decryptResult.stdout)
 
     return { certificate, mobileProvision }
   } finally {
