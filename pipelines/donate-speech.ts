@@ -277,60 +277,41 @@ async function decryptMatchFile(
     logger.info("Detected match v2 (base64-wrapped AES-256-GCM) format")
     const payload = decoded.slice(MATCH_ENCRYPT_PREFIX.length)
 
-    // Try SHA-256 first, then SHA-1 for older repos
-    for (const hash of ["SHA-256", "SHA-1"] as const) {
-      try {
-        return await decryptMatchV2(payload, password, hash)
-      } catch {
-        logger.info(`v2 decryption with ${hash} failed, trying next...`)
-      }
-    }
-    throw new Error("Failed to decrypt match v2 file with both SHA-256 and SHA-1")
+    // v2 key = SHA-256(password), format: iv(12) + tag(16) + ciphertext
+    const iv = payload.slice(0, 12)
+    const authTag = payload.slice(12, 28)
+    const ciphertext = payload.slice(28)
+
+    const rawKey = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(password),
+    )
+
+    const key = await crypto.subtle.importKey(
+      "raw",
+      rawKey,
+      "AES-GCM",
+      false,
+      ["decrypt"],
+    )
+
+    // AES-GCM expects ciphertext + tag concatenated
+    const combined = new Uint8Array(ciphertext.length + authTag.length)
+    combined.set(ciphertext)
+    combined.set(authTag, ciphertext.length)
+
+    const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      key,
+      combined,
+    )
+
+    return new Uint8Array(decrypted)
   }
 
   // v1: raw openssl enc -aes-256-cbc -k <password> -a
   logger.info("Detected v1 (openssl CBC) format — decrypting with openssl")
   return await decryptMatchV1(data, password)
-}
-
-async function decryptMatchV2(
-  data: Uint8Array,
-  password: string,
-  hash: "SHA-256" | "SHA-1",
-): Promise<Uint8Array> {
-  const salt = data.slice(0, 8)
-  const iv = data.slice(8, 20)
-  const authTag = data.slice(20, 36)
-  const ciphertext = data.slice(36)
-
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveKey"],
-  )
-
-  const key = await crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations: 10000, hash },
-    keyMaterial,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["decrypt"],
-  )
-
-  // AES-GCM expects ciphertext + tag concatenated
-  const combined = new Uint8Array(ciphertext.length + authTag.length)
-  combined.set(ciphertext)
-  combined.set(authTag, ciphertext.length)
-
-  const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv },
-    key,
-    combined,
-  )
-
-  return new Uint8Array(decrypted)
 }
 
 async function decryptMatchV1(
