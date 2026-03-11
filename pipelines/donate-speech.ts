@@ -266,12 +266,14 @@ async function decryptMatchFile(
 ): Promise<Uint8Array> {
   const MATCH_ENCRYPT_PREFIX = "match_encrypt_v2"
 
-  // Detect format: v2 files are base64 text starting with "match_encrypt\n" when decoded
   const text = new TextDecoder().decode(data).replace(/\s/g, "")
   const decoded = decodeBase64(text)
-  const prefix = new TextDecoder().decode(decoded.slice(0, MATCH_ENCRYPT_PREFIX.length))
+  const prefixBytes = decoded.slice(0, 32)
+  const prefix = new TextDecoder().decode(prefixBytes)
+  logger.info(`Decoded ${decoded.byteLength} bytes, prefix: ${JSON.stringify(prefix.slice(0, 24))}`)
+  logger.info(`Prefix hex: ${Array.from(prefixBytes.slice(0, 24)).map(b => b.toString(16).padStart(2, "0")).join(" ")}`)
 
-  if (prefix === MATCH_ENCRYPT_PREFIX) {
+  if (prefix.startsWith(MATCH_ENCRYPT_PREFIX)) {
     logger.info("Detected match v2 (base64-wrapped AES-256-GCM) format")
     const payload = decoded.slice(MATCH_ENCRYPT_PREFIX.length)
 
