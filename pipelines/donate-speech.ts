@@ -219,32 +219,10 @@ async function setupSigningFromMatch(
       throw new Error(`Encrypted profile not found in match repo at: profiles/appstore/AppStore_no.uit.divvun.donate-your-speech.mobileprovision`)
     }
 
-    const decryptResult = await new Deno.Command("ruby", {
-      args: [
-        "-e",
-        [
-          `require "fastlane"`,
-          `e = Match::Encryption::MatchDataEncryption.new`,
-          `$stdout.write(e.decrypt(File.binread(ARGV[0]), ARGV[1]))`,
-        ].join("; "),
-        encryptedProfilePath,
-        matchPassword,
-      ],
-      stdout: "piped",
-      stderr: "piped",
-    }).output()
-
-    if (!decryptResult.success) {
-      const stderr = new TextDecoder().decode(decryptResult.stderr)
-      throw new Error(`Failed to decrypt provisioning profile: ${stderr}`)
-    }
-
-    if (decryptResult.stdout.length === 0) {
-      throw new Error("Decrypted provisioning profile is empty")
-    }
-
-    logger.info(`Decrypted provisioning profile (${decryptResult.stdout.length} bytes)`)
-    const mobileProvision = encodeBase64(decryptResult.stdout)
+    const encryptedData = await Deno.readFile(encryptedProfilePath)
+    const profileData = await decryptMatchFile(encryptedData, matchPassword)
+    logger.info(`Decrypted provisioning profile (${profileData.byteLength} bytes)`)
+    const mobileProvision = encodeBase64(profileData)
 
     return { certificate, mobileProvision }
   } finally {
@@ -277,4 +255,46 @@ async function findFile(pattern: string): Promise<string | null> {
     }
   }
   return null
+}
+
+// Decrypt a fastlane match v2 encrypted file (AES-256-GCM with PBKDF2).
+// Format: salt (8 bytes) | iv (12 bytes) | auth tag (16 bytes) | ciphertext
+async function decryptMatchFile(
+  data: Uint8Array,
+  password: string,
+): Promise<Uint8Array> {
+  const salt = data.slice(0, 8)
+  const iv = data.slice(8, 20)
+  const authTag = data.slice(20, 36)
+  const ciphertext = data.slice(36)
+
+  // Derive key using PBKDF2-SHA256
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"],
+  )
+
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: 10000, hash: "SHA-256" },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"],
+  )
+
+  // AES-GCM expects ciphertext + tag concatenated
+  const combined = new Uint8Array(ciphertext.length + authTag.length)
+  combined.set(ciphertext)
+  combined.set(authTag, ciphertext.length)
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    combined,
+  )
+
+  return new Uint8Array(decrypted)
 }
