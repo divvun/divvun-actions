@@ -1,3 +1,4 @@
+import { encodeBase64 } from "@std/encoding/base64"
 import * as fs from "@std/fs"
 import * as path from "@std/path"
 import { fastlanePilotUpload } from "~/actions/fastlane/pilot.ts"
@@ -5,7 +6,8 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import logger from "~/util/log.ts"
-import { makeTempDir, makeTempFile } from "~/util/temp.ts"
+import { makeTempDir } from "~/util/temp.ts"
+import type { SecretsStore } from "~/util/openbao.ts"
 
 const BUNDLE_ID = "no.uit.divvun.donate-your-speech"
 
@@ -49,11 +51,14 @@ export function pipelineDonateSpeech(): BuildkitePipeline {
 
 export async function runDonateSpeechBuildIOS() {
   const secrets = await builder.secrets()
-  const apiKey = JSON.parse(secrets.get("macos/appStoreKeyJson"))
 
-  // Write the App Store Connect API private key to a .p8 file
-  using apiKeyFile = await makeTempFile({ suffix: ".p8" })
-  await Deno.writeTextFile(apiKeyFile.path, apiKey.key)
+  let certificate: string
+  let mobileProvision: string
+  await builder.group("Fetching signing credentials from match", async () => {
+    const credentials = await fetchMatchCredentials(secrets)
+    certificate = credentials.certificate
+    mobileProvision = credentials.mobileProvision
+  })
 
   await builder.group("Installing dependencies", async () => {
     await builder.exec("pnpm", ["install", "--frozen-lockfile"])
@@ -74,10 +79,9 @@ export async function runDonateSpeechBuildIOS() {
       "src-tauri/tauri.conf.release.json",
     ], {
       env: {
-        APPLE_API_KEY: apiKey.key_id,
-        APPLE_API_ISSUER: apiKey.issuer_id,
-        APPLE_API_KEY_PATH: apiKeyFile.path,
-        APPLE_DEVELOPMENT_TEAM: secrets.get("macos/teamId"),
+        IOS_CERTIFICATE: certificate!,
+        IOS_CERTIFICATE_PASSWORD: "",
+        IOS_MOBILE_PROVISION: mobileProvision!,
       },
     })
   })
@@ -111,6 +115,74 @@ export async function runDonateSpeechDeployIOS() {
       ipaPath,
     })
   })
+}
+
+async function fetchMatchCredentials(secrets: SecretsStore): Promise<{
+  certificate: string
+  mobileProvision: string
+}> {
+  using matchDir = await makeTempDir()
+
+  // Clone the match repo
+  const matchGitUrl = secrets.get("ios/matchGitUrl")
+  await builder.exec("git", ["clone", "--depth", "1", matchGitUrl, matchDir.path])
+
+  // Find the distribution certificate .p12
+  const certDir = path.join(matchDir.path, "certs", "distribution")
+  let certPath: string | null = null
+  for await (const entry of fs.expandGlob(path.join(certDir, "*.p12"))) {
+    certPath = entry.path
+    break
+  }
+  if (!certPath) {
+    throw new Error("No distribution certificate found in match repo")
+  }
+
+  // Find the provisioning profile
+  const profilePath = path.join(
+    matchDir.path,
+    "profiles",
+    "appstore",
+    `AppStore_${BUNDLE_ID}.mobileprovision`,
+  )
+
+  const matchPassword = secrets.get("ios/matchPassword")
+  const decryptedCert = await decryptMatchFile(certPath, matchPassword)
+  const decryptedProfile = await decryptMatchFile(profilePath, matchPassword)
+
+  return {
+    certificate: encodeBase64(decryptedCert),
+    mobileProvision: encodeBase64(decryptedProfile),
+  }
+}
+
+async function decryptMatchFile(
+  filePath: string,
+  password: string,
+): Promise<Uint8Array> {
+  const output = await new Deno.Command("openssl", {
+    args: [
+      "enc",
+      "-aes-256-cbc",
+      "-d",
+      "-a",
+      "-md",
+      "md5",
+      "-pass",
+      `pass:${password}`,
+      "-in",
+      filePath,
+    ],
+    stdout: "piped",
+    stderr: "piped",
+  }).output()
+
+  if (!output.success) {
+    const stderr = new TextDecoder().decode(output.stderr)
+    throw new Error(`Failed to decrypt ${filePath}: ${stderr}`)
+  }
+
+  return output.stdout
 }
 
 async function findIpa(): Promise<string> {
