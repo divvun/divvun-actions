@@ -267,7 +267,7 @@ async function decryptMatchFile(
   const MATCH_ENCRYPT_PREFIX = "match_encrypt\n"
 
   // Detect format: v2 files are base64 text starting with "match_encrypt\n" when decoded
-  const text = new TextDecoder().decode(data)
+  const text = new TextDecoder().decode(data).replace(/\s/g, "")
   const decoded = decodeBase64(text)
   const prefix = new TextDecoder().decode(decoded.slice(0, MATCH_ENCRYPT_PREFIX.length))
 
