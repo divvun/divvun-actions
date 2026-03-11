@@ -206,8 +206,10 @@ async function setupSigningFromMatch(
     // Find the provisioning profile installed by match.
     // Match installs profiles as <UUID>.mobileprovision, so search by content.
     let profilePath: string | null = null
+    const profileFiles: string[] = []
     for await (const entry of Deno.readDir(profilesDir)) {
       if (!entry.name.endsWith(".mobileprovision")) continue
+      profileFiles.push(entry.name)
 
       const fullPath = path.join(profilesDir, entry.name)
       const result = await new Deno.Command("security", {
@@ -216,18 +218,28 @@ async function setupSigningFromMatch(
         stderr: "piped",
       }).output()
 
-      if (!result.success) continue
+      if (!result.success) {
+        const stderr = new TextDecoder().decode(result.stderr)
+        logger.info(`security cms failed for ${entry.name}: ${stderr.trim()}`)
+        continue
+      }
 
       const plist = new TextDecoder().decode(result.stdout)
+      // Look for the bundle ID in the profile's application-identifier
       if (plist.includes(BUNDLE_ID)) {
         profilePath = fullPath
         break
+      } else {
+        // Log which app ID this profile is for (for debugging)
+        const appIdMatch = plist.match(/<key>application-identifier<\/key>\s*<string>([^<]+)<\/string>/)
+        logger.info(`Profile ${entry.name} is for: ${appIdMatch?.[1] ?? "unknown"}`)
       }
     }
 
     if (!profilePath) {
       throw new Error(
-        `No provisioning profile for ${BUNDLE_ID} found in ${profilesDir}`,
+        `No provisioning profile for ${BUNDLE_ID} found in ${profilesDir}. ` +
+        `Found ${profileFiles.length} profiles: ${profileFiles.join(", ")}`,
       )
     }
 
