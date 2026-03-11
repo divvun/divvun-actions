@@ -1,4 +1,4 @@
-import { decodeBase64, encodeBase64 } from "@std/encoding/base64"
+import { encodeBase64 } from "@std/encoding/base64"
 import * as fs from "@std/fs"
 import * as path from "@std/path"
 import { fastlanePilotUpload } from "~/actions/fastlane/pilot.ts"
@@ -198,30 +198,34 @@ async function setupSigningFromMatch(
     const certificate = encodeBase64(certData)
     logger.info(`Exported certificate from keychain (${certData.length} bytes)`)
 
-    // Decrypt the provisioning profile directly from the match git repo.
-    // Searching ~/Library/MobileDevice/Provisioning Profiles/ is unreliable
-    // on CI — the profile may not be installed there by match on all machines.
-    using matchParentDir = await makeTempDir()
-    const matchDir = path.join(matchParentDir.path, "match")
-    const matchGitUrl = secrets.get("ios/matchGitUrl")
-    const matchPassword = secrets.get("ios/matchPassword")
-
-    await builder.exec("git", ["clone", "--depth", "1", matchGitUrl, matchDir])
-
-    const encryptedProfilePath = path.join(
-      matchDir,
-      "profiles/appstore/AppStore_no.uit.divvun.donate-your-speech.mobileprovision",
+    // Read the provisioning profile installed by match.
+    // Match installs profiles to ~/Library/Developer/Xcode/UserData/Provisioning Profiles/<UUID>.mobileprovision
+    const profilesDir = path.join(
+      Deno.env.get("HOME")!,
+      "Library/Developer/Xcode/UserData/Provisioning Profiles",
     )
 
-    try {
-      await Deno.stat(encryptedProfilePath)
-    } catch {
-      throw new Error(`Encrypted profile not found in match repo at: profiles/appstore/AppStore_no.uit.divvun.donate-your-speech.mobileprovision`)
+    let profilePath: string | null = null
+    for await (const entry of Deno.readDir(profilesDir)) {
+      if (!entry.name.endsWith(".mobileprovision")) continue
+
+      const fullPath = path.join(profilesDir, entry.name)
+      const data = await Deno.readFile(fullPath)
+      const text = new TextDecoder("utf-8", { fatal: false }).decode(data)
+      if (text.includes(BUNDLE_ID)) {
+        profilePath = fullPath
+        break
+      }
     }
 
-    const encryptedData = await Deno.readFile(encryptedProfilePath)
-    const profileData = await decryptMatchFile(encryptedData, matchPassword)
-    logger.info(`Decrypted provisioning profile (${profileData.byteLength} bytes)`)
+    if (!profilePath) {
+      throw new Error(
+        `No provisioning profile for ${BUNDLE_ID} found in ${profilesDir}`,
+      )
+    }
+
+    logger.info(`Found provisioning profile: ${profilePath}`)
+    const profileData = await Deno.readFile(profilePath)
     const mobileProvision = encodeBase64(profileData)
 
     return { certificate, mobileProvision }
@@ -257,83 +261,3 @@ async function findFile(pattern: string): Promise<string | null> {
   return null
 }
 
-// Decrypt a fastlane match encrypted file.
-// v2 format (binary): salt (8) | iv (12) | auth tag (16) | ciphertext — AES-256-GCM
-// v1 format (base64 text): openssl enc -aes-256-cbc output
-async function decryptMatchFile(
-  data: Uint8Array,
-  password: string,
-): Promise<Uint8Array> {
-  const MATCH_ENCRYPT_PREFIX = "match_encrypted_v2__"
-
-  const text = new TextDecoder().decode(data).replace(/\s/g, "")
-  const decoded = decodeBase64(text)
-  const prefixBytes = decoded.slice(0, 32)
-  const prefix = new TextDecoder().decode(prefixBytes)
-  logger.info(`Decoded ${decoded.byteLength} bytes, prefix: ${JSON.stringify(prefix.slice(0, 24))}`)
-  logger.info(`Prefix hex: ${Array.from(prefixBytes.slice(0, 24)).map(b => b.toString(16).padStart(2, "0")).join(" ")}`)
-
-  if (prefix.startsWith(MATCH_ENCRYPT_PREFIX)) {
-    logger.info("Detected match v2 (base64-wrapped AES-256-GCM) format")
-    const payload = decoded.slice(MATCH_ENCRYPT_PREFIX.length)
-
-    // v2 key = SHA-256(password), format: iv(12) + tag(16) + ciphertext
-    const iv = payload.slice(0, 12)
-    const authTag = payload.slice(12, 28)
-    const ciphertext = payload.slice(28)
-
-    const rawKey = await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(password),
-    )
-
-    const key = await crypto.subtle.importKey(
-      "raw",
-      rawKey,
-      "AES-GCM",
-      false,
-      ["decrypt"],
-    )
-
-    // AES-GCM expects ciphertext + tag concatenated
-    const combined = new Uint8Array(ciphertext.length + authTag.length)
-    combined.set(ciphertext)
-    combined.set(authTag, ciphertext.length)
-
-    const decrypted = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv },
-      key,
-      combined,
-    )
-
-    return new Uint8Array(decrypted)
-  }
-
-  // v1: raw openssl enc -aes-256-cbc -k <password> -a
-  logger.info("Detected v1 (openssl CBC) format — decrypting with openssl")
-  return await decryptMatchV1(data, password)
-}
-
-async function decryptMatchV1(
-  data: Uint8Array,
-  password: string,
-): Promise<Uint8Array> {
-  // v1 is openssl enc -aes-256-cbc -k <password> -a -d
-  const child = new Deno.Command("openssl", {
-    args: ["enc", "-aes-256-cbc", "-d", "-a", "-k", password],
-    stdin: "piped",
-    stdout: "piped",
-    stderr: "piped",
-  }).spawn()
-
-  const writer = child.stdin.getWriter()
-  await writer.write(data)
-  await writer.close()
-
-  const output = await child.output()
-  if (!output.success) {
-    const stderr = new TextDecoder().decode(output.stderr)
-    throw new Error(`openssl decryption failed: ${stderr}`)
-  }
-  return output.stdout
-}
