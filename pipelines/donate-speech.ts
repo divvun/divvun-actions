@@ -264,7 +264,7 @@ async function decryptMatchFile(
   data: Uint8Array,
   password: string,
 ): Promise<Uint8Array> {
-  const MATCH_ENCRYPT_PREFIX = "match_encrypt_v2"
+  const MATCH_ENCRYPT_PREFIX = "match_encrypted_v2__"
 
   const text = new TextDecoder().decode(data).replace(/\s/g, "")
   const decoded = decodeBase64(text)
