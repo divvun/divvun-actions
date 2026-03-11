@@ -131,6 +131,20 @@ async function fetchMatchCredentials(secrets: SecretsStore): Promise<{
     await Security.unlockKeychain(keychainName, keychainPassword)
     await Security.setKeychainTimeout(keychainName, 3600)
 
+    // Snapshot profiles directory before match
+    const profilesDir = path.join(
+      Deno.env.get("HOME")!,
+      "Library/MobileDevice/Provisioning Profiles",
+    )
+    const existingProfiles = new Set<string>()
+    try {
+      for await (const entry of Deno.readDir(profilesDir)) {
+        existingProfiles.add(entry.name)
+      }
+    } catch {
+      // Directory might not exist yet
+    }
+
     // Run fastlane match to fetch and install cert + profile
     await builder.exec("fastlane", [
       "match",
@@ -175,43 +189,44 @@ async function fetchMatchCredentials(secrets: SecretsStore): Promise<{
     const certData = await Deno.readFile(certFile.path)
     const certificate = encodeBase64(certData)
 
-    // Find the provisioning profile installed by match
-    const profilesDir = path.join(
-      Deno.env.get("HOME")!,
-      "Library/MobileDevice/Provisioning Profiles",
-    )
-    const mobileProvision = await findAndEncodeProfile(profilesDir, BUNDLE_ID)
+    // Find the provisioning profile that match just installed.
+    // First look for a new file; if match overwrote an existing one, find the
+    // most recently modified .mobileprovision instead.
+    let profilePath: string | null = null
+    let latestMtime = 0
+    for await (const entry of Deno.readDir(profilesDir)) {
+      if (!entry.name.endsWith(".mobileprovision")) continue
+
+      const fullPath = path.join(profilesDir, entry.name)
+      if (!existingProfiles.has(entry.name)) {
+        // New file — definitely ours
+        profilePath = fullPath
+        break
+      }
+
+      // Track the most recently modified as fallback
+      const stat = await Deno.stat(fullPath)
+      const mtime = stat.mtime?.getTime() ?? 0
+      if (mtime > latestMtime) {
+        latestMtime = mtime
+        profilePath = fullPath
+      }
+    }
+
+    if (!profilePath) {
+      throw new Error(
+        `No provisioning profile found in ${profilesDir} after match`,
+      )
+    }
+
+    logger.info(`Found provisioning profile: ${profilePath}`)
+    const profileData = await Deno.readFile(profilePath)
+    const mobileProvision = encodeBase64(profileData)
 
     return { certificate, mobileProvision }
   } finally {
     await Security.deleteKeychain(keychainName).catch(() => {})
   }
-}
-
-async function findAndEncodeProfile(
-  profilesDir: string,
-  bundleId: string,
-): Promise<string> {
-  // Find the provisioning profile matching our bundle ID
-  for await (const entry of fs.expandGlob(path.join(profilesDir, "*.mobileprovision"))) {
-    const result = await new Deno.Command("security", {
-      args: ["cms", "-D", "-i", entry.path],
-      stdout: "piped",
-      stderr: "piped",
-    }).output()
-
-    if (!result.success) continue
-
-    const plist = new TextDecoder().decode(result.stdout)
-    if (plist.includes(bundleId)) {
-      const data = await Deno.readFile(entry.path)
-      return encodeBase64(data)
-    }
-  }
-
-  throw new Error(
-    `No provisioning profile found for ${bundleId} in ${profilesDir}`,
-  )
 }
 
 async function findIpa(): Promise<string> {
