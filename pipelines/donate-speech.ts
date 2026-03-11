@@ -5,7 +5,7 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import logger from "~/util/log.ts"
-import { makeTempDir } from "~/util/temp.ts"
+import { makeTempDir, makeTempFile } from "~/util/temp.ts"
 import { Security } from "~/util/security.ts"
 
 const BUNDLE_ID = "no.uit.divvun.donate-your-speech"
@@ -50,6 +50,11 @@ export function pipelineDonateSpeech(): BuildkitePipeline {
 
 export async function runDonateSpeechBuildIOS() {
   const secrets = await builder.secrets()
+  const apiKey = JSON.parse(secrets.get("macos/appStoreKeyJson"))
+
+  // Write the App Store Connect API private key to a .p8 file
+  using apiKeyFile = await makeTempFile({ suffix: ".p8" })
+  await Deno.writeTextFile(apiKeyFile.path, apiKey.key)
 
   await builder.group("Installing signing credentials", async () => {
     // Unlock the login keychain so match can import the certificate
@@ -91,6 +96,11 @@ export async function runDonateSpeechBuildIOS() {
       "src-tauri/tauri.conf.release.json",
     ], {
       env: {
+        // API key vars make Tauri skip signing during build phase
+        // and provide auth credentials for the export phase
+        APPLE_API_KEY: apiKey.key_id,
+        APPLE_API_ISSUER: apiKey.issuer_id,
+        APPLE_API_KEY_PATH: apiKeyFile.path,
         APPLE_DEVELOPMENT_TEAM: secrets.get("macos/teamId"),
       },
     })
