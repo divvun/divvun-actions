@@ -153,19 +153,10 @@ async function setupSigningFromMatch(
     const wwdrCertPath = await downloadAppleWWDRCA("G3")
     await Security.import(KEYCHAIN_NAME, wwdrCertPath)
 
-    // Snapshot the provisioning profiles directory before match
     const profilesDir = path.join(
       Deno.env.get("HOME")!,
       "Library/MobileDevice/Provisioning Profiles",
     )
-    const existingProfiles = new Set<string>()
-    try {
-      for await (const entry of Deno.readDir(profilesDir)) {
-        existingProfiles.add(entry.name)
-      }
-    } catch {
-      // Directory might not exist yet
-    }
 
     // Run fastlane match to install cert + provisioning profile
     await builder.exec("fastlane", [
@@ -212,28 +203,32 @@ async function setupSigningFromMatch(
     const certificate = encodeBase64(certData)
     logger.info(`Exported certificate from keychain (${certData.length} bytes)`)
 
-    // Find the provisioning profile that match just installed
+    // Find the provisioning profile installed by match.
+    // Match installs profiles as <UUID>.mobileprovision, so search by content.
     let profilePath: string | null = null
-    let latestMtime = 0
     for await (const entry of Deno.readDir(profilesDir)) {
       if (!entry.name.endsWith(".mobileprovision")) continue
 
       const fullPath = path.join(profilesDir, entry.name)
-      if (!existingProfiles.has(entry.name)) {
+      const result = await new Deno.Command("security", {
+        args: ["cms", "-D", "-i", fullPath],
+        stdout: "piped",
+        stderr: "piped",
+      }).output()
+
+      if (!result.success) continue
+
+      const plist = new TextDecoder().decode(result.stdout)
+      if (plist.includes(BUNDLE_ID)) {
         profilePath = fullPath
         break
-      }
-
-      const stat = await Deno.stat(fullPath)
-      const mtime = stat.mtime?.getTime() ?? 0
-      if (mtime > latestMtime) {
-        latestMtime = mtime
-        profilePath = fullPath
       }
     }
 
     if (!profilePath) {
-      throw new Error(`No provisioning profile found in ${profilesDir} after match`)
+      throw new Error(
+        `No provisioning profile for ${BUNDLE_ID} found in ${profilesDir}`,
+      )
     }
 
     logger.info(`Found provisioning profile: ${profilePath}`)
