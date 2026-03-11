@@ -1,4 +1,4 @@
-import { encodeBase64 } from "@std/encoding/base64"
+import { decodeBase64, encodeBase64 } from "@std/encoding/base64"
 import * as fs from "@std/fs"
 import * as path from "@std/path"
 import { fastlanePilotUpload } from "~/actions/fastlane/pilot.ts"
@@ -264,25 +264,31 @@ async function decryptMatchFile(
   data: Uint8Array,
   password: string,
 ): Promise<Uint8Array> {
-  logger.info(`Encrypted file: ${data.byteLength} bytes, first bytes: ${Array.from(data.slice(0, 16)).map(b => b.toString(16).padStart(2, "0")).join(" ")}`)
+  const MATCH_ENCRYPT_PREFIX = "match_encrypt\n"
 
-  // Check if this is v1 (base64-encoded openssl output) — text files start with printable ASCII
-  const isText = data.every(b => (b >= 0x20 && b <= 0x7e) || b === 0x0a || b === 0x0d)
-  if (isText) {
-    logger.info("Detected v1 (openssl CBC) format — decrypting with openssl")
-    return await decryptMatchV1(data, password)
-  }
+  // Detect format: v2 files are base64 text starting with "match_encrypt\n" when decoded
+  const text = new TextDecoder().decode(data)
+  const decoded = decodeBase64(text)
+  const prefix = new TextDecoder().decode(decoded.slice(0, MATCH_ENCRYPT_PREFIX.length))
 
-  // v2: try SHA-256 first, then SHA-1
-  for (const hash of ["SHA-256", "SHA-1"] as const) {
-    try {
-      return await decryptMatchV2(data, password, hash)
-    } catch {
-      logger.info(`v2 decryption with ${hash} failed, trying next...`)
+  if (prefix === MATCH_ENCRYPT_PREFIX) {
+    logger.info("Detected match v2 (base64-wrapped AES-256-GCM) format")
+    const payload = decoded.slice(MATCH_ENCRYPT_PREFIX.length)
+
+    // Try SHA-256 first, then SHA-1 for older repos
+    for (const hash of ["SHA-256", "SHA-1"] as const) {
+      try {
+        return await decryptMatchV2(payload, password, hash)
+      } catch {
+        logger.info(`v2 decryption with ${hash} failed, trying next...`)
+      }
     }
+    throw new Error("Failed to decrypt match v2 file with both SHA-256 and SHA-1")
   }
 
-  throw new Error("Failed to decrypt match file with all methods (v2 SHA-256, v2 SHA-1, v1 openssl)")
+  // v1: raw openssl enc -aes-256-cbc -k <password> -a
+  logger.info("Detected v1 (openssl CBC) format — decrypting with openssl")
+  return await decryptMatchV1(data, password)
 }
 
 async function decryptMatchV2(
