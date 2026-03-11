@@ -6,7 +6,8 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import logger from "~/util/log.ts"
-import { makeTempDir } from "~/util/temp.ts"
+import { makeTempDir, makeTempFile } from "~/util/temp.ts"
+import { Security } from "~/util/security.ts"
 import type { SecretsStore } from "~/util/openbao.ts"
 
 const BUNDLE_ID = "no.uit.divvun.donate-your-speech"
@@ -121,68 +122,96 @@ async function fetchMatchCredentials(secrets: SecretsStore): Promise<{
   certificate: string
   mobileProvision: string
 }> {
-  using matchDir = await makeTempDir()
+  const keychainName = "match-donate-speech"
+  const keychainPassword = secrets.get("macos/adminPassword")
 
-  // Clone the match repo
-  const matchGitUrl = secrets.get("ios/matchGitUrl")
-  await builder.exec("git", ["clone", "--depth", "1", matchGitUrl, matchDir.path])
+  // Create a temporary keychain for match to import into
+  await Security.createKeychain(keychainName, keychainPassword)
+  try {
+    await Security.unlockKeychain(keychainName, keychainPassword)
+    await Security.setKeychainTimeout(keychainName, 3600)
 
-  // Find the distribution certificate .p12
-  const certDir = path.join(matchDir.path, "certs", "distribution")
-  let certPath: string | null = null
-  for await (const entry of fs.expandGlob(path.join(certDir, "*.p12"))) {
-    certPath = entry.path
-    break
-  }
-  if (!certPath) {
-    throw new Error("No distribution certificate found in match repo")
-  }
+    // Run fastlane match to fetch and install cert + profile
+    await builder.exec("fastlane", [
+      "match",
+      "appstore",
+      "--readonly",
+      "--app_identifier",
+      BUNDLE_ID,
+    ], {
+      env: {
+        MATCH_GIT_URL: secrets.get("ios/matchGitUrl"),
+        MATCH_PASSWORD: secrets.get("ios/matchPassword"),
+        MATCH_KEYCHAIN_NAME: `${keychainName}.keychain`,
+        MATCH_KEYCHAIN_PASSWORD: keychainPassword,
+      },
+    })
 
-  // Find the provisioning profile
-  const profilePath = path.join(
-    matchDir.path,
-    "profiles",
-    "appstore",
-    `AppStore_${BUNDLE_ID}.mobileprovision`,
-  )
+    // Export the certificate from the temp keychain as .p12
+    using certFile = await makeTempFile({ suffix: ".p12" })
+    const exportResult = await new Deno.Command("security", {
+      args: [
+        "export",
+        "-k",
+        `${Deno.env.get("HOME")}/Library/Keychains/${keychainName}.keychain-db`,
+        "-t",
+        "identities",
+        "-f",
+        "pkcs12",
+        "-P",
+        "",
+        "-o",
+        certFile.path,
+      ],
+      stdout: "piped",
+      stderr: "piped",
+    }).output()
 
-  const matchPassword = secrets.get("ios/matchPassword")
-  const decryptedCert = await decryptMatchFile(certPath, matchPassword)
-  const decryptedProfile = await decryptMatchFile(profilePath, matchPassword)
+    if (!exportResult.success) {
+      const stderr = new TextDecoder().decode(exportResult.stderr)
+      throw new Error(`Failed to export certificate from keychain: ${stderr}`)
+    }
 
-  return {
-    certificate: encodeBase64(decryptedCert),
-    mobileProvision: encodeBase64(decryptedProfile),
+    const certData = await Deno.readFile(certFile.path)
+    const certificate = encodeBase64(certData)
+
+    // Find the provisioning profile installed by match
+    const profilesDir = path.join(
+      Deno.env.get("HOME")!,
+      "Library/MobileDevice/Provisioning Profiles",
+    )
+    const mobileProvision = await findAndEncodeProfile(profilesDir, BUNDLE_ID)
+
+    return { certificate, mobileProvision }
+  } finally {
+    await Security.deleteKeychain(keychainName).catch(() => {})
   }
 }
 
-async function decryptMatchFile(
-  filePath: string,
-  password: string,
-): Promise<Uint8Array> {
-  const output = await new Deno.Command("openssl", {
-    args: [
-      "enc",
-      "-aes-256-cbc",
-      "-d",
-      "-a",
-      "-md",
-      "md5",
-      "-pass",
-      `pass:${password}`,
-      "-in",
-      filePath,
-    ],
-    stdout: "piped",
-    stderr: "piped",
-  }).output()
+async function findAndEncodeProfile(
+  profilesDir: string,
+  bundleId: string,
+): Promise<string> {
+  // Find the provisioning profile matching our bundle ID
+  for await (const entry of fs.expandGlob(path.join(profilesDir, "*.mobileprovision"))) {
+    const result = await new Deno.Command("security", {
+      args: ["cms", "-D", "-i", entry.path],
+      stdout: "piped",
+      stderr: "piped",
+    }).output()
 
-  if (!output.success) {
-    const stderr = new TextDecoder().decode(output.stderr)
-    throw new Error(`Failed to decrypt ${filePath}: ${stderr}`)
+    if (!result.success) continue
+
+    const plist = new TextDecoder().decode(result.stdout)
+    if (plist.includes(bundleId)) {
+      const data = await Deno.readFile(entry.path)
+      return encodeBase64(data)
+    }
   }
 
-  return output.stdout
+  throw new Error(
+    `No provisioning profile found for ${bundleId} in ${profilesDir}`,
+  )
 }
 
 async function findIpa(): Promise<string> {
