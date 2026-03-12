@@ -131,8 +131,7 @@ export async function runDonateSpeechBuildAndroid() {
 
   // Write the keystore file from base64 secret
   using keystoreFile = await makeTempFile({ suffix: ".jks" })
-  const keystoreBase64 = secrets.get("android/donateSpeech/keystoreBase64")
-  const keystoreBytes = Uint8Array.from(atob(keystoreBase64), (c) => c.charCodeAt(0))
+  const keystoreBytes = secrets.base64ByteArray("android/divvun/donate-your-speech/keystore")
   await Deno.writeFile(keystoreFile.path, keystoreBytes)
 
   await builder.group("Installing dependencies", async () => {
@@ -153,9 +152,9 @@ export async function runDonateSpeechBuildAndroid() {
     ], {
       env: {
         TAURI_SIGNING_STORE_PATH: keystoreFile.path,
-        TAURI_SIGNING_STORE_PASSWORD: secrets.get("android/donateSpeech/keystorePassword"),
-        TAURI_SIGNING_KEY_ALIAS: secrets.get("android/donateSpeech/keyAlias"),
-        TAURI_SIGNING_KEY_PASSWORD: secrets.get("android/donateSpeech/keyPassword"),
+        TAURI_SIGNING_STORE_PASSWORD: secrets.get("android/divvun/donate-your-speech/storePassword"),
+        TAURI_SIGNING_KEY_ALIAS: secrets.get("android/divvun/donate-your-speech/keyalias"),
+        TAURI_SIGNING_KEY_PASSWORD: secrets.get("android/divvun/donate-your-speech/keyPassword"),
       },
     })
   })
@@ -183,7 +182,7 @@ export async function runDonateSpeechDeployAndroid() {
     }
 
     logger.info(`Uploading AAB: ${aabPath}`)
-    const serviceAccountJson = secrets.get("android/donateSpeech/googleServiceAccountJson")
+    const serviceAccountJson = secrets.get("android/divvun/googleServiceAccountJson")
 
     using serviceAccountFile = await makeTempFile({ suffix: ".json" })
     await Deno.writeTextFile(serviceAccountFile.path, serviceAccountJson)
