@@ -13,6 +13,7 @@ import {
 } from "~/util/security.ts"
 
 const BUNDLE_ID = "no.uit.divvun.donate-your-speech"
+const BUNDLE_ID_ANDROID = "no.uit.divvun.donate_your_speech"
 const KEYCHAIN_NAME = "donate-speech-signing"
 
 function command(input: CommandStep): CommandStep {
@@ -36,6 +37,12 @@ export function pipelineDonateSpeech(): BuildkitePipeline {
         command: "divvun-actions run donate-speech-build-ios",
         agents: { queue: "macos" },
       }),
+      command({
+        label: "Build & Sign Android",
+        key: "build-android",
+        command: "divvun-actions run donate-speech-build-android",
+        agents: { queue: "linux" },
+      }),
     ],
   }
 
@@ -46,6 +53,12 @@ export function pipelineDonateSpeech(): BuildkitePipeline {
         command: "divvun-actions run donate-speech-deploy-ios",
         depends_on: "build-ios",
         agents: { queue: "macos" },
+      }),
+      command({
+        label: "Deploy Android",
+        command: "divvun-actions run donate-speech-deploy-android",
+        depends_on: "build-android",
+        agents: { queue: "linux" },
       }),
     )
   }
@@ -110,6 +123,82 @@ export async function runDonateSpeechBuildIOS() {
     const ipaPath = await findIpa()
     logger.info(`Found IPA: ${ipaPath}`)
     await builder.uploadArtifacts(ipaPath)
+  })
+}
+
+export async function runDonateSpeechBuildAndroid() {
+  const secrets = await builder.secrets()
+
+  // Write the keystore file from base64 secret
+  using keystoreFile = await makeTempFile({ suffix: ".jks" })
+  const keystoreBase64 = secrets.get("android/donateSpeech/keystoreBase64")
+  const keystoreBytes = Uint8Array.from(atob(keystoreBase64), (c) => c.charCodeAt(0))
+  await Deno.writeFile(keystoreFile.path, keystoreBytes)
+
+  await builder.group("Installing dependencies", async () => {
+    await builder.exec("pnpm", ["install", "--frozen-lockfile"])
+  })
+
+  await builder.group("Initializing Android project", async () => {
+    await builder.exec("pnpm", ["tauri", "android", "init"])
+  })
+
+  await builder.group("Building Android app", async () => {
+    await builder.exec("pnpm", [
+      "tauri",
+      "android",
+      "build",
+      "--config",
+      "src-tauri/tauri.conf.release.json",
+    ], {
+      env: {
+        TAURI_SIGNING_STORE_PATH: keystoreFile.path,
+        TAURI_SIGNING_STORE_PASSWORD: secrets.get("android/donateSpeech/keystorePassword"),
+        TAURI_SIGNING_KEY_ALIAS: secrets.get("android/donateSpeech/keyAlias"),
+        TAURI_SIGNING_KEY_PASSWORD: secrets.get("android/donateSpeech/keyPassword"),
+      },
+    })
+  })
+
+  await builder.group("Uploading artifacts", async () => {
+    const aabPath = await findAab()
+    logger.info(`Found AAB: ${aabPath}`)
+    await builder.uploadArtifacts(aabPath)
+  })
+}
+
+export async function runDonateSpeechDeployAndroid() {
+  const secrets = await builder.secrets()
+
+  using tempDir = await makeTempDir()
+
+  await builder.group("Downloading artifacts", async () => {
+    await builder.downloadArtifacts("**/*.aab", tempDir.path)
+  })
+
+  await builder.group("Uploading to Google Play", async () => {
+    const aabPath = await findFile(path.join(tempDir.path, "**/*.aab"))
+    if (!aabPath) {
+      throw new Error("No AAB found in downloaded artifacts")
+    }
+
+    logger.info(`Uploading AAB: ${aabPath}`)
+    const serviceAccountJson = secrets.get("android/donateSpeech/googleServiceAccountJson")
+
+    using serviceAccountFile = await makeTempFile({ suffix: ".json" })
+    await Deno.writeTextFile(serviceAccountFile.path, serviceAccountJson)
+
+    await builder.exec("fastlane", [
+      "supply",
+      "--aab",
+      aabPath,
+      "--json_key",
+      serviceAccountFile.path,
+      "--package_name",
+      BUNDLE_ID_ANDROID,
+      "--track",
+      "internal",
+    ])
   })
 }
 
@@ -248,6 +337,23 @@ async function findIpa(): Promise<string> {
 
   throw new Error(
     "No IPA found. Searched: " + searchPaths.join(", "),
+  )
+}
+
+async function findAab(): Promise<string> {
+  // Tauri Android builds output the AAB under src-tauri/gen/android/app/build/outputs/
+  const searchPaths = [
+    "src-tauri/gen/android/app/build/outputs/**/*.aab",
+    "**/*.aab",
+  ]
+
+  for (const pattern of searchPaths) {
+    const result = await findFile(pattern)
+    if (result) return result
+  }
+
+  throw new Error(
+    "No AAB found. Searched: " + searchPaths.join(", "),
   )
 }
 

@@ -51,7 +51,9 @@ import pipelineLibpahkat, {
 } from "./pipelines/pahkat/libpahkat.ts"
 import {
   pipelineDonateSpeech,
+  runDonateSpeechBuildAndroid,
   runDonateSpeechBuildIOS,
+  runDonateSpeechDeployAndroid,
   runDonateSpeechDeployIOS,
 } from "./pipelines/donate-speech.ts"
 import {
@@ -308,6 +310,14 @@ async function runPipeline(args: any) {
     }
     case "donate-speech-deploy-ios": {
       await runDonateSpeechDeployIOS()
+      break
+    }
+    case "donate-speech-build-android": {
+      await runDonateSpeechBuildAndroid()
+      break
+    }
+    case "donate-speech-deploy-android": {
+      await runDonateSpeechDeployAndroid()
       break
     }
     case "debug": {
