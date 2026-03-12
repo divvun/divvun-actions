@@ -141,6 +141,24 @@ export async function runDonateSpeechBuildAndroid() {
     await builder.exec("pnpm", ["tauri", "android", "init"])
   })
 
+  // Write key.properties so Gradle picks up signing config
+  await builder.group("Configuring signing", async () => {
+    const keyProperties = [
+      `storeFile=${keystoreFile.path}`,
+      `storePassword=${
+        secrets.get("android/divvun/donate-your-speech/storePassword")
+      }`,
+      `keyAlias=${secrets.get("android/divvun/donate-your-speech/keyalias")}`,
+      `keyPassword=${
+        secrets.get("android/divvun/donate-your-speech/keyPassword")
+      }`,
+    ].join("\n")
+    await Deno.writeTextFile(
+      "src-tauri/gen/android/key.properties",
+      keyProperties,
+    )
+  })
+
   await builder.group("Building Android app", async () => {
     await builder.exec("pnpm", [
       "tauri",
@@ -150,20 +168,7 @@ export async function runDonateSpeechBuildAndroid() {
       "aarch64",
       "--config",
       "src-tauri/tauri.conf.release.json",
-    ], {
-      env: {
-        TAURI_SIGNING_STORE_PATH: keystoreFile.path,
-        TAURI_SIGNING_STORE_PASSWORD: secrets.get(
-          "android/divvun/donate-your-speech/storePassword",
-        ),
-        TAURI_SIGNING_KEY_ALIAS: secrets.get(
-          "android/divvun/donate-your-speech/keyalias",
-        ),
-        TAURI_SIGNING_KEY_PASSWORD: secrets.get(
-          "android/divvun/donate-your-speech/keyPassword",
-        ),
-      },
-    })
+    ])
   })
 
   await builder.group("Uploading artifacts", async () => {
