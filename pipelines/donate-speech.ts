@@ -141,22 +141,36 @@ export async function runDonateSpeechBuildAndroid() {
     await builder.exec("pnpm", ["tauri", "android", "init"])
   })
 
-  // Write keystore.properties so the Tauri-generated build.gradle.kts picks up signing config
+  // Patch the generated build.gradle.kts to add release signing config
   await builder.group("Configuring signing", async () => {
-    const keystoreProperties = [
-      `password=${
-        secrets.get("android/divvun/donate-your-speech/storePassword")
-      }`,
-      `keyPassword=${
-        secrets.get("android/divvun/donate-your-speech/keyPassword")
-      }`,
-      `keyAlias=${secrets.get("android/divvun/donate-your-speech/keyalias")}`,
-      `storeFile=${keystoreFile.path}`,
-    ].join("\n")
-    await Deno.writeTextFile(
-      "src-tauri/gen/android/keystore.properties",
-      keystoreProperties,
+    const buildGradlePath = "src-tauri/gen/android/app/build.gradle.kts"
+    let buildGradle = await Deno.readTextFile(buildGradlePath)
+
+    // Add signingConfigs block and wire it to the release build type
+    const signingConfig = `
+    signingConfigs {
+        create("release") {
+            storeFile = file("${keystoreFile.path}")
+            storePassword = "${secrets.get("android/divvun/donate-your-speech/storePassword")}"
+            keyAlias = "${secrets.get("android/divvun/donate-your-speech/keyalias")}"
+            keyPassword = "${secrets.get("android/divvun/donate-your-speech/keyPassword")}"
+        }
+    }`
+
+    // Insert signingConfigs before buildTypes
+    buildGradle = buildGradle.replace(
+      "    buildTypes {",
+      `${signingConfig}\n    buildTypes {`,
     )
+
+    // Add signingConfig to release build type
+    buildGradle = buildGradle.replace(
+      '        getByName("release") {',
+      '        getByName("release") {\n            signingConfig = signingConfigs.getByName("release")',
+    )
+
+    await Deno.writeTextFile(buildGradlePath, buildGradle)
+    logger.info("Patched build.gradle.kts with release signing config")
   })
 
   await builder.group("Building Android app", async () => {
