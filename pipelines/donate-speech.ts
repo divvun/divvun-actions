@@ -141,21 +141,21 @@ export async function runDonateSpeechBuildAndroid() {
     await builder.exec("pnpm", ["tauri", "android", "init"])
   })
 
-  // Write key.properties so Gradle picks up signing config
+  // Write keystore.properties so the Tauri-generated build.gradle.kts picks up signing config
   await builder.group("Configuring signing", async () => {
-    const keyProperties = [
-      `storeFile=${keystoreFile.path}`,
-      `storePassword=${
+    const keystoreProperties = [
+      `password=${
         secrets.get("android/divvun/donate-your-speech/storePassword")
       }`,
-      `keyAlias=${secrets.get("android/divvun/donate-your-speech/keyalias")}`,
       `keyPassword=${
         secrets.get("android/divvun/donate-your-speech/keyPassword")
       }`,
+      `keyAlias=${secrets.get("android/divvun/donate-your-speech/keyalias")}`,
+      `storeFile=${keystoreFile.path}`,
     ].join("\n")
     await Deno.writeTextFile(
-      "src-tauri/gen/android/key.properties",
-      keyProperties,
+      "src-tauri/gen/android/keystore.properties",
+      keystoreProperties,
     )
   })
 
