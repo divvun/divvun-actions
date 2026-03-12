@@ -147,6 +147,8 @@ export async function runDonateSpeechBuildAndroid() {
       "tauri",
       "android",
       "build",
+      "--target",
+      "aarch64",
       "--config",
       "src-tauri/tauri.conf.release.json",
     ], {
