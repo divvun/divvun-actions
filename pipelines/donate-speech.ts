@@ -350,7 +350,7 @@ async function googlePlayUpload(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       track: "internal",
-      releases: [{ versionCodes: [bundle.versionCode], status: "completed" }],
+      releases: [{ versionCodes: [bundle.versionCode], status: "draft" }],
     }),
   })
   logger.info("Assigned to internal track")
