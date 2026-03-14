@@ -148,12 +148,19 @@ export async function runDonateSpeechBuildAndroid() {
     let buildGradle = await Deno.readTextFile(buildGradlePath)
 
     // Override versionCode with CI build number (Tauri derives one from semver but it doesn't auto-increment)
-    const versionCodePattern = /versionCode = tauriProperties\.getProperty\("tauri\.android\.versionCode", "\d+"\)\.toInt\(\)/
+    // The first version manually uploaded had a derived versionCode of 1000. New version codes must be higher
+    // than the highest current versionCode Google is aware of, so we add 1000 to the build number
+    const versionCode = 1000 + Number(buildNumber)
+    const versionCodePattern =
+      /versionCode = tauriProperties\.getProperty\("tauri\.android\.versionCode", "\d+"\)\.toInt\(\)/
     const match = buildGradle.match(versionCodePattern)
     if (match) {
       logger.info(`Found versionCode line: ${match[0]}`)
-      buildGradle = buildGradle.replace(versionCodePattern, `versionCode = ${buildNumber}`)
-      logger.info(`Replaced with: versionCode = ${buildNumber}`)
+      buildGradle = buildGradle.replace(
+        versionCodePattern,
+        `versionCode = ${versionCode}`,
+      )
+      logger.info(`Replaced with: versionCode = ${versionCode}`)
     } else {
       logger.info(`WARNING: versionCode pattern not found in build.gradle.kts`)
       logger.info(`File contents:\n${buildGradle}`)
