@@ -50,6 +50,13 @@ import pipelineLibpahkat, {
   runLibpahkatPublish,
 } from "./pipelines/pahkat/libpahkat.ts"
 import {
+  pipelineDonateSpeech,
+  runDonateSpeechBuildAndroid,
+  runDonateSpeechBuildIOS,
+  runDonateSpeechDeployAndroid,
+  runDonateSpeechDeployIOS,
+} from "./pipelines/donate-speech/mod.ts"
+import {
   pipelinePdfStrings,
   runPdfStringsPublish,
 } from "./pipelines/pdf-strings/mod.ts"
@@ -297,6 +304,22 @@ async function runPipeline(args: any) {
       await runPdfStringsPublish()
       break
     }
+    case "donate-speech-build-ios": {
+      await runDonateSpeechBuildIOS()
+      break
+    }
+    case "donate-speech-deploy-ios": {
+      await runDonateSpeechDeployIOS()
+      break
+    }
+    case "donate-speech-build-android": {
+      await runDonateSpeechBuildAndroid()
+      break
+    }
+    case "donate-speech-deploy-android": {
+      await runDonateSpeechDeployAndroid()
+      break
+    }
     case "debug": {
       console.log("Environment:")
       console.log(JSON.stringify(builder.env, null, 2))
@@ -454,6 +477,10 @@ async function runCi(_args: any) {
     }
     case "pdf-strings": {
       pipeline = pipelinePdfStrings()
+      break
+    }
+    case "Kielipankki-donatespeech-app": {
+      pipeline = pipelineDonateSpeech()
       break
     }
     case "static-lib-build": {
