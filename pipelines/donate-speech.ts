@@ -1,5 +1,3 @@
-import { encodeBase64 } from "@std/encoding/base64"
-import * as path from "@std/path"
 import { fastlanePilotUpload } from "~/actions/fastlane/pilot.ts"
 import { googlePlayUpload } from "~/actions/google-play/upload.ts"
 import * as builder from "~/builder.ts"
@@ -8,7 +6,7 @@ import * as target from "~/target.ts"
 import { globOneFile } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir, makeTempFile } from "~/util/temp.ts"
-import { downloadAppleWWDRCA, Security } from "~/util/security.ts"
+import { setupSigningFromMatch } from "~/util/security.ts"
 
 const BUNDLE_ID = "no.uit.divvun.donate-your-speech"
 const BUNDLE_ID_ANDROID = "no.uit.divvun.donate_your_speech"
@@ -78,7 +76,13 @@ export async function runDonateSpeechBuildIOS() {
   let iosMobileProvision: string
 
   await builder.group("Installing signing credentials", async () => {
-    const result = await setupSigningFromMatch(secrets, keychainPassword)
+    const result = await setupSigningFromMatch({
+      bundleId: BUNDLE_ID,
+      keychainName: KEYCHAIN_NAME,
+      keychainPassword,
+      matchGitUrl: secrets.get("ios/matchGitUrl"),
+      matchPassword: secrets.get("ios/matchPassword"),
+    })
     iosCertificate = result.certificate
     iosMobileProvision = result.mobileProvision
   })
@@ -271,112 +275,6 @@ export async function runDonateSpeechDeployIOS() {
       ipaPath,
     })
   })
-}
-
-async function setupSigningFromMatch(
-  secrets: Awaited<ReturnType<typeof builder.secrets>>,
-  keychainPassword: string,
-): Promise<{ certificate: string; mobileProvision: string }> {
-  // Create a dedicated keychain so we can cleanly export just the match cert
-  await Security.createKeychain(KEYCHAIN_NAME, keychainPassword)
-
-  try {
-    await Security.unlockKeychain(KEYCHAIN_NAME, keychainPassword)
-    await Security.setKeychainTimeout(KEYCHAIN_NAME, 3600)
-
-    // Import Apple WWDR intermediate cert so the cert chain is complete
-    // (required for security find-identity to recognize the distribution cert)
-    const wwdrCertPath = await downloadAppleWWDRCA("G3")
-    await Security.import(KEYCHAIN_NAME, wwdrCertPath)
-
-    // Run fastlane match to install cert into keychain
-    await builder.exec("fastlane", [
-      "match",
-      "appstore",
-      "--readonly",
-      "--app_identifier",
-      BUNDLE_ID,
-    ], {
-      env: {
-        MATCH_GIT_URL: secrets.get("ios/matchGitUrl"),
-        MATCH_PASSWORD: secrets.get("ios/matchPassword"),
-        MATCH_KEYCHAIN_NAME: `${KEYCHAIN_NAME}.keychain`,
-        MATCH_KEYCHAIN_PASSWORD: keychainPassword,
-      },
-    })
-
-    // Export the distribution certificate from the keychain as .p12
-    using certFile = await makeTempFile({ suffix: ".p12" })
-    const keychainPath = `${
-      Deno.env.get("HOME")
-    }/Library/Keychains/${KEYCHAIN_NAME}.keychain-db`
-
-    const exportResult = await new Deno.Command("security", {
-      args: [
-        "export",
-        "-k",
-        keychainPath,
-        "-t",
-        "identities",
-        "-f",
-        "pkcs12",
-        "-P",
-        "",
-        "-o",
-        certFile.path,
-      ],
-      stdout: "piped",
-      stderr: "piped",
-    }).output()
-
-    if (!exportResult.success) {
-      const stderr = new TextDecoder().decode(exportResult.stderr)
-      throw new Error(`Failed to export certificate: ${stderr}`)
-    }
-
-    const certData = await Deno.readFile(certFile.path)
-    if (certData.length === 0) {
-      throw new Error(
-        "Exported certificate is empty — cert may not have been imported properly",
-      )
-    }
-    const certificate = encodeBase64(certData)
-    logger.info(`Exported certificate from keychain (${certData.length} bytes)`)
-
-    // Read the provisioning profile installed by match.
-    // Match installs profiles to ~/Library/Developer/Xcode/UserData/Provisioning Profiles/<UUID>.mobileprovision
-    const profilesDir = path.join(
-      Deno.env.get("HOME")!,
-      "Library/Developer/Xcode/UserData/Provisioning Profiles",
-    )
-
-    let profilePath: string | null = null
-    for await (const entry of Deno.readDir(profilesDir)) {
-      if (!entry.name.endsWith(".mobileprovision")) continue
-
-      const fullPath = path.join(profilesDir, entry.name)
-      const data = await Deno.readFile(fullPath)
-      const text = new TextDecoder("utf-8", { fatal: false }).decode(data)
-      if (text.includes(BUNDLE_ID)) {
-        profilePath = fullPath
-        break
-      }
-    }
-
-    if (!profilePath) {
-      throw new Error(
-        `No provisioning profile for ${BUNDLE_ID} found in ${profilesDir}`,
-      )
-    }
-
-    logger.info(`Found provisioning profile: ${profilePath}`)
-    const profileData = await Deno.readFile(profilePath)
-    const mobileProvision = encodeBase64(profileData)
-
-    return { certificate, mobileProvision }
-  } finally {
-    await Security.deleteKeychain(KEYCHAIN_NAME).catch(() => {})
-  }
 }
 
 async function findBuildArtifact(
