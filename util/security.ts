@@ -51,6 +51,16 @@ export class Security {
     return await Bash.runScript(`security ${subcommand} ${args.join(" ")}`)
   }
 
+  public static async keychainExists(name: string): Promise<boolean> {
+    const { stdout } = await new Deno.Command("security", {
+      args: ["list-keychains"],
+      stdout: "piped",
+      stderr: "null",
+    }).output()
+    const keychains = new TextDecoder().decode(stdout)
+    return keychains.includes(`${name}.keychain`)
+  }
+
   public static async deleteKeychain(name: string) {
     return await Security.run("delete-keychain", [`${name}.keychain`])
   }
@@ -164,8 +174,10 @@ export async function setupSigningFromMatch(
     matchPassword,
   } = options
 
-  // Delete any leftover keychain from a previous failed run
-  await Security.deleteKeychain(keychainName).catch(() => {})
+  // Delete any leftover keychain from a previous failed run.
+  if (await Security.keychainExists(keychainName)) {
+    await Security.deleteKeychain(keychainName)
+  }
   await Security.createKeychain(keychainName, keychainPassword)
 
   try {
