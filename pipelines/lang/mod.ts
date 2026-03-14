@@ -222,7 +222,6 @@ export async function runLangBundle(
   })
 }
 
-
 function extractVersionFromTag(tag: string): string | null {
   const match = tag.match(/\/v(\d+\.\d+\.\d+(?:-\S+)?)$/)
   return match ? match[1] : null
