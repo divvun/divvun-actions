@@ -1,10 +1,10 @@
 import { encodeBase64 } from "@std/encoding/base64"
-import * as fs from "@std/fs"
 import * as path from "@std/path"
 import { fastlanePilotUpload } from "~/actions/fastlane/pilot.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
+import { globOneFile } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir, makeTempFile } from "~/util/temp.ts"
 import { downloadAppleWWDRCA, Security } from "~/util/security.ts"
@@ -117,7 +117,7 @@ export async function runDonateSpeechBuildIOS() {
   })
 
   await builder.group("Uploading artifacts", async () => {
-    const ipaPath = await findIpa()
+    const ipaPath = await findBuildArtifact("ipa", "src-tauri/gen/apple/build")
     logger.info(`Found IPA: ${ipaPath}`)
     await builder.uploadArtifacts(ipaPath)
   })
@@ -212,7 +212,10 @@ export async function runDonateSpeechBuildAndroid() {
   })
 
   await builder.group("Uploading artifacts", async () => {
-    const aabPath = await findAab()
+    const aabPath = await findBuildArtifact(
+      "aab",
+      "src-tauri/gen/android/app/build/outputs",
+    )
     logger.info(`Found AAB: ${aabPath}`)
     await builder.uploadArtifacts(aabPath)
   })
@@ -228,7 +231,7 @@ export async function runDonateSpeechDeployAndroid() {
   })
 
   await builder.group("Uploading to Google Play", async () => {
-    const aabPath = await findFile(path.join(tempDir.path, "**/*.aab"))
+    const aabPath = await globOneFile("**/*.aab", { root: tempDir.path })
     if (!aabPath) {
       throw new Error("No AAB found in downloaded artifacts")
     }
@@ -251,7 +254,7 @@ export async function runDonateSpeechDeployIOS() {
   })
 
   await builder.group("Uploading to App Store Connect", async () => {
-    const ipaPath = await findFile(path.join(tempDir.path, "**/*.ipa"))
+    const ipaPath = await globOneFile("**/*.ipa", { root: tempDir.path })
     if (!ipaPath) {
       throw new Error("No IPA found in downloaded artifacts")
     }
@@ -492,46 +495,16 @@ async function setupSigningFromMatch(
   }
 }
 
-async function findIpa(): Promise<string> {
-  // Tauri iOS builds output the IPA under src-tauri/gen/apple/build/
-  const searchPaths = [
-    "src-tauri/gen/apple/build/**/*.ipa",
-    "**/*.ipa",
-  ]
-
-  for (const pattern of searchPaths) {
-    const result = await findFile(pattern)
+async function findBuildArtifact(
+  extension: string,
+  primaryDir: string,
+): Promise<string> {
+  const patterns = [`${primaryDir}/**/*.${extension}`, `**/*.${extension}`]
+  for (const pattern of patterns) {
+    const result = await globOneFile(pattern)
     if (result) return result
   }
-
   throw new Error(
-    "No IPA found. Searched: " + searchPaths.join(", "),
+    `No .${extension} found. Searched: ${patterns.join(", ")}`,
   )
-}
-
-async function findAab(): Promise<string> {
-  // Tauri Android builds output the AAB under src-tauri/gen/android/app/build/outputs/
-  const searchPaths = [
-    "src-tauri/gen/android/app/build/outputs/**/*.aab",
-    "**/*.aab",
-  ]
-
-  for (const pattern of searchPaths) {
-    const result = await findFile(pattern)
-    if (result) return result
-  }
-
-  throw new Error(
-    "No AAB found. Searched: " + searchPaths.join(", "),
-  )
-}
-
-async function findFile(pattern: string): Promise<string | null> {
-  const files = await fs.expandGlob(pattern, { followSymlinks: false })
-  for await (const file of files) {
-    if (file.isFile) {
-      return file.path
-    }
-  }
-  return null
 }
