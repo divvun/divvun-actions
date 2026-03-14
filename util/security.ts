@@ -164,6 +164,8 @@ export async function setupSigningFromMatch(
     matchPassword,
   } = options
 
+  // Delete any leftover keychain from a previous failed run
+  await Security.deleteKeychain(keychainName).catch(() => {})
   await Security.createKeychain(keychainName, keychainPassword)
 
   try {
