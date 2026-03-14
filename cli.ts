@@ -55,7 +55,7 @@ import {
   runDonateSpeechBuildIOS,
   runDonateSpeechDeployAndroid,
   runDonateSpeechDeployIOS,
-} from "./pipelines/donate-speech.ts"
+} from "./pipelines/donate-speech/mod.ts"
 import {
   pipelinePdfStrings,
   runPdfStringsPublish,
