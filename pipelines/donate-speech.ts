@@ -151,9 +151,15 @@ export async function runDonateSpeechBuildAndroid() {
     signingConfigs {
         create("release") {
             storeFile = file("${keystoreFile.path}")
-            storePassword = "${secrets.get("android/divvun/donate-your-speech/storePassword")}"
-            keyAlias = "${secrets.get("android/divvun/donate-your-speech/keyalias")}"
-            keyPassword = "${secrets.get("android/divvun/donate-your-speech/keyPassword")}"
+            storePassword = "${
+      secrets.get("android/divvun/donate-your-speech/storePassword")
+    }"
+            keyAlias = "${
+      secrets.get("android/divvun/donate-your-speech/keyalias")
+    }"
+            keyPassword = "${
+      secrets.get("android/divvun/donate-your-speech/keyPassword")
+    }"
         }
     }`
 
