@@ -1,6 +1,7 @@
 import { encodeBase64 } from "@std/encoding/base64"
 import * as path from "@std/path"
 import { fastlanePilotUpload } from "~/actions/fastlane/pilot.ts"
+import { googlePlayUpload } from "~/actions/google-play/upload.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
@@ -240,7 +241,11 @@ export async function runDonateSpeechDeployAndroid() {
     const serviceAccountJson = secrets.get(
       "android/divvun/googleServiceAccountJson",
     )
-    await googlePlayUpload(serviceAccountJson, BUNDLE_ID_ANDROID, aabPath)
+    await googlePlayUpload({
+      serviceAccountJson,
+      packageName: BUNDLE_ID_ANDROID,
+      aabPath,
+    })
   })
 }
 
@@ -266,127 +271,6 @@ export async function runDonateSpeechDeployIOS() {
       ipaPath,
     })
   })
-}
-
-// --- Google Play API upload (no external dependencies) ---
-
-async function googlePlayGetAccessToken(
-  serviceAccountJson: string,
-): Promise<string> {
-  const sa = JSON.parse(serviceAccountJson)
-  const now = Math.floor(Date.now() / 1000)
-
-  const header = base64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }))
-  const claims = base64Url(JSON.stringify({
-    iss: sa.client_email,
-    scope: "https://www.googleapis.com/auth/androidpublisher",
-    aud: sa.token_uri,
-    iat: now,
-    exp: now + 3600,
-  }))
-
-  const pemBody = sa.private_key
-    .replace(/-----BEGIN PRIVATE KEY-----/, "")
-    .replace(/-----END PRIVATE KEY-----/, "")
-    .replace(/\s/g, "")
-
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0)),
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"],
-  )
-
-  const sig = base64Url(
-    new Uint8Array(
-      await crypto.subtle.sign(
-        "RSASSA-PKCS1-v1_5",
-        key,
-        new TextEncoder().encode(`${header}.${claims}`),
-      ),
-    ),
-  )
-
-  const resp = await fetch(sa.token_uri, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: `${header}.${claims}.${sig}`,
-    }),
-  })
-
-  if (!resp.ok) {
-    throw new Error(
-      `Failed to get access token: ${resp.status} ${await resp.text()}`,
-    )
-  }
-  return (await resp.json()).access_token
-}
-
-function base64Url(input: string | Uint8Array): string {
-  const data = typeof input === "string"
-    ? new TextEncoder().encode(input)
-    : input
-  return encodeBase64(data)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "")
-}
-
-async function googlePlayUpload(
-  serviceAccountJson: string,
-  packageName: string,
-  aabPath: string,
-) {
-  const token = await googlePlayGetAccessToken(serviceAccountJson)
-  const api =
-    `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${packageName}`
-
-  async function apiCall(url: string, init?: RequestInit) {
-    const resp = await fetch(url, {
-      ...init,
-      headers: { Authorization: `Bearer ${token}`, ...init?.headers },
-    })
-    if (!resp.ok) {
-      throw new Error(
-        `Google Play API error: ${resp.status} ${await resp.text()}`,
-      )
-    }
-    return resp.json()
-  }
-
-  // Create edit
-  const edit = await apiCall(`${api}/edits`, { method: "POST" })
-  logger.info(`Created edit: ${edit.id}`)
-
-  // Upload AAB
-  const aabData = await Deno.readFile(aabPath)
-  const bundle = await apiCall(
-    `https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/${packageName}/edits/${edit.id}/bundles?uploadType=media`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/octet-stream" },
-      body: aabData,
-    },
-  )
-  logger.info(`Uploaded AAB: version code ${bundle.versionCode}`)
-
-  // Assign to internal track
-  await apiCall(`${api}/edits/${edit.id}/tracks/internal`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      track: "internal",
-      releases: [{ versionCodes: [bundle.versionCode], status: "completed" }],
-    }),
-  })
-  logger.info("Assigned to internal track")
-
-  // Commit
-  await apiCall(`${api}/edits/${edit.id}:commit`, { method: "POST" })
-  logger.info("Edit committed — upload complete")
 }
 
 async function setupSigningFromMatch(
