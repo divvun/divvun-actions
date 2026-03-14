@@ -158,33 +158,38 @@ export async function runDonateSpeechBuildAndroid() {
     const versionCode = 1000 + Number(buildNumber)
     const versionCodePattern =
       /versionCode = tauriProperties\.getProperty\("tauri\.android\.versionCode", "\d+"\)\.toInt\(\)/
-    const match = buildGradle.match(versionCodePattern)
-    if (match) {
-      logger.info(`Found versionCode line: ${match[0]}`)
-      buildGradle = buildGradle.replace(
-        versionCodePattern,
-        `versionCode = ${versionCode}`,
+    if (!versionCodePattern.test(buildGradle)) {
+      throw new Error(
+        "versionCode pattern not found in build.gradle.kts — Tauri may have changed its output format",
       )
-      logger.info(`Replaced with: versionCode = ${versionCode}`)
-    } else {
-      logger.info(`WARNING: versionCode pattern not found in build.gradle.kts`)
-      logger.info(`File contents:\n${buildGradle}`)
     }
+    buildGradle = buildGradle.replace(
+      versionCodePattern,
+      `versionCode = ${versionCode}`,
+    )
+    logger.info(`Set versionCode = ${versionCode}`)
 
     // Add signingConfigs block and wire it to the release build type
+    const escapeGradleString = (s: string) =>
+      s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+
+    const storePassword = escapeGradleString(
+      secrets.get("android/divvun/donate-your-speech/storePassword"),
+    )
+    const keyAlias = escapeGradleString(
+      secrets.get("android/divvun/donate-your-speech/keyalias"),
+    )
+    const keyPassword = escapeGradleString(
+      secrets.get("android/divvun/donate-your-speech/keyPassword"),
+    )
+
     const signingConfig = `
     signingConfigs {
         create("release") {
-            storeFile = file("${keystoreFile.path}")
-            storePassword = "${
-      secrets.get("android/divvun/donate-your-speech/storePassword")
-    }"
-            keyAlias = "${
-      secrets.get("android/divvun/donate-your-speech/keyalias")
-    }"
-            keyPassword = "${
-      secrets.get("android/divvun/donate-your-speech/keyPassword")
-    }"
+            storeFile = file("${escapeGradleString(keystoreFile.path)}")
+            storePassword = "${storePassword}"
+            keyAlias = "${keyAlias}"
+            keyPassword = "${keyPassword}"
         }
     }`
 
