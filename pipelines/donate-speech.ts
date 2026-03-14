@@ -141,10 +141,23 @@ export async function runDonateSpeechBuildAndroid() {
     await builder.exec("pnpm", ["tauri", "android", "init"])
   })
 
-  // Patch the generated build.gradle.kts to add release signing config
-  await builder.group("Configuring signing", async () => {
+  // Patch the generated build.gradle.kts to add signing config and version code
+  await builder.group("Configuring signing and version code", async () => {
+    const buildNumber = builder.env.buildNumber ?? "1"
     const buildGradlePath = "src-tauri/gen/android/app/build.gradle.kts"
     let buildGradle = await Deno.readTextFile(buildGradlePath)
+
+    // Override versionCode with CI build number (Tauri derives one from semver but it doesn't auto-increment)
+    const versionCodePattern = /versionCode = tauriProperties\.getProperty\("tauri\.android\.versionCode", "\d+"\)\.toInt\(\)/
+    const match = buildGradle.match(versionCodePattern)
+    if (match) {
+      logger.info(`Found versionCode line: ${match[0]}`)
+      buildGradle = buildGradle.replace(versionCodePattern, `versionCode = ${buildNumber}`)
+      logger.info(`Replaced with: versionCode = ${buildNumber}`)
+    } else {
+      logger.info(`WARNING: versionCode pattern not found in build.gradle.kts`)
+      logger.info(`File contents:\n${buildGradle}`)
+    }
 
     // Add signingConfigs block and wire it to the release build type
     const signingConfig = `
