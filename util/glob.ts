@@ -14,6 +14,20 @@ export async function globOneFile(
   return null
 }
 
+/** Find the first directory matching a glob pattern, or null if none found. */
+export async function globOneDir(
+  pattern: string,
+  options?: { root?: string },
+): Promise<string | null> {
+  const entries = await fs.expandGlob(pattern, { root: options?.root })
+  for await (const entry of entries) {
+    if (entry.isDirectory) {
+      return entry.path
+    }
+  }
+  return null
+}
+
 /** Find all files matching a glob pattern. */
 export async function globFiles(
   pattern: string,

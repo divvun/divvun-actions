@@ -2,7 +2,7 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import macosSign from "~/services/macos-codesign.ts"
 import { GitHub } from "~/util/github.ts"
-import { globOneFile } from "~/util/glob.ts"
+import { globOneDir } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
@@ -22,7 +22,7 @@ export async function runDonateSpeechBuildMacOS() {
 
   await builder.group("Uploading artifacts", async () => {
     const bundleDir = "src-tauri/target/release/bundle/macos"
-    const appPath = await globOneFile(`${bundleDir}/*.app`)
+    const appPath = await globOneDir(`${bundleDir}/*.app`)
     if (!appPath) {
       throw new Error(`No .app bundle found in ${bundleDir}`)
     }
@@ -62,7 +62,7 @@ export async function runDonateSpeechDeployMacOS() {
     await builder.exec("unzip", ["-q", zipPath, "-d", tempDir.path])
   })
 
-  const appPath = await globOneFile(`${tempDir.path}/*.app`)
+  const appPath = await globOneDir(`${tempDir.path}/*.app`)
   if (!appPath) {
     throw new Error("No .app bundle found after extraction")
   }
