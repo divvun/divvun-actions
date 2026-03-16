@@ -131,6 +131,7 @@ export async function uploadToDevRelease(artifacts: string[]) {
   } else {
     logger.info("Uploading to existing dev release...")
     await gh.uploadRelease(DEV_RELEASE_TAG, artifacts)
+    await gh.refreshReleaseTimestamp(DEV_RELEASE_TAG)
   }
 }
 

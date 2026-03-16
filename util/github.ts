@@ -104,6 +104,39 @@ export class GitHub {
     }
   }
 
+  /**
+   * Reset a release's published_at timestamp to now by toggling it
+   * through draft and back to published.
+   */
+  async refreshReleaseTimestamp(tag: string) {
+    const editArgs = (draft: boolean) => [
+      "release",
+      "edit",
+      tag,
+      `--draft=${draft}`,
+      "--repo",
+      this.#repo,
+    ]
+
+    const toDraft = new Deno.Command("gh", { args: editArgs(true) }).spawn()
+    const { code: draftCode } = await toDraft.output()
+    if (draftCode !== 0) {
+      logger.warning(
+        `Failed to set release ${tag} to draft: exit code ${draftCode}`,
+      )
+      return
+    }
+
+    const toPublished = new Deno.Command("gh", { args: editArgs(false) })
+      .spawn()
+    const { code: publishCode } = await toPublished.output()
+    if (publishCode !== 0) {
+      logger.warning(
+        `Failed to publish release ${tag}: exit code ${publishCode}`,
+      )
+    }
+  }
+
   async releaseExists(tag: string): Promise<boolean> {
     const args = ["release", "view", tag, "--repo", this.#repo]
 
