@@ -34,6 +34,12 @@ export function pipelineDonateSpeech(): BuildkitePipeline {
         command: "divvun-actions run donate-speech-build-android",
         agents: { queue: "linux" },
       }),
+      command({
+        label: "Build macOS",
+        key: "build-macos",
+        command: "divvun-actions run donate-speech-build-macos",
+        agents: { queue: "macos" },
+      }),
     ],
   }
 
@@ -49,6 +55,12 @@ export function pipelineDonateSpeech(): BuildkitePipeline {
         label: "Deploy Android",
         command: "divvun-actions run donate-speech-deploy-android",
         depends_on: "build-android",
+        agents: { queue: "linux" },
+      }),
+      command({
+        label: "Sign & Deploy macOS",
+        command: "divvun-actions run donate-speech-deploy-macos",
+        depends_on: "build-macos",
         agents: { queue: "linux" },
       }),
     )
@@ -76,3 +88,7 @@ export {
   runDonateSpeechBuildAndroid,
   runDonateSpeechDeployAndroid,
 } from "./android.ts"
+export {
+  runDonateSpeechBuildMacOS,
+  runDonateSpeechDeployMacOS,
+} from "./macos.ts"
