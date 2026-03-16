@@ -15,13 +15,16 @@ export async function runDonateSpeechBuildMacOS() {
     await builder.exec("pnpm", [
       "tauri",
       "build",
+      "--target",
+      "universal-apple-darwin",
       "--config",
       "src-tauri/tauri.conf.release.json",
     ])
   })
 
   await builder.group("Uploading artifacts", async () => {
-    const bundleDir = "src-tauri/target/release/bundle/macos"
+    const bundleDir =
+      "src-tauri/target/universal-apple-darwin/release/bundle/macos"
     const appPath = await globOneDir(`${bundleDir}/*.app`)
     if (!appPath) {
       throw new Error(`No .app bundle found in ${bundleDir}`)
