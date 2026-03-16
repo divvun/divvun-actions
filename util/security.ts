@@ -52,13 +52,18 @@ export class Security {
   }
 
   public static async keychainExists(name: string): Promise<boolean> {
-    const { stdout } = await new Deno.Command("security", {
-      args: ["list-keychains"],
-      stdout: "piped",
-      stderr: "null",
-    }).output()
-    const keychains = new TextDecoder().decode(stdout)
-    return keychains.includes(`${name}.keychain`)
+    // Check the file on disk rather than `security list-keychains`, because
+    // list-keychains only shows keychains in the search list.  If a previous
+    // run was killed after create-keychain but before list-keychains -s, the
+    // file exists but won't appear in the search list.
+    const home = Deno.env.get("HOME")
+    const path = `${home}/Library/Keychains/${name}.keychain-db`
+    try {
+      await Deno.stat(path)
+      return true
+    } catch {
+      return false
+    }
   }
 
   public static async deleteKeychain(name: string) {
