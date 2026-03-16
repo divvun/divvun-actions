@@ -4,7 +4,7 @@ import { globOneFile } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir, makeTempFile } from "~/util/temp.ts"
 import { setupSigningFromMatch } from "~/util/security.ts"
-import { BUNDLE_ID, KEYCHAIN_NAME, findBuildArtifact } from "./mod.ts"
+import { BUNDLE_ID, findBuildArtifact, KEYCHAIN_NAME } from "./mod.ts"
 
 export async function runDonateSpeechBuildIOS() {
   const secrets = await builder.secrets()

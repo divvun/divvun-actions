@@ -71,10 +71,7 @@ export async function findBuildArtifact(
   )
 }
 
-export {
-  runDonateSpeechBuildIOS,
-  runDonateSpeechDeployIOS,
-} from "./ios.ts"
+export { runDonateSpeechBuildIOS, runDonateSpeechDeployIOS } from "./ios.ts"
 export {
   runDonateSpeechBuildAndroid,
   runDonateSpeechDeployAndroid,
