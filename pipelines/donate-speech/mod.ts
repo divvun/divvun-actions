@@ -23,65 +23,86 @@ function command(input: CommandStep): CommandStep {
 export function pipelineDonateSpeech(): BuildkitePipeline {
   const isMainBranch = builder.env.branch === "main"
 
-  const pipeline: BuildkitePipeline = {
+  return {
     steps: [
-      command({
-        label: "Build & Sign iOS",
-        key: "build-ios",
-        command: "divvun-actions run donate-speech-build-ios",
-        agents: { queue: "macos" },
-      }),
-      command({
-        label: "Build & Sign Android",
-        key: "build-android",
-        command: "divvun-actions run donate-speech-build-android",
-        agents: { queue: "linux" },
-      }),
-      command({
-        label: "Build macOS",
-        key: "build-macos",
-        command: "divvun-actions run donate-speech-build-macos",
-        agents: { queue: "macos" },
-      }),
-      command({
-        label: "Build Windows",
-        key: "build-windows",
-        command: "divvun-actions run donate-speech-build-windows",
-        agents: { queue: "windows" },
-      }),
+      {
+        group: "iOS",
+        steps: [
+          command({
+            label: "Build & Sign",
+            key: "build-ios",
+            command: "divvun-actions run donate-speech-build-ios",
+            agents: { queue: "macos" },
+          }),
+          ...(isMainBranch
+            ? [command({
+              label: "Deploy",
+              command: "divvun-actions run donate-speech-deploy-ios",
+              depends_on: "build-ios",
+              agents: { queue: "macos" },
+            })]
+            : []),
+        ],
+      },
+      {
+        group: "Android",
+        steps: [
+          command({
+            label: "Build & Sign",
+            key: "build-android",
+            command: "divvun-actions run donate-speech-build-android",
+            agents: { queue: "linux" },
+          }),
+          ...(isMainBranch
+            ? [command({
+              label: "Deploy",
+              command: "divvun-actions run donate-speech-deploy-android",
+              depends_on: "build-android",
+              agents: { queue: "linux" },
+            })]
+            : []),
+        ],
+      },
+      {
+        group: "macOS",
+        steps: [
+          command({
+            label: "Build",
+            key: "build-macos",
+            command: "divvun-actions run donate-speech-build-macos",
+            agents: { queue: "macos" },
+          }),
+          ...(isMainBranch
+            ? [command({
+              label: "Sign & Deploy",
+              command: "divvun-actions run donate-speech-deploy-macos",
+              depends_on: "build-macos",
+              agents: { queue: "linux" },
+            })]
+            : []),
+        ],
+      },
+      {
+        group: "Windows",
+        steps: [
+          command({
+            label: "Build",
+            key: "build-windows",
+            command: "divvun-actions run donate-speech-build-windows",
+            agents: { queue: "windows" },
+          }),
+          ...(isMainBranch
+            ? [command({
+              label: "Sign & Deploy",
+              command: "divvun-actions run donate-speech-deploy-windows",
+              depends_on: "build-windows",
+              agents: { queue: "linux" },
+            })]
+            : []),
+        ],
+      },
     ],
   }
-
-  if (isMainBranch) {
-    pipeline.steps.push(
-      command({
-        label: "Deploy iOS",
-        command: "divvun-actions run donate-speech-deploy-ios",
-        depends_on: "build-ios",
-        agents: { queue: "macos" },
-      }),
-      command({
-        label: "Deploy Android",
-        command: "divvun-actions run donate-speech-deploy-android",
-        depends_on: "build-android",
-        agents: { queue: "linux" },
-      }),
-      command({
-        label: "Sign & Deploy macOS",
-        command: "divvun-actions run donate-speech-deploy-macos",
-        depends_on: "build-macos",
-        agents: { queue: "linux" },
-      }),
-      command({
-        label: "Sign & Deploy Windows",
-        command: "divvun-actions run donate-speech-deploy-windows",
-        depends_on: "build-windows",
-        agents: { queue: "linux" },
-      }),
-    )
-  }
-
-  return pipeline
 }
 
 /**
