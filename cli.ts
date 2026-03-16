@@ -54,9 +54,11 @@ import {
   runDonateSpeechBuildAndroid,
   runDonateSpeechBuildIOS,
   runDonateSpeechBuildMacOS,
+  runDonateSpeechBuildWindows,
   runDonateSpeechDeployAndroid,
   runDonateSpeechDeployIOS,
   runDonateSpeechDeployMacOS,
+  runDonateSpeechDeployWindows,
 } from "./pipelines/donate-speech/mod.ts"
 import {
   pipelinePdfStrings,
@@ -328,6 +330,14 @@ async function runPipeline(args: any) {
     }
     case "donate-speech-deploy-macos": {
       await runDonateSpeechDeployMacOS()
+      break
+    }
+    case "donate-speech-build-windows": {
+      await runDonateSpeechBuildWindows()
+      break
+    }
+    case "donate-speech-deploy-windows": {
+      await runDonateSpeechDeployWindows()
       break
     }
     case "debug": {

@@ -1,11 +1,14 @@
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
+import { GitHub } from "~/util/github.ts"
 import { globOneFile } from "~/util/glob.ts"
+import logger from "~/util/log.ts"
 
 export const BUNDLE_ID = "no.uit.divvun.donate-your-speech"
 export const BUNDLE_ID_ANDROID = "no.uit.divvun.donate_your_speech"
 export const KEYCHAIN_NAME = "donate-speech-signing"
+export const DEV_RELEASE_TAG = "dev"
 
 function command(input: CommandStep): CommandStep {
   return {
@@ -40,6 +43,12 @@ export function pipelineDonateSpeech(): BuildkitePipeline {
         command: "divvun-actions run donate-speech-build-macos",
         agents: { queue: "macos" },
       }),
+      command({
+        label: "Build Windows",
+        key: "build-windows",
+        command: "divvun-actions run donate-speech-build-windows",
+        agents: { queue: "windows" },
+      }),
     ],
   }
 
@@ -63,10 +72,45 @@ export function pipelineDonateSpeech(): BuildkitePipeline {
         depends_on: "build-macos",
         agents: { queue: "linux" },
       }),
+      command({
+        label: "Sign & Deploy Windows",
+        command: "divvun-actions run donate-speech-deploy-windows",
+        depends_on: "build-windows",
+        agents: { queue: "linux" },
+      }),
     )
   }
 
   return pipeline
+}
+
+/**
+ * Upload artifacts to the shared "dev" GitHub Release.
+ * Creates the release if it doesn't exist, otherwise adds/replaces assets
+ * without removing other platforms' artifacts.
+ */
+export async function uploadToDevRelease(artifacts: string[]) {
+  if (!builder.env.repo) {
+    throw new Error("No repo found, cannot deploy")
+  }
+
+  const gh = new GitHub(builder.env.repo)
+  const exists = await gh.releaseExists(DEV_RELEASE_TAG)
+
+  if (!exists) {
+    logger.info("Creating dev release...")
+    await gh.ensureTagExists(DEV_RELEASE_TAG)
+    await gh.createRelease(DEV_RELEASE_TAG, artifacts, {
+      draft: false,
+      prerelease: true,
+      latest: false,
+      verifyTag: true,
+      name: "Dev Build",
+    })
+  } else {
+    logger.info("Uploading to existing dev release...")
+    await gh.uploadRelease(DEV_RELEASE_TAG, artifacts)
+  }
 }
 
 export async function findBuildArtifact(
@@ -92,3 +136,7 @@ export {
   runDonateSpeechBuildMacOS,
   runDonateSpeechDeployMacOS,
 } from "./macos.ts"
+export {
+  runDonateSpeechBuildWindows,
+  runDonateSpeechDeployWindows,
+} from "./windows.ts"

@@ -1,10 +1,10 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import macosSign from "~/services/macos-codesign.ts"
-import { GitHub } from "~/util/github.ts"
 import { globOneDir } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
+import { uploadToDevRelease } from "./mod.ts"
 
 export async function runDonateSpeechBuildMacOS() {
   await builder.group("Installing dependencies", async () => {
@@ -41,10 +41,6 @@ export async function runDonateSpeechBuildMacOS() {
 }
 
 export async function runDonateSpeechDeployMacOS() {
-  if (!builder.env.repo) {
-    throw new Error("No repo found, cannot deploy")
-  }
-
   using tempDir = await makeTempDir()
 
   await builder.group("Downloading artifacts", async () => {
@@ -79,12 +75,7 @@ export async function runDonateSpeechDeployMacOS() {
       cwd: tempDir.path,
     })
 
-    logger.info(`Uploading to macos-dev release: ${signedZip}`)
-    const gh = new GitHub(builder.env.repo!)
-    await gh.updateRelease("macos-dev", [signedZip], {
-      draft: false,
-      prerelease: true,
-      name: "macOS Dev Build",
-    })
+    logger.info(`Uploading to dev release: ${signedZip}`)
+    await uploadToDevRelease([signedZip])
   })
 }
