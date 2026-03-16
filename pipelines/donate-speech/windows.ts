@@ -15,6 +15,8 @@ export async function runDonateSpeechBuildWindows() {
     await builder.exec("pnpm", [
       "tauri",
       "build",
+      "--bundles",
+      "nsis",
       "--config",
       "src-tauri/tauri.conf.release.json",
     ])
@@ -22,14 +24,14 @@ export async function runDonateSpeechBuildWindows() {
 
   await builder.group("Uploading artifacts", async () => {
     const bundleDir = "src-tauri/target/release/bundle"
-    const msiPath = await globOneFile(`${bundleDir}/msi/*.msi`)
-    if (!msiPath) {
-      throw new Error(`No .msi installer found in ${bundleDir}/msi`)
+    const exePath = await globOneFile(`${bundleDir}/nsis/*.exe`)
+    if (!exePath) {
+      throw new Error(`No .exe installer found in ${bundleDir}/nsis`)
     }
-    logger.info(`Found MSI: ${msiPath}`)
+    logger.info(`Found NSIS installer: ${exePath}`)
 
-    const artifactName = "donate-your-speech-windows-unsigned.msi"
-    await Deno.copyFile(msiPath, artifactName)
+    const artifactName = "donate-your-speech-windows-unsigned.exe"
+    await Deno.copyFile(exePath, artifactName)
     await builder.uploadArtifacts(artifactName)
   })
 }
@@ -39,19 +41,19 @@ export async function runDonateSpeechDeployWindows() {
 
   await builder.group("Downloading artifacts", async () => {
     await builder.downloadArtifacts(
-      "donate-your-speech-windows-unsigned.msi",
+      "donate-your-speech-windows-unsigned.exe",
       tempDir.path,
     )
   })
 
   const unsignedPath = path.join(
     tempDir.path,
-    "donate-your-speech-windows-unsigned.msi",
+    "donate-your-speech-windows-unsigned.exe",
   )
-  const signedPath = path.join(tempDir.path, "donate-your-speech-windows.msi")
+  const signedPath = path.join(tempDir.path, "donate-your-speech-windows.exe")
 
   await builder.group("Signing", async () => {
-    logger.info(`Signing MSI: ${unsignedPath}`)
+    logger.info(`Signing installer: ${unsignedPath}`)
     await sign(unsignedPath)
     await Deno.rename(unsignedPath, signedPath)
   })
