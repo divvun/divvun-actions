@@ -13,6 +13,7 @@ import langSpellerTest from "~/actions/lang/test-speller.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
+import { globFiles, globOneFile } from "~/util/glob.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
 import { versionAsDev } from "~/util/shared.ts"
@@ -219,27 +220,6 @@ export async function runLangBundle(
     manifest,
     spellerPaths,
   })
-}
-
-async function globOneFile(pattern: string): Promise<string | null> {
-  const files = await fs.expandGlob(pattern)
-  for await (const file of files) {
-    if (file.isFile) {
-      return file.path
-    }
-  }
-  return null
-}
-
-async function globFiles(pattern: string): Promise<string[]> {
-  const files = await fs.expandGlob(pattern)
-  const result: string[] = []
-  for await (const file of files) {
-    if (file.isFile) {
-      result.push(file.path)
-    }
-  }
-  return result
 }
 
 function extractVersionFromTag(tag: string): string | null {

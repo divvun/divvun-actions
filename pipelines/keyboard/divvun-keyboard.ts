@@ -1,4 +1,3 @@
-import * as fs from "@std/fs"
 import * as path from "@std/path"
 import { fastlanePilotUpload } from "~/actions/fastlane/pilot.ts"
 import keyboardBuildMeta from "~/actions/keyboard/build-meta.ts"
@@ -7,6 +6,7 @@ import { KeyboardType } from "~/actions/keyboard/types.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
+import { globOneFile } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import keyboardDeploy from "../../actions/keyboard/deploy.ts"
@@ -218,28 +218,17 @@ export async function runDesktopKeyboardDeploy(keyboardType: KeyboardType) {
 
   const bundlePath = await builder.metadata("bundle-path")
 
-  // Find downloaded artifacts using glob patterns in temp directory
-  async function globOneFile(pattern: string): Promise<string | null> {
-    const files = await fs.expandGlob(pattern, { root: tempDir.path })
-    for await (const file of files) {
-      if (file.isFile) {
-        return file.path
-      }
-    }
-    return null
-  }
-
   let payloadPath: string | null = null
   let channel: string | null = null
   let version: string
 
   if (keyboardType === KeyboardType.Windows) {
-    payloadPath = await globOneFile("**/*.exe")
+    payloadPath = await globOneFile("**/*.exe", { root: tempDir.path })
     channel = await builder.metadata("windows-channel") || null
     version = await builder.metadata("windows-version")
     logger.debug(`Deploying Windows keyboard: ${payloadPath}`)
   } else if (keyboardType === KeyboardType.MacOS) {
-    payloadPath = await globOneFile("**/*.pkg")
+    payloadPath = await globOneFile("**/*.pkg", { root: tempDir.path })
     channel = await builder.metadata("macos-channel") || null
     version = await builder.metadata("macos-version")
     logger.debug(`Deploying macOS keyboard: ${payloadPath}`)
