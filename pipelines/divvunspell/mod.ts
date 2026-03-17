@@ -83,6 +83,8 @@ function buildBin(arch: string): { cmd: string; args: string[] } {
     "divvunspell-cli",
     "--bin",
     "divvunspell",
+    "--features",
+    "accuracy",
     "--release",
     "--target",
     arch,
@@ -106,9 +108,12 @@ export function pipelineDivvunspell() {
   const libSteps = []
 
   let isPublishLib = false
+  let isPublishBin = false
 
   if (builder.env.tag?.startsWith("libdivvun-fst/v")) {
     isPublishLib = true
+  } else if (builder.env.tag?.startsWith("divvunspell/v")) {
+    isPublishBin = true
   }
 
   if (!isPublishLib) {
@@ -145,52 +150,54 @@ export function pipelineDivvunspell() {
     }
   }
 
-  for (const [os, archs] of Object.entries(libPlatforms)) {
-    for (const arch of archs) {
-      const { cmd, args } = buildLib(arch)
+  if (!isPublishBin) {
+    for (const [os, archs] of Object.entries(libPlatforms)) {
+      for (const arch of archs) {
+        const { cmd, args } = buildLib(arch)
 
-      if (os === "windows") {
-        libSteps.push(command({
-          agents: {
-            queue: os,
-          },
-          label: arch,
-          command: [
-            `${cmd} ${args.join(" ")}`,
-            `mv target/${arch}/release/divvun_fst.dll divvun_fst-${arch}.dll`,
-            `buildkite-agent artifact upload divvun_fst-${arch}.dll`,
-          ],
-        }))
-      } else {
-        const ext = os === "linux" ? "so" : "dylib"
-        const libName = `libdivvun_fst-${arch}.${ext}`
+        if (os === "windows") {
+          libSteps.push(command({
+            agents: {
+              queue: os,
+            },
+            label: arch,
+            command: [
+              `${cmd} ${args.join(" ")}`,
+              `mv target/${arch}/release/divvun_fst.dll divvun_fst-${arch}.dll`,
+              `buildkite-agent artifact upload divvun_fst-${arch}.dll`,
+            ],
+          }))
+        } else {
+          const ext = os === "linux" ? "so" : "dylib"
+          const libName = `libdivvun_fst-${arch}.${ext}`
 
-        let stripCmd
-        if (arch.includes("android")) {
-          const ndkHome = Deno.env.get("ANDROID_NDK_HOME")
+          let stripCmd
+          if (arch.includes("android")) {
+            const ndkHome = Deno.env.get("ANDROID_NDK_HOME")
 
-          if (!ndkHome) {
-            throw new Error("ANDROID_NDK_HOME not set")
+            if (!ndkHome) {
+              throw new Error("ANDROID_NDK_HOME not set")
+            }
+
+            stripCmd =
+              `${ndkHome}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip`
           }
 
-          stripCmd =
-            `${ndkHome}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip`
+          const commands = [
+            `${cmd} ${args.join(" ")}`,
+            `mv target/${arch}/release/libdivvun_fst.${ext} ${libName}`,
+            stripCmd ? `${stripCmd} ${libName}` : undefined,
+            `buildkite-agent artifact upload ${libName}`,
+          ].filter((c) => c !== undefined) as string[]
+
+          libSteps.push(command({
+            agents: {
+              queue: os,
+            },
+            label: arch,
+            command: commands,
+          }))
         }
-
-        const commands = [
-          `${cmd} ${args.join(" ")}`,
-          `mv target/${arch}/release/libdivvun_fst.${ext} ${libName}`,
-          stripCmd ? `${stripCmd} ${libName}` : undefined,
-          `buildkite-agent artifact upload ${libName}`,
-        ].filter((c) => c !== undefined) as string[]
-
-        libSteps.push(command({
-          agents: {
-            queue: os,
-          },
-          label: arch,
-          command: commands,
-        }))
       }
     }
   }
@@ -207,11 +214,13 @@ export function pipelineDivvunspell() {
     })
   }
 
-  pipeline.steps.push({
-    group: "Build Libraries",
-    key: "build-libraries",
-    steps: libSteps,
-  })
+  if (libSteps.length > 0) {
+    pipeline.steps.push({
+      group: "Build Libraries",
+      key: "build-libraries",
+      steps: libSteps,
+    })
+  }
 
   if (isPublishLib) {
     pipeline.steps.push(command({
@@ -221,6 +230,17 @@ export function pipelineDivvunspell() {
         queue: "linux",
       },
       depends_on: "build-libraries",
+    }))
+  }
+
+  if (isPublishBin) {
+    pipeline.steps.push(command({
+      label: "Publish",
+      command: "divvun-actions run divvunspell-publish",
+      agents: {
+        queue: "linux",
+      },
+      depends_on: "build-binaries",
     }))
   }
 
@@ -375,5 +395,65 @@ export async function runLibdivvunFstPublish() {
   logger.info("Creating GitHub release...")
   const gh = new GitHub(builder.env.repo)
   await gh.createRelease(builder.env.tag, artifacts)
+  logger.info("GitHub release completed")
+}
+
+export async function runDivvunspellPublish() {
+  if (!builder.env.tag) {
+    throw new Error("No tag found, cannot publish divvunspell")
+  }
+
+  if (!builder.env.tag.startsWith("divvunspell/v")) {
+    throw new Error(
+      `Tag ${builder.env.tag} does not start with divvunspell/v, cannot publish divvunspell`,
+    )
+  }
+
+  if (!builder.env.repo) {
+    throw new Error("No repo found, cannot publish divvunspell")
+  }
+
+  const [_prefix, version] = builder.env.tag.split("/")
+
+  using tempDir = await makeTempDir()
+  await builder.downloadArtifacts(`divvunspell-*`, tempDir.path)
+
+  using archivePath = await makeTempDir({ prefix: "divvunspell-" })
+  const artifacts: string[] = []
+
+  for (const [os, archs] of Object.entries(binPlatforms)) {
+    for (const arch of archs) {
+      const isWindows = os === "windows"
+      const ext = isWindows ? "zip" : "tgz"
+      const binaryExt = isWindows ? ".exe" : ""
+      const artifactName = `divvunspell-${arch}${binaryExt}`
+      const inputPath = `${tempDir.path}/${artifactName}`
+
+      if (!isWindows) {
+        await Deno.chmod(inputPath, 0o755)
+      }
+
+      const stagingName = `divvunspell-${arch}-${version}`
+      const stagingDir = `${archivePath.path}/${stagingName}`
+      await Deno.mkdir(stagingDir)
+      await Deno.copyFile(
+        inputPath,
+        `${stagingDir}/divvunspell${binaryExt}`,
+      )
+
+      const outPath = `${archivePath.path}/${stagingName}.${ext}`
+      if (isWindows) {
+        await Zip.create([stagingDir], outPath)
+      } else {
+        await Tar.createFlatTgz([stagingDir], outPath)
+      }
+
+      artifacts.push(outPath)
+    }
+  }
+
+  logger.info(`Creating GitHub release for ${builder.env.tag}...`)
+  const gh = new GitHub(builder.env.repo)
+  await gh.createRelease(builder.env.tag, artifacts, { latest: true })
   logger.info("GitHub release completed")
 }

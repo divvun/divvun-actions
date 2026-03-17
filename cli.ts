@@ -28,6 +28,7 @@ import { pipelineBox, runBoxPublish } from "./pipelines/box.ts"
 import { pipelineBorealium, runBorealiumDeploy } from "./pipelines/borealium.ts"
 import {
   pipelineDivvunspell,
+  runDivvunspellPublish,
   runLibdivvunFstPublish,
 } from "./pipelines/divvunspell/mod.ts"
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
@@ -302,6 +303,10 @@ async function runPipeline(args: any) {
     }
     case "libdivvun-fst-publish": {
       await runLibdivvunFstPublish()
+      break
+    }
+    case "divvunspell-publish": {
+      await runDivvunspellPublish()
       break
     }
     case "pdf-strings-publish": {
