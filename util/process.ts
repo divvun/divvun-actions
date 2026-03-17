@@ -44,16 +44,30 @@ export async function spawn(
 
   if (options?.listeners?.stdout && process.stdout) {
     ;(async () => {
-      for await (const chunk of process.stdout) {
-        options?.listeners?.stdout?.(chunk)
+      const reader = process.stdout.getReader()
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          options?.listeners?.stdout?.(value)
+        }
+      } finally {
+        reader.releaseLock()
       }
     })()
   }
 
   if (options?.listeners?.stderr && process.stderr) {
     ;(async () => {
-      for await (const chunk of process.stderr) {
-        options?.listeners?.stderr?.(chunk)
+      const reader = process.stderr.getReader()
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          options?.listeners?.stderr?.(value)
+        }
+      } finally {
+        reader.releaseLock()
       }
     })()
   }

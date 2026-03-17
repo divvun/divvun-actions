@@ -2,6 +2,7 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import { GitHub } from "~/util/github.ts"
+import logger from "~/util/log.ts"
 import { Tar } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
@@ -89,11 +90,11 @@ export async function runLibpahkatAndroid() {
           if (file.name === "libpahkat_client.so") {
             // Strip the libpahkat_client.so file
             await builder.exec(stripCmd, [filePath])
-            console.log(`Stripped ${filePath}`)
+            logger.info(`Stripped ${filePath}`)
           } else if (!file.name.startsWith("libpahkat")) {
             // Remove non-libpahkat .so files
             await Deno.remove(filePath)
-            console.log(`Removed ${filePath}`)
+            logger.info(`Removed ${filePath}`)
           }
         }
       }
@@ -103,7 +104,7 @@ export async function runLibpahkatAndroid() {
   // Create tarball of jniLibs directory
   const tarPath = "libpahkat-android.tar.gz"
   await Tar.createFlatTgz([jniLibsPath], tarPath)
-  console.log(`Created tarball: ${tarPath}`)
+  logger.info(`Created tarball: ${tarPath}`)
 
   // Upload tarball as artifact
   await builder.uploadArtifacts(tarPath)

@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 
@@ -39,12 +40,12 @@ export async function buildLibomp(options: BuildLibompOptions) {
     version = "21.1.4",
   } = options
 
-  console.log("Building LLVM OpenMP Runtime (libomp)")
+  logger.info("Building LLVM OpenMP Runtime (libomp)")
 
   const platform = detectPlatform(target)
 
   if (platform === "windows") {
-    console.log(
+    logger.info(
       "Warning: Static OpenMP is not officially supported on Windows",
     )
   }
@@ -68,7 +69,7 @@ export async function buildLibomp(options: BuildLibompOptions) {
   const isCrossCompile = platform === "linux" && targetTriple !== hostTriple
 
   if (isCrossCompile) {
-    console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
+    logger.info(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
   }
 
   // Set up compilers
@@ -113,21 +114,21 @@ export async function buildLibomp(options: BuildLibompOptions) {
     cxx = "cl.exe"
   }
 
-  console.log("")
-  console.log("=== OpenMP Build Configuration ===")
-  console.log(`Target triple:      ${target}`)
-  console.log(`Build type:         ${buildType}`)
-  console.log(`Platform:           ${platform}`)
-  console.log(`C compiler:         ${cc}`)
-  console.log(`C++ compiler:       ${cxx}`)
-  console.log(`LLVM source:        ${llvmProjectDir}`)
-  console.log(`Build directory:    ${buildRoot}`)
-  console.log(`Install prefix:     ${installPrefix}`)
-  console.log("======================================")
-  console.log("")
+  logger.info("")
+  logger.info("=== OpenMP Build Configuration ===")
+  logger.info(`Target triple:      ${target}`)
+  logger.info(`Build type:         ${buildType}`)
+  logger.info(`Platform:           ${platform}`)
+  logger.info(`C compiler:         ${cc}`)
+  logger.info(`C++ compiler:       ${cxx}`)
+  logger.info(`LLVM source:        ${llvmProjectDir}`)
+  logger.info(`Build directory:    ${buildRoot}`)
+  logger.info(`Install prefix:     ${installPrefix}`)
+  logger.info("======================================")
+  logger.info("")
 
   // Clone LLVM project
-  console.log("Removing existing LLVM project directory (if any)...")
+  logger.info("Removing existing LLVM project directory (if any)...")
   try {
     await Deno.remove(llvmProjectDir, { recursive: true })
   } catch {
@@ -135,7 +136,7 @@ export async function buildLibomp(options: BuildLibompOptions) {
   }
 
   const llvmTag = convertLibompVersionToTag(version)
-  console.log(`Cloning LLVM project (tag ${llvmTag})...`)
+  logger.info(`Cloning LLVM project (tag ${llvmTag})...`)
   await builder.exec("git", [
     "clone",
     "--depth",
@@ -148,7 +149,7 @@ export async function buildLibomp(options: BuildLibompOptions) {
 
   // Clean build directory if requested
   if (clean) {
-    console.log("Cleaning build directory...")
+    logger.info("Cleaning build directory...")
     try {
       await Deno.remove(buildRoot, { recursive: true })
     } catch {
@@ -213,7 +214,7 @@ export async function buildLibomp(options: BuildLibompOptions) {
   }
 
   // Run CMake configuration
-  console.log("Running CMake configuration...")
+  logger.info("Running CMake configuration...")
   Deno.env.set("MSYS_NO_PATHCONV", "1")
   Deno.env.set("MSYS2_ARG_CONV_EXCL", "*")
 
@@ -238,7 +239,7 @@ export async function buildLibomp(options: BuildLibompOptions) {
   }
 
   // Build
-  console.log(`Building with ${maxJobs} parallel jobs...`)
+  logger.info(`Building with ${maxJobs} parallel jobs...`)
   Deno.env.set("MSYS_NO_PATHCONV", "1")
   Deno.env.set("MSYS2_ARG_CONV_EXCL", "*")
 
@@ -254,21 +255,21 @@ export async function buildLibomp(options: BuildLibompOptions) {
   Deno.env.delete("MSYS_NO_PATHCONV")
   Deno.env.delete("MSYS2_ARG_CONV_EXCL")
 
-  console.log("")
-  console.log("OpenMP build completed successfully!")
-  console.log("")
-  console.log(`Target: ${target}`)
-  console.log("")
-  console.log("Library files:")
+  logger.info("")
+  logger.info("OpenMP build completed successfully!")
+  logger.info("")
+  logger.info(`Target: ${target}`)
+  logger.info("")
+  logger.info("Library files:")
   try {
     const libs = await builder.output("ls", ["-lh"], {
       cwd: path.join(installPrefix, "lib"),
     })
-    console.log(libs)
+    logger.info(libs)
   } catch {
-    console.log("  (none found - check build output)")
+    logger.info("  (none found - check build output)")
   }
-  console.log("")
-  console.log(`You can now link against: ${installPrefix}/lib/libomp.a`)
-  console.log("")
+  logger.info("")
+  logger.info(`You can now link against: ${installPrefix}/lib/libomp.a`)
+  logger.info("")
 }

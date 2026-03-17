@@ -1,9 +1,10 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { GitHub } from "~/util/github.ts"
+import logger from "~/util/log.ts"
 
 export async function publishLibrary(library: string, version: string) {
-  console.log(`Publishing ${library} ${version}`)
+  logger.info(`Publishing ${library} ${version}`)
 
   // Download all artifacts (both Unix and Windows path separators)
   await builder.downloadArtifacts(`target/${library}_*.tar.gz`, ".")
@@ -36,7 +37,7 @@ export async function publishLibrary(library: string, version: string) {
     }
   }
 
-  console.log(`Found ${artifacts.length} artifacts`)
+  logger.info(`Found ${artifacts.length} artifacts`)
 
   // Rename each artifact with version in filename
   const versionedArtifacts: string[] = []
@@ -50,7 +51,7 @@ export async function publishLibrary(library: string, version: string) {
       : `${library}_(.+)\\.tar\\.gz$`
     const targetMatch = artifact.match(pattern)
     if (!targetMatch) {
-      console.log(`Warning: Could not parse target from ${artifact}`)
+      logger.info(`Warning: Could not parse target from ${artifact}`)
       continue
     }
     const target = targetMatch[1]
@@ -65,7 +66,7 @@ export async function publishLibrary(library: string, version: string) {
     await Deno.rename(artifact, versionedArtifact)
 
     versionedArtifacts.push(versionedArtifact)
-    console.log(`Renamed ${artifact} to ${versionedArtifact}`)
+    logger.info(`Renamed ${artifact} to ${versionedArtifact}`)
   }
 
   if (versionedArtifacts.length === 0) {
@@ -78,12 +79,12 @@ export async function publishLibrary(library: string, version: string) {
 
   const exists = await gh.releaseExists(tag)
   if (!exists) {
-    console.log(`Creating GitHub release ${tag}`)
+    logger.info(`Creating GitHub release ${tag}`)
     await gh.createRelease(tag, [], { verifyTag: false })
   }
 
-  console.log(`Uploading ${versionedArtifacts.length} artifacts to ${tag}`)
+  logger.info(`Uploading ${versionedArtifacts.length} artifacts to ${tag}`)
   await gh.uploadRelease(tag, versionedArtifacts)
 
-  console.log(`Successfully published ${library} ${version}`)
+  logger.info(`Successfully published ${library} ${version}`)
 }

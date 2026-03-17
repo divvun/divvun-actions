@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 
@@ -21,14 +22,14 @@ export async function buildExecutorchLinux(
     verbose = false,
   } = options
 
-  console.log(`Building ExecuTorch for Linux (${target})`)
+  logger.info(`Building ExecuTorch for Linux (${target})`)
 
   const repoRoot = Deno.cwd()
   const executorchRoot = path.join(repoRoot, "executorch")
 
   // Detect host architecture
   const hostArch = Deno.build.arch === "aarch64" ? "aarch64" : "x86_64"
-  console.log(`Detected host architecture: ${hostArch}`)
+  logger.info(`Detected host architecture: ${hostArch}`)
 
   // Determine target architecture and libc
   const targetArch = target.startsWith("aarch64") ? "aarch64" : "x86_64"
@@ -39,7 +40,7 @@ export async function buildExecutorchLinux(
   const isCrossCompile = target !== hostTriple
 
   if (isCrossCompile) {
-    console.log(`Cross-compiling: ${hostTriple} -> ${target}`)
+    logger.info(`Cross-compiling: ${hostTriple} -> ${target}`)
   }
 
   // Check for Python venv
@@ -49,14 +50,14 @@ export async function buildExecutorchLinux(
   try {
     await Deno.stat(venvPath)
   } catch {
-    console.log("No .venv found, creating one with uv...")
+    logger.info("No .venv found, creating one with uv...")
     await builder.exec("uv", ["venv"], { cwd: executorchRoot })
   }
 
-  console.log(`Using Python: ${pythonPath}`)
+  logger.info(`Using Python: ${pythonPath}`)
 
   // Install Python dependencies
-  console.log("Installing Python dependencies")
+  logger.info("Installing Python dependencies")
   await builder.exec(
     "uv",
     [
@@ -77,7 +78,7 @@ export async function buildExecutorchLinux(
   const buildRoot = path.join(repoRoot, `build/${target}/executorch`)
 
   if (clean) {
-    console.log("Cleaning build and install directories...")
+    logger.info("Cleaning build and install directories...")
     try {
       await Deno.remove(buildRoot, { recursive: true })
     } catch {
@@ -170,18 +171,18 @@ export async function buildExecutorchLinux(
   }
 
   // Display build configuration
-  console.log("")
-  console.log("=== Linux Build Configuration ===")
-  console.log(`Target triple:      ${target}`)
-  console.log(`Host triple:        ${hostTriple}`)
-  console.log(`Cross-compile:      ${isCrossCompile}`)
-  console.log(`Using musl:         ${isMusl}`)
-  console.log(`Build type:         ${buildType}`)
-  console.log(`Python:             ${pythonPath}`)
-  console.log(`Build directory:    ${buildRoot}`)
-  console.log(`Install directory:  ${installPrefix}`)
-  console.log("====================================")
-  console.log("")
+  logger.info("")
+  logger.info("=== Linux Build Configuration ===")
+  logger.info(`Target triple:      ${target}`)
+  logger.info(`Host triple:        ${hostTriple}`)
+  logger.info(`Cross-compile:      ${isCrossCompile}`)
+  logger.info(`Using musl:         ${isMusl}`)
+  logger.info(`Build type:         ${buildType}`)
+  logger.info(`Python:             ${pythonPath}`)
+  logger.info(`Build directory:    ${buildRoot}`)
+  logger.info(`Install directory:  ${installPrefix}`)
+  logger.info("====================================")
+  logger.info("")
 
   // Build environment with venv activated
   const venvBinPath = path.join(venvPath, "bin")
@@ -192,10 +193,10 @@ export async function buildExecutorchLinux(
     VIRTUAL_ENV: venvPath,
   }
 
-  console.log(`Using venv: ${venvPath}`)
+  logger.info(`Using venv: ${venvPath}`)
 
   // Run CMake configuration
-  console.log("Running CMake configuration")
+  logger.info("Running CMake configuration")
   await builder.exec("cmake", ["-B", buildRoot, ...cmakeArgs], {
     cwd: executorchRoot,
     env: buildEnv,
@@ -208,22 +209,22 @@ export async function buildExecutorchLinux(
   }
 
   // Build and install
-  console.log(`Building ExecuTorch (${maxJobs} parallel jobs)`)
+  logger.info(`Building ExecuTorch (${maxJobs} parallel jobs)`)
   await builder.exec(
     "cmake",
     ["--build", buildRoot, "--target", "install", "-j", maxJobs],
     { cwd: executorchRoot, env: buildEnv },
   )
 
-  console.log("")
-  console.log("Linux build completed successfully!")
-  console.log("")
-  console.log(`Target: ${target}`)
-  console.log("")
-  console.log("Library files:")
-  console.log(`  ${installPrefix}/lib/`)
-  console.log("")
-  console.log("Header files:")
-  console.log(`  ${installPrefix}/include/`)
-  console.log("")
+  logger.info("")
+  logger.info("Linux build completed successfully!")
+  logger.info("")
+  logger.info(`Target: ${target}`)
+  logger.info("")
+  logger.info("Library files:")
+  logger.info(`  ${installPrefix}/lib/`)
+  logger.info("")
+  logger.info("Header files:")
+  logger.info(`  ${installPrefix}/include/`)
+  logger.info("")
 }

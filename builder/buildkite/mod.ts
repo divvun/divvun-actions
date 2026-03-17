@@ -1,4 +1,4 @@
-// deno-lint-ignore-file no-explicit-any no-console
+// deno-lint-ignore-file no-explicit-any
 // Buildkite implementation of the builder interface
 
 import { buildkite as getEnv, Env } from "~/util/env.ts"
@@ -190,11 +190,11 @@ async function renewTokenInBackground(
           } days`,
         )
       } else {
-        console.error("Failed to renew token in background")
+        logger.error("Failed to renew token in background")
       }
     }
   } catch (e) {
-    console.error("Background token renewal failed:", e)
+    logger.error("Background token renewal failed:", e)
   }
 }
 
@@ -225,11 +225,12 @@ export async function secrets(): Promise<SecretsStore> {
 }
 
 export async function group(name: string, callback: () => Promise<void>) {
+  // deno-lint-ignore no-console
   console.log(`--- ${name}`)
   try {
     await callback()
-    // console.log(`~~~ ${name}`)
   } catch (error) {
+    // deno-lint-ignore no-console
     console.log(`^^^ +++`)
     logger.error(error)
     throw error

@@ -258,10 +258,10 @@ export async function runLangDeploy() {
   const macosFiles = await globOneFile("*.pkg")
   const mobileFiles = await globOneFile("*.pkt.tar.zst")
 
-  console.log("Deploying language files:")
-  console.log(`- Windows: ${windowsFiles}`)
-  console.log(`- macOS: ${macosFiles}`)
-  console.log(`- Mobile: ${mobileFiles}`)
+  logger.info("Deploying language files:")
+  logger.info(`- Windows: ${windowsFiles}`)
+  logger.info(`- macOS: ${macosFiles}`)
+  logger.info(`- Mobile: ${mobileFiles}`)
 
   if (!windowsFiles || !macosFiles || !mobileFiles) {
     throw new Error("Missing required files for deployment")

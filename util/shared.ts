@@ -395,11 +395,11 @@ export class PahkatPrefix {
       throw new Error(`Unsupported platform: ${platform}`)
     }
 
-    console.log("Extracting", txz)
+    logger.info("Extracting", txz)
     // Extract the file
     const outputPath = await Tar.extractTar(txz)
     const binPath = path.resolve(outputPath, "bin")
-    console.log("Extracted to", outputPath)
+    logger.info("Extracted to", outputPath)
     logger.info(`Bin path: ${binPath}, platform: ${Deno.build.os}`)
 
     if (Deno.build.os === "windows") {
@@ -414,33 +414,33 @@ export class PahkatPrefix {
 
     // Init the repo
     if (await fs.exists(PahkatPrefix.path)) {
-      console.log(`${PahkatPrefix.path} exists; deleting first.`)
+      logger.info(`${PahkatPrefix.path} exists; deleting first.`)
       logger.debug(`${PahkatPrefix.path} exists; deleting first.`)
       await Deno.remove(PahkatPrefix.path, { recursive: true })
     }
 
-    console.log("Initializing pahkat prefix at", PahkatPrefix.path)
+    logger.info("Initializing pahkat prefix at", PahkatPrefix.path)
     logger.info(`Initializing pahkat prefix at ${PahkatPrefix.path}`)
 
-    console.log("Running pahkat-prefix init")
+    logger.info("Running pahkat-prefix init")
     if (Deno.build.os === "windows") {
       const { status } = await builder.output("pwsh", [
         "-c",
         `pahkat-prefix init -c ${PahkatPrefix.path}`,
       ])
-      console.log(`Process exited with exit code ${status.code}.`)
+      logger.info(`Process exited with exit code ${status.code}.`)
     } else {
       const { status } = await builder.output("bash", [
         "-c",
         `pahkat-prefix init -c ${PahkatPrefix.path}`,
       ])
-      console.log(`Process exited with exit code ${status.code}.`)
+      logger.info(`Process exited with exit code ${status.code}.`)
     }
     logger.debug(`repos: ${repos}`)
     for (const repo of repos) {
       await PahkatPrefix.addRepo(repo, channel)
     }
-    console.log("Done running pahkat-prefix init")
+    logger.info("Done running pahkat-prefix init")
   }
 
   static async addRepo(repoName: string, channel?: string) {
@@ -558,7 +558,7 @@ export class PahkatUploader {
       packageType?: string | null
     } = {},
   ) {
-    console.log(arguments)
+    logger.info(arguments)
 
     const fileName = path.parse(artifactPath).base
 
@@ -909,7 +909,7 @@ export class Kbdgen {
     target: string,
     start: number = 0,
   ) {
-    console.log("Setting build number for " + target)
+    logger.info("Setting build number for " + target)
     const targetData = await Kbdgen.loadTarget(bundlePath, target)
 
     // Set to run number
@@ -918,7 +918,7 @@ export class Kbdgen {
       10,
     )
 
-    console.log("Version number: " + versionNumber)
+    logger.info("Version number: " + versionNumber)
 
     targetData["build"] = start + versionNumber
     logger.debug("Set build number to " + targetData["build"])
@@ -928,7 +928,7 @@ export class Kbdgen {
       yaml.stringify({ ...targetData }),
     )
 
-    console.log("Wrote target data: " + targetData["build"])
+    logger.info("Wrote target data: " + targetData["build"])
 
     return targetData["build"]
   }
@@ -1050,7 +1050,7 @@ export class Kbdgen {
   }
 
   static async buildMacOS(bundlePath: string): Promise<string> {
-    console.log("Building macOS")
+    logger.info("Building macOS")
     logger.setLogLevel("trace")
     const abs = path.resolve(bundlePath)
     const cwd = path.dirname(abs)

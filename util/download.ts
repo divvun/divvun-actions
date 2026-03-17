@@ -1,4 +1,5 @@
 import * as path from "@std/path"
+import logger from "~/util/log.ts"
 import { makeTempDirSync } from "./temp.ts"
 
 export async function download(url: string, options: {
@@ -8,7 +9,7 @@ export async function download(url: string, options: {
   const p = options.path ?? makeTempDirSync().path
   const filename = options.fileName ?? path.basename(url)
 
-  console.log("Downloading", url, "to", p, "as", filename)
+  logger.info("Downloading", url, "to", p, "as", filename)
 
   const downloadPath = path.resolve(
     p,
@@ -16,7 +17,7 @@ export async function download(url: string, options: {
   )
 
   if (Deno.build.os === "windows") {
-    console.log("Downloading", url, "to", downloadPath)
+    logger.info("Downloading", url, "to", downloadPath)
     const proc = new Deno.Command("pwsh", {
       args: [
         // "-NoNewWindow",
@@ -24,10 +25,10 @@ export async function download(url: string, options: {
         `Invoke-WebRequest -Uri "${url}" -OutFile "${downloadPath}"`,
       ],
     })
-    console.log("Waiting for process to finish")
+    logger.info("Waiting for process to finish")
     const status = await proc.spawn().status
 
-    console.log("Process finished with status", status.code)
+    logger.info("Process finished with status", status.code)
     if (status.code !== 0) {
       throw new Error(`Process exited with code ${status.code}`)
     }
@@ -42,6 +43,6 @@ export async function download(url: string, options: {
     }
   }
 
-  console.log("Downloaded", url, "to", downloadPath)
+  logger.info("Downloaded", url, "to", downloadPath)
   return path.resolve(downloadPath)
 }

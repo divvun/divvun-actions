@@ -1,6 +1,6 @@
 import * as fs from "@std/fs"
 import * as path from "@std/path"
-import { exec, spawn } from "~/builder.ts"
+import { exec, spawn } from "~/util/process.ts"
 import type { DivvunActionsTargetMacOSConfig } from "~/util/config.ts"
 import logger from "~/util/log.ts"
 
@@ -36,7 +36,7 @@ export default class Tart {
     // No await here because it runs forever...
     const proc = await spawn("nohup", args, {
       silent: true,
-    } as any)
+    })
 
     logger.info("Waiting for VM to start...")
 
@@ -73,11 +73,11 @@ export default class Tart {
 
     await exec("tart", ["get", vmName, "--format", "json"], {
       listeners: {
-        stdout: (data: any) => {
-          rawOutput += data.toString()
+        stdout: (data: Uint8Array) => {
+          rawOutput += new TextDecoder().decode(data)
         },
       },
-    } as any)
+    })
 
     const output: TartStatus = JSON.parse(rawOutput)
     // logger.info(output)
@@ -176,7 +176,7 @@ export default class Tart {
     logger.info("Attaching image...")
     await exec("hdiutil", ["attach", imagePath], {
       silent: true,
-    } as any)
+    })
 
     logger.info("Copying workspace...")
     await exec("ditto", [Tart.WORKSPACE_PATH, `/Volumes/${volName}`])
@@ -210,11 +210,11 @@ export default class Tart {
 
     return exec("tart", ["ip", vmName], {
       listeners: {
-        stdout: (data) => {
-          output += data.toString()
+        stdout: (data: Uint8Array) => {
+          output += new TextDecoder().decode(data)
         },
       },
-    } as any).then(() => {
+    }).then(() => {
       // logger.info("IP: " + output)
       return output.trim()
     })

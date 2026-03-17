@@ -1,4 +1,5 @@
 import { pooledMap } from "@std/async/pool"
+import logger from "~/util/log.ts"
 import { listGithubRepos, listGithubWebhooks } from "./github-client.ts"
 import { listBuildkitePipelines } from "./buildkite-client.ts"
 import { assessStatus } from "./assessor.ts"
@@ -21,16 +22,16 @@ export async function getStatus(props: SyncGithubProps): Promise<SyncStatus[]> {
     SyncGithubProps["buildkite"]
   >
 
-  console.log("🔍 Getting pipelines...")
+  logger.info("🔍 Getting pipelines...")
   const pipelines = await listBuildkitePipelines(buildkiteProps)
 
-  console.log("🔍 Getting repos...")
+  logger.info("🔍 Getting repos...")
   const allRepos = await listGithubRepos(githubProps)
   const repos = allRepos.filter((repo) => {
     return repo.name.includes("lang-") || repo.name.includes("keyboard-")
   })
 
-  console.log("🔄 Assessing sync status...")
+  logger.info("🔄 Assessing sync status...")
   const results: SyncStatus[] = []
 
   for await (
@@ -38,12 +39,12 @@ export async function getStatus(props: SyncGithubProps): Promise<SyncStatus[]> {
       5,
       repos,
       async (repo) => {
-        console.log(`🔍 Checking ${repo.name}...`)
+        logger.info(`🔍 Checking ${repo.name}...`)
         let webhooks: GithubWebhook[] = []
         try {
           webhooks = await listGithubWebhooks(githubProps, repo.name)
         } catch (error) {
-          console.warn(
+          logger.warning(
             `⚠️ Could not fetch webhooks for ${repo.name}: ${error}`,
           )
         }
@@ -69,16 +70,16 @@ export async function syncAndFix(
     SyncGithubProps["buildkite"]
   >
 
-  console.log("🔍 Getting pipelines...")
+  logger.info("🔍 Getting pipelines...")
   const pipelines = await listBuildkitePipelines(buildkiteProps)
 
-  console.log("🔍 Getting repos...")
+  logger.info("🔍 Getting repos...")
   const allRepos = await listGithubRepos(githubProps)
   const repos = allRepos.filter((repo) => {
     return repo.name.includes("lang-") || repo.name.includes("keyboard-")
   })
 
-  console.log("🔄 Assessing sync status...")
+  logger.info("🔄 Assessing sync status...")
   const results: SyncStatus[] = []
 
   for await (
@@ -86,12 +87,12 @@ export async function syncAndFix(
       5,
       repos,
       async (repo) => {
-        console.log(`🔍 Checking webhooks for ${repo.name}...`)
+        logger.info(`🔍 Checking webhooks for ${repo.name}...`)
         let webhooks: GithubWebhook[] = []
         try {
           webhooks = await listGithubWebhooks(githubProps, repo.name)
         } catch (error) {
-          console.warn(
+          logger.warning(
             `⚠️ Could not fetch webhooks for ${repo.name}: ${error}`,
           )
         }
@@ -105,7 +106,7 @@ export async function syncAndFix(
 
   prettyPrintSyncResults(results)
 
-  console.log("\n🔧 Applying fixes...")
+  logger.info("\n🔧 Applying fixes...")
   await applyFixes(results, githubProps, buildkiteProps)
 
   return results
@@ -119,7 +120,7 @@ export async function writeStatusJson(
   releasesByRepo: Record<string, Record<string, PackageChannels>>,
   outputPath = "status.json",
 ): Promise<void> {
-  console.log(`📝 Writing ${outputPath}...`)
+  logger.info(`📝 Writing ${outputPath}...`)
   const statusData: Record<string, StatusEntry> = {}
 
   for (const result of results) {
@@ -143,12 +144,12 @@ export async function writeStatusJson(
       outputPath,
       JSON.stringify(statusData, null, 2),
     )
-    console.log(
+    logger.info(
       `✅ Wrote status for ${
         Object.keys(statusData).length
       } pipelines to ${outputPath}`,
     )
   } catch (error) {
-    console.error(`❌ Failed to write ${outputPath}: ${error}`)
+    logger.error(`❌ Failed to write ${outputPath}: ${error}`)
   }
 }

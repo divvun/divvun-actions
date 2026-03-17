@@ -112,7 +112,7 @@ export class InnoSetupBuilder {
     return this
   }
 
-  build(options: { codesign: boolean }): string {
+  build(options: { codesign?: boolean } = {}): string {
     for (
       const key of [
         "name",

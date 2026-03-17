@@ -1,4 +1,3 @@
-// deno-lint-ignore-file no-console
 import { parseArgs } from "@std/cli/parse-args"
 import { pooledMap } from "@std/async/pool"
 import { requiredArgs } from "./utils.ts"
@@ -13,9 +12,10 @@ import { getStatus, syncAndFix, writeStatusJson } from "./core.ts"
 import { prettyPrintSyncResults } from "./formatters.ts"
 import { parseReleasesByPackage } from "./release-parser.ts"
 import type { PackageChannels, SyncGithubProps } from "./types.ts"
+import logger from "~/util/log.ts"
 
 function showHelp() {
-  console.log(`
+  logger.info(`
 Sync GitHub repositories with Buildkite pipelines
 
 USAGE:
@@ -117,13 +117,13 @@ if (import.meta.main) {
         const releasesByRepo: Record<string, Record<string, PackageChannels>> =
           {}
 
-        console.log("\n🔍 Fetching releases for status.json...")
+        logger.info("\n🔍 Fetching releases for status.json...")
         for await (
           const { repoName, packages } of pooledMap(
             5,
             results,
             async (result) => {
-              console.log(`🔍 Checking releases for ${result.repoName}...`)
+              logger.info(`🔍 Checking releases for ${result.repoName}...`)
               try {
                 const releases = await listGithubReleases(
                   githubProps,
@@ -132,7 +132,7 @@ if (import.meta.main) {
                 const packages = parseReleasesByPackage(releases)
                 return { repoName: result.repoName, packages }
               } catch (error) {
-                console.warn(
+                logger.warning(
                   `⚠️ Could not fetch releases for ${result.repoName}: ${error}`,
                 )
                 return { repoName: result.repoName, packages: {} }
@@ -158,16 +158,16 @@ if (import.meta.main) {
       requiredArgs(["gh-key", "gh-orgs"], args)
       const githubProps = props.github as Required<SyncGithubProps["github"]>
       const repos = await listGithubRepos(githubProps)
-      console.log(`\n📦 Found ${repos.length} repositories:\n`)
+      logger.info(`\n📦 Found ${repos.length} repositories:\n`)
       for (const repo of repos) {
-        console.log(`  📁 ${repo.name}`)
+        logger.info(`  📁 ${repo.name}`)
         if (repo.description) {
-          console.log(`     ${repo.description}`)
+          logger.info(`     ${repo.description}`)
         }
         if (repo.topics.length > 0) {
-          console.log(`     🏷️  ${repo.topics.join(", ")}`)
+          logger.info(`     🏷️  ${repo.topics.join(", ")}`)
         }
-        console.log()
+        logger.info()
       }
       break
     }
@@ -178,14 +178,14 @@ if (import.meta.main) {
         SyncGithubProps["buildkite"]
       >
       const pipelines = await listBuildkitePipelines(buildkiteProps)
-      console.log(`\n🔧 Found ${pipelines.length} pipelines:\n`)
+      logger.info(`\n🔧 Found ${pipelines.length} pipelines:\n`)
       for (const pipeline of pipelines) {
-        console.log(`  🔨 ${pipeline.name} (${pipeline.slug})`)
-        console.log(`     ${pipeline.url}`)
+        logger.info(`  🔨 ${pipeline.name} (${pipeline.slug})`)
+        logger.info(`     ${pipeline.url}`)
         if (pipeline.tags.length > 0) {
-          console.log(`     🏷️  ${pipeline.tags.join(", ")}`)
+          logger.info(`     🏷️  ${pipeline.tags.join(", ")}`)
         }
-        console.log()
+        logger.info()
       }
       break
     }
@@ -195,12 +195,12 @@ if (import.meta.main) {
       const githubProps = props.github as Required<SyncGithubProps["github"]>
       const dryRun = args["dry-run"]
 
-      console.log(
+      logger.info(
         `\n${dryRun ? "[DRY RUN] " : ""}Clearing dev-latest releases...\n`,
       )
 
       const repos = await listGithubRepos(githubProps)
-      console.log(`Found ${repos.length} repositories to check\n`)
+      logger.info(`Found ${repos.length} repositories to check\n`)
 
       let totalDeleted = 0
       let totalFound = 0
@@ -232,7 +232,7 @@ if (import.meta.main) {
                 deleted: devReleases.length,
               }
             } catch (error) {
-              console.warn(
+              logger.warning(
                 `  Warning: Could not process ${repo.name}: ${error}`,
               )
               return { repoName: repo.name, releases: [], deleted: 0 }
@@ -241,9 +241,9 @@ if (import.meta.main) {
         )
       ) {
         if (releases.length > 0) {
-          console.log(`${repoName}:`)
+          logger.info(`${repoName}:`)
           for (const release of releases) {
-            console.log(
+            logger.info(
               `  ${
                 dryRun ? "[would delete]" : "[deleted]"
               } ${release.tag_name}`,
@@ -254,18 +254,18 @@ if (import.meta.main) {
         }
       }
 
-      console.log(`\n${dryRun ? "[DRY RUN] " : ""}Summary:`)
-      console.log(`  Total dev-latest releases found: ${totalFound}`)
+      logger.info(`\n${dryRun ? "[DRY RUN] " : ""}Summary:`)
+      logger.info(`  Total dev-latest releases found: ${totalFound}`)
       if (!dryRun) {
-        console.log(`  Total releases deleted: ${totalDeleted}`)
+        logger.info(`  Total releases deleted: ${totalDeleted}`)
       } else {
-        console.log(`  Run without --dry-run to delete these releases`)
+        logger.info(`  Run without --dry-run to delete these releases`)
       }
       break
     }
 
     default: {
-      console.error(`Unknown command: ${command}`)
+      logger.error(`Unknown command: ${command}`)
       showHelp()
       Deno.exit(1)
     }

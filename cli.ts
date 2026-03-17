@@ -1,4 +1,4 @@
-// deno-lint-ignore-file no-explicit-any no-console
+// deno-lint-ignore-file no-explicit-any
 import { parseArgs, ParseOptions } from "@std/cli/parse-args"
 import * as yaml from "@std/yaml"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
@@ -108,18 +108,18 @@ const commands: Record<Command, { options: ParseOptions; help: string }> = {
 
 function printHelp(command?: Command) {
   if (!command) {
-    console.log(`Usage: <command> [options]\n`)
-    console.log()
-    console.log("Commands:")
+    logger.info(`Usage: <command> [options]\n`)
+    logger.info()
+    logger.info("Commands:")
     for (const [command, commandOptions] of Object.entries(commands)) {
-      console.log(`  ${command}\t${commandOptions.help}`)
+      logger.info(`  ${command}\t${commandOptions.help}`)
     }
     return
   }
 
   const commandOptions = commands[command as Command]
-  console.log(`Usage: ${Deno.args[0]} ${command} [options]`)
-  console.log(commandOptions.help)
+  logger.info(`Usage: ${Deno.args[0]} ${command} [options]`)
+  logger.info(commandOptions.help)
 }
 
 function parseCommand(input: string[]) {
@@ -139,7 +139,7 @@ function parseCommand(input: string[]) {
   const command = args._[0] as Command
   const commandOptions = commands[command]?.options
   if (!commandOptions) {
-    console.error(`Unknown command: ${command}`)
+    logger.error(`Unknown command: ${command}`)
     printHelp()
     Deno.exit(1)
   }
@@ -346,8 +346,8 @@ async function runPipeline(args: any) {
       break
     }
     case "debug": {
-      console.log("Environment:")
-      console.log(JSON.stringify(builder.env, null, 2))
+      logger.info("Environment:")
+      logger.info(JSON.stringify(builder.env, null, 2))
       break
     }
     case "macos-sign": {
@@ -456,7 +456,7 @@ async function runPipeline(args: any) {
 }
 
 async function runCi(_args: any) {
-  console.log("Running CI")
+  logger.info("Running CI")
 
   let pipeline: BuildkitePipeline
   switch (builder.env.repoName) {

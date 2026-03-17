@@ -1,3 +1,5 @@
+import logger from "~/util/log.ts"
+
 class RateLimitError extends Error {
   resetTime: number
   constructor(resetTime: number) {
@@ -7,7 +9,7 @@ class RateLimitError extends Error {
   }
 }
 
-async function sleep(ms: number): Promise<void> {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
@@ -42,7 +44,7 @@ export async function fetchGithub(
         const waitMs =
           Math.max(0, (resetTimestamp - Math.floor(Date.now() / 1000)) * 1000) +
           1000
-        console.log(
+        logger.info(
           `⏳ Rate limited, waiting ${Math.ceil(waitMs / 1000)}s for reset...`,
         )
         await sleep(waitMs)
@@ -95,7 +97,7 @@ export async function fetchBuildkite(
 
       if (resetSeconds && attempt < maxAttempts) {
         const waitMs = (parseInt(resetSeconds) + 1) * 1000
-        console.log(
+        logger.info(
           `⏳ Buildkite rate limited, waiting ${resetSeconds}s for reset...`,
         )
         await sleep(waitMs)

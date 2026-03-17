@@ -1,5 +1,6 @@
 import * as builder from "~/builder.ts"
 import { GitHub } from "~/util/github.ts"
+import logger from "~/util/log.ts"
 
 const DEFAULT_EXECUTORCH_VERSION = "v1.1.0"
 const EXECUTORCH_REPO = "https://github.com/pytorch/executorch.git"
@@ -18,7 +19,7 @@ export async function downloadExecutorchCache(version?: string) {
   const executorchUrl =
     `https://github.com/divvun/static-lib-build/releases/download/executorch%2F${executorchVersion}/${tarballName}`
 
-  console.log(`--- Downloading cached ExecuTorch ${executorchVersion}`)
+  logger.info(`--- Downloading cached ExecuTorch ${executorchVersion}`)
 
   // Clean up any existing executorch directory
   try {
@@ -31,7 +32,7 @@ export async function downloadExecutorchCache(version?: string) {
   try {
     await builder.exec("curl", ["-sSfL", executorchUrl, "-o", tarballName])
 
-    console.log("Cache found, extracting...")
+    logger.info("Cache found, extracting...")
 
     // Extract (use bsdtar on Windows because msys tar is broken)
     const isWindows = Deno.build.os === "windows"
@@ -44,14 +45,14 @@ export async function downloadExecutorchCache(version?: string) {
     // Clean up tarball
     await Deno.remove(tarballName)
 
-    console.log(`ExecuTorch ${executorchVersion} extracted successfully`)
+    logger.info(`ExecuTorch ${executorchVersion} extracted successfully`)
   } catch {
-    console.log(
+    logger.info(
       `Cache not found for ${executorchVersion}, cloning from source...`,
     )
 
     // Clone ExecuTorch at specific tag
-    console.log(`--- Cloning ExecuTorch at tag ${executorchVersion}...`)
+    logger.info(`--- Cloning ExecuTorch at tag ${executorchVersion}...`)
     await builder.exec("git", [
       "clone",
       "--depth",
@@ -63,7 +64,7 @@ export async function downloadExecutorchCache(version?: string) {
     ])
 
     // Initialize submodules
-    console.log("--- Initializing submodules...")
+    logger.info("--- Initializing submodules...")
     await builder.exec("git", ["submodule", "sync", "--recursive"], {
       cwd: EXECUTORCH_DIR,
     })
@@ -73,10 +74,10 @@ export async function downloadExecutorchCache(version?: string) {
       { cwd: EXECUTORCH_DIR },
     )
 
-    console.log(`ExecuTorch ${executorchVersion} cloned successfully`)
+    logger.info(`ExecuTorch ${executorchVersion} cloned successfully`)
 
     // Create cache tarball
-    console.log(`--- Creating cache archive: ${tarballName}`)
+    logger.info(`--- Creating cache archive: ${tarballName}`)
     await builder.exec("tar", [
       "--exclude=.git",
       "--exclude=.github",
@@ -85,7 +86,7 @@ export async function downloadExecutorchCache(version?: string) {
       EXECUTORCH_DIR,
     ])
 
-    console.log("Cache archive created, uploading to GitHub release...")
+    logger.info("Cache archive created, uploading to GitHub release...")
 
     // Check if release exists
     const releaseTag = `executorch/${executorchVersion}`
@@ -94,24 +95,24 @@ export async function downloadExecutorchCache(version?: string) {
 
     // Create release if it doesn't exist
     if (!releaseExists) {
-      console.log(`--- Creating release ${releaseTag}...`)
+      logger.info(`--- Creating release ${releaseTag}...`)
       await gh.createRelease(releaseTag, [], { verifyTag: false })
     }
 
     // Upload tarball to release
-    console.log(`--- Uploading ${tarballName} to release ${releaseTag}...`)
+    logger.info(`--- Uploading ${tarballName} to release ${releaseTag}...`)
     await gh.uploadRelease(releaseTag, [tarballName])
 
     // Clean up tarball
     await Deno.remove(tarballName)
 
-    console.log(
+    logger.info(
       `ExecuTorch ${executorchVersion} cache created and uploaded successfully`,
     )
   }
 
   // Upload executorch directory as Buildkite artifact for other build steps to use
-  console.log("--- Uploading ExecuTorch directory as Buildkite artifact...")
+  logger.info("--- Uploading ExecuTorch directory as Buildkite artifact...")
   const buildkiteArtifact = "executorch.tar.gz"
   await builder.exec("tar", ["-czf", buildkiteArtifact, EXECUTORCH_DIR])
   await builder.uploadArtifacts(buildkiteArtifact)

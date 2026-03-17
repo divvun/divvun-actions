@@ -1,20 +1,19 @@
-// Re-export types
+const provider = Deno.env.get("BUILDKITE") ? "buildkite" : null
 
-const isBuildkite = Deno.env.get("BUILDKITE")
-
-// Ensure we get the proper types from the implementations
-let selectedBuilder: typeof import("~/builder/buildkite/mod.ts")
-export let mode: string
-
-if (isBuildkite) {
-  selectedBuilder = await import("~/builder/buildkite/mod.ts")
-  mode = "buildkite"
-} else {
-  selectedBuilder = await import("~/builder/local.ts")
-  mode = "local"
+if (!provider) {
+  throw new Error("No supported CI provider detected")
 }
 
-// Re-export everything with proper typing
+let selectedBuilder: typeof import("~/builder/buildkite/mod.ts")
+
+switch (provider) {
+  case "buildkite":
+    selectedBuilder = await import("~/builder/buildkite/mod.ts")
+    break
+}
+
+export const mode = provider
+
 export const {
   exec,
   output,

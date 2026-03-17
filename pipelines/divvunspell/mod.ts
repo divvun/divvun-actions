@@ -388,7 +388,11 @@ export async function runLibdivvunFstPublish() {
       const stat = Deno.statSync(artifact)
       logger.info(`  ${index + 1}. ${fileName} (${stat.size} bytes)`)
     } catch (e) {
-      logger.error(`  ${index + 1}. ${fileName} (ERROR: ${e.message})`)
+      logger.error(
+        `  ${index + 1}. ${fileName} (ERROR: ${
+          e instanceof Error ? e.message : String(e)
+        })`,
+      )
     }
   })
 

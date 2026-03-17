@@ -14,6 +14,7 @@ import {
   versionAsNightly,
 } from "~/util/shared.ts"
 import { createInstaller } from "./bundle-macos.ts"
+import logger from "~/util/log.ts"
 import {
   deriveLangTag,
   derivePackageId,
@@ -57,7 +58,7 @@ export default async function spellerBundle({
       manifest.package.speller.version,
       builder.env.buildNumber,
     )
-  console.log /*logger.debug*/(
+  logger.debug(
     `Speller bundle for ${spellerType} with version ${version} and langTag ${langTag}`,
   )
 
@@ -68,20 +69,20 @@ export default async function spellerBundle({
       const bhfstPath = await ThfstTools.zhfstToBhfst(zhfstPath)
       const langTagBhfst = `${path.dirname(bhfstPath)}/${langTag}.bhfst`
 
-      console.log /*logger.debug*/(`Copying ${bhfstPath} to ${langTagBhfst}`)
+      logger.debug(`Copying ${bhfstPath} to ${langTagBhfst}`)
       await Deno.copyFile(bhfstPath, langTagBhfst)
       bhfstPaths.push(langTagBhfst)
     }
 
     const pktPath = `${packageId}_${version}_noarch-mobile.pkt.tar.zst`
-    console.log /*logger.debug*/(
+    logger.debug(
       `Creating pkt from [${bhfstPaths.join(", ")}] at ${pktPath}`,
     )
     payloadPath = pktPath
     await Tar.createFlatPkt(bhfstPaths, payloadPath)
-    console.log /*logger.debug*/(`Created pkt at ${payloadPath}`)
+    logger.debug(`Created pkt at ${payloadPath}`)
   } else if (spellerType == SpellerType.Windows) {
-    console.log(manifest.windows)
+    logger.info(manifest.windows)
     if (manifest.windows.system_product_code == null) {
       throw new Error("Missing system_product_code")
     }
@@ -94,7 +95,7 @@ export default async function spellerBundle({
       await Deno.rename(value, out)
       zhfstPaths.push(out)
     }
-    console.log(zhfstPaths)
+    logger.info(zhfstPaths)
     const innoBuilder = new InnoSetupBuilder(Deno.cwd())
       .name(`${spellerName} Speller`)
       .version(version)
@@ -137,8 +138,8 @@ export default async function spellerBundle({
           }
         }
 
-        console.log /*logger.debug*/("Writing speller.toml:")
-        console.log /*logger.debug*/(toml.stringify(spellerToml))
+        logger.debug("Writing speller.toml:")
+        logger.debug(toml.stringify(spellerToml))
         Deno.writeTextFileSync(
           "./speller.toml",
           toml.stringify(spellerToml),
@@ -165,17 +166,17 @@ export default async function spellerBundle({
     try {
       innoBuilder.write("./install.iss", { codesign: true })
       result = await makeInstaller(".\\install.iss")
-      console.log /*logger.debug*/("Installer created")
+      logger.debug("Installer created")
     } catch (error) {
-      console.warn(
+      logger.warning(
         `Signing failed: ${
           error instanceof Error ? error.message : String(error)
         }`,
       )
-      console.warn("Retrying without code signing...")
+      logger.warning("Retrying without code signing...")
       innoBuilder.write("./install.iss", { codesign: false })
       result = await makeInstaller(".\\install.iss", { skipSigning: true })
-      console.log /*logger.debug*/("Unsigned installer created")
+      logger.debug("Unsigned installer created")
     }
 
     const unsignedSuffix = result.unsigned ? ".UNSIGNED" : ""
@@ -183,16 +184,16 @@ export default async function spellerBundle({
       result.path,
       `${packageId}_${version}_noarch-windows${unsignedSuffix}.exe`,
     )
-    console.log /*logger.debug*/(`Installer created at ${payloadPath}`)
+    logger.debug(`Installer created at ${payloadPath}`)
   } else if (spellerType == SpellerType.MacOS) {
     const zhfstFile = spellerPaths.desktop[langTag]
-    console.log /*logger.debug*/(
+    logger.debug(
       "Getting desktop zhfst file",
       zhfstFile,
       "for",
       langTag,
     )
-    console.log /*logger.debug*/("Speller paths", spellerPaths)
+    logger.debug("Speller paths", spellerPaths)
 
     if (!zhfstFile) {
       throw new Error(`Missing zhfst file for langTag ${langTag}`)
@@ -214,7 +215,7 @@ export default async function spellerBundle({
       pkgPath,
       `${packageId}_${version}_noarch-macos.pkg`,
     )
-    console.log /*logger.debug*/(`Installer created at ${payloadPath}`)
+    logger.debug(`Installer created at ${payloadPath}`)
   } else {
     throw new Error(`Unsupported speller type: ${spellerType}`)
   }

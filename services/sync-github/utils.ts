@@ -1,3 +1,5 @@
+import logger from "~/util/log.ts"
+
 export function parseNextLinkHeader(linkHeader: string | null): string | null {
   if (!linkHeader) {
     return null
@@ -24,7 +26,7 @@ export function requiredArgs(
 ): void {
   for (const arg of required) {
     if (!args[arg]) {
-      console.error(`Missing required argument: ${arg}`)
+      logger.error(`Missing required argument: ${arg}`)
       Deno.exit(1)
     }
   }

@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 
@@ -42,7 +43,7 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
     version = "33.0",
   } = options
 
-  console.log("Building Protocol Buffers (libprotobuf)")
+  logger.info("Building Protocol Buffers (libprotobuf)")
 
   const platform = detectPlatform(target)
 
@@ -65,7 +66,7 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
   const isCrossCompile = platform === "linux" && targetTriple !== hostTriple
 
   if (isCrossCompile) {
-    console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
+    logger.info(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
   }
 
   // Set up compilers
@@ -129,21 +130,21 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
     cxx = "cl.exe"
   }
 
-  console.log("")
-  console.log("=== Protobuf Build Configuration ===")
-  console.log(`Target triple:      ${target}`)
-  console.log(`Build type:         ${buildType}`)
-  console.log(`Platform:           ${platform}`)
-  console.log(`C compiler:         ${cc}`)
-  console.log(`C++ compiler:       ${cxx}`)
-  console.log(`Protobuf source:    ${protobufSourceDir}`)
-  console.log(`Build directory:    ${buildRoot}`)
-  console.log(`Install prefix:     ${installPrefix}`)
-  console.log("======================================")
-  console.log("")
+  logger.info("")
+  logger.info("=== Protobuf Build Configuration ===")
+  logger.info(`Target triple:      ${target}`)
+  logger.info(`Build type:         ${buildType}`)
+  logger.info(`Platform:           ${platform}`)
+  logger.info(`C compiler:         ${cc}`)
+  logger.info(`C++ compiler:       ${cxx}`)
+  logger.info(`Protobuf source:    ${protobufSourceDir}`)
+  logger.info(`Build directory:    ${buildRoot}`)
+  logger.info(`Install prefix:     ${installPrefix}`)
+  logger.info("======================================")
+  logger.info("")
 
   // Clone protobuf
-  console.log("Removing existing protobuf directory (if any)...")
+  logger.info("Removing existing protobuf directory (if any)...")
   try {
     await Deno.remove(protobufSourceDir, { recursive: true })
   } catch {
@@ -151,7 +152,7 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
   }
 
   const protobufTag = convertProtobufVersionToTag(version)
-  console.log(`Cloning Protocol Buffers from GitHub (tag ${protobufTag})...`)
+  logger.info(`Cloning Protocol Buffers from GitHub (tag ${protobufTag})...`)
   await builder.exec("git", [
     "clone",
     "--depth",
@@ -164,7 +165,7 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
 
   // Clean build directory if requested
   if (clean) {
-    console.log("Cleaning build directory...")
+    logger.info("Cleaning build directory...")
     try {
       await Deno.remove(buildRoot, { recursive: true })
     } catch {
@@ -255,7 +256,7 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
   }
 
   // Run CMake configuration
-  console.log("Running CMake configuration...")
+  logger.info("Running CMake configuration...")
   await builder.exec(cmakePath, cmakeArgs, { cwd: buildRoot })
 
   // Determine number of parallel jobs
@@ -274,7 +275,7 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
   }
 
   // Build
-  console.log(`Building with ${maxJobs} parallel jobs...`)
+  logger.info(`Building with ${maxJobs} parallel jobs...`)
   await builder.exec(cmakePath, [
     "--build",
     ".",
@@ -285,7 +286,7 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
   ], { cwd: buildRoot })
 
   // Copy Abseil libraries to sysroot
-  console.log("Copying Abseil libraries to sysroot...")
+  logger.info("Copying Abseil libraries to sysroot...")
   try {
     const findResult = await builder.output("find", [
       buildRoot,
@@ -301,16 +302,16 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
       for (const lib of abslLibs) {
         await builder.exec("cp", ["-v", lib, path.join(installPrefix, "lib")])
       }
-      console.log(`Copied ${abslLibs.length} Abseil libraries`)
+      logger.info(`Copied ${abslLibs.length} Abseil libraries`)
     } else {
-      console.log("Warning: No Abseil libraries found in build directory")
+      logger.info("Warning: No Abseil libraries found in build directory")
     }
   } catch (error) {
-    console.log("Warning: Failed to copy Abseil libraries:", error)
+    logger.info("Warning: Failed to copy Abseil libraries:", error)
   }
 
   // Copy Abseil headers if present
-  console.log("Copying Abseil headers...")
+  logger.info("Copying Abseil headers...")
   const abslHeaderPaths = [
     path.join(buildRoot, "abseil-cpp/absl"),
     path.join(buildRoot, "_deps/abseil-cpp-src/absl"),
@@ -324,7 +325,7 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
         abslPath,
         path.join(installPrefix, "include"),
       ])
-      console.log("Copied Abseil headers")
+      logger.info("Copied Abseil headers")
       break
     } catch {
       // Try next path
@@ -332,24 +333,24 @@ export async function buildProtobuf(options: BuildProtobufOptions) {
     }
   }
 
-  console.log("")
-  console.log("Protobuf build completed successfully!")
-  console.log("")
-  console.log(`Target: ${target}`)
-  console.log("")
-  console.log("Binaries:")
+  logger.info("")
+  logger.info("Protobuf build completed successfully!")
+  logger.info("")
+  logger.info(`Target: ${target}`)
+  logger.info("")
+  logger.info("Binaries:")
   try {
     const bins = await builder.output("ls", ["-lh"], {
       cwd: path.join(installPrefix, "bin"),
     })
-    console.log(bins)
+    logger.info(bins)
   } catch {
-    console.log("  (protoc not found - check build output)")
+    logger.info("  (protoc not found - check build output)")
   }
-  console.log("")
-  console.log("You can now use:")
-  console.log(`  protoc: ${installPrefix}/bin/protoc`)
-  console.log(`  libprotobuf.a: ${installPrefix}/lib/libprotobuf.a`)
-  console.log(`  libabsl_*.a: ${installPrefix}/lib/libabsl_*.a`)
-  console.log("")
+  logger.info("")
+  logger.info("You can now use:")
+  logger.info(`  protoc: ${installPrefix}/bin/protoc`)
+  logger.info(`  libprotobuf.a: ${installPrefix}/lib/libprotobuf.a`)
+  logger.info(`  libabsl_*.a: ${installPrefix}/lib/libabsl_*.a`)
+  logger.info("")
 }

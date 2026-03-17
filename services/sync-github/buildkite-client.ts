@@ -1,4 +1,5 @@
 import { parseNextLinkHeader } from "./utils.ts"
+import logger from "~/util/log.ts"
 import { fetchBuildkite } from "./api.ts"
 import {
   BUILDKITE_CLUSTER_ID,
@@ -7,16 +8,22 @@ import {
   type SyncGithubProps,
 } from "./types.ts"
 
+function requireApiKey(props: SyncGithubProps["buildkite"]): string {
+  if (!props.apiKey) throw new Error("Buildkite API key is required")
+  return props.apiKey
+}
+
 export async function listBuildkitePipelines(
   props: SyncGithubProps["buildkite"],
 ): Promise<BuildkitePipeline[]> {
+  const apiKey = requireApiKey(props)
   let nextUrl: string | null =
     `https://api.buildkite.com/v2/organizations/${props.orgName}/pipelines?per_page=100`
   let responses: any[] = []
 
   while (nextUrl != null) {
-    console.log(`Fetching pipelines from ${nextUrl}`)
-    const response = await fetchBuildkite(nextUrl, props.apiKey)
+    logger.info(`Fetching pipelines from ${nextUrl}`)
+    const response = await fetchBuildkite(nextUrl, apiKey)
 
     nextUrl = parseNextLinkHeader(response.headers.get("link"))
     const data = await response.json()
@@ -50,9 +57,10 @@ export async function createBuildkitePipeline(
   props: SyncGithubProps["buildkite"],
   repo: any,
 ) {
+  const apiKey = requireApiKey(props)
   const response = await fetchBuildkite(
     `https://api.buildkite.com/v2/organizations/${props.orgName}/pipelines`,
-    props.apiKey,
+    apiKey,
     {
       headers: {
         "Content-Type": "application/json",
@@ -94,9 +102,10 @@ export async function updateBuildkitePipeline(
       }
     },
 ) {
+  const apiKey = requireApiKey(props)
   const response = await fetchBuildkite(
     `https://api.buildkite.com/v2/organizations/${props.orgName}/pipelines/${pipeline.slug}`,
-    props.apiKey,
+    apiKey,
     {
       headers: {
         "Content-Type": "application/json",

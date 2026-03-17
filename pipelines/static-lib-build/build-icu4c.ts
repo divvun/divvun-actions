@@ -1,6 +1,7 @@
 import * as fs from "@std/fs"
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 
@@ -59,7 +60,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     version = "77.1",
   } = options
 
-  console.log("Building ICU (International Components for Unicode)")
+  logger.info("Building ICU (International Components for Unicode)")
 
   const platform = detectPlatform(target)
   const repoRoot = Deno.cwd()
@@ -79,7 +80,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   const isCrossCompile = platform === "linux" && targetTriple !== hostTriple
 
   if (isCrossCompile) {
-    console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
+    logger.info(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
   }
 
   // Windows uses vcpkg for ICU installation
@@ -93,10 +94,10 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     const overlayPath = path.join(repoRoot, "vcpkg-overlay")
     try {
       await Deno.stat(path.join(overlayPath, ".git"))
-      console.log("Updating vcpkg overlay...")
+      logger.info("Updating vcpkg overlay...")
       await builder.exec("git", ["pull"], { cwd: overlayPath })
     } catch {
-      console.log("Cloning vcpkg overlay...")
+      logger.info("Cloning vcpkg overlay...")
       await builder.exec("git", [
         "clone",
         "https://github.com/divvun/vcpkg-overlay.git",
@@ -114,12 +115,12 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       const targetVersion = version.replace(/^v/, "")
 
       if (installedVersion === targetVersion) {
-        console.log(
+        logger.info(
           `ICU ${targetVersion} already installed in vcpkg, using cached version`,
         )
       } else {
         if (installedVersion) {
-          console.log(
+          logger.info(
             `Found ICU ${installedVersion} but need ${targetVersion}, reinstalling...`,
           )
           await builder.exec("vcpkg", [
@@ -128,7 +129,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
             "--triplet=x64-windows-static",
           ])
         }
-        console.log(
+        logger.info(
           `Installing ICU ${targetVersion} with vcpkg using overlay...`,
         )
         await builder.exec("vcpkg", [
@@ -140,7 +141,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       }
     } catch {
       // vcpkg list failed, assume not installed
-      console.log(`Installing ICU ${version} with vcpkg using overlay...`)
+      logger.info(`Installing ICU ${version} with vcpkg using overlay...`)
       await builder.exec("vcpkg", [
         "install",
         "icu",
@@ -154,7 +155,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       "packages/icu_x64-windows-static",
     )
 
-    console.log("Copying ICU files...")
+    logger.info("Copying ICU files...")
 
     // Create output directories
     await fs.ensureDir(path.join(installPrefix, "lib"))
@@ -172,9 +173,9 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       { overwrite: true },
     )
 
-    console.log("ICU build completed successfully!")
-    console.log(`Target: ${target}`)
-    console.log(`Install prefix: ${installPrefix}`)
+    logger.info("ICU build completed successfully!")
+    logger.info(`Target: ${target}`)
+    logger.info(`Install prefix: ${installPrefix}`)
     return
   }
 
@@ -296,20 +297,20 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   Deno.env.set("CFLAGS", `${existingCflags} ${cflagsOpt}`.trim())
   Deno.env.set("CXXFLAGS", `${existingCxxflags} ${cxxflagsOpt}`.trim())
 
-  console.log("")
-  console.log("=== ICU Build Configuration ===")
-  console.log(`Target triple:      ${target}`)
-  console.log(`Build type:         ${buildType}`)
-  console.log(`Platform:           ${platform}`)
-  console.log(`ICU platform:       ${icuPlatform}`)
-  console.log(`ICU source:         ${icuSourceDir}`)
-  console.log(`Build directory:    ${buildRoot}`)
-  console.log(`Install prefix:     ${installPrefix}`)
-  console.log("===================================")
-  console.log("")
+  logger.info("")
+  logger.info("=== ICU Build Configuration ===")
+  logger.info(`Target triple:      ${target}`)
+  logger.info(`Build type:         ${buildType}`)
+  logger.info(`Platform:           ${platform}`)
+  logger.info(`ICU platform:       ${icuPlatform}`)
+  logger.info(`ICU source:         ${icuSourceDir}`)
+  logger.info(`Build directory:    ${buildRoot}`)
+  logger.info(`Install prefix:     ${installPrefix}`)
+  logger.info("===================================")
+  logger.info("")
 
   // Clone ICU
-  console.log("Removing existing ICU directory (if any)...")
+  logger.info("Removing existing ICU directory (if any)...")
   try {
     await Deno.remove(path.join(repoRoot, "icu"), { recursive: true })
   } catch {
@@ -317,7 +318,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   }
 
   const icuTag = convertIcuVersionToTag(version)
-  console.log(`Cloning ICU from GitHub (tag ${icuTag})...`)
+  logger.info(`Cloning ICU from GitHub (tag ${icuTag})...`)
   await builder.exec("git", [
     "clone",
     "--depth",
@@ -330,7 +331,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
 
   // Clean build directory if requested
   if (clean) {
-    console.log("Cleaning build directory...")
+    logger.info("Cleaning build directory...")
     try {
       await Deno.remove(buildRoot, { recursive: true })
     } catch {
@@ -341,7 +342,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   await Deno.mkdir(buildRoot, { recursive: true })
 
   // Configure
-  console.log("Running ICU configure...")
+  logger.info("Running ICU configure...")
   const configureArgs = [
     "--enable-static",
     "--disable-shared",
@@ -364,17 +365,17 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       "*-apple-*)",
     )
     await Deno.writeTextFile(acincludePath, acincludeContent)
-    console.log("Patched ICU to recognize iOS as Darwin platform")
+    logger.info("Patched ICU to recognize iOS as Darwin platform")
 
     // Regenerate configure script with the patched acinclude.m4
-    console.log("Regenerating configure script...")
+    logger.info("Regenerating configure script...")
     await builder.exec("autoconf", [], { cwd: icuSourceDir })
 
     // Also copy mh-darwin to mh-unknown for the build phase
     const mhDarwin = path.join(icuSourceDir, "config/mh-darwin")
     const mhUnknown = path.join(icuSourceDir, "config/mh-unknown")
     await Deno.copyFile(mhDarwin, mhUnknown)
-    console.log("Copied mh-darwin to mh-unknown for iOS build")
+    logger.info("Copied mh-darwin to mh-unknown for iOS build")
 
     const hostBuildDir = path.join(
       repoRoot,
@@ -441,21 +442,21 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   // Helper to print config.log on failure
   const printConfigLogOnFailure = async (error: unknown) => {
     const configLogPath = path.join(buildRoot, "config.log")
-    console.error("\n=== ICU configure failed! Printing config.log ===\n")
+    logger.error("\n=== ICU configure failed! Printing config.log ===\n")
     try {
       const configLog = await Deno.readTextFile(configLogPath)
-      console.error(configLog)
+      logger.error(configLog)
     } catch {
-      console.error(`Could not read ${configLogPath}`)
+      logger.error(`Could not read ${configLogPath}`)
     }
-    console.error("\n=== End of config.log ===\n")
+    logger.error("\n=== End of config.log ===\n")
     throw error
   }
 
   // For cross-compilation (iOS/Android), always use configure directly
   // runConfigureICU doesn't handle cross-compilation well
   if (platform === "ios" || platform === "android") {
-    console.log("Cross-compiling: using configure directly")
+    logger.info("Cross-compiling: using configure directly")
     try {
       await builder.exec(
         path.join(icuSourceDir, "configure"),
@@ -466,7 +467,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       await printConfigLogOnFailure(e)
     }
   } else if (hasRunConfigureIcu) {
-    console.log(`Using runConfigureICU for platform: ${icuPlatform}`)
+    logger.info(`Using runConfigureICU for platform: ${icuPlatform}`)
     try {
       await builder.exec(
         runConfigureIcu,
@@ -477,7 +478,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       await printConfigLogOnFailure(e)
     }
   } else {
-    console.log("Using configure directly")
+    logger.info("Using configure directly")
     try {
       await builder.exec(
         path.join(icuSourceDir, "configure"),
@@ -505,15 +506,15 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
   }
 
   // Build
-  console.log(`Building with ${maxJobs} parallel jobs...`)
+  logger.info(`Building with ${maxJobs} parallel jobs...`)
   await builder.exec("make", [`-j${maxJobs}`], { cwd: buildRoot })
 
   // Install
-  console.log(`Installing to ${installPrefix}...`)
+  logger.info(`Installing to ${installPrefix}...`)
   await builder.exec("make", ["install"], { cwd: buildRoot })
 
   // Rewrite pkg-config files to use portable relative paths
-  console.log("Rewriting pkg-config files for portability...")
+  logger.info("Rewriting pkg-config files for portability...")
   const pkgconfigDir = path.join(installPrefix, "lib/pkgconfig")
   try {
     for await (const entry of Deno.readDir(pkgconfigDir)) {
@@ -528,32 +529,32 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
           "prefix=${pcfiledir}/../..",
         )
         await Deno.writeTextFile(pcPath, content)
-        console.log(`  Rewrote ${entry.name}`)
+        logger.info(`  Rewrote ${entry.name}`)
       }
     }
   } catch (err) {
-    console.log(`  Warning: Could not rewrite pkg-config files: ${err}`)
+    logger.info(`  Warning: Could not rewrite pkg-config files: ${err}`)
   }
 
-  console.log("")
-  console.log("ICU build completed successfully!")
-  console.log("")
-  console.log(`Target: ${target}`)
-  console.log("")
-  console.log("Library files:")
+  logger.info("")
+  logger.info("ICU build completed successfully!")
+  logger.info("")
+  logger.info(`Target: ${target}`)
+  logger.info("")
+  logger.info("Library files:")
   try {
     const libs = await builder.output("ls", ["-lh"], {
       cwd: path.join(installPrefix, "lib"),
     })
-    console.log(libs)
+    logger.info(libs)
   } catch {
-    console.log("  (libraries not found - check build output)")
+    logger.info("  (libraries not found - check build output)")
   }
-  console.log("")
-  console.log("You can now link against ICU static libraries:")
-  console.log("  libicuuc.a  - Unicode Common")
-  console.log("  libicui18n.a - Internationalization")
-  console.log("  libicudata.a - ICU Data")
-  console.log("  libicuio.a  - ICU I/O (optional)")
-  console.log("")
+  logger.info("")
+  logger.info("You can now link against ICU static libraries:")
+  logger.info("  libicuuc.a  - Unicode Common")
+  logger.info("  libicui18n.a - Internationalization")
+  logger.info("  libicudata.a - ICU Data")
+  logger.info("  libicuio.a  - ICU I/O (optional)")
+  logger.info("")
 }

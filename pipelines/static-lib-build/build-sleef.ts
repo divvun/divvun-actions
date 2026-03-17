@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import { exec, output } from "~/util/process.ts"
+import logger from "~/util/log.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 
@@ -33,7 +34,7 @@ export async function buildSleef(options: BuildSleefOptions) {
     version = "3.9.0",
   } = options
 
-  console.log(
+  logger.info(
     "Building SLEEF (SIMD Library for Evaluating Elementary Functions)",
   )
 
@@ -87,7 +88,7 @@ export async function buildSleef(options: BuildSleefOptions) {
       hostTriple.includes("gnu") && targetTriple.includes("-musl"))
 
   if (isCrossCompile) {
-    console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
+    logger.info(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
   }
 
   // Set up compilers
@@ -132,28 +133,28 @@ export async function buildSleef(options: BuildSleefOptions) {
     cxx = "cl.exe"
   }
 
-  console.log("")
-  console.log("=== SLEEF Build Configuration ===")
-  console.log(`Target triple:      ${target}`)
-  console.log(`Build type:         ${buildType}`)
-  console.log(`Platform:           ${platform}`)
-  console.log(`C compiler:         ${cc}`)
-  console.log(`C++ compiler:       ${cxx}`)
-  console.log(`SLEEF source:       ${sleefDir}`)
-  console.log(`Build directory:    ${buildRoot}`)
-  console.log(`Install prefix:     ${installPrefix}`)
-  console.log("===================================")
-  console.log("")
+  logger.info("")
+  logger.info("=== SLEEF Build Configuration ===")
+  logger.info(`Target triple:      ${target}`)
+  logger.info(`Build type:         ${buildType}`)
+  logger.info(`Platform:           ${platform}`)
+  logger.info(`C compiler:         ${cc}`)
+  logger.info(`C++ compiler:       ${cxx}`)
+  logger.info(`SLEEF source:       ${sleefDir}`)
+  logger.info(`Build directory:    ${buildRoot}`)
+  logger.info(`Install prefix:     ${installPrefix}`)
+  logger.info("===================================")
+  logger.info("")
 
   // Clone SLEEF
-  console.log("Removing existing SLEEF directory (if any)...")
+  logger.info("Removing existing SLEEF directory (if any)...")
   try {
     await Deno.remove(sleefDir, { recursive: true })
   } catch {
     // Ignore if doesn't exist
   }
 
-  console.log(`Cloning SLEEF from GitHub (version ${version})...`)
+  logger.info(`Cloning SLEEF from GitHub (version ${version})...`)
   await exec("git", [
     "clone",
     "--depth",
@@ -166,7 +167,7 @@ export async function buildSleef(options: BuildSleefOptions) {
 
   // Clean build directory
   if (clean) {
-    console.log("Cleaning build directory...")
+    logger.info("Cleaning build directory...")
     try {
       await Deno.remove(buildRoot, { recursive: true })
     } catch {
@@ -253,7 +254,7 @@ export async function buildSleef(options: BuildSleefOptions) {
   }
 
   // Run CMake configuration
-  console.log("Running CMake configuration...")
+  logger.info("Running CMake configuration...")
   await exec(cmakePath, cmakeArgs, { cwd: buildRoot })
 
   // Determine number of parallel jobs
@@ -272,24 +273,24 @@ export async function buildSleef(options: BuildSleefOptions) {
   }
 
   // Build
-  console.log(`Building SLEEF (${maxJobs} parallel jobs)`)
+  logger.info(`Building SLEEF (${maxJobs} parallel jobs)`)
   await exec(
     cmakePath,
     ["--build", ".", "--target", "install", "--", `-j${maxJobs}`],
     { cwd: buildRoot },
   )
 
-  console.log("")
-  console.log("SLEEF build completed successfully!")
-  console.log("")
-  console.log(`Target: ${target}`)
-  console.log("")
-  console.log("Library files:")
-  console.log(`  ${installPrefix}/lib/`)
-  console.log("")
-  console.log("Header files:")
-  console.log(`  ${installPrefix}/include/`)
-  console.log("")
+  logger.info("")
+  logger.info("SLEEF build completed successfully!")
+  logger.info("")
+  logger.info(`Target: ${target}`)
+  logger.info("")
+  logger.info("Library files:")
+  logger.info(`  ${installPrefix}/lib/`)
+  logger.info("")
+  logger.info("Header files:")
+  logger.info(`  ${installPrefix}/include/`)
+  logger.info("")
 }
 
 if (import.meta.main) {

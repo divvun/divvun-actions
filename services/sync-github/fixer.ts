@@ -1,4 +1,5 @@
 import { pooledMap } from "@std/async/pool"
+import logger from "~/util/log.ts"
 import { createBuildkiteWebhook } from "./github-client.ts"
 import {
   createBuildkitePipeline,
@@ -18,12 +19,12 @@ export async function applyFixes(
   )
 
   for (const result of noPipelines) {
-    console.log(`🚀 Creating pipeline for ${result.repoName}...`)
+    logger.info(`🚀 Creating pipeline for ${result.repoName}...`)
     const newPipeline = await createBuildkitePipeline(
       buildkiteProps,
       result.repo,
     )
-    console.log(`✅ Created pipeline: ${newPipeline.name} (${newPipeline.url})`)
+    logger.info(`✅ Created pipeline: ${newPipeline.name} (${newPipeline.url})`)
   }
 
   // Fix 2: Create missing webhooks
@@ -38,16 +39,16 @@ export async function applyFixes(
       async (result) => {
         if (!result.pipeline) return
 
-        console.log(`🔗 Creating webhook for ${result.repoName}...`)
+        logger.info(`🔗 Creating webhook for ${result.repoName}...`)
         try {
           const webhook = await createBuildkiteWebhook(
             githubProps,
             result.repoName,
             result.pipeline,
           )
-          console.log(`✅ Created webhook: ${webhook.config.url}`)
+          logger.info(`✅ Created webhook: ${webhook.config.url}`)
         } catch (error) {
-          console.error(
+          logger.error(
             `❌ Failed to create webhook for ${result.repoName}: ${error}`,
           )
         }
@@ -70,7 +71,7 @@ export async function applyFixes(
       async (result) => {
         if (!result.pipeline) return
 
-        console.log(
+        logger.info(
           `🌿 Updating branch configuration for ${result.repoName}...`,
         )
         try {
@@ -90,9 +91,9 @@ export async function applyFixes(
             result.pipeline,
             { branch_configuration: newBranchConfig },
           )
-          console.log(`✅ Updated branch configuration: ${newBranchConfig}`)
+          logger.info(`✅ Updated branch configuration: ${newBranchConfig}`)
         } catch (error) {
-          console.error(
+          logger.error(
             `❌ Failed to update branch configuration for ${result.repoName}: ${error}`,
           )
         }
@@ -114,16 +115,16 @@ export async function applyFixes(
       async (result) => {
         if (!result.pipeline) return
 
-        console.log(`🏷️  Enabling build_tags for ${result.repoName}...`)
+        logger.info(`🏷️  Enabling build_tags for ${result.repoName}...`)
         try {
           await updateBuildkitePipeline(
             buildkiteProps,
             result.pipeline,
             { provider_settings: { build_tags: true } },
           )
-          console.log(`✅ Enabled build_tags for ${result.repoName}`)
+          logger.info(`✅ Enabled build_tags for ${result.repoName}`)
         } catch (error) {
-          console.error(
+          logger.error(
             `❌ Failed to enable build_tags for ${result.repoName}: ${error}`,
           )
         }
@@ -145,7 +146,7 @@ export async function applyFixes(
       async (result) => {
         if (!result.pipeline) return
 
-        console.log(`🔍 Setting build filter for ${result.repoName}...`)
+        logger.info(`🔍 Setting build filter for ${result.repoName}...`)
         try {
           await updateBuildkitePipeline(
             buildkiteProps,
@@ -156,9 +157,9 @@ export async function applyFixes(
                 `build.branch != "gh-pages" && build.tag !~ /dev-latest$/`,
             },
           )
-          console.log(`✅ Set build filter for ${result.repoName}`)
+          logger.info(`✅ Set build filter for ${result.repoName}`)
         } catch (error) {
-          console.error(
+          logger.error(
             `❌ Failed to set build filter for ${result.repoName}: ${error}`,
           )
         }
@@ -181,7 +182,7 @@ export async function applyFixes(
       async (result) => {
         if (!result.pipeline) return
 
-        console.log(
+        logger.info(
           `⏭️  Enabling skip_queued_branch_builds for ${result.repoName}...`,
         )
         try {
@@ -193,11 +194,11 @@ export async function applyFixes(
               skip_queued_branch_builds_filter: null,
             },
           )
-          console.log(
+          logger.info(
             `✅ Enabled skip_queued_branch_builds for ${result.repoName}`,
           )
         } catch (error) {
-          console.error(
+          logger.error(
             `❌ Failed to enable skip_queued_branch_builds for ${result.repoName}: ${error}`,
           )
         }
@@ -224,7 +225,7 @@ export async function applyFixes(
         const expectedMaturityTag = extractMaturityTag(result.repo.topics)
         if (!expectedMaturityTag) return
 
-        console.log(`📦 Updating maturity tag for ${result.repoName}...`)
+        logger.info(`📦 Updating maturity tag for ${result.repoName}...`)
         try {
           // Remove old :package: tags and add the new one
           const otherTags = result.pipeline.tags.filter((tag) =>
@@ -237,11 +238,11 @@ export async function applyFixes(
             result.pipeline,
             { tags: newTags },
           )
-          console.log(
+          logger.info(
             `✅ Updated maturity tag for ${result.repoName}: ${expectedMaturityTag}`,
           )
         } catch (error) {
-          console.error(
+          logger.error(
             `❌ Failed to update maturity tag for ${result.repoName}: ${error}`,
           )
         }

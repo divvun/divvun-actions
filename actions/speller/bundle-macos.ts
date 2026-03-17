@@ -1,4 +1,4 @@
-import * as path from "jsr:@std/path"
+import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 
 const APP_NAME = "MacDivvun"
@@ -76,7 +76,7 @@ async function createBundle({
 
   try {
     await Deno.remove(bundleDir, { recursive: true })
-  } catch (err) {
+  } catch {
     // Ignore if directory doesn't exist
   }
 
@@ -185,7 +185,7 @@ async function createInstallerFromBundle(
     if (!success) {
       throw new Error("productbuild failed")
     }
-  } catch (err) {
+  } catch {
     throw new Error("productbuild failed")
   }
 }
@@ -213,7 +213,7 @@ async function signInstaller(
     if (!success) {
       throw new Error("productsign failed")
     }
-  } catch (err) {
+  } catch {
     throw new Error("productsign failed")
   }
 }
@@ -279,7 +279,7 @@ async function createComponentPackage(
     if (!success) {
       throw new Error("pkgbuild failed")
     }
-  } catch (err) {
+  } catch {
     throw new Error("pkgbuild failed")
   }
 

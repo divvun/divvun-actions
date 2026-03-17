@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 type AndroidABI = "arm64-v8a" | "armeabi-v7a" | "x86_64" | "x86"
@@ -31,7 +32,7 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
     lite = false,
   } = options
 
-  console.log("Building PyTorch for Android")
+  logger.info("Building PyTorch for Android")
 
   const repoRoot = Deno.cwd()
   const pytorchRoot = path.join(repoRoot, "pytorch")
@@ -48,9 +49,9 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
 
   try {
     await Deno.stat(path.join(hostProtobufPath, "bin/protoc"))
-    console.log(`Host protobuf already exists at ${hostProtobufPath}`)
+    logger.info(`Host protobuf already exists at ${hostProtobufPath}`)
   } catch {
-    console.log(
+    logger.info(
       `Downloading host protobuf ${protobufVersion} for ${hostTarget}...`,
     )
     const hostDownloadUrl =
@@ -62,7 +63,7 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
       hostProtobufArtifact,
     ])
 
-    console.log(`Extracting ${hostProtobufArtifact}...`)
+    logger.info(`Extracting ${hostProtobufArtifact}...`)
     await Deno.mkdir(path.join(repoRoot, `target/${hostTarget}`), {
       recursive: true,
     })
@@ -73,7 +74,7 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
       path.join(repoRoot, `target/${hostTarget}`),
     ])
     await Deno.remove(hostProtobufArtifact)
-    console.log(`Host protobuf extracted to ${hostProtobufPath}`)
+    logger.info(`Host protobuf extracted to ${hostProtobufPath}`)
   }
 
   // Download target protobuf (Android library to link against)
@@ -82,9 +83,9 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
 
   try {
     await Deno.stat(path.join(targetProtobufPath, "lib/libprotobuf.a"))
-    console.log(`Target protobuf already exists at ${targetProtobufPath}`)
+    logger.info(`Target protobuf already exists at ${targetProtobufPath}`)
   } catch {
-    console.log(
+    logger.info(
       `Downloading target protobuf ${protobufVersion} for ${target}...`,
     )
     const targetDownloadUrl =
@@ -96,7 +97,7 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
       targetProtobufArtifact,
     ])
 
-    console.log(`Extracting ${targetProtobufArtifact}...`)
+    logger.info(`Extracting ${targetProtobufArtifact}...`)
     await Deno.mkdir(path.join(repoRoot, `target/${target}`), {
       recursive: true,
     })
@@ -107,7 +108,7 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
       path.join(repoRoot, `target/${target}`),
     ])
     await Deno.remove(targetProtobufArtifact)
-    console.log(`Target protobuf extracted to ${targetProtobufPath}`)
+    logger.info(`Target protobuf extracted to ${targetProtobufPath}`)
   }
 
   // Check for ANDROID_NDK
@@ -115,7 +116,7 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
   if (!androidNdk) {
     androidNdk = Deno.env.get("ANDROID_NDK_HOME")
     if (androidNdk) {
-      console.log(`Using ANDROID_NDK_HOME as ANDROID_NDK: ${androidNdk}`)
+      logger.info(`Using ANDROID_NDK_HOME as ANDROID_NDK: ${androidNdk}`)
     } else {
       throw new Error(
         "ANDROID_NDK environment variable not set. Set ANDROID_NDK or ANDROID_NDK_HOME to your Android NDK directory.",
@@ -185,14 +186,14 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
   try {
     await Deno.stat(venvPath)
   } catch {
-    console.log("No .venv found, creating one with uv...")
+    logger.info("No .venv found, creating one with uv...")
     await builder.exec("uv", ["venv"], { cwd: pytorchRoot })
   }
 
-  console.log(`Using Python: ${pythonPath}`)
+  logger.info(`Using Python: ${pythonPath}`)
 
   // Install Python dependencies
-  console.log("Installing Python dependencies")
+  logger.info("Installing Python dependencies")
   await builder.exec(
     "uv",
     ["pip", "install", "pyyaml", "setuptools", "typing-extensions"],
@@ -200,11 +201,11 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
   )
 
   // Fetch optional dependencies
-  console.log("Fetching optional dependencies")
+  logger.info("Fetching optional dependencies")
   const eigenCheck = path.join(pytorchRoot, "third_party/eigen/CMakeLists.txt")
   try {
     await Deno.stat(eigenCheck)
-    console.log("Eigen already present")
+    logger.info("Eigen already present")
   } catch {
     await builder.exec(
       pythonPath,
@@ -238,7 +239,7 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
   )
 
   if (clean) {
-    console.log("Cleaning build and install directories...")
+    logger.info("Cleaning build and install directories...")
     try {
       await Deno.remove(buildRoot, { recursive: true })
     } catch {
@@ -411,8 +412,8 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
     )
   }
 
-  console.log(`Using custom-built protoc from ${hostProtoc}`)
-  console.log(`Using custom-built static Protobuf from ${customProtobufLib}`)
+  logger.info(`Using custom-built protoc from ${hostProtoc}`)
+  logger.info(`Using custom-built static Protobuf from ${customProtobufLib}`)
   cmakeArgs.push("-DBUILD_CUSTOM_PROTOBUF=OFF")
   cmakeArgs.push(`-DCAFFE2_CUSTOM_PROTOC_EXECUTABLE=${hostProtoc}`)
   cmakeArgs.push(`-DProtobuf_PROTOC_EXECUTABLE=${hostProtoc}`)
@@ -427,27 +428,27 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
   }
 
   // Display build configuration
-  console.log("")
-  console.log("=== Android Build Configuration ===")
-  console.log(`Target triple:      ${targetTriple}`)
-  console.log(`Android NDK:        ${androidNdk}`)
-  console.log(`NDK version:        ${androidNdkVersion}`)
-  console.log(`ABI:                ${abi}`)
-  console.log(`API level:          ${apiLevel}`)
-  console.log(`Build type:         ${buildType}`)
-  console.log(`Python:             ${pythonPath}`)
-  console.log(`Output directory:   ${buildRoot}`)
-  console.log(`BUILD_LITE:         ${lite}`)
-  console.log(`USE_VULKAN:         ${vulkan || vulkanFp16}`)
-  console.log(`STL:                ${stlShared ? "shared" : "static"}`)
-  console.log("====================================")
-  console.log("")
+  logger.info("")
+  logger.info("=== Android Build Configuration ===")
+  logger.info(`Target triple:      ${targetTriple}`)
+  logger.info(`Android NDK:        ${androidNdk}`)
+  logger.info(`NDK version:        ${androidNdkVersion}`)
+  logger.info(`ABI:                ${abi}`)
+  logger.info(`API level:          ${apiLevel}`)
+  logger.info(`Build type:         ${buildType}`)
+  logger.info(`Python:             ${pythonPath}`)
+  logger.info(`Output directory:   ${buildRoot}`)
+  logger.info(`BUILD_LITE:         ${lite}`)
+  logger.info(`USE_VULKAN:         ${vulkan || vulkanFp16}`)
+  logger.info(`STL:                ${stlShared ? "shared" : "static"}`)
+  logger.info("====================================")
+  logger.info("")
 
   // Set environment variables
   Deno.env.set("CMAKE_MAKE_PROGRAM", ninjaPath)
 
   // Run CMake configuration
-  console.log("Running CMake configuration")
+  logger.info("Running CMake configuration")
   await builder.exec(cmakePath, [pytorchRoot, ...cmakeArgs], { cwd: buildRoot })
 
   // Determine number of parallel jobs
@@ -462,7 +463,7 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
   }
 
   // Build
-  console.log(`Building PyTorch (${maxJobs} parallel jobs)`)
+  logger.info(`Building PyTorch (${maxJobs} parallel jobs)`)
   await builder.exec(
     cmakePath,
     ["--build", ".", "--target", "install", "--", `-j${maxJobs}`],
@@ -470,7 +471,7 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
   )
 
   // Install libraries and headers
-  console.log("Installing libraries and headers")
+  logger.info("Installing libraries and headers")
   try {
     await builder.exec("cp", [
       "-rf",
@@ -490,15 +491,15 @@ export async function buildPytorchAndroid(options: BuildPytorchAndroidOptions) {
     // Ignore if copy fails
   }
 
-  console.log("")
-  console.log("Android build completed successfully!")
-  console.log("")
-  console.log(`Target: ${targetTriple}`)
-  console.log("")
-  console.log("Library files:")
-  console.log(`  ${buildRoot}/lib/`)
-  console.log("")
-  console.log("Header files:")
-  console.log(`  ${buildRoot}/include/`)
-  console.log("")
+  logger.info("")
+  logger.info("Android build completed successfully!")
+  logger.info("")
+  logger.info(`Target: ${targetTriple}`)
+  logger.info("")
+  logger.info("Library files:")
+  logger.info(`  ${buildRoot}/lib/`)
+  logger.info("")
+  logger.info("Header files:")
+  logger.info(`  ${buildRoot}/include/`)
+  logger.info("")
 }

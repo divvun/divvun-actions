@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 
@@ -25,7 +26,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     lite = false,
   } = options
 
-  console.log("Building PyTorch C++ libraries for Linux")
+  logger.info("Building PyTorch C++ libraries for Linux")
 
   const repoRoot = Deno.cwd()
   const pytorchRoot = path.join(repoRoot, "pytorch")
@@ -37,15 +38,15 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
 
   try {
     await Deno.stat(path.join(protobufPath, "bin/protoc"))
-    console.log(`Protobuf already exists at ${protobufPath}`)
+    logger.info(`Protobuf already exists at ${protobufPath}`)
   } catch {
-    console.log(`Downloading protobuf ${protobufVersion} for ${target}...`)
+    logger.info(`Downloading protobuf ${protobufVersion} for ${target}...`)
     const downloadUrl =
       `https://github.com/divvun/static-lib-build/releases/download/protobuf%2F${protobufVersion}/${protobufArtifact}`
     await builder.exec("curl", ["-sSfL", downloadUrl, "-o", protobufArtifact])
 
     // Extract protobuf artifact
-    console.log(`Extracting ${protobufArtifact}...`)
+    logger.info(`Extracting ${protobufArtifact}...`)
     await Deno.mkdir(path.join(repoRoot, `target/${target}`), {
       recursive: true,
     })
@@ -56,12 +57,12 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
       path.join(repoRoot, `target/${target}`),
     ])
     await Deno.remove(protobufArtifact)
-    console.log(`Protobuf extracted to ${protobufPath}`)
+    logger.info(`Protobuf extracted to ${protobufPath}`)
   }
 
   // Detect host architecture
   const hostArch = Deno.build.arch === "aarch64" ? "aarch64" : "x86_64"
-  console.log(`Detected host architecture: ${hostArch}`)
+  logger.info(`Detected host architecture: ${hostArch}`)
 
   // Get tool paths
   const ninjaPath = (await builder.output("which", ["ninja"])).stdout.trim()
@@ -74,14 +75,14 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   try {
     await Deno.stat(venvPath)
   } catch {
-    console.log("No .venv found, creating one with uv...")
+    logger.info("No .venv found, creating one with uv...")
     await builder.exec("uv", ["venv"], { cwd: pytorchRoot })
   }
 
-  console.log(`Using Python: ${pythonPath}`)
+  logger.info(`Using Python: ${pythonPath}`)
 
   // Install Python dependencies
-  console.log("Installing Python dependencies")
+  logger.info("Installing Python dependencies")
   await builder.exec(
     "uv",
     ["pip", "install", "pyyaml", "setuptools", "typing-extensions", "six"],
@@ -89,11 +90,11 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   )
 
   // Fetch optional dependencies
-  console.log("Fetching optional dependencies")
+  logger.info("Fetching optional dependencies")
   const eigenCheck = path.join(pytorchRoot, "third_party/eigen/CMakeLists.txt")
   try {
     await Deno.stat(eigenCheck)
-    console.log("Eigen already present")
+    logger.info("Eigen already present")
   } catch {
     await builder.exec(
       pythonPath,
@@ -103,7 +104,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   }
 
   // Apply SLEEF patch
-  console.log("Applying SLEEF patch")
+  logger.info("Applying SLEEF patch")
   const sleefPatchPath = path.join(
     import.meta.dirname!,
     "patches/pytorch/aten-sleef.patch",
@@ -114,7 +115,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
 
   // Apply patches for musl builds
   if (target.includes("-musl")) {
-    console.log("Applying tensorpipe prctl.h patch for musl")
+    logger.info("Applying tensorpipe prctl.h patch for musl")
     const tensorpipePatchPath = path.join(
       import.meta.dirname!,
       "patches/pytorch/tensorpipe-prctl.patch",
@@ -123,7 +124,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
       cwd: pytorchRoot,
     })
 
-    console.log("Applying gloo caddr_t patch for musl")
+    logger.info("Applying gloo caddr_t patch for musl")
     const glooPatchPath = path.join(
       import.meta.dirname!,
       "patches/pytorch/gloo-caddr.patch",
@@ -132,7 +133,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
       cwd: pytorchRoot,
     })
 
-    console.log("Applying c10 __assert_fail patch for musl")
+    logger.info("Applying c10 __assert_fail patch for musl")
     const c10PatchPath = path.join(
       import.meta.dirname!,
       "patches/pytorch/c10-assert-fail.patch",
@@ -143,7 +144,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   }
 
   // Apply FindARM SVE detection patch for all builds
-  console.log("Applying FindARM SVE detection patch")
+  logger.info("Applying FindARM SVE detection patch")
   const findArmPatchPath = path.join(
     import.meta.dirname!,
     "patches/pytorch/findarm-sve.patch",
@@ -154,7 +155,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
 
   // Disable SVE for aarch64 Linux builds
   if (target.startsWith("aarch64")) {
-    console.log("Applying remove-sve-detect patch for aarch64")
+    logger.info("Applying remove-sve-detect patch for aarch64")
     const removeSvePatchPath = path.join(
       import.meta.dirname!,
       "patches/pytorch/remove-sve-detect.patch",
@@ -180,7 +181,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   const isCrossCompile = targetTriple !== hostTriple
 
   if (isCrossCompile) {
-    console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
+    logger.info(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
   }
 
   // Set up directories
@@ -191,7 +192,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   )
 
   if (clean) {
-    console.log("Cleaning build and install directories...")
+    logger.info("Cleaning build and install directories...")
     try {
       await Deno.remove(buildRoot, { recursive: true })
     } catch {
@@ -333,7 +334,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   const customOpenmpInclude = path.join(libompPrefix, "include")
   try {
     await Deno.stat(customOpenmpLib)
-    console.log(`Using custom-built static OpenMP from ${customOpenmpLib}`)
+    logger.info(`Using custom-built static OpenMP from ${customOpenmpLib}`)
     cmakeArgs.push("-DUSE_OPENMP=ON")
     cmakeArgs.push(
       `-DOpenMP_C_FLAGS=-fopenmp -I${customOpenmpInclude}`,
@@ -403,8 +404,8 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     )
   }
 
-  console.log(`Using custom-built protoc from ${customProtoc}`)
-  console.log(`Using custom-built static Protobuf from ${customProtobufLib}`)
+  logger.info(`Using custom-built protoc from ${customProtoc}`)
+  logger.info(`Using custom-built static Protobuf from ${customProtobufLib}`)
   cmakeArgs.push("-DBUILD_CUSTOM_PROTOBUF=OFF")
   cmakeArgs.push(`-DCAFFE2_CUSTOM_PROTOC_EXECUTABLE=${customProtoc}`)
   cmakeArgs.push(`-DProtobuf_PROTOC_EXECUTABLE=${customProtoc}`)
@@ -419,17 +420,17 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   }
 
   // Display build configuration
-  console.log("")
-  console.log("=== Linux Build Configuration ===")
-  console.log(`Target triple:      ${targetTriple}`)
-  console.log(`Build type:         ${buildType}`)
-  console.log(`Library type:       ${shared ? "shared" : "static"}`)
-  console.log(`Python:             ${pythonPath}`)
-  console.log(`Output directory:   ${buildRoot}`)
-  console.log(`USE_DISTRIBUTED:    ${distributed}`)
-  console.log(`BUILD_LITE:         ${lite}`)
-  console.log("====================================")
-  console.log("")
+  logger.info("")
+  logger.info("=== Linux Build Configuration ===")
+  logger.info(`Target triple:      ${targetTriple}`)
+  logger.info(`Build type:         ${buildType}`)
+  logger.info(`Library type:       ${shared ? "shared" : "static"}`)
+  logger.info(`Python:             ${pythonPath}`)
+  logger.info(`Output directory:   ${buildRoot}`)
+  logger.info(`USE_DISTRIBUTED:    ${distributed}`)
+  logger.info(`BUILD_LITE:         ${lite}`)
+  logger.info("====================================")
+  logger.info("")
 
   // Set environment variables
   if (isMusl) {
@@ -447,7 +448,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   Deno.env.set("PYTHON", pythonExecutable)
 
   // Run CMake configuration
-  console.log("Running CMake configuration")
+  logger.info("Running CMake configuration")
   await builder.exec(cmakePath, [pytorchRoot, ...cmakeArgs], { cwd: buildRoot })
 
   // Determine number of parallel jobs
@@ -457,7 +458,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   }
 
   // Build
-  console.log(`Building PyTorch (${maxJobs} parallel jobs)`)
+  logger.info(`Building PyTorch (${maxJobs} parallel jobs)`)
   await builder.exec(
     cmakePath,
     ["--build", ".", "--target", "install", "--", `-j${maxJobs}`],
@@ -465,7 +466,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   )
 
   // Install libraries and headers
-  console.log("Installing libraries and headers")
+  logger.info("Installing libraries and headers")
   try {
     await builder.exec("cp", [
       "-rf",
@@ -486,7 +487,7 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
   }
 
   // Copy SLEEF libraries into PyTorch bundle
-  console.log("Copying SLEEF libraries")
+  logger.info("Copying SLEEF libraries")
   try {
     await builder.exec("cp", [
       "-rf",
@@ -506,15 +507,15 @@ export async function buildPytorchLinux(options: BuildPytorchLinuxOptions) {
     // Ignore if copy fails
   }
 
-  console.log("")
-  console.log("Linux build completed successfully!")
-  console.log("")
-  console.log(`Target: ${targetTriple}`)
-  console.log("")
-  console.log("Library files:")
-  console.log(`  ${buildRoot}/lib/`)
-  console.log("")
-  console.log("Header files:")
-  console.log(`  ${buildRoot}/include/`)
-  console.log("")
+  logger.info("")
+  logger.info("Linux build completed successfully!")
+  logger.info("")
+  logger.info(`Target: ${targetTriple}`)
+  logger.info("")
+  logger.info("Library files:")
+  logger.info(`  ${buildRoot}/lib/`)
+  logger.info("")
+  logger.info("Header files:")
+  logger.info(`  ${buildRoot}/include/`)
+  logger.info("")
 }

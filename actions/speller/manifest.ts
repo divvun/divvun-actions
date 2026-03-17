@@ -1,4 +1,5 @@
 import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 
 export enum SpellerType {
   MacOS = "speller-macos",
@@ -38,9 +39,9 @@ export type SpellerManifest = {
 }
 
 export function deriveLangTag() {
-  console.log("repoName", builder.env.repoName)
+  logger.info("repoName", builder.env.repoName)
   const lang = builder.env.repoName.split("lang-")[1]?.split("-")[0]
-  console.log("lang", lang)
+  logger.info("lang", lang)
 
   // Map ISO 639-3 codes to ISO 639-1 codes where they exist
   // This is the complete set of ISO 639-1 languages that might be relevant

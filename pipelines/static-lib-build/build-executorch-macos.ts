@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 
@@ -21,14 +22,14 @@ export async function buildExecutorchMacos(
     verbose = false,
   } = options
 
-  console.log("Building ExecuTorch for macOS")
+  logger.info("Building ExecuTorch for macOS")
 
   const repoRoot = Deno.cwd()
   const executorchRoot = path.join(repoRoot, "executorch")
 
   // Detect host architecture
   const hostArch = Deno.build.arch === "aarch64" ? "arm64" : "x86_64"
-  console.log(`Detected host architecture: ${hostArch}`)
+  logger.info(`Detected host architecture: ${hostArch}`)
 
   // Determine brew prefix
   const brewPrefix = hostArch === "arm64" ? "/opt/homebrew" : "/usr/local"
@@ -42,14 +43,14 @@ export async function buildExecutorchMacos(
   try {
     await Deno.stat(venvPath)
   } catch {
-    console.log("No .venv found, creating one with uv...")
+    logger.info("No .venv found, creating one with uv...")
     await builder.exec("uv", ["venv"], { cwd: executorchRoot })
   }
 
-  console.log(`Using Python: ${pythonPath}`)
+  logger.info(`Using Python: ${pythonPath}`)
 
   // Install Python dependencies
-  console.log("Installing Python dependencies")
+  logger.info("Installing Python dependencies")
   await builder.exec(
     "uv",
     [
@@ -73,7 +74,7 @@ export async function buildExecutorchMacos(
 
   const isCrossCompile = targetTriple !== hostTriple
   if (isCrossCompile) {
-    console.log(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
+    logger.info(`Cross-compiling: ${hostTriple} -> ${targetTriple}`)
   }
 
   // Set up directories
@@ -81,7 +82,7 @@ export async function buildExecutorchMacos(
   const buildRoot = path.join(repoRoot, `build/${targetTriple}/executorch`)
 
   if (clean) {
-    console.log("Cleaning build and install directories...")
+    logger.info("Cleaning build and install directories...")
     try {
       await Deno.remove(buildRoot, { recursive: true })
     } catch {
@@ -111,12 +112,12 @@ export async function buildExecutorchMacos(
   if (isCrossCompile) {
     if (targetTriple === "x86_64-apple-darwin") {
       cmakeArgs.push("-DCMAKE_OSX_ARCHITECTURES=x86_64")
-      console.log(
+      logger.info(
         "Setting CMAKE_OSX_ARCHITECTURES=x86_64 for cross-compilation",
       )
     } else if (targetTriple === "aarch64-apple-darwin") {
       cmakeArgs.push("-DCMAKE_OSX_ARCHITECTURES=arm64")
-      console.log("Setting CMAKE_OSX_ARCHITECTURES=arm64 for cross-compilation")
+      logger.info("Setting CMAKE_OSX_ARCHITECTURES=arm64 for cross-compilation")
     }
   }
 
@@ -139,15 +140,15 @@ export async function buildExecutorchMacos(
   }
 
   // Display build configuration
-  console.log("")
-  console.log("=== macOS Build Configuration ===")
-  console.log(`Target triple:      ${targetTriple}`)
-  console.log(`Build type:         ${buildType}`)
-  console.log(`Python:             ${pythonPath}`)
-  console.log(`Build directory:    ${buildRoot}`)
-  console.log(`Install directory:  ${installPrefix}`)
-  console.log("====================================")
-  console.log("")
+  logger.info("")
+  logger.info("=== macOS Build Configuration ===")
+  logger.info(`Target triple:      ${targetTriple}`)
+  logger.info(`Build type:         ${buildType}`)
+  logger.info(`Python:             ${pythonPath}`)
+  logger.info(`Build directory:    ${buildRoot}`)
+  logger.info(`Install directory:  ${installPrefix}`)
+  logger.info("====================================")
+  logger.info("")
 
   // Build environment with venv activated
   const venvBinPath = path.join(venvPath, "bin")
@@ -162,10 +163,10 @@ export async function buildExecutorchMacos(
     VIRTUAL_ENV: venvPath,
   }
 
-  console.log(`Using venv: ${venvPath}`)
+  logger.info(`Using venv: ${venvPath}`)
 
   // Run CMake configuration
-  console.log("Running CMake configuration")
+  logger.info("Running CMake configuration")
   await builder.exec(cmakePath, ["-B", buildRoot, ...cmakeArgs], {
     cwd: executorchRoot,
     env: buildEnv,
@@ -178,22 +179,22 @@ export async function buildExecutorchMacos(
   }
 
   // Build and install
-  console.log(`Building ExecuTorch (${maxJobs} parallel jobs)`)
+  logger.info(`Building ExecuTorch (${maxJobs} parallel jobs)`)
   await builder.exec(
     cmakePath,
     ["--build", buildRoot, "--target", "install", "-j", maxJobs],
     { cwd: executorchRoot, env: buildEnv },
   )
 
-  console.log("")
-  console.log("macOS build completed successfully!")
-  console.log("")
-  console.log(`Target: ${targetTriple}`)
-  console.log("")
-  console.log("Library files:")
-  console.log(`  ${installPrefix}/lib/`)
-  console.log("")
-  console.log("Header files:")
-  console.log(`  ${installPrefix}/include/`)
-  console.log("")
+  logger.info("")
+  logger.info("macOS build completed successfully!")
+  logger.info("")
+  logger.info(`Target: ${targetTriple}`)
+  logger.info("")
+  logger.info("Library files:")
+  logger.info(`  ${installPrefix}/lib/`)
+  logger.info("")
+  logger.info("Header files:")
+  logger.info(`  ${installPrefix}/include/`)
+  logger.info("")
 }

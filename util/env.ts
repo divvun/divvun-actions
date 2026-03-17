@@ -124,4 +124,3 @@ export type Env = {
 }
 
 export const buildkite = memoize(() => env("BUILDKITE"))
-export const local = memoize(() => env("LOCAL"))

@@ -1,5 +1,4 @@
 import * as builder from "~/builder.ts"
-import * as target from "~/target.ts"
 import logger from "~/util/log.ts"
 import runCli from "./cli.ts"
 import { ExpectedError } from "./util/error.ts"
@@ -18,7 +17,7 @@ function prettyPlatform() {
 }
 
 logger.debug(
-  `Loading Divvun Actions [Mode: ${builder.mode}] [Env: ${target.env}] [Platform: ${prettyPlatform()}]`,
+  `Loading Divvun Actions [Mode: ${builder.mode}] [Platform: ${prettyPlatform()}]`,
 )
 
 async function main() {
@@ -32,10 +31,6 @@ async function main() {
   }
 
   switch (builder.mode) {
-    case "local": {
-      // await localMain()
-      throw new Error("Local mode not implemented")
-    }
     case "buildkite": {
       await buildkiteMain()
       return

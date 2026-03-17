@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 import { makeTempDir } from "../util/temp.ts"
 
 export default async function sign(
@@ -28,10 +29,10 @@ export default async function sign(
   const codeSignArgs = []
 
   if (entitlementsPath) {
-    console.log("Using entitlements from:", entitlementsPath)
+    logger.info("Using entitlements from:", entitlementsPath)
     codeSignArgs.push("-e", entitlementsPath)
   } else {
-    console.log("No entitlements provided, skipping")
+    logger.info("No entitlements provided, skipping")
   }
 
   await builder.exec("rcodesign", [
@@ -56,7 +57,7 @@ export default async function sign(
     )
   }
 
-  console.log("rcodesign print-signature-info:", assessResult.stdout)
+  logger.info("rcodesign print-signature-info:", assessResult.stdout)
 }
 
 async function notarize(inputFile: string, keyJson: string) {
@@ -65,7 +66,7 @@ async function notarize(inputFile: string, keyJson: string) {
 
   if (isDirectory) {
     // .app bundle: notarize directly with stapling
-    console.log("Stapling notarization ticket (app bundle or package)")
+    logger.info("Stapling notarization ticket (app bundle or package)")
     await builder.exec("rcodesign", [
       "notary-submit",
       "--api-key-file",
@@ -76,7 +77,7 @@ async function notarize(inputFile: string, keyJson: string) {
     ])
   } else {
     // Plain binary: zip it, notarize the zip, then delete the zip
-    console.log(
+    logger.info(
       "Plain binary detected - zipping for notarization (system will check online)",
     )
     using tempDir = await makeTempDir({ prefix: "notarize-" })

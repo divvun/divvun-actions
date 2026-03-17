@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 
@@ -21,7 +22,7 @@ export async function buildExecutorchWindows(
     verbose = false,
   } = options
 
-  console.log(`Building ExecuTorch for Windows (${target})`)
+  logger.info(`Building ExecuTorch for Windows (${target})`)
 
   const repoRoot = Deno.cwd()
   const executorchRoot = path.join(repoRoot, "executorch")
@@ -36,14 +37,14 @@ export async function buildExecutorchWindows(
   try {
     await Deno.stat(venvPath)
   } catch {
-    console.log("No .venv found, creating one with uv...")
+    logger.info("No .venv found, creating one with uv...")
     await builder.exec("uv", ["venv"], { cwd: executorchRoot })
   }
 
-  console.log(`Using Python: ${pythonPath}`)
+  logger.info(`Using Python: ${pythonPath}`)
 
   // Install Python dependencies
-  console.log("Installing Python dependencies")
+  logger.info("Installing Python dependencies")
   await builder.exec(
     "uv",
     [
@@ -60,7 +61,7 @@ export async function buildExecutorchWindows(
   )
 
   // Apply Windows patch (Ninja ExternalProject fixes for flatc/flatcc)
-  console.log("Applying Windows patch")
+  logger.info("Applying Windows patch")
   const windowsPatchPath = path.join(
     import.meta.dirname!,
     "patches/executorch/windows.patch",
@@ -72,9 +73,9 @@ export async function buildExecutorchWindows(
   ], {
     cwd: executorchRoot,
   })
-  console.log(patchResult.stdout)
+  logger.info(patchResult.stdout)
   if (patchResult.stderr) {
-    console.log(patchResult.stderr)
+    logger.info(patchResult.stderr)
   }
 
   // Set up directories
@@ -82,7 +83,7 @@ export async function buildExecutorchWindows(
   const buildRoot = path.join(repoRoot, `build/${target}/executorch`)
 
   if (clean) {
-    console.log("Cleaning build and install directories...")
+    logger.info("Cleaning build and install directories...")
     try {
       await Deno.remove(buildRoot, { recursive: true })
     } catch {
@@ -140,16 +141,16 @@ export async function buildExecutorchWindows(
   }
 
   // Display build configuration
-  console.log("")
-  console.log("=== Windows Build Configuration ===")
-  console.log(`Target triple:      ${target}`)
-  console.log(`ARM64 build:        ${isArm64}`)
-  console.log(`Build type:         ${buildType}`)
-  console.log(`Python:             ${pythonPath}`)
-  console.log(`Build directory:    ${buildRoot}`)
-  console.log(`Install directory:  ${installPrefix}`)
-  console.log("====================================")
-  console.log("")
+  logger.info("")
+  logger.info("=== Windows Build Configuration ===")
+  logger.info(`Target triple:      ${target}`)
+  logger.info(`ARM64 build:        ${isArm64}`)
+  logger.info(`Build type:         ${buildType}`)
+  logger.info(`Python:             ${pythonPath}`)
+  logger.info(`Build directory:    ${buildRoot}`)
+  logger.info(`Install directory:  ${installPrefix}`)
+  logger.info("====================================")
+  logger.info("")
 
   // Build environment with venv activated (matching Linux approach)
   // Also add LLVM tools to PATH for other build tools
@@ -161,32 +162,32 @@ export async function buildExecutorchWindows(
     VIRTUAL_ENV: venvPath,
   }
 
-  console.log(`Using venv: ${venvPath}`)
+  logger.info(`Using venv: ${venvPath}`)
 
   // Run CMake configuration
-  console.log("Running CMake configuration")
+  logger.info("Running CMake configuration")
   await builder.exec("cmake", ["-B", buildRoot, ...cmakeArgs], {
     cwd: executorchRoot,
     env: buildEnv,
   })
 
   // Build and install
-  console.log("Building ExecuTorch")
+  logger.info("Building ExecuTorch")
   await builder.exec(
     "cmake",
     ["--build", buildRoot, "--config", buildType, "--target", "install"],
     { cwd: executorchRoot, env: buildEnv },
   )
 
-  console.log("")
-  console.log("Windows build completed successfully!")
-  console.log("")
-  console.log(`Target: ${target}`)
-  console.log("")
-  console.log("Library files:")
-  console.log(`  ${installPrefix}/lib/`)
-  console.log("")
-  console.log("Header files:")
-  console.log(`  ${installPrefix}/include/`)
-  console.log("")
+  logger.info("")
+  logger.info("Windows build completed successfully!")
+  logger.info("")
+  logger.info(`Target: ${target}`)
+  logger.info("")
+  logger.info("Library files:")
+  logger.info(`  ${installPrefix}/lib/`)
+  logger.info("")
+  logger.info("Header files:")
+  logger.info(`  ${installPrefix}/include/`)
+  logger.info("")
 }

@@ -1,5 +1,6 @@
 import { Client, createClient, Schema } from "@openbao/api"
-import { decodeBase64 } from "jsr:@std/encoding/base64"
+import { decodeBase64 } from "@std/encoding/base64"
+import logger from "~/util/log.ts"
 
 type AppRoleLoginResponse = {
   auth: {
@@ -19,10 +20,13 @@ export class OpenBao {
       plugins: [
         {
           onRequestInit: ({ requestInit }) => {
-            requestInit.headers = {
-              ...requestInit.headers,
-              Authorization: `Bearer ${serviceToken}`,
-            }
+            Object.assign(requestInit, {
+              headers: {
+                ...(requestInit as { headers?: Record<string, string> })
+                  .headers,
+                Authorization: `Bearer ${serviceToken}`,
+              },
+            })
           },
         },
       ],
@@ -37,7 +41,7 @@ export class OpenBao {
       }).json() as any
 
     if (roleResponse?.errors != null) {
-      console.error(roleResponse)
+      logger.error(roleResponse)
       throw new Error(
         `OpenBao: ${roleResponse.errors.map((e: any) => e.message).join(", ")}`,
       )
@@ -91,7 +95,7 @@ export class OpenBao {
     const json = await response.json() as AppRoleLoginResponse
 
     if (json?.auth?.client_token == null) {
-      console.error(json)
+      logger.error(json)
       throw new Error("OpenBao client token not found")
     }
 
@@ -104,10 +108,13 @@ export class OpenBao {
       plugins: [
         {
           onRequestInit: ({ requestInit }) => {
-            requestInit.headers = {
-              ...requestInit.headers,
-              Authorization: `Bearer ${token}`,
-            }
+            Object.assign(requestInit, {
+              headers: {
+                ...(requestInit as { headers?: Record<string, string> })
+                  .headers,
+                Authorization: `Bearer ${token}`,
+              },
+            })
           },
         },
       ],

@@ -1,4 +1,5 @@
 import type { DiscrepancyCode, SyncStatus } from "./types.ts"
+import logger from "~/util/log.ts"
 
 export function extractMaturityTag(topics: string[]): string | null {
   const maturityTopic = topics.find((topic) => topic.startsWith("maturity-"))
@@ -23,45 +24,45 @@ export function prettyPrintSyncResults(results: SyncStatus[]): void {
   const inSyncCount = results.filter((r) => r.inSync).length
   const outOfSyncCount = results.length - inSyncCount
 
-  console.log(`\n📊 Sync Status Summary`)
-  console.log(`${"=".repeat(50)}`)
-  console.log(`✅ In sync: ${inSyncCount}`)
-  console.log(`❌ Out of sync: ${outOfSyncCount}`)
-  console.log(`📦 Total repositories: ${results.length}`)
-  console.log()
+  logger.info(`\n📊 Sync Status Summary`)
+  logger.info(`${"=".repeat(50)}`)
+  logger.info(`✅ In sync: ${inSyncCount}`)
+  logger.info(`❌ Out of sync: ${outOfSyncCount}`)
+  logger.info(`📦 Total repositories: ${results.length}`)
+  logger.info()
 
   // Group results by sync status
   const inSync = results.filter((r) => r.inSync)
   const outOfSync = results.filter((r) => !r.inSync)
 
   if (inSync.length > 0) {
-    console.log(`✅ Repositories in sync:`)
-    console.log(`${"─".repeat(30)}`)
+    logger.info(`✅ Repositories in sync:`)
+    logger.info(`${"─".repeat(30)}`)
     for (const result of inSync) {
-      console.log(`  📁 ${result.repoName}`)
+      logger.info(`  📁 ${result.repoName}`)
       if (result.pipelineName) {
-        console.log(`     🔧 Pipeline: ${result.pipelineName}`)
+        logger.info(`     🔧 Pipeline: ${result.pipelineName}`)
       }
     }
-    console.log()
+    logger.info()
   }
 
   if (outOfSync.length > 0) {
-    console.log(`❌ Repositories out of sync:`)
-    console.log(`${"─".repeat(35)}`)
+    logger.info(`❌ Repositories out of sync:`)
+    logger.info(`${"─".repeat(35)}`)
     for (const result of outOfSync) {
-      console.log(`  📁 ${result.repoName}`)
+      logger.info(`  📁 ${result.repoName}`)
       if (result.pipelineName) {
-        console.log(`     🔧 Pipeline: ${result.pipelineName}`)
+        logger.info(`     🔧 Pipeline: ${result.pipelineName}`)
       } else {
-        console.log(`     🔧 Pipeline: None`)
+        logger.info(`     🔧 Pipeline: None`)
       }
 
       for (const discrepancy of result.discrepancies) {
         const icon = getDiscrepancyIcon(discrepancy.code)
-        console.log(`     ${icon} ${discrepancy.message}`)
+        logger.info(`     ${icon} ${discrepancy.message}`)
       }
-      console.log()
+      logger.info()
     }
   }
 }

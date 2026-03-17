@@ -2,6 +2,7 @@ import * as path from "@std/path"
 import * as yaml from "@std/yaml"
 import { Ajv } from "ajv"
 import * as emoji from "emoji"
+import logger from "~/util/log.ts"
 import pipelineSchema from "./schema.json" with { "type": "json" }
 
 /**
@@ -680,8 +681,8 @@ export function validatePipeline(
 ): BuildkitePipeline {
   const ajv = new Ajv()
   if (!ajv.validate(pipelineSchema, pipeline)) {
-    console.log(ajv.errors)
-    console.log(pipeline)
+    logger.info(ajv.errors)
+    logger.info(pipeline)
     throw new Error(ajv.errorsText())
   }
   return pipeline

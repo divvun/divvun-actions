@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import logger from "~/util/log.ts"
 
 type BuildType = "Debug" | "Release" | "RelWithDebInfo" | "MinSizeRel"
 type AndroidAbi = "arm64-v8a" | "armeabi-v7a" | "x86_64" | "x86"
@@ -38,7 +39,7 @@ export async function buildExecutorchAndroid(
     apiLevel = 26,
   } = options
 
-  console.log(`Building ExecuTorch for Android (${abi})`)
+  logger.info(`Building ExecuTorch for Android (${abi})`)
 
   const repoRoot = Deno.cwd()
   const executorchRoot = path.join(repoRoot, "executorch")
@@ -51,7 +52,7 @@ export async function buildExecutorchAndroid(
       "ANDROID_NDK or ANDROID_NDK_HOME environment variable must be set",
     )
   }
-  console.log(`Using Android NDK: ${androidNdk}`)
+  logger.info(`Using Android NDK: ${androidNdk}`)
 
   // Check for Python venv
   const venvPath = path.join(executorchRoot, ".venv")
@@ -60,14 +61,14 @@ export async function buildExecutorchAndroid(
   try {
     await Deno.stat(venvPath)
   } catch {
-    console.log("No .venv found, creating one with uv...")
+    logger.info("No .venv found, creating one with uv...")
     await builder.exec("uv", ["venv"], { cwd: executorchRoot })
   }
 
-  console.log(`Using Python: ${pythonPath}`)
+  logger.info(`Using Python: ${pythonPath}`)
 
   // Install Python dependencies
-  console.log("Installing Python dependencies")
+  logger.info("Installing Python dependencies")
   await builder.exec(
     "uv",
     [
@@ -91,7 +92,7 @@ export async function buildExecutorchAndroid(
   const buildRoot = path.join(repoRoot, `build/${targetTriple}/executorch`)
 
   if (clean) {
-    console.log("Cleaning build and install directories...")
+    logger.info("Cleaning build and install directories...")
     try {
       await Deno.remove(buildRoot, { recursive: true })
     } catch {
@@ -144,17 +145,17 @@ export async function buildExecutorchAndroid(
   }
 
   // Display build configuration
-  console.log("")
-  console.log("=== Android Build Configuration ===")
-  console.log(`Target triple:      ${targetTriple}`)
-  console.log(`Android ABI:        ${abi}`)
-  console.log(`API Level:          ${apiLevel}`)
-  console.log(`Build type:         ${buildType}`)
-  console.log(`Python:             ${pythonPath}`)
-  console.log(`Build directory:    ${buildRoot}`)
-  console.log(`Install directory:  ${installPrefix}`)
-  console.log("====================================")
-  console.log("")
+  logger.info("")
+  logger.info("=== Android Build Configuration ===")
+  logger.info(`Target triple:      ${targetTriple}`)
+  logger.info(`Android ABI:        ${abi}`)
+  logger.info(`API Level:          ${apiLevel}`)
+  logger.info(`Build type:         ${buildType}`)
+  logger.info(`Python:             ${pythonPath}`)
+  logger.info(`Build directory:    ${buildRoot}`)
+  logger.info(`Install directory:  ${installPrefix}`)
+  logger.info("====================================")
+  logger.info("")
 
   // Build environment with venv activated
   const venvBinPath = path.join(venvPath, "bin")
@@ -165,10 +166,10 @@ export async function buildExecutorchAndroid(
     VIRTUAL_ENV: venvPath,
   }
 
-  console.log(`Using venv: ${venvPath}`)
+  logger.info(`Using venv: ${venvPath}`)
 
   // Run CMake configuration
-  console.log("Running CMake configuration")
+  logger.info("Running CMake configuration")
   await builder.exec("cmake", ["-B", buildRoot, ...cmakeArgs], {
     cwd: executorchRoot,
     env: buildEnv,
@@ -187,22 +188,22 @@ export async function buildExecutorchAndroid(
   }
 
   // Build and install
-  console.log(`Building ExecuTorch (${maxJobs} parallel jobs)`)
+  logger.info(`Building ExecuTorch (${maxJobs} parallel jobs)`)
   await builder.exec(
     "cmake",
     ["--build", buildRoot, "--target", "install", "-j", maxJobs],
     { cwd: executorchRoot, env: buildEnv },
   )
 
-  console.log("")
-  console.log("Android build completed successfully!")
-  console.log("")
-  console.log(`Target: ${targetTriple}`)
-  console.log("")
-  console.log("Library files:")
-  console.log(`  ${installPrefix}/lib/`)
-  console.log("")
-  console.log("Header files:")
-  console.log(`  ${installPrefix}/include/`)
-  console.log("")
+  logger.info("")
+  logger.info("Android build completed successfully!")
+  logger.info("")
+  logger.info(`Target: ${targetTriple}`)
+  logger.info("")
+  logger.info("Library files:")
+  logger.info(`  ${installPrefix}/lib/`)
+  logger.info("")
+  logger.info("Header files:")
+  logger.info(`  ${installPrefix}/include/`)
+  logger.info("")
 }
