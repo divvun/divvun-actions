@@ -729,18 +729,23 @@ export async function pipelineLang() {
     builder.env.branch === "main"
 
   // Build phase steps array
-  const buildSteps: CommandStep[] = [spellerBuildStep]
+  const buildSteps: CommandStep[] = []
+
+  // Speller build is needed for everything except textproc-only releases
+  if (!isTtsTextprocReleaseTag) {
+    buildSteps.push(spellerBuildStep)
+  }
 
   if (
     buildConfig?.["grammar-checkers"] === true &&
-    (isGrammarReleaseTag || !isSpellerReleaseTag)
+    (isGrammarReleaseTag || (!isSpellerReleaseTag && !isTtsTextprocReleaseTag))
   ) {
     buildSteps.push(grammarBuildStep)
   }
 
   if (
-    buildConfig?.["tts-textproc"] === true &&
-    (isTtsTextprocReleaseTag || !isSpellerReleaseTag)
+    isTtsTextprocReleaseTag ||
+    (buildConfig?.["tts-textproc"] === true && !isSpellerReleaseTag)
   ) {
     buildSteps.push(ttsTextprocBuildStep)
   }
@@ -857,7 +862,10 @@ export async function pipelineLang() {
     }))
   }
 
-  if (buildConfig?.["tts-textproc"] === true && isTtsTextprocDeploy) {
+  if (
+    isTtsTextprocReleaseTag ||
+    (buildConfig?.["tts-textproc"] === true && isTtsTextprocDeploy)
+  ) {
     deploySteps.push(command({
       label: `Deploy TTS Text Processor (${
         isTtsTextprocReleaseTag ? "Release" : "Dev"
