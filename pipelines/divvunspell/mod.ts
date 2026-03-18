@@ -1,3 +1,4 @@
+import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
@@ -103,9 +104,43 @@ function command(input: CommandStep): CommandStep {
   }
 }
 
+function createBinSignStep(
+  platform: "windows" | "macos",
+  arch: string,
+  buildKey: string,
+): CommandStep {
+  const ext = platform === "windows" ? ".exe" : ""
+  const binaryPath = `target/${arch}/release/divvunspell${ext}`
+  const signedPath = `signed/${binaryPath}`
+
+  const downloadPath = platform === "windows"
+    ? `target\\${arch}\\release\\divvunspell${ext}`
+    : binaryPath
+
+  const signCommand = platform === "windows"
+    ? `divvun-actions sign ${binaryPath}`
+    : `divvun-actions run macos-sign ${binaryPath}`
+
+  return command({
+    key: `sign-${platform}-${arch}`,
+    label: "Sign",
+    agents: { queue: "linux" },
+    command: [
+      "echo '--- Downloading unsigned binary'",
+      `buildkite-agent artifact download '${downloadPath}' .`,
+      "echo '--- Signing'",
+      signCommand,
+      "echo '--- Uploading signed binary'",
+      `mkdir -p signed/target/${arch}/release`,
+      `mv ${binaryPath} ${signedPath}`,
+      `buildkite-agent artifact upload ${signedPath}`,
+    ],
+    depends_on: buildKey,
+  })
+}
+
 export function pipelineDivvunspell() {
-  const binSteps = []
-  const libSteps = []
+  const steps: BuildkitePipeline["steps"] = []
 
   let isPublishLib = false
   let isPublishBin = false
@@ -117,49 +152,65 @@ export function pipelineDivvunspell() {
   }
 
   if (!isPublishLib) {
+    const publishDependKeys: string[] = []
+
     for (const [os, archs] of Object.entries(binPlatforms)) {
       for (const arch of archs) {
         const { cmd, args } = buildBin(arch)
+        const buildKey = `build-bin-${os}-${arch}`
+        const isWindows = os === "windows"
+        const ext = isWindows ? ".exe" : ""
+        const binaryPath = `target/${arch}/release/divvunspell${ext}`
 
-        if (os === "windows") {
-          binSteps.push(command({
-            agents: {
-              queue: os,
-            },
-            label: arch,
-            command: [
-              `${cmd} ${args.join(" ")}`,
-              `mv target/${arch}/release/divvunspell.exe divvunspell-${arch}.exe`,
-              `buildkite-agent artifact upload divvunspell-${arch}.exe`,
-            ],
-          }))
+        const groupSteps: CommandStep[] = []
+
+        groupSteps.push(command({
+          key: buildKey,
+          agents: { queue: os },
+          label: "Build",
+          command: [
+            `${cmd} ${args.join(" ")}`,
+            `buildkite-agent artifact upload ${binaryPath}`,
+          ],
+        }))
+
+        if (isPublishBin && (os === "macos" || os === "windows")) {
+          const signKey = `sign-${os}-${arch}`
+          publishDependKeys.push(signKey)
+          groupSteps.push(
+            createBinSignStep(os as "macos" | "windows", arch, buildKey),
+          )
         } else {
-          binSteps.push(command({
-            agents: {
-              queue: os,
-            },
-            label: arch,
-            command: [
-              `${cmd} ${args.join(" ")}`,
-              `mv target/${arch}/release/divvunspell divvunspell-${arch}`,
-              `buildkite-agent artifact upload divvunspell-${arch}`,
-            ],
-          }))
+          publishDependKeys.push(buildKey)
         }
+
+        steps.push({
+          group: `${os} ${arch}`,
+          steps: groupSteps,
+        })
       }
+    }
+
+    if (isPublishBin) {
+      steps.push(command({
+        label: "Publish",
+        command: "divvun-actions run divvunspell-publish",
+        agents: { queue: "linux" },
+        depends_on: publishDependKeys,
+      }))
     }
   }
 
   if (!isPublishBin) {
+    const libSteps: CommandStep[] = []
+
     for (const [os, archs] of Object.entries(libPlatforms)) {
       for (const arch of archs) {
         const { cmd, args } = buildLib(arch)
 
         if (os === "windows") {
           libSteps.push(command({
-            agents: {
-              queue: os,
-            },
+            agents: { queue: os },
             label: arch,
             command: [
               `${cmd} ${args.join(" ")}`,
@@ -191,60 +242,33 @@ export function pipelineDivvunspell() {
           ].filter((c) => c !== undefined) as string[]
 
           libSteps.push(command({
-            agents: {
-              queue: os,
-            },
+            agents: { queue: os },
             label: arch,
             command: commands,
           }))
         }
       }
     }
+
+    if (libSteps.length > 0) {
+      steps.push({
+        group: "Build Libraries",
+        key: "build-libraries",
+        steps: libSteps,
+      })
+    }
+
+    if (isPublishLib) {
+      steps.push(command({
+        label: "Publish",
+        command: "divvun-actions run libdivvun-fst-publish",
+        agents: { queue: "linux" },
+        depends_on: "build-libraries",
+      }))
+    }
   }
 
-  const pipeline: BuildkitePipeline = {
-    steps: [],
-  }
-
-  if (binSteps.length > 0) {
-    pipeline.steps.push({
-      group: "Build Binaries",
-      key: "build-binaries",
-      steps: binSteps,
-    })
-  }
-
-  if (libSteps.length > 0) {
-    pipeline.steps.push({
-      group: "Build Libraries",
-      key: "build-libraries",
-      steps: libSteps,
-    })
-  }
-
-  if (isPublishLib) {
-    pipeline.steps.push(command({
-      label: "Publish",
-      command: "divvun-actions run libdivvun-fst-publish",
-      agents: {
-        queue: "linux",
-      },
-      depends_on: "build-libraries",
-    }))
-  }
-
-  if (isPublishBin) {
-    pipeline.steps.push(command({
-      label: "Publish",
-      command: "divvun-actions run divvunspell-publish",
-      agents: {
-        queue: "linux",
-      },
-      depends_on: "build-binaries",
-    }))
-  }
-
-  return pipeline
+  return { steps }
 }
 
 export async function runLibdivvunFstPublish() {
@@ -420,7 +444,18 @@ export async function runDivvunspellPublish() {
   const [_prefix, version] = builder.env.tag.split("/")
 
   using tempDir = await makeTempDir()
-  await builder.downloadArtifacts(`divvunspell-*`, tempDir.path)
+  await builder.downloadArtifacts(
+    `signed/target/*-apple-darwin/release/divvunspell`,
+    tempDir.path,
+  )
+  await builder.downloadArtifacts(
+    `signed/target/*-pc-windows-msvc/release/divvunspell.exe`,
+    tempDir.path,
+  )
+  await builder.downloadArtifacts(
+    `target/*-linux-*/release/divvunspell`,
+    tempDir.path,
+  )
 
   using archivePath = await makeTempDir({ prefix: "divvunspell-" })
   const artifacts: string[] = []
@@ -428,24 +463,31 @@ export async function runDivvunspellPublish() {
   for (const [os, archs] of Object.entries(binPlatforms)) {
     for (const arch of archs) {
       const isWindows = os === "windows"
+      const isSigned = os === "macos" || isWindows
       const ext = isWindows ? "zip" : "tgz"
       const binaryExt = isWindows ? ".exe" : ""
-      const artifactName = `divvunspell-${arch}${binaryExt}`
-      const inputPath = `${tempDir.path}/${artifactName}`
+
+      const inputPath = path.join(
+        tempDir.path,
+        ...(isSigned ? ["signed", "target"] : ["target"]),
+        arch,
+        "release",
+        `divvunspell${binaryExt}`,
+      )
 
       if (!isWindows) {
         await Deno.chmod(inputPath, 0o755)
       }
 
       const stagingName = `divvunspell-${arch}-${version}`
-      const stagingDir = `${archivePath.path}/${stagingName}`
+      const stagingDir = path.join(archivePath.path, stagingName)
       await Deno.mkdir(stagingDir)
       await Deno.copyFile(
         inputPath,
-        `${stagingDir}/divvunspell${binaryExt}`,
+        path.join(stagingDir, `divvunspell${binaryExt}`),
       )
 
-      const outPath = `${archivePath.path}/${stagingName}.${ext}`
+      const outPath = path.join(archivePath.path, `${stagingName}.${ext}`)
       if (isWindows) {
         await Zip.create([stagingDir], outPath)
       } else {

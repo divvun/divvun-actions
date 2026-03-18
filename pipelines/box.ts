@@ -32,65 +32,109 @@ function queue(target: string): string {
   throw new Error(`Unknown queue for target: ${target}`)
 }
 
+function createSignStep(
+  platform: "windows" | "macos",
+  arch: string,
+  buildKey: string,
+): CommandStep {
+  const ext = platform === "windows" ? ".exe" : ""
+  const binaryPath = `target/${arch}/release/box${ext}`
+  const signedPath = `signed/${binaryPath}`
+
+  const downloadPath = platform === "windows"
+    ? `target\\${arch}\\release\\box${ext}`
+    : binaryPath
+
+  const signCommand = platform === "windows"
+    ? `divvun-actions sign ${binaryPath}`
+    : `divvun-actions run macos-sign ${binaryPath}`
+
+  return command({
+    key: `sign-${arch}`,
+    label: "Sign",
+    agents: { queue: "linux" },
+    command: [
+      "echo '--- Downloading unsigned binary'",
+      `buildkite-agent artifact download '${downloadPath}' .`,
+      "echo '--- Signing'",
+      signCommand,
+      "echo '--- Uploading signed binary'",
+      `mkdir -p signed/target/${arch}/release`,
+      `mv ${binaryPath} ${signedPath}`,
+      `buildkite-agent artifact upload ${signedPath}`,
+    ],
+    depends_on: buildKey,
+  })
+}
+
 export function pipelineBox(): BuildkitePipeline {
   const isRelease = builder.env.tag?.match(/^v/)
   const isMainBranch = builder.env.branch === "main"
 
-  const buildSteps: CommandStep[] = []
+  const steps: BuildkitePipeline["steps"] = []
+  const publishDependKeys: string[] = []
 
   for (const target of TARGETS) {
     const isWindows = target.includes("windows")
+    const isMacos = target.includes("apple")
     const binaryName = isWindows ? "box.exe" : "box"
-    const artifactName = isWindows ? `box-${target}.exe` : `box-${target}`
-    const targetFile = path.join("target", target, "release", binaryName)
+    const binaryPath = `target/${target}/release/${binaryName}`
+    const buildKey = `build-${target}`
+
+    const groupSteps: CommandStep[] = []
 
     if (isWindows) {
       const llvmArch = target.includes("aarch64") ? "ARM64" : "x64"
-      buildSteps.push(command({
-        label: `build-${target}`,
+      groupSteps.push(command({
+        key: buildKey,
+        label: "Build",
         command: [
           `$$env:PATH = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; cargo build -p box-cli --bin box --release --target ${target}`,
-          `mv ${targetFile} .\\${artifactName}`,
-          `buildkite-agent artifact upload ${artifactName}`,
+          `buildkite-agent artifact upload ${binaryPath}`,
         ],
         agents: { queue: "windows" },
       }))
     } else {
-      buildSteps.push(command({
-        label: `build-${target}`,
+      groupSteps.push(command({
+        key: buildKey,
+        label: "Build",
         command: [
           `cargo build -p box-cli --bin box --release --target ${target}`,
-          `mv ${targetFile} ./${artifactName}`,
-          `buildkite-agent artifact upload ${artifactName}`,
+          `buildkite-agent artifact upload ${binaryPath}`,
         ],
         agents: { queue: queue(target) },
         ...muslCrossEnv(target),
       }))
     }
-  }
 
-  const pipeline: BuildkitePipeline = {
-    steps: [
-      {
-        group: "Build",
-        key: "build",
-        steps: buildSteps,
-      },
-    ],
+    if (isRelease && (isMacos || isWindows)) {
+      const signKey = `sign-${target}`
+      publishDependKeys.push(signKey)
+      groupSteps.push(
+        createSignStep(isWindows ? "windows" : "macos", target, buildKey),
+      )
+    } else {
+      publishDependKeys.push(buildKey)
+    }
+
+    steps.push({
+      group: target,
+      steps: groupSteps,
+    })
   }
 
   if (isRelease || isMainBranch) {
-    pipeline.steps.push(
+    steps.push(
       command({
         label: `Publish (${isRelease ? "Release" : "Dev"})`,
         command: "divvun-actions run box-publish",
         agents: { queue: "linux" },
-        depends_on: "build",
+        depends_on: publishDependKeys,
       }),
     )
   }
 
-  return pipeline
+  return { steps }
 }
 
 function muslCrossEnv(
@@ -146,15 +190,31 @@ export async function runBoxPublish() {
 
   using tempDir = await makeTempDir()
 
-  // Download all artifacts
-  await Promise.all(
-    TARGETS.map((target) => {
-      const artifactName = target.includes("windows")
-        ? `box-${target}.exe`
-        : `box-${target}`
-      return builder.downloadArtifacts(artifactName, tempDir.path)
-    }),
-  )
+  // Download artifacts
+  if (isRelease) {
+    await builder.downloadArtifacts(
+      `signed/target/*-apple-darwin/release/box`,
+      tempDir.path,
+    )
+    await builder.downloadArtifacts(
+      `signed/target/*-pc-windows-msvc/release/box.exe`,
+      tempDir.path,
+    )
+    await builder.downloadArtifacts(
+      `target/*-linux-*/release/box`,
+      tempDir.path,
+    )
+  } else {
+    await Promise.all(
+      TARGETS.map((target) => {
+        const binaryName = target.includes("windows") ? "box.exe" : "box"
+        return builder.downloadArtifacts(
+          `target/${target}/release/${binaryName}`,
+          tempDir.path,
+        )
+      }),
+    )
+  }
 
   // Determine version string for archive names
   let version: string
@@ -179,14 +239,22 @@ export async function runBoxPublish() {
 
   for (const target of TARGETS) {
     const isWindows = target.includes("windows")
+    const isMacos = target.includes("apple")
+    const isSigned = isRelease && (isMacos || isWindows)
     const ext = isWindows ? "zip" : "tgz"
+    const binaryName = isWindows ? "box.exe" : "box"
+
+    const inputPath = path.join(
+      tempDir.path,
+      ...(isSigned ? ["signed", "target"] : ["target"]),
+      target,
+      "release",
+      binaryName,
+    )
+
     const outPath = path.join(
       archivePath.path,
       `box-${target}-${version}.${ext}`,
-    )
-    const inputPath = path.join(
-      tempDir.path,
-      isWindows ? `box-${target}.exe` : `box-${target}`,
     )
 
     if (!isWindows) {
@@ -197,7 +265,7 @@ export async function runBoxPublish() {
     await Deno.mkdir(stagingDir)
     await Deno.copyFile(
       inputPath,
-      path.join(stagingDir, isWindows ? "box.exe" : "box"),
+      path.join(stagingDir, binaryName),
     )
 
     if (isWindows) {
