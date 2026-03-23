@@ -114,6 +114,7 @@ export async function buildExecutorchWindows(
   // Build configuration
   cmakeArgs.push(`-DCMAKE_INSTALL_PREFIX=${installPrefix}`)
   cmakeArgs.push(`-DCMAKE_BUILD_TYPE=${buildType}`)
+  cmakeArgs.push("-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded")
 
   // ARM64 cross-compilation
   if (isArm64) {
