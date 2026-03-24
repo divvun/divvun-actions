@@ -105,50 +105,24 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       ])
     }
 
-    // Check if the correct version of ICU is already installed
+    // Always remove and reinstall to pick up overlay portfile changes
     try {
-      const result = await builder.output("vcpkg", ["list", "icu"])
-      const installedVersion = result.stdout.match(
-        /icu:x64-windows-static\s+([\d.]+)/,
-      )?.[1]
-
-      const targetVersion = version.replace(/^v/, "")
-
-      if (installedVersion === targetVersion) {
-        logger.info(
-          `ICU ${targetVersion} already installed in vcpkg, using cached version`,
-        )
-      } else {
-        if (installedVersion) {
-          logger.info(
-            `Found ICU ${installedVersion} but need ${targetVersion}, reinstalling...`,
-          )
-          await builder.exec("vcpkg", [
-            "remove",
-            "icu",
-            "--triplet=x64-windows-static",
-          ])
-        }
-        logger.info(
-          `Installing ICU ${targetVersion} with vcpkg using overlay...`,
-        )
-        await builder.exec("vcpkg", [
-          "install",
-          "icu",
-          "--triplet=x64-windows-static",
-          `--overlay-ports=${overlayPath}/ports`,
-        ])
-      }
-    } catch {
-      // vcpkg list failed, assume not installed
-      logger.info(`Installing ICU ${version} with vcpkg using overlay...`)
       await builder.exec("vcpkg", [
-        "install",
+        "remove",
         "icu",
         "--triplet=x64-windows-static",
-        `--overlay-ports=${overlayPath}/ports`,
       ])
+    } catch {
+      // Not installed, that's fine
     }
+
+    logger.info(`Installing ICU ${version} with vcpkg using overlay...`)
+    await builder.exec("vcpkg", [
+      "install",
+      "icu",
+      "--triplet=x64-windows-static",
+      `--overlay-ports=${overlayPath}/ports`,
+    ])
 
     const vcpkgInstalled = path.join(
       vcpkgRoot,
