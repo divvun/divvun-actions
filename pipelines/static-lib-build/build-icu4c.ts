@@ -348,6 +348,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     "--disable-shared",
     "--disable-tests",
     "--disable-samples",
+    "--with-data-packaging=static",
     `--prefix=${installPrefix}`,
   ]
 
@@ -386,7 +387,6 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     // Disable tools for iOS - they use system() which is not available on iOS
     configureArgs.push("--disable-tools")
     configureArgs.push("--disable-extras")
-    configureArgs.push("--with-data-packaging=static")
     const sdkPath =
       (await builder.output("xcrun", ["--sdk", "iphoneos", "--show-sdk-path"]))
         .stdout.trim()
@@ -416,7 +416,6 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     // Disable tools for Android - they won't run on Android anyway
     configureArgs.push("--disable-tools")
     configureArgs.push("--disable-extras")
-    configureArgs.push("--with-data-packaging=static")
     // Note: We don't need to set CFLAGS/CXXFLAGS here since the NDK compiler
     // already knows the correct target and sysroot from its name (aarch64-linux-android21-clang)
   } else if (isCrossCompile) {
