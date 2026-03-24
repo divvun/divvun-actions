@@ -120,6 +120,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     await builder.exec("vcpkg", [
       "install",
       "icu",
+      "--no-binarycaching",
       "--triplet=x64-windows-static",
       `--overlay-ports=${overlayPath}/ports`,
     ])
