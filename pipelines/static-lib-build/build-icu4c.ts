@@ -119,7 +119,7 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
     logger.info(`Installing ICU ${version} with vcpkg using overlay...`)
     await builder.exec("vcpkg", [
       "install",
-      "icu",
+      "icu[core,tools]",
       "--no-binarycaching",
       "--triplet=x64-windows-static",
       `--overlay-ports=${overlayPath}/ports`,
@@ -129,6 +129,15 @@ export async function buildIcu4c(options: BuildIcu4cOptions) {
       vcpkgRoot,
       "packages/icu_x64-windows-static",
     )
+
+    // Diagnostic: show what vcpkg produced
+    logger.info("=== vcpkg packages directory contents ===")
+    try {
+      const libs = await builder.output("powershell", ["-Command", `Get-ChildItem -Recurse '${path.join(vcpkgInstalled, "lib")}' | Select-Object FullName, Length | Format-Table -AutoSize`])
+      logger.info(libs.stdout)
+    } catch {
+      logger.info("Could not list vcpkg lib directory")
+    }
 
     logger.info("Copying ICU files...")
 
