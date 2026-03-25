@@ -135,6 +135,7 @@ export async function buildExecutorchWindows(
   cmakeArgs.push("-DEXECUTORCH_BUILD_PORTABLE_OPS=ON")
   cmakeArgs.push("-DEXECUTORCH_BUILD_KERNELS_OPTIMIZED=ON")
   cmakeArgs.push("-DEXECUTORCH_BUILD_KERNELS_QUANTIZED=ON")
+  cmakeArgs.push("-DEXECUTORCH_ENABLE_LOGGING=ON")
 
   // Verbose
   if (verbose) {
