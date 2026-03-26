@@ -245,6 +245,27 @@ export class GitHub {
 
       logger.info(`Uploading new artifacts to existing release ${tag}...`)
       await this.uploadRelease(tag, artifacts)
+
+      const editArgs = [
+        "release",
+        "edit",
+        tag,
+        "--repo",
+        this.#repo,
+      ]
+
+      if (name) {
+        editArgs.push("--title", name)
+      }
+      editArgs.push(`--draft=${draft}`, `--prerelease=${prerelease}`)
+
+      const editProc = new Deno.Command("gh", { args: editArgs }).spawn()
+      const { code: editCode } = await editProc.output()
+      if (editCode !== 0) {
+        logger.warning(
+          `Failed to update release metadata for ${tag}: exit code ${editCode}`,
+        )
+      }
     } else {
       logger.info(
         `Release ${tag} does not exist, creating as draft and prerelease...`,
