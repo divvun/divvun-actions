@@ -212,7 +212,9 @@ export function pipelineDivvunspell() {
           ],
         }))
 
-        if (isPublishBin && (os === "macos" || os === "windows")) {
+        if (
+          (isPublishBin || isMainBranch) && (os === "macos" || os === "windows")
+        ) {
           const signKey = `sign-${os}-${arch}`
           publishDependKeys.push(signKey)
           groupSteps.push(
@@ -516,30 +518,20 @@ export async function runDivvunspellPublish() {
 
   using tempDir = await makeTempDir()
 
-  if (isRelease) {
-    await builder.downloadArtifacts(
-      `signed/target/*-apple-darwin/release/divvunspell`,
-      tempDir.path,
-    )
-    await builder.downloadArtifacts(
-      `signed/target/*-pc-windows-msvc/release/divvunspell.exe`,
-      tempDir.path,
-    )
-    await builder.downloadArtifacts(
-      `target/*-linux-*/release/divvunspell`,
-      tempDir.path,
-    )
-  } else {
-    for (const [os, archs] of Object.entries(binPlatforms)) {
-      for (const arch of archs) {
-        const binaryName = os === "windows" ? "divvunspell.exe" : "divvunspell"
-        await builder.downloadArtifacts(
-          `target/${arch}/release/${binaryName}`,
-          tempDir.path,
-        )
-      }
-    }
-  }
+  // Signed artifacts (uploaded from Linux sign step, forward slashes)
+  await builder.downloadArtifacts(
+    `signed/target/*-apple-darwin/release/divvunspell`,
+    tempDir.path,
+  )
+  await builder.downloadArtifacts(
+    `signed/target/*-pc-windows-msvc/release/divvunspell.exe`,
+    tempDir.path,
+  )
+  // Unsigned Linux artifacts
+  await builder.downloadArtifacts(
+    `target/*-linux-*/release/divvunspell`,
+    tempDir.path,
+  )
 
   let version: string
   if (isRelease) {
@@ -565,7 +557,7 @@ export async function runDivvunspellPublish() {
   for (const [os, archs] of Object.entries(binPlatforms)) {
     for (const arch of archs) {
       const isWindows = os === "windows"
-      const isSigned = isRelease && (os === "macos" || isWindows)
+      const isSigned = os === "macos" || isWindows
       const ext = isWindows ? "zip" : "tgz"
       const binaryExt = isWindows ? ".exe" : ""
 
