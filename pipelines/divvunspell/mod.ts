@@ -4,7 +4,7 @@ import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import { GitHub } from "../../util/github.ts"
 import logger from "../../util/log.ts"
-import { Tar, Zip } from "../../util/shared.ts"
+import { Tar, versionAsDev, Zip } from "../../util/shared.ts"
 import { makeTempDir } from "../../util/temp.ts"
 
 const binPlatforms = {
@@ -139,11 +139,49 @@ function createBinSignStep(
   })
 }
 
+function isDesktopMacosTarget(arch: string): boolean {
+  return arch.includes("apple-darwin")
+}
+
+function createLibSignStep(
+  platform: "windows" | "macos",
+  arch: string,
+  buildKey: string,
+): CommandStep {
+  const isWindows = platform === "windows"
+  const ext = isWindows ? "dll" : "dylib"
+  const prefix = isWindows ? "" : "lib"
+  const artifactName = `${prefix}divvun_fst-${arch}.${ext}`
+  const signedArtifactName = `signed/${artifactName}`
+
+  const signCommand = isWindows
+    ? `divvun-actions sign ${artifactName}`
+    : `divvun-actions run macos-sign ${artifactName}`
+
+  return command({
+    key: `sign-lib-${platform}-${arch}`,
+    label: `Sign ${arch}`,
+    agents: { queue: "linux" },
+    command: [
+      "echo '--- Downloading unsigned library'",
+      `buildkite-agent artifact download '${artifactName}' .`,
+      "echo '--- Signing'",
+      signCommand,
+      "echo '--- Uploading signed library'",
+      `mkdir -p signed`,
+      `mv ${artifactName} ${signedArtifactName}`,
+      `buildkite-agent artifact upload ${signedArtifactName}`,
+    ],
+    depends_on: buildKey,
+  })
+}
+
 export function pipelineDivvunspell() {
   const steps: BuildkitePipeline["steps"] = []
 
   let isPublishLib = false
   let isPublishBin = false
+  const isMainBranch = builder.env.branch === "main"
 
   if (builder.env.tag?.startsWith("libdivvun-fst/v")) {
     isPublishLib = true
@@ -191,9 +229,9 @@ export function pipelineDivvunspell() {
       }
     }
 
-    if (isPublishBin) {
+    if (isPublishBin || isMainBranch) {
       steps.push(command({
-        label: "Publish",
+        label: `Publish (${isPublishBin ? "Release" : "Dev"})`,
         command: "divvun-actions run divvunspell-publish",
         agents: { queue: "linux" },
         depends_on: publishDependKeys,
@@ -203,21 +241,32 @@ export function pipelineDivvunspell() {
 
   if (!isPublishBin) {
     const libSteps: CommandStep[] = []
+    const libPublishDependKeys: string[] = []
 
     for (const [os, archs] of Object.entries(libPlatforms)) {
       for (const arch of archs) {
         const { cmd, args } = buildLib(arch)
+        const buildKey = `build-lib-${arch}`
 
         if (os === "windows") {
+          const artifactName = `divvun_fst-${arch}.dll`
           libSteps.push(command({
+            key: buildKey,
             agents: { queue: os },
             label: arch,
             command: [
               `${cmd} ${args.join(" ")}`,
-              `mv target/${arch}/release/divvun_fst.dll divvun_fst-${arch}.dll`,
-              `buildkite-agent artifact upload divvun_fst-${arch}.dll`,
+              `mv target/${arch}/release/divvun_fst.dll ${artifactName}`,
+              `buildkite-agent artifact upload ${artifactName}`,
             ],
           }))
+
+          if (isPublishLib) {
+            libPublishDependKeys.push(`sign-lib-${os}-${arch}`)
+            libSteps.push(createLibSignStep("windows", arch, buildKey))
+          } else {
+            libPublishDependKeys.push(buildKey)
+          }
         } else {
           const ext = os === "linux" ? "so" : "dylib"
           const libName = `libdivvun_fst-${arch}.${ext}`
@@ -242,10 +291,18 @@ export function pipelineDivvunspell() {
           ].filter((c) => c !== undefined) as string[]
 
           libSteps.push(command({
+            key: buildKey,
             agents: { queue: os },
             label: arch,
             command: commands,
           }))
+
+          if (isPublishLib && os === "macos" && isDesktopMacosTarget(arch)) {
+            libPublishDependKeys.push(`sign-lib-${os}-${arch}`)
+            libSteps.push(createLibSignStep("macos", arch, buildKey))
+          } else {
+            libPublishDependKeys.push(buildKey)
+          }
         }
       }
     }
@@ -263,7 +320,7 @@ export function pipelineDivvunspell() {
         label: "Publish",
         command: "divvun-actions run libdivvun-fst-publish",
         agents: { queue: "linux" },
-        depends_on: "build-libraries",
+        depends_on: libPublishDependKeys,
       }))
     }
   }
@@ -287,8 +344,20 @@ export async function runLibdivvunFstPublish() {
   }
 
   using tempDir = await makeTempDir()
-  await builder.downloadArtifacts(`libdivvun_fst-*`, tempDir.path)
-  await builder.downloadArtifacts(`divvun_fst-*`, tempDir.path)
+
+  // Download signed artifacts for Windows and desktop macOS
+  await builder.downloadArtifacts(`signed/divvun_fst-*`, tempDir.path)
+  await builder.downloadArtifacts(
+    `signed/libdivvun_fst-*-apple-darwin.dylib`,
+    tempDir.path,
+  )
+
+  // Download unsigned artifacts for Linux, Android, iOS
+  await builder.downloadArtifacts(`libdivvun_fst-*-linux-*.so`, tempDir.path)
+  await builder.downloadArtifacts(
+    `libdivvun_fst-*-apple-ios*.dylib`,
+    tempDir.path,
+  )
 
   using archivePath = await makeTempDir({ prefix: "libdivvun-fst-" })
   const [_tag, version] = builder.env.tag.split("/")
@@ -302,10 +371,15 @@ export async function runLibdivvunFstPublish() {
         ? `divvun_fst.dll`
         : `libdivvun_fst.${libExt}`
 
+      const isSigned = os === "windows" ||
+        (os === "macos" && isDesktopMacosTarget(target))
+
       const artifactName = `${
         os === "windows" ? "" : "lib"
       }divvun_fst-${target}.${libExt}`
-      const inputPath = `${tempDir.path}/${artifactName}`
+      const inputPath = isSigned
+        ? `${tempDir.path}/signed/${artifactName}`
+        : `${tempDir.path}/${artifactName}`
 
       const archiveFilePath = tempDir.path + "/" + target
       const libPath = archiveFilePath + "/lib"
@@ -427,13 +501,12 @@ export async function runLibdivvunFstPublish() {
 }
 
 export async function runDivvunspellPublish() {
-  if (!builder.env.tag) {
-    throw new Error("No tag found, cannot publish divvunspell")
-  }
+  const isRelease = builder.env.tag?.startsWith("divvunspell/v")
+  const isMainBranch = builder.env.branch === "main"
 
-  if (!builder.env.tag.startsWith("divvunspell/v")) {
+  if (!isRelease && !isMainBranch) {
     throw new Error(
-      `Tag ${builder.env.tag} does not start with divvunspell/v, cannot publish divvunspell`,
+      "divvunspell-publish requires a divvunspell/v* tag or main branch",
     )
   }
 
@@ -441,21 +514,50 @@ export async function runDivvunspellPublish() {
     throw new Error("No repo found, cannot publish divvunspell")
   }
 
-  const [_prefix, version] = builder.env.tag.split("/")
-
   using tempDir = await makeTempDir()
-  await builder.downloadArtifacts(
-    `signed/target/*-apple-darwin/release/divvunspell`,
-    tempDir.path,
-  )
-  await builder.downloadArtifacts(
-    `signed/target/*-pc-windows-msvc/release/divvunspell.exe`,
-    tempDir.path,
-  )
-  await builder.downloadArtifacts(
-    `target/*-linux-*/release/divvunspell`,
-    tempDir.path,
-  )
+
+  if (isRelease) {
+    await builder.downloadArtifacts(
+      `signed/target/*-apple-darwin/release/divvunspell`,
+      tempDir.path,
+    )
+    await builder.downloadArtifacts(
+      `signed/target/*-pc-windows-msvc/release/divvunspell.exe`,
+      tempDir.path,
+    )
+    await builder.downloadArtifacts(
+      `target/*-linux-*/release/divvunspell`,
+      tempDir.path,
+    )
+  } else {
+    for (const [os, archs] of Object.entries(binPlatforms)) {
+      for (const arch of archs) {
+        const binaryName = os === "windows" ? "divvunspell.exe" : "divvunspell"
+        await builder.downloadArtifacts(
+          `target/${arch}/release/${binaryName}`,
+          tempDir.path,
+        )
+      }
+    }
+  }
+
+  let version: string
+  if (isRelease) {
+    const [_prefix, v] = builder.env.tag!.split("/")
+    version = v
+  } else {
+    const cargoTomlText = await Deno.readTextFile("Cargo.toml")
+    const versionMatch = cargoTomlText.match(/version\s*=\s*"(.*?)"/)
+    const cargoVersion = versionMatch?.[1]
+    if (typeof cargoVersion !== "string") {
+      throw new Error("Could not determine version from Cargo.toml")
+    }
+    version = versionAsDev(
+      cargoVersion,
+      builder.env.buildTimestamp,
+      builder.env.buildNumber,
+    )
+  }
 
   using archivePath = await makeTempDir({ prefix: "divvunspell-" })
   const artifacts: string[] = []
@@ -463,7 +565,7 @@ export async function runDivvunspellPublish() {
   for (const [os, archs] of Object.entries(binPlatforms)) {
     for (const arch of archs) {
       const isWindows = os === "windows"
-      const isSigned = os === "macos" || isWindows
+      const isSigned = isRelease && (os === "macos" || isWindows)
       const ext = isWindows ? "zip" : "tgz"
       const binaryExt = isWindows ? ".exe" : ""
 
@@ -498,8 +600,18 @@ export async function runDivvunspellPublish() {
     }
   }
 
-  logger.info(`Creating GitHub release for ${builder.env.tag}...`)
   const gh = new GitHub(builder.env.repo)
-  await gh.createRelease(builder.env.tag, artifacts, { latest: true })
+
+  if (isRelease) {
+    logger.info(`Creating GitHub release for ${builder.env.tag}...`)
+    await gh.createRelease(builder.env.tag!, artifacts, { latest: true })
+  } else {
+    logger.info(`Publishing dev release v${version}...`)
+    await gh.updateRelease("dev-latest", artifacts, {
+      draft: false,
+      prerelease: true,
+      name: `v${version}`,
+    })
+  }
   logger.info("GitHub release completed")
 }

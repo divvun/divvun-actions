@@ -46,5 +46,13 @@ export async function necessaryCodeSign(
     throw new Error("osslsigncode attach-signature failed")
   }
 
+  // Verify the signature was correctly applied
+  const verifyProc = new Deno.Command("osslsigncode", {
+    args: ["verify", "-in", outputFile],
+  }).spawn()
+  if (!(await verifyProc.status).success) {
+    throw new Error("osslsigncode verify failed: signature verification failed")
+  }
+
   await Deno.copyFile(outputFile, inputFile)
 }
