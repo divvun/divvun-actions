@@ -2,7 +2,7 @@ import * as builder from "~/builder.ts"
 import { GitHub } from "~/util/github.ts"
 import logger from "~/util/log.ts"
 
-const DEFAULT_EXECUTORCH_VERSION = "v1.1.0"
+const DEFAULT_EXECUTORCH_VERSION = "v1.2.0"
 const EXECUTORCH_REPO = "https://github.com/pytorch/executorch.git"
 const EXECUTORCH_DIR = "executorch"
 
