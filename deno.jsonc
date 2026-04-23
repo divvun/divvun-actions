@@ -1,6 +1,10 @@
 {
   "tasks": {
-    "start": "deno run --allow-read --allow-write --allow-net --allow-run --allow-env index.ts"
+    "start": "deno run --allow-read --allow-write --allow-net --allow-run --allow-env index.ts",
+    "docker:gen": "deno run --allow-read --allow-write --allow-env docker/generate.ts",
+    "docker:check": "deno run --allow-read --allow-env docker/generate.ts --check",
+    "docker:list": "deno run --allow-read --allow-env docker/generate.ts --list",
+    "docker:audit": "deno run --allow-net --allow-env docker/audit.ts"
   },
   "compilerOptions": {
     "lib": ["deno.unstable", "deno.ns", "dom"],
