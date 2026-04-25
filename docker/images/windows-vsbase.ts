@@ -10,8 +10,7 @@ import {
 
 export default defineImage({
   target: "windows-vsbase",
-  imageRef:
-    "ghcr.io/divvun/lts-windowsservercore-ltsc2022-vs2022:latest",
+  imageRef: "ghcr.io/divvun/lts-windowsservercore-ltsc2022-vs2022:latest",
   base: "mcr.microsoft.com/windows/servercore:ltsc2022",
   platform: "windows",
   shell: "cmd",

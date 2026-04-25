@@ -50,9 +50,7 @@ export function pipelineDivvunActions(): BuildkitePipeline {
   ]
 
   for (const spec of TARGET_SPECS) {
-    const dependsOn = spec.dependsOn
-      ? [spec.dependsOn]
-      : ["drift-check"]
+    const dependsOn = spec.dependsOn ? [spec.dependsOn] : ["drift-check"]
     steps.push(
       command({
         key: `build-${spec.target}`,
