@@ -10,7 +10,11 @@ async function loadImages(): Promise<ImageDef[]> {
   const images: ImageDef[] = []
   for await (const entry of Deno.readDir(IMAGES_DIR)) {
     if (!entry.isFile || !entry.name.endsWith(".ts")) continue
-    const mod = await import(path.join(IMAGES_DIR, entry.name))
+    // path.join returns an OS path; on Windows that's `c:\...\foo.ts` which
+    // Deno's import() rejects ("Unsupported scheme 'c'"). Convert to file://
+    // URL.
+    const fileUrl = path.toFileUrl(path.join(IMAGES_DIR, entry.name)).href
+    const mod = await import(fileUrl)
     const def = mod.default as ImageDef | undefined
     if (!def) {
       throw new Error(`${entry.name} has no default export`)
