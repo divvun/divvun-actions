@@ -25,6 +25,10 @@ import {
   runDivvunWorkerTtsPublish,
 } from "./pipelines/divvun-worker-tts.ts"
 import { pipelineBox, runBoxPublish } from "./pipelines/box.ts"
+import {
+  pipelineDivvunActions,
+  runDivvunActionsBuildImage,
+} from "./pipelines/divvun-actions.ts"
 import { pipelineBorealium, runBorealiumDeploy } from "./pipelines/borealium.ts"
 import {
   pipelineDivvunspell,
@@ -273,6 +277,17 @@ async function runPipeline(args: any) {
       await runBoxPublish()
       break
     }
+    case "divvun-actions-build-image": {
+      const target = args._[1] as string
+      const pushArg = args._[2] as string
+      if (!target || !pushArg) {
+        throw new Error(
+          "Usage: divvun-actions-build-image <alpine|linux> <push|no-push>",
+        )
+      }
+      await runDivvunActionsBuildImage(target, pushArg)
+      break
+    }
     case "divvun-runtime-publish": {
       await runDivvunRuntimePublish()
       break
@@ -486,6 +501,10 @@ async function runCi(_args: any) {
     }
     case "box": {
       pipeline = pipelineBox()
+      break
+    }
+    case "divvun-actions": {
+      pipeline = pipelineDivvunActions()
       break
     }
     case "borealium.org": {
