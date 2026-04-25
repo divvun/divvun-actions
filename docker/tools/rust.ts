@@ -17,17 +17,17 @@ export function rust(opts: RustOpts = {}): Tool {
         const lines = [
           `Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe`,
         ]
-        const args = ["-y"]
+        const args = ["'-y'"]
         for (const t of opts.targets ?? []) {
           args.push("'--target'", `'${t}'`)
         }
         lines.push(
-          `Start-Process -FilePath .\\rustup-init.exe -ArgumentList @(${
+          `Start-Process -FilePath .\\\\rustup-init.exe -ArgumentList @(${
             args.join(", ")
           }) -NoNewWindow -Wait`,
         )
-        lines.push(`Remove-Item -Force .\\rustup-init.exe`)
-        return `RUN ${lines.join(" ; \\\n    ")}`
+        lines.push(`Remove-Item -Force .\\\\rustup-init.exe`)
+        return `RUN ${lines.join("; \\\n    ")}`
       }
 
       // bash (ubuntu + alpine)

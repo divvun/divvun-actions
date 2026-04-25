@@ -14,6 +14,8 @@ export type ImageDef = {
   /** Full registry reference (e.g. `ghcr.io/divvun/divvun-actions:alpine-latest`). */
   imageRef: string
   base: string
+  /** Optional `AS <stage>` name on the FROM directive. */
+  baseStage?: string
   platform: Platform
   /**
    * Shell used for RUN directives. When omitted, no SHELL directive is
@@ -71,12 +73,15 @@ export function renderImage(def: ImageDef): string {
   if (def.escape) out.push(`# escape=${def.escape}`)
   out.push(...GENERATED_HEADER)
   out.push("")
-  out.push(`FROM ${def.base}`)
+  const fromLine = def.baseStage
+    ? `FROM ${def.base} AS ${def.baseStage}`
+    : `FROM ${def.base}`
+  out.push(fromLine)
   out.push("")
 
   if (def.shell) {
     const shellArr = dockerfileShellDirective(def.shell)
-    out.push(`SHELL ${JSON.stringify(shellArr)}`)
+    out.push(`SHELL [${shellArr.map((s) => JSON.stringify(s)).join(", ")}]`)
     out.push("")
   }
 

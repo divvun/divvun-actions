@@ -5,7 +5,7 @@
 
 FROM buildkite/agent:3-ubuntu-24.04
 
-SHELL ["bash","-lic"]
+SHELL ["bash", "-lic"]
 
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="/var/cache/buildkite"
 ENV ANDROID_HOME="/root/Android/sdk"
