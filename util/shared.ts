@@ -178,6 +178,31 @@ export class Bash {
   }
 }
 
+/**
+ * macOS-only helpers built on top of `ditto`. Preserves resource forks,
+ * xattrs, symlinks, and codesign signatures — `cp -r` and `zip` don't.
+ */
+export class Ditto {
+  /**
+   * Archive a macOS .app bundle into a zip, preserving everything ditto
+   * can preserve. Equivalent to `ditto -c -k --keepParent <app> <zip>`.
+   * Output zip contains the .app at its root (because of --keepParent).
+   */
+  static async zipApp(appPath: string, outputPath: string): Promise<string> {
+    if (Deno.build.os !== "darwin") {
+      throw new Error("Ditto.zipApp is only supported on macOS")
+    }
+    const proc = new Deno.Command("ditto", {
+      args: ["-c", "-k", "--keepParent", appPath, outputPath],
+    }).spawn()
+    const code = (await proc.status).code
+    if (code !== 0) {
+      throw new Error(`ditto exited with code ${code}`)
+    }
+    return outputPath
+  }
+}
+
 export class Zip {
   static async create(paths: string[], outputPath?: string): Promise<string> {
     const platform = Deno.build.os

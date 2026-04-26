@@ -8,6 +8,7 @@ import {
 import * as builder from "~/builder.ts"
 import { InnoSetupBuilder } from "~/util/inno.ts"
 import {
+  Ditto,
   SpellerPaths,
   Tar,
   ThfstTools,
@@ -271,22 +272,21 @@ export default async function spellerBundle({
   }
 
   // outto on macOS produces a .app *directory*. Buildkite artifact upload
-  // assumes a file path, so skip the upload+metadata for that path — the
-  // build itself is the validation. Windows outto produces a .exe file
-  // and uploads normally.
-  const skipUpload = installerKind === "outto" &&
-    spellerType === SpellerType.MacOS
-  if (skipUpload) {
-    logger.info(
-      `outto macOS speller build complete: ${payloadPath} (artifact upload skipped)`,
-    )
-  } else {
-    await builder.uploadArtifacts(payloadPath)
-    await builder.setMetadata("speller-version", version)
-    await builder.setMetadata("speller-type", spellerType)
+  // assumes a file path, so we ditto-zip the .app first (preserves resource
+  // forks, xattrs, codesign signatures). Windows outto and the legacy
+  // paths produce single-file artifacts and upload as-is.
+  let uploadPath = payloadPath
+  if (installerKind === "outto" && spellerType === SpellerType.MacOS) {
+    uploadPath = `${payloadPath}.zip`
+    await Ditto.zipApp(payloadPath, uploadPath)
+    logger.debug(`Zipped .app for upload: ${uploadPath}`)
   }
 
+  await builder.uploadArtifacts(uploadPath)
+  await builder.setMetadata("speller-version", version)
+  await builder.setMetadata("speller-type", spellerType)
+
   return {
-    payloadPath,
+    payloadPath: uploadPath,
   }
 }

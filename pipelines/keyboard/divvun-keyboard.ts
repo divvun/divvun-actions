@@ -13,7 +13,7 @@ import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import keyboardDeploy from "../../actions/keyboard/deploy.ts"
 import { sentryUploadIOSDebugFiles } from "../../actions/sentry/upload-debug-files.ts"
-import { Kbdgen, versionAsNightly } from "../../util/shared.ts"
+import { Ditto, Kbdgen, versionAsNightly } from "../../util/shared.ts"
 
 export async function runDivvunKeyboardIOS(kbdgenBundlePath: string) {
   const secrets = await builder.secrets()
@@ -175,6 +175,31 @@ async function createMacosPackage(
   return packagePath
 }
 
+/**
+ * Wrap an outto-produced .app bundle into a ditto zip so Buildkite can
+ * upload it as a single artifact. ditto preserves resource forks, xattrs,
+ * and codesign signatures (plain `zip` doesn't).
+ */
+async function createMacosOuttoArtifact(
+  appPath: string,
+  packageId: string,
+  bundlePath: string,
+  channel: string | null,
+): Promise<string> {
+  using tempDir = await makeTempDir()
+
+  const target = await Kbdgen.loadTarget(bundlePath, "macos")
+  const baseVersion = target.version as string
+  const version = channel
+    ? await versionAsNightly(baseVersion, builder.env.buildNumber)
+    : baseVersion
+
+  const archiveName = `${packageId}_${version}_macos.app.zip`
+  const archivePath = path.join(tempDir.path, archiveName)
+  await Ditto.zipApp(appPath, archivePath)
+  return archivePath
+}
+
 export async function runDesktopKeyboardMacOS(
   kbdgenBundlePath: string,
   installer?: InstallerKind,
@@ -190,23 +215,25 @@ export async function runDesktopKeyboardMacOS(
   })
   // Note: unsigned is always false for macOS builds
 
+  // outto on macOS emits a .app *directory*. Ditto-zip it to preserve
+  // codesign + xattrs and produce a single uploadable artifact. Legacy
+  // path produces a single .pkg file and uses createMacosPackage().
+  let artifactPath: string
   if (installer === "outto") {
-    // outto emits a .app *directory*; createMacosPackage assumes a single
-    // .pkg file. For the validation slice we just confirm the build
-    // succeeded; artifact upload of the .app is a follow-up.
-    logger.info(
-      `outto macOS keyboard build complete: ${payloadPath} (artifact upload skipped)`,
+    artifactPath = await createMacosOuttoArtifact(
+      payloadPath,
+      builder.env.repoName,
+      kbdgenBundlePath,
+      channel,
     )
-    return
+  } else {
+    artifactPath = await createMacosPackage(
+      payloadPath,
+      builder.env.repoName,
+      kbdgenBundlePath,
+      channel,
+    )
   }
-
-  // Create properly named package
-  const artifactPath = await createMacosPackage(
-    payloadPath,
-    builder.env.repoName,
-    kbdgenBundlePath,
-    channel,
-  )
 
   await builder.uploadArtifacts(artifactPath)
 
