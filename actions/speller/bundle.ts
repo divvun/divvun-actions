@@ -270,9 +270,21 @@ export default async function spellerBundle({
     throw new Error(`Unsupported speller type: ${spellerType}`)
   }
 
-  await builder.uploadArtifacts(payloadPath)
-  await builder.setMetadata("speller-version", version)
-  await builder.setMetadata("speller-type", spellerType)
+  // outto on macOS produces a .app *directory*. Buildkite artifact upload
+  // assumes a file path, so skip the upload+metadata for that path — the
+  // build itself is the validation. Windows outto produces a .exe file
+  // and uploads normally.
+  const skipUpload = installerKind === "outto" &&
+    spellerType === SpellerType.MacOS
+  if (skipUpload) {
+    logger.info(
+      `outto macOS speller build complete: ${payloadPath} (artifact upload skipped)`,
+    )
+  } else {
+    await builder.uploadArtifacts(payloadPath)
+    await builder.setMetadata("speller-version", version)
+    await builder.setMetadata("speller-type", spellerType)
+  }
 
   return {
     payloadPath,

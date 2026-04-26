@@ -17,7 +17,9 @@ import { globFiles, globOneFile } from "~/util/glob.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
 import { versionAsDev } from "~/util/shared.ts"
-import spellerBundle from "../../actions/speller/bundle.ts"
+import spellerBundle, {
+  type InstallerKind,
+} from "../../actions/speller/bundle.ts"
 import { SpellerManifest, SpellerType } from "../../actions/speller/manifest.ts"
 import logger from "../../util/log.ts"
 
@@ -186,7 +188,10 @@ export async function runLangGrammarTest() {
 }
 
 export async function runLangBundle(
-  { target }: { target: "windows" | "macos" | "mobile" },
+  { target, installer }: {
+    target: "windows" | "macos" | "mobile"
+    installer?: InstallerKind
+  },
 ) {
   await builder.downloadArtifacts("build/tools/spellcheckers/*.zhfst", ".")
 
@@ -219,6 +224,7 @@ export async function runLangBundle(
     spellerType,
     manifest,
     spellerPaths,
+    installer,
   })
 }
 
@@ -813,6 +819,32 @@ export async function pipelineLang() {
       key: "speller-bundle-macos",
       command: "divvun-actions run lang-bundle macos",
       depends_on: "speller-build",
+      agents: {
+        queue: "macos",
+      },
+    }))
+
+    // Parallel outto validation: build the same artifacts via the new
+    // installer toolchain. soft_fail so a failure here doesn't gate deploy,
+    // and deploy's depends_on does NOT include these keys (only the legacy
+    // bundle steps).
+    bundleSteps.push(command({
+      label: "Bundle Speller (Windows, outto)",
+      key: "speller-bundle-windows-outto",
+      command: "divvun-actions run lang-bundle windows outto",
+      depends_on: "speller-build",
+      soft_fail: true,
+      agents: {
+        queue: "windows",
+      },
+    }))
+
+    bundleSteps.push(command({
+      label: "Bundle Speller (macOS, outto)",
+      key: "speller-bundle-macos-outto",
+      command: "divvun-actions run lang-bundle macos outto",
+      depends_on: "speller-build",
+      soft_fail: true,
       agents: {
         queue: "macos",
       },

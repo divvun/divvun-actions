@@ -1,7 +1,9 @@
 import * as path from "@std/path"
 import { fastlanePilotUpload } from "~/actions/fastlane/pilot.ts"
 import keyboardBuildMeta from "~/actions/keyboard/build-meta.ts"
-import keyboardBuild from "~/actions/keyboard/build/mod.ts"
+import keyboardBuild, {
+  type InstallerKind,
+} from "~/actions/keyboard/build/mod.ts"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
@@ -106,12 +108,20 @@ async function createWindowsPackage(
   return packagePath
 }
 
-export async function runDesktopKeyboardWindows(kbdgenBundlePath: string) {
-  logger.info("Building Divvun Keyboard for Windows")
+export async function runDesktopKeyboardWindows(
+  kbdgenBundlePath: string,
+  installer?: InstallerKind,
+) {
+  logger.info(
+    `Building Divvun Keyboard for Windows (installer: ${
+      installer ?? "default"
+    })`,
+  )
 
   const { payloadPath, channel, unsigned } = await keyboardBuild({
     keyboardType: KeyboardType.Windows,
     bundlePath: kbdgenBundlePath,
+    installer,
   })
 
   const artifactPath = await createWindowsPackage(
@@ -165,14 +175,30 @@ async function createMacosPackage(
   return packagePath
 }
 
-export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
-  logger.info("Building Divvun Keyboard for macOS")
+export async function runDesktopKeyboardMacOS(
+  kbdgenBundlePath: string,
+  installer?: InstallerKind,
+) {
+  logger.info(
+    `Building Divvun Keyboard for macOS (installer: ${installer ?? "default"})`,
+  )
 
   const { payloadPath, channel } = await keyboardBuild({
     keyboardType: KeyboardType.MacOS,
     bundlePath: kbdgenBundlePath,
+    installer,
   })
   // Note: unsigned is always false for macOS builds
+
+  if (installer === "outto") {
+    // outto emits a .app *directory*; createMacosPackage assumes a single
+    // .pkg file. For the validation slice we just confirm the build
+    // succeeded; artifact upload of the .app is a follow-up.
+    logger.info(
+      `outto macOS keyboard build complete: ${payloadPath} (artifact upload skipped)`,
+    )
+    return
+  }
 
   // Create properly named package
   const artifactPath = await createMacosPackage(
@@ -333,6 +359,27 @@ export function pipelineDesktopKeyboard() {
         depends_on: "build-macos",
         agents: {
           queue: "linux",
+        },
+      }),
+      // Parallel outto validation: build the same artifacts via the new
+      // installer toolchain. soft_fail so a failure here doesn't gate the
+      // legacy deploy. No deploy follow-up — these are validation only.
+      command({
+        label: "Build Divvun Keyboard for Windows (outto)",
+        key: "build-windows-outto",
+        command: "divvun-actions run divvun-keyboard-windows outto",
+        soft_fail: true,
+        agents: {
+          queue: "windows",
+        },
+      }),
+      command({
+        label: "Build Divvun Keyboard for macOS (outto)",
+        key: "build-macos-outto",
+        command: "divvun-actions run divvun-keyboard-macos outto",
+        soft_fail: true,
+        agents: {
+          queue: "macos",
         },
       }),
     ],
