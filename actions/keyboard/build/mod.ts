@@ -2,6 +2,7 @@ import * as path from "@std/path"
 import logger from "~/util/log.ts"
 import { isMatchingTag, Kbdgen, PahkatPrefix } from "~/util/shared.ts"
 import { type InstallerResult, makeInstaller } from "../../inno-setup/lib.ts"
+import { buildKeyboardWindowsOutto } from "./outto.ts"
 import { KeyboardType } from "../types.ts"
 import { generateKbdInnoFromBundle } from "./iss.ts"
 import { NIGHTLY_CHANNEL } from "../../version.ts"
@@ -10,9 +11,21 @@ import { NIGHTLY_CHANNEL } from "../../version.ts"
 const SEMVER_TAG_RE =
   /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
 
+/** Selects which installer toolchain to use. */
+export type InstallerKind = "legacy" | "outto"
+
+function resolveInstallerKind(explicit?: InstallerKind): InstallerKind {
+  if (explicit) return explicit
+  const env = Deno.env.get("DIVVUN_INSTALLER")
+  if (env === "outto" || env === "legacy") return env
+  return "legacy"
+}
+
 export type Props = {
   keyboardType: KeyboardType
   bundlePath: string
+  /** Installer toolchain. Defaults to env DIVVUN_INSTALLER, else "legacy". */
+  installer?: InstallerKind
 }
 
 export type Output = {
@@ -24,6 +37,7 @@ export type Output = {
 export default async function keyboardBuild({
   keyboardType,
   bundlePath,
+  installer,
 }: Props): Promise<Output> {
   if (
     keyboardType !== KeyboardType.Windows &&
@@ -34,6 +48,7 @@ export default async function keyboardBuild({
     )
   }
 
+  const installerKind = resolveInstallerKind(installer)
   const platform = keyboardType === KeyboardType.MacOS ? "macos" : "windows"
   const channel = await determineVersionAndChannel(
     bundlePath,
@@ -44,9 +59,12 @@ export default async function keyboardBuild({
   let unsigned = false
 
   if (keyboardType === KeyboardType.MacOS) {
+    // outto path for macOS keyboards depends on kbdgen emitting a payload
+    // we can wrap; until then macOS keyboards always go through kbdgen's
+    // pkgbuild flow.
     payloadPath = await Kbdgen.buildMacOS(bundlePath)
   } else {
-    const result = await buildWindowsKeyboard(bundlePath)
+    const result = await buildWindowsKeyboard(bundlePath, installerKind)
     payloadPath = result.path
     unsigned = result.unsigned
   }
@@ -74,6 +92,7 @@ async function determineVersionAndChannel(
 
 async function buildWindowsKeyboard(
   bundlePath: string,
+  installerKind: InstallerKind,
 ): Promise<InstallerResult> {
   await setupWindowsDependencies()
 
@@ -83,6 +102,11 @@ async function buildWindowsKeyboard(
 
   await copyKbdiExecutables(outputPath)
   await createArchitectureDirectories(outputPath)
+
+  if (installerKind === "outto") {
+    logger.debug("Creating Windows installer via outto")
+    return await buildKeyboardWindowsOutto(bundlePath, outputPath)
+  }
 
   return await createWindowsInstaller(bundlePath, outputPath)
 }

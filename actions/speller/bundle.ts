@@ -14,6 +14,7 @@ import {
   versionAsNightly,
 } from "~/util/shared.ts"
 import { createInstaller } from "./bundle-macos.ts"
+import { buildSpellerOutto } from "./bundle-outto.ts"
 import logger from "~/util/log.ts"
 import {
   deriveLangTag,
@@ -22,10 +23,27 @@ import {
   SpellerType,
 } from "./manifest.ts"
 
+/** Selects which installer toolchain to use. */
+export type InstallerKind = "legacy" | "outto"
+
+/**
+ * Resolve the installer toolchain. Callers may pass `installer` directly;
+ * otherwise we honour the DIVVUN_INSTALLER env var ("legacy" | "outto").
+ * Defaults to "legacy".
+ */
+export function resolveInstallerKind(explicit?: InstallerKind): InstallerKind {
+  if (explicit) return explicit
+  const env = Deno.env.get("DIVVUN_INSTALLER")
+  if (env === "outto" || env === "legacy") return env
+  return "legacy"
+}
+
 export type Props = {
   spellerType: SpellerType
   manifest: SpellerManifest
   spellerPaths: SpellerPaths
+  /** Installer toolchain. Defaults to env DIVVUN_INSTALLER, else "legacy". */
+  installer?: InstallerKind
 }
 
 export type Output = {
@@ -43,7 +61,9 @@ export default async function spellerBundle({
   spellerType,
   manifest,
   spellerPaths,
+  installer,
 }: Props): Promise<Output> {
+  const installerKind = resolveInstallerKind(installer)
   const spellerName = manifest.package.speller.name
   const packageId = derivePackageId(spellerType)
   const langTag = deriveLangTag()
@@ -81,6 +101,36 @@ export default async function spellerBundle({
     payloadPath = pktPath
     await Tar.createFlatPkt(bhfstPaths, payloadPath)
     logger.debug(`Created pkt at ${payloadPath}`)
+  } else if (
+    spellerType == SpellerType.Windows && installerKind === "outto"
+  ) {
+    const result = await buildSpellerOutto({
+      spellerType,
+      packageId,
+      langTag,
+      version,
+      buildNumber: parseInt(builder.env.buildNumber ?? "1"),
+      spellerName,
+      manifest,
+      spellerPaths,
+    })
+    payloadPath = result.payloadPath
+    logger.debug(`Outto installer created at ${payloadPath}`)
+  } else if (
+    spellerType == SpellerType.MacOS && installerKind === "outto"
+  ) {
+    const result = await buildSpellerOutto({
+      spellerType,
+      packageId,
+      langTag,
+      version,
+      buildNumber: parseInt(builder.env.buildNumber ?? "1"),
+      spellerName,
+      manifest,
+      spellerPaths,
+    })
+    payloadPath = result.payloadPath
+    logger.debug(`Outto installer created at ${payloadPath}`)
   } else if (spellerType == SpellerType.Windows) {
     logger.info(manifest.windows)
     if (manifest.windows.system_product_code == null) {
