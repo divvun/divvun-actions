@@ -1,4 +1,5 @@
-// Keyboard Windows installer build path that uses outto instead of Inno Setup.
+// Keyboard installer build path that uses outto instead of Inno Setup
+// (Windows) / pkgbuild+productbuild (macOS).
 //
 // Opt-in: callers select this path via the `installer: "outto"` flag on
 // keyboardBuild() (see ./mod.ts). Until the matching Pahkat upload type
@@ -7,7 +8,9 @@
 // deno-lint-ignore-file no-explicit-any
 import * as path from "@std/path"
 import * as uuid from "@std/uuid"
+import * as builder from "~/builder.ts"
 import { makeOuttoInstaller } from "~/actions/outto/lib.ts"
+import macosSign from "~/services/macos-codesign.ts"
 import * as target from "~/target.ts"
 import { OuttoBuilder } from "~/util/outto.ts"
 import { Kbdgen } from "~/util/shared.ts"
@@ -198,4 +201,96 @@ async function addLayoutToOuttoManifest(
     arguments: `keyboard_enable -g "{${guidStr}}" -t ${languageCode}`,
     description: `Enable ${layoutDisplayName} keyboard layout`,
   })
+}
+
+// ── macOS ─────────────────────────────────────────────────────────────────
+
+/**
+ * Wrap a kbdgen-produced keyboard layout `.bundle` (run kbdgen with
+ * `--no-installer`) into an outto-built installer `.app`.
+ *
+ * The kbdgen bundle goes to `/Library/Keyboard Layouts/<bundle>` per the
+ * legacy pkgbuild flow; outto preserves that placement.
+ */
+export async function buildKeyboardMacOSOutto(opts: {
+  bundlePath: string
+  generatedBundleDir: string
+  outputDir: string
+}): Promise<OuttoKeyboardResult> {
+  const meta = await Kbdgen.loadTarget(opts.bundlePath, "macos")
+  const project = await Kbdgen.loadProjectBundle(opts.bundlePath)
+
+  const bundleDirAbs = path.resolve(opts.generatedBundleDir)
+  const stageDir = path.dirname(bundleDirAbs)
+  const bundleName = path.basename(bundleDirAbs)
+
+  // Codesign the keyboard bundle before outto packages it.
+  await codesignKeyboardBundle(bundleDirAbs)
+
+  // macOS target YAML has packageId / bundleName / version (no appName/url —
+  // those live on the project bundle).
+  const oBuilder = new OuttoBuilder(stageDir, "macos")
+    .id(`${meta.packageId}.keyboardlayout.${meta.bundleName}`)
+    .name(`${project.name} (${meta.bundleName})`)
+    .version(meta.version)
+    .publisher(project.organisation)
+    .url(project.url)
+    .privileges("admin")
+    .upgradePolicy("overwrite")
+    .removeAppDirOnUninstall(true)
+    .defaultDir(`#{library}/Keyboard Layouts/${bundleName}`)
+    .file({
+      source: bundleName,
+      dest: "#{library}/Keyboard Layouts",
+      bundle: true,
+      overwrite: "always",
+    })
+
+  const configPath = path.join(stageDir, "outto.toml")
+  await oBuilder.write(configPath)
+
+  const outputPath = path.join(
+    path.resolve(opts.outputDir),
+    `${meta.packageId}.keyboardlayout.${meta.bundleName}.app`,
+  )
+
+  const result = await makeOuttoInstaller({
+    configPath,
+    sourceDir: stageDir,
+    outputPath,
+    target: "macos",
+  })
+
+  await macosSign(result.path)
+
+  return { path: result.path, unsigned: false }
+}
+
+async function codesignKeyboardBundle(bundleDir: string): Promise<void> {
+  const appCodeSignId =
+    "Developer ID Application: The University of Tromso (2K5J2584NX)"
+
+  await builder.exec("security", ["find-identity", "-v", "-p", "codesigning"])
+  await builder.exec("security", [
+    "unlock-keychain",
+    "-p",
+    "admin",
+    "/Users/admin/Library/Keychains/login.keychain-db",
+  ])
+
+  const result = await builder.output("timeout", [
+    "60s",
+    "codesign",
+    "-f",
+    "-v",
+    "-s",
+    appCodeSignId,
+    bundleDir,
+  ])
+
+  if (result.status.code !== 0) {
+    throw new Error(
+      `keyboard bundle signing failed: ${result.stderr}\nexit code: ${result.status.code}`,
+    )
+  }
 }

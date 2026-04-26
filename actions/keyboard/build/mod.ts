@@ -2,7 +2,7 @@ import * as path from "@std/path"
 import logger from "~/util/log.ts"
 import { isMatchingTag, Kbdgen, PahkatPrefix } from "~/util/shared.ts"
 import { type InstallerResult, makeInstaller } from "../../inno-setup/lib.ts"
-import { buildKeyboardWindowsOutto } from "./outto.ts"
+import { buildKeyboardMacOSOutto, buildKeyboardWindowsOutto } from "./outto.ts"
 import { KeyboardType } from "../types.ts"
 import { generateKbdInnoFromBundle } from "./iss.ts"
 import { NIGHTLY_CHANNEL } from "../../version.ts"
@@ -59,10 +59,20 @@ export default async function keyboardBuild({
   let unsigned = false
 
   if (keyboardType === KeyboardType.MacOS) {
-    // outto path for macOS keyboards depends on kbdgen emitting a payload
-    // we can wrap; until then macOS keyboards always go through kbdgen's
-    // pkgbuild flow.
-    payloadPath = await Kbdgen.buildMacOS(bundlePath)
+    if (installerKind === "outto") {
+      const generatedBundleDir = await Kbdgen.buildMacOS(bundlePath, {
+        noInstaller: true,
+      })
+      const result = await buildKeyboardMacOSOutto({
+        bundlePath,
+        generatedBundleDir,
+        outputDir: path.dirname(generatedBundleDir),
+      })
+      payloadPath = result.path
+      unsigned = result.unsigned
+    } else {
+      payloadPath = await Kbdgen.buildMacOS(bundlePath)
+    }
   } else {
     const result = await buildWindowsKeyboard(bundlePath, installerKind)
     payloadPath = result.path

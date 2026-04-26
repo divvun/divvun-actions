@@ -1049,7 +1049,10 @@ export class Kbdgen {
     )
   }
 
-  static async buildMacOS(bundlePath: string): Promise<string> {
+  static async buildMacOS(
+    bundlePath: string,
+    options: { noInstaller?: boolean } = {},
+  ): Promise<string> {
     logger.info("Building macOS")
     logger.setLogLevel("trace")
     const abs = path.resolve(bundlePath)
@@ -1088,18 +1091,18 @@ export class Kbdgen {
     }
 
     {
-      const proc = new Deno.Command("kbdgen", {
-        args: [
-          "target",
-          "--output-path",
-          "output",
-          "--bundle-path",
-          abs,
-          "macos",
-          "build",
-        ],
-        cwd,
-      }).spawn()
+      const args = [
+        "target",
+        "--output-path",
+        "output",
+        "--bundle-path",
+        abs,
+        "macos",
+        "build",
+      ]
+      if (options.noInstaller) args.push("--no-installer")
+
+      const proc = new Deno.Command("kbdgen", { args, cwd }).spawn()
 
       const code = (await proc.status).code
       if (code !== 0) {
@@ -1107,6 +1110,11 @@ export class Kbdgen {
       }
     }
 
+    if (options.noInstaller) {
+      // Bundle generation only — return the .bundle directory for the caller
+      // to wrap with their own installer.
+      return await Kbdgen.resolveOutput(path.join(cwd, "output", `*.bundle`))
+    }
     return await Kbdgen.resolveOutput(path.join(cwd, "output", `*.pkg`))
   }
 
