@@ -4,9 +4,12 @@ import macosSign from "~/services/macos-codesign.ts"
 import { globOneDir } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
+import { logXcodeVersion } from "~/util/xcode.ts"
 import { uploadToDevRelease } from "./mod.ts"
 
 export async function runDonateSpeechBuildMacOS() {
+  await logXcodeVersion()
+
   await builder.group("Installing dependencies", async () => {
     await builder.exec("pnpm", ["install", "--frozen-lockfile"])
   })

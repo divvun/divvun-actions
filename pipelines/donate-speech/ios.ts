@@ -4,9 +4,12 @@ import { globOneFile } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir, makeTempFile } from "~/util/temp.ts"
 import { setupSigningFromMatch } from "~/util/security.ts"
+import { logXcodeVersion } from "~/util/xcode.ts"
 import { BUNDLE_ID, findBuildArtifact, KEYCHAIN_NAME } from "./mod.ts"
 
 export async function runDonateSpeechBuildIOS() {
+  await logXcodeVersion()
+
   const secrets = await builder.secrets()
   const apiKey = JSON.parse(secrets.get("macos/appStoreKeyJson"))
   const keychainPassword = secrets.get("macos/adminPassword")

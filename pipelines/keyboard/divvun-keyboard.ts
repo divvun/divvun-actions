@@ -11,6 +11,7 @@ import * as target from "~/target.ts"
 import { globOneFile } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
+import { logXcodeVersion } from "~/util/xcode.ts"
 import keyboardDeploy from "../../actions/keyboard/deploy.ts"
 import { sentryUploadIOSDebugFiles } from "../../actions/sentry/upload-debug-files.ts"
 import { Ditto, Kbdgen, versionAsNightly } from "../../util/shared.ts"
@@ -24,6 +25,8 @@ export async function runDivvunKeyboardIOS(kbdgenBundlePath: string) {
   //     packages: ["kbdgen"],
   //   })
   // })
+
+  await logXcodeVersion()
 
   await builder.group("Building Divvun Keyboard for iOS", async () => {
     await keyboardBuildMeta({
@@ -207,6 +210,8 @@ export async function runDesktopKeyboardMacOS(
   logger.info(
     `Building Divvun Keyboard for macOS (installer: ${installer ?? "default"})`,
   )
+
+  await logXcodeVersion()
 
   const { payloadPath, channel } = await keyboardBuild({
     keyboardType: KeyboardType.MacOS,
