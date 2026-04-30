@@ -792,6 +792,10 @@ export async function pipelineLang() {
 
   // Bundle phase steps array (only on deploy)
   const bundleSteps: CommandStep[] = []
+  // Outto validation steps go into their own side group so they're isolated
+  // from the legacy bundle/deploy chain. Each is soft_fail and the group's
+  // key is not referenced by any downstream step.
+  const outtoBundleSteps: CommandStep[] = []
 
   if (isSpellerDeploy) {
     bundleSteps.push(command({
@@ -824,11 +828,7 @@ export async function pipelineLang() {
       },
     }))
 
-    // Parallel outto validation: build the same artifacts via the new
-    // installer toolchain. soft_fail so a failure here doesn't gate deploy,
-    // and deploy's depends_on does NOT include these keys (only the legacy
-    // bundle steps).
-    bundleSteps.push(command({
+    outtoBundleSteps.push(command({
       label: "Bundle Speller (Windows, outto)",
       key: "speller-bundle-windows-outto",
       command: "divvun-actions run lang-bundle windows outto",
@@ -839,7 +839,7 @@ export async function pipelineLang() {
       },
     }))
 
-    bundleSteps.push(command({
+    outtoBundleSteps.push(command({
       label: "Bundle Speller (macOS, outto)",
       key: "speller-bundle-macos-outto",
       command: "divvun-actions run lang-bundle macos outto",
@@ -932,6 +932,16 @@ export async function pipelineLang() {
       group: "Bundle",
       key: "bundle",
       steps: bundleSteps,
+    })
+  }
+
+  if (outtoBundleSteps.length > 0) {
+    // Side group: isolated from the legacy bundle/deploy chain. Group key
+    // "outto" is intentionally not used in any depends_on.
+    steps.push({
+      group: "Outto (validation)",
+      key: "outto",
+      steps: outtoBundleSteps,
     })
   }
 

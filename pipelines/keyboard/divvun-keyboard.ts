@@ -393,27 +393,33 @@ export function pipelineDesktopKeyboard() {
           queue: "linux",
         },
       }),
-      // Parallel outto validation: build the same artifacts via the new
-      // installer toolchain. soft_fail so a failure here doesn't gate the
-      // legacy deploy. No deploy follow-up — these are validation only.
-      command({
-        label: "Build Divvun Keyboard for Windows (outto)",
-        key: "build-windows-outto",
-        command: "divvun-actions run divvun-keyboard-windows outto",
-        soft_fail: true,
-        agents: {
-          queue: "windows",
-        },
-      }),
-      command({
-        label: "Build Divvun Keyboard for macOS (outto)",
-        key: "build-macos-outto",
-        command: "divvun-actions run divvun-keyboard-macos outto",
-        soft_fail: true,
-        agents: {
-          queue: "macos",
-        },
-      }),
+      // Side group: outto validation builds. Isolated from the legacy
+      // build/deploy chain. Group key "outto" is intentionally not used
+      // in any depends_on; each step is soft_fail.
+      {
+        group: "Outto (validation)",
+        key: "outto",
+        steps: [
+          command({
+            label: "Build Divvun Keyboard for Windows (outto)",
+            key: "build-windows-outto",
+            command: "divvun-actions run divvun-keyboard-windows outto",
+            soft_fail: true,
+            agents: {
+              queue: "windows",
+            },
+          }),
+          command({
+            label: "Build Divvun Keyboard for macOS (outto)",
+            key: "build-macos-outto",
+            command: "divvun-actions run divvun-keyboard-macos outto",
+            soft_fail: true,
+            agents: {
+              queue: "macos",
+            },
+          }),
+        ],
+      },
     ],
   }
 
