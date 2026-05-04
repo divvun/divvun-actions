@@ -29,6 +29,7 @@ const ALPINE_PACKAGES = [
   "cmake",
   "compiler-rt",
   "curl",
+  "dbus-dev",
   "deno",
   "flex",
   "git",
