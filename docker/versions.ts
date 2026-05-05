@@ -27,4 +27,5 @@ export const versions = {
   pahkatDevtoolsChannel: "nightly",
   divvunRuntime: "0.3.1",
   rcodesign: "0.29.0",
+  outto: "d5f7e46790cf4cb8ee4a869892de6c0df503c10c",
 }

@@ -25,6 +25,7 @@ import {
   runDivvunWorkerTtsPublish,
 } from "./pipelines/divvun-worker-tts.ts"
 import { pipelineBox, runBoxPublish } from "./pipelines/box.ts"
+import { pipelineOutto, runOuttoPublish } from "./pipelines/outto.ts"
 import {
   pipelineDivvunActions,
   runDivvunActionsBuildImage,
@@ -290,6 +291,10 @@ async function runPipeline(args: any) {
       await runBoxPublish()
       break
     }
+    case "outto-publish": {
+      await runOuttoPublish()
+      break
+    }
     case "divvun-actions-build-image": {
       const target = args._[1] as string
       const pushArg = args._[2] as string
@@ -514,6 +519,10 @@ async function runCi(_args: any) {
     }
     case "box": {
       pipeline = pipelineBox()
+      break
+    }
+    case "outto": {
+      pipeline = pipelineOutto()
       break
     }
     case "divvun-actions": {

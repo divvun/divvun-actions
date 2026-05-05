@@ -101,6 +101,23 @@ RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
     Start-Process -FilePath .\\rustup-init.exe -ArgumentList @('-y', '--target', 'aarch64-pc-windows-msvc') -NoNewWindow -Wait; \
     Remove-Item -Force .\\rustup-init.exe
 
+# outto@d5f7e46
+RUN rustup toolchain install nightly --component rust-src ; \
+    rustup target add x86_64-pc-windows-msvc --toolchain nightly
+
+RUN git clone https://github.com/divvun/outto C:\outto-src ; \
+    Push-Location C:\outto-src ; \
+    cargo +nightly build --release --workspace -Zbuild-std=std --target x86_64-pc-windows-msvc ; \
+    Pop-Location ; \
+    New-Item -ItemType Directory -Path C:\outto\bin -Force | Out-Null ; \
+    New-Item -ItemType Directory -Path C:\outto\libexec -Force | Out-Null ; \
+    Copy-Item C:\outto-src\target\x86_64-pc-windows-msvc\release\outto.exe C:\outto\bin\ ; \
+    Copy-Item C:\outto-src\target\x86_64-pc-windows-msvc\release\outto-gui.exe C:\outto\libexec\ ; \
+    Copy-Item C:\outto-src\target\x86_64-pc-windows-msvc\release\outto-sfx.exe C:\outto\libexec\ ; \
+    Copy-Item C:\outto-src\target\x86_64-pc-windows-msvc\release\outto-uninstall.exe C:\outto\libexec\ ; \
+    Remove-Item -Recurse -Force C:\outto-src ; \
+    setx /M PATH $($Env:PATH + ';C:\outto\bin')
+
 # deno
 RUN irm https://deno.land/install.ps1 | iex
 
