@@ -104,6 +104,18 @@ RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
 # rust-nightly (rust-src)
 RUN rustup toolchain install nightly --component rust-src
 
+# outto (dev-latest)
+RUN $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/divvun/outto/releases/tags/dev-latest' ; \
+    $asset = $rel.assets | Where-Object { $_.name -match '^outto-x86_64-pc-windows-msvc-.*\.zip$' } | Select-Object -First 1 ; \
+    if (-not $asset) { throw "No outto windows asset on dev-latest" } ; \
+    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile outto.zip ; \
+    Expand-Archive outto.zip -DestinationPath C:\outto-extract ; \
+    $inner = Get-ChildItem C:\outto-extract -Directory | Select-Object -First 1 ; \
+    Move-Item $inner.FullName C:\outto ; \
+    Remove-Item -Recurse -Force C:\outto-extract ; \
+    Remove-Item -Force outto.zip ; \
+    setx /M PATH $($Env:PATH + ';C:\outto\bin')
+
 # deno
 RUN irm https://deno.land/install.ps1 | iex
 
