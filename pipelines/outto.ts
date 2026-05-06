@@ -208,10 +208,12 @@ export async function runOuttoPublish() {
   } else {
     await Promise.all(
       TARGETS.flatMap((target) => {
-        const ext = target.includes("windows") ? ".exe" : ""
+        const isWindows = target.includes("windows")
+        const ext = isWindows ? ".exe" : ""
+        const sep = isWindows ? "\\" : "/"
         return binariesFor(target).map((name) =>
           builder.downloadArtifacts(
-            `target/${target}/release/${name}${ext}`,
+            `target${sep}${target}${sep}release${sep}${name}${ext}`,
             tempDir.path,
           )
         )
