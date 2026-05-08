@@ -27,7 +27,6 @@ RUN apk update && apk upgrade && apk add --no-cache \
     cmake \
     compiler-rt \
     curl \
-    dbus-dev \
     deno \
     flex \
     git \
@@ -98,7 +97,6 @@ RUN mkdir -p /opt/sysroot-aarch64 && \
     cmake \
     compiler-rt \
     curl \
-    dbus-dev \
     deno \
     flex \
     git \
