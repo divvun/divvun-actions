@@ -48,6 +48,7 @@ export type Props = {
   version: string
   channel: string | null
   pahkatRepo: string
+  artifactUrl?: string
   secrets: {
     pahkatApiKey: string
     awsAccessKeyId: string
@@ -62,6 +63,7 @@ export default async function spellerDeploy({
   version,
   channel,
   pahkatRepo,
+  artifactUrl: artifactUrlOverride,
   secrets,
 }: Props) {
   try {
@@ -89,11 +91,8 @@ export default async function spellerDeploy({
         path.dirname(payloadPath),
         `${pathItems.join("_")}${ext}`,
       )
-      artifactUrl = `${PahkatUploader.ARTIFACTS_URL}${
-        path.basename(
-          artifactPath,
-        )
-      }`
+      artifactUrl = artifactUrlOverride ??
+        `${PahkatUploader.ARTIFACTS_URL}${path.basename(artifactPath)}`
       artifactSize = getArtifactSize(payloadPath)
 
       // Make the dev channel be used if any channel except for the default.
@@ -125,11 +124,8 @@ export default async function spellerDeploy({
         path.dirname(payloadPath),
         `${pathItems.join("_")}${ext}`,
       )
-      artifactUrl = `${PahkatUploader.ARTIFACTS_URL}${
-        path.basename(
-          artifactPath,
-        )
-      }`
+      artifactUrl = artifactUrlOverride ??
+        `${PahkatUploader.ARTIFACTS_URL}${path.basename(artifactPath)}`
       artifactSize = getArtifactSize(payloadPath)
 
       // Make the dev channel be used if any channel except for the default.
@@ -160,11 +156,8 @@ export default async function spellerDeploy({
         path.dirname(payloadPath),
         `${pathItems.join("_")}${ext}`,
       )
-      artifactUrl = `${PahkatUploader.ARTIFACTS_URL}${
-        path.basename(
-          artifactPath,
-        )
-      }`
+      artifactUrl = artifactUrlOverride ??
+        `${PahkatUploader.ARTIFACTS_URL}${path.basename(artifactPath)}`
       artifactSize = getArtifactSize(payloadPath)
 
       payloadMetadata = await PahkatUploader.release.tarballPackage(
@@ -208,6 +201,7 @@ export default async function spellerDeploy({
       {
         manifestTomlPath: manifestPath,
         packageType: "speller",
+        skipArtifactUpload: artifactUrlOverride != null,
       },
     )
   } catch (error: any) {

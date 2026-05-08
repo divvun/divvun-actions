@@ -22,6 +22,7 @@ import spellerBundle, {
 } from "../../actions/speller/bundle.ts"
 import spellerDeploy from "../../actions/speller/deploy.ts"
 import { SpellerManifest, SpellerType } from "../../actions/speller/manifest.ts"
+import { NIGHTLY_CHANNEL } from "../../actions/version.ts"
 import logger from "../../util/log.ts"
 
 function command(input: CommandStep): CommandStep {
@@ -409,9 +410,10 @@ export async function runLangDeploy() {
       versionedMacosFile,
       versionedMobileFile,
     ]
+    const allSecrets = await builder.secrets()
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
-      await builder.secrets(),
+      allSecrets,
     )
 
     logger.info(
@@ -429,6 +431,50 @@ export async function runLangDeploy() {
     )
 
     logger.info("Speller dev-latest GitHub release updated successfully")
+
+    const pahkatSecrets = {
+      awsAccessKeyId: allSecrets.get("s3/accessKeyId"),
+      awsSecretAccessKey: allSecrets.get("s3/secretAccessKey"),
+      pahkatApiKey: allSecrets.get("pahkat/apiKey"),
+    }
+
+    const githubAssetUrl = (filename: string) =>
+      `https://github.com/${builder.env.repo}/releases/download/${releaseTag}/${filename}`
+
+    logger.info(
+      "Publishing nightly speller to pahkat (GitHub-hosted artifacts)",
+    )
+    await spellerDeploy({
+      spellerType: SpellerType.Windows,
+      manifestPath: "./manifest.toml",
+      payloadPath: versionedWindowsFile,
+      version: devVersion,
+      channel: NIGHTLY_CHANNEL,
+      pahkatRepo: "https://pahkat.uit.no/main/",
+      artifactUrl: githubAssetUrl(versionedWindowsFile),
+      secrets: pahkatSecrets,
+    })
+    await spellerDeploy({
+      spellerType: SpellerType.MacOS,
+      manifestPath: "./manifest.toml",
+      payloadPath: versionedMacosFile,
+      version: devVersion,
+      channel: NIGHTLY_CHANNEL,
+      pahkatRepo: "https://pahkat.uit.no/main/",
+      artifactUrl: githubAssetUrl(versionedMacosFile),
+      secrets: pahkatSecrets,
+    })
+    await spellerDeploy({
+      spellerType: SpellerType.Mobile,
+      manifestPath: "./manifest.toml",
+      payloadPath: versionedMobileFile,
+      version: devVersion,
+      channel: NIGHTLY_CHANNEL,
+      pahkatRepo: "https://pahkat.uit.no/main/",
+      artifactUrl: githubAssetUrl(versionedMobileFile),
+      secrets: pahkatSecrets,
+    })
+    logger.info("Nightly speller pahkat publish completed for all platforms")
   }
 }
 

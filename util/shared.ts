@@ -581,6 +581,7 @@ export class PahkatUploader {
       metadataJsonPath?: string | null
       manifestTomlPath?: string | null
       packageType?: string | null
+      skipArtifactUpload?: boolean
     } = {},
   ) {
     logger.info(arguments)
@@ -602,49 +603,55 @@ export class PahkatUploader {
       )
     }
 
-    logger.info(`Uploading ${artifactPath} to S3`)
+    if (extra.skipArtifactUpload) {
+      logger.info(
+        `Skipping artifact upload for ${fileName}; using externally hosted URL`,
+      )
+    } else {
+      logger.info(`Uploading ${artifactPath} to S3`)
 
-    let retries = 0
-    await builder.exec("aws", [
-      "configure",
-      "set",
-      "default.s3.multipart_threshold",
-      "500MB",
-    ])
-    while (true) {
-      try {
-        await builder.exec(
-          "aws",
-          [
-            "s3",
-            "cp",
-            "--cli-connect-timeout",
-            "6000",
-            "--endpoint",
-            "https://ams3.digitaloceanspaces.com",
-            "--acl",
-            "public-read",
-            artifactPath,
-            `s3://divvun/pahkat/artifacts/${fileName}`,
-          ],
-          {
-            env: Object.assign({}, env(), {
-              AWS_ACCESS_KEY_ID: secrets.awsAccessKeyId,
-              AWS_SECRET_ACCESS_KEY: secrets.awsSecretAccessKey,
-              AWS_DEFAULT_REGION: "ams3",
-            }),
-          },
-        )
-        logger.info("Artifact upload successful")
-        break
-      } catch (err) {
-        logger.info(err)
-        if (retries >= 5) {
-          throw err
+      let retries = 0
+      await builder.exec("aws", [
+        "configure",
+        "set",
+        "default.s3.multipart_threshold",
+        "500MB",
+      ])
+      while (true) {
+        try {
+          await builder.exec(
+            "aws",
+            [
+              "s3",
+              "cp",
+              "--cli-connect-timeout",
+              "6000",
+              "--endpoint",
+              "https://ams3.digitaloceanspaces.com",
+              "--acl",
+              "public-read",
+              artifactPath,
+              `s3://divvun/pahkat/artifacts/${fileName}`,
+            ],
+            {
+              env: Object.assign({}, env(), {
+                AWS_ACCESS_KEY_ID: secrets.awsAccessKeyId,
+                AWS_SECRET_ACCESS_KEY: secrets.awsSecretAccessKey,
+                AWS_DEFAULT_REGION: "ams3",
+              }),
+            },
+          )
+          logger.info("Artifact upload successful")
+          break
+        } catch (err) {
+          logger.info(err)
+          if (retries >= 5) {
+            throw err
+          }
+          await delay(10000)
+          logger.info("Retrying")
+          retries += 1
         }
-        await delay(10000)
-        logger.info("Retrying")
-        retries += 1
       }
     }
 
