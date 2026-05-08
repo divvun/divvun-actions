@@ -20,6 +20,7 @@ import { versionAsDev } from "~/util/shared.ts"
 import spellerBundle, {
   type InstallerKind,
 } from "../../actions/speller/bundle.ts"
+import spellerDeploy from "../../actions/speller/deploy.ts"
 import { SpellerManifest, SpellerType } from "../../actions/speller/manifest.ts"
 import logger from "../../util/log.ts"
 
@@ -318,9 +319,10 @@ export async function runLangDeploy() {
       versionedMacosFile,
       versionedMobileFile,
     ]
+    const allSecrets = await builder.secrets()
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
-      await builder.secrets(),
+      allSecrets,
     )
 
     logger.info(`Creating GitHub release for speller version ${tagVersion}`)
@@ -335,6 +337,42 @@ export async function runLangDeploy() {
     )
 
     logger.info("Speller GitHub release created successfully")
+
+    const pahkatSecrets = {
+      awsAccessKeyId: allSecrets.get("s3/accessKeyId"),
+      awsSecretAccessKey: allSecrets.get("s3/secretAccessKey"),
+      pahkatApiKey: allSecrets.get("pahkat/apiKey"),
+    }
+
+    logger.info("Publishing speller to pahkat")
+    await spellerDeploy({
+      spellerType: SpellerType.Windows,
+      manifestPath: "./manifest.toml",
+      payloadPath: versionedWindowsFile,
+      version: versionWithBuild,
+      channel: null,
+      pahkatRepo: "https://pahkat.uit.no/main/",
+      secrets: pahkatSecrets,
+    })
+    await spellerDeploy({
+      spellerType: SpellerType.MacOS,
+      manifestPath: "./manifest.toml",
+      payloadPath: versionedMacosFile,
+      version: versionWithBuild,
+      channel: null,
+      pahkatRepo: "https://pahkat.uit.no/main/",
+      secrets: pahkatSecrets,
+    })
+    await spellerDeploy({
+      spellerType: SpellerType.Mobile,
+      manifestPath: "./manifest.toml",
+      payloadPath: versionedMobileFile,
+      version: versionWithBuild,
+      channel: null,
+      pahkatRepo: "https://pahkat.uit.no/main/",
+      secrets: pahkatSecrets,
+    })
+    logger.info("Speller pahkat publish completed for all platforms")
   } else if (isMainBranch) {
     if (!builder.env.repo) {
       throw new Error("No repository information available")
