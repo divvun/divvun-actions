@@ -151,10 +151,6 @@ RUN curl -fsSL https://musl.cc/aarch64-linux-musl-cross.tgz -o aarch64-musl-cros
 # uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# pipx install GiellaLTLexTools (gtlemmatest, gtspelltest, ...)
-RUN pipx install git+https://github.com/divvun/GiellaLTLexTools
-ENV PATH="/root/.local/bin:$PATH"
-
 # gh@2.83.1
 RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.83.1/gh_2.83.1_linux_amd64.deb -o gh.deb && \
     dpkg -i gh.deb && \
@@ -249,6 +245,11 @@ ENV PATH="$VULKAN_SDK/bin:$PATH"
 
 # git-lfs init
 RUN git lfs install
+
+# pipx install GiellaLTLexTools (gtlemmatest, gtspelltest, ...)
+ARG GIELLALTLEXTOOLS_CACHE_BUST=0
+RUN pipx install git+https://github.com/divvun/GiellaLTLexTools
+ENV PATH="/root/.local/bin:$PATH"
 
 # Buildkite fs-cache folder
 RUN mkdir -p $BUILDKITE_PLUGIN_FS_CACHE_FOLDER

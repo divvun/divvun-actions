@@ -14,7 +14,9 @@ if [ "$target" = "--list" ] || [ "$target" = "-l" ]; then
   exec deno run --allow-read --allow-env generate.ts --list
 fi
 
+shift  # consume the target arg; remaining args are passed to docker build
+
 deno run --allow-read --allow-write --allow-env generate.ts --only="$target"
 ref=$(deno run --allow-read --allow-env generate.ts --print-ref="$target")
 
-exec docker build --platform linux/amd64 -t "$ref" -f "Dockerfile.$target" .
+exec docker build --platform linux/amd64 -t "$ref" -f "Dockerfile.$target" . "$@"

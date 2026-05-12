@@ -140,11 +140,6 @@ export default defineImage({
     muslCross({ arch: "x86_64" }),
     muslCross({ arch: "aarch64" }),
     uv(),
-    pipxInstall({
-      spec: "git+https://github.com/divvun/GiellaLTLexTools",
-      label: "GiellaLTLexTools (gtlemmatest, gtspelltest, ...)",
-      exportPath: true,
-    }),
     gh(),
     rust({
       targets: [
@@ -171,6 +166,15 @@ export default defineImage({
     rcodesign(),
     vulkanSdk(),
     gitLfsInit(),
+    // Placed last so busting its cache layer doesn't invalidate anything above.
+    // To force a re-install without --no-cache:
+    //   ./build.sh linux --build-arg GIELLALTLEXTOOLS_CACHE_BUST=$(date +%s)
+    pipxInstall({
+      spec: "git+https://github.com/divvun/GiellaLTLexTools",
+      label: "GiellaLTLexTools (gtlemmatest, gtspelltest, ...)",
+      exportPath: true,
+      cacheBust: "GIELLALTLEXTOOLS_CACHE_BUST",
+    }),
     mkdir({
       path: "$BUILDKITE_PLUGIN_FS_CACHE_FOLDER",
       label: "Buildkite fs-cache folder",
