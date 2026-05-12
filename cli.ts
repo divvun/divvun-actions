@@ -32,6 +32,10 @@ import {
 } from "./pipelines/divvun-actions.ts"
 import { pipelineBorealium, runBorealiumDeploy } from "./pipelines/borealium.ts"
 import {
+  pipelineKeyboardViewer,
+  runKeyboardViewerDeploy,
+} from "./pipelines/keyboard-viewer.ts"
+import {
   pipelineDivvunspell,
   runDivvunspellPublish,
   runLibdivvunFstPublish,
@@ -322,6 +326,10 @@ async function runPipeline(args: any) {
       await runBorealiumDeploy()
       break
     }
+    case "keyboard-viewer-deploy": {
+      await runKeyboardViewerDeploy()
+      break
+    }
     case "libpahkat-android": {
       await runLibpahkatAndroid()
       break
@@ -531,6 +539,10 @@ async function runCi(_args: any) {
     }
     case "borealium.org": {
       pipeline = pipelineBorealium()
+      break
+    }
+    case "keyboard-viewer": {
+      pipeline = pipelineKeyboardViewer()
       break
     }
     case "pahkat": {
