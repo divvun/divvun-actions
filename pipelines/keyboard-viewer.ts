@@ -16,20 +16,25 @@ export function pipelineKeyboardViewer(): BuildkitePipeline {
   return {
     steps: [
       command({
+        key: "lint",
         label: "Lint",
         command: "divvun-actions run keyboard-viewer-lint",
         agents: { queue: "linux" },
       }),
       command({
+        key: "build",
         label: "Build",
         command: "divvun-actions run keyboard-viewer-build",
         agents: { queue: "linux" },
+        depends_on: "lint",
       }),
       command({
+        key: "push",
         label: "Push",
         command: "divvun-actions run keyboard-viewer-push",
         agents: { queue: "linux" },
         branches: "main",
+        depends_on: "build",
       }),
     ],
   }
