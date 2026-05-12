@@ -33,7 +33,9 @@ import {
 import { pipelineBorealium, runBorealiumDeploy } from "./pipelines/borealium.ts"
 import {
   pipelineKeyboardViewer,
-  runKeyboardViewerDeploy,
+  runKeyboardViewerBuild,
+  runKeyboardViewerLint,
+  runKeyboardViewerPush,
 } from "./pipelines/keyboard-viewer.ts"
 import {
   pipelineDivvunspell,
@@ -326,8 +328,16 @@ async function runPipeline(args: any) {
       await runBorealiumDeploy()
       break
     }
-    case "keyboard-viewer-deploy": {
-      await runKeyboardViewerDeploy()
+    case "keyboard-viewer-lint": {
+      await runKeyboardViewerLint()
+      break
+    }
+    case "keyboard-viewer-build": {
+      await runKeyboardViewerBuild()
+      break
+    }
+    case "keyboard-viewer-push": {
+      await runKeyboardViewerPush()
       break
     }
     case "libpahkat-android": {
