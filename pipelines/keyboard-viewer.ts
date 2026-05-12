@@ -41,9 +41,9 @@ export function pipelineKeyboardViewer(): BuildkitePipeline {
 }
 
 export async function runKeyboardViewerLint() {
-  await builder.exec("deno", ["install"])
   await builder.exec("deno", ["fmt", "--check"])
   await builder.exec("deno", ["lint"])
+  await builder.exec("deno", ["install"])
   await builder.exec("deno", ["check"])
 }
 
