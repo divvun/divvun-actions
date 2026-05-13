@@ -38,6 +38,11 @@ import {
   runKeyboardViewerPush,
 } from "./pipelines/keyboard-viewer.ts"
 import {
+  pipelineDict,
+  runDictBuild,
+  runDictDeploy,
+} from "./pipelines/dict/mod.ts"
+import {
   pipelineDivvunspell,
   runDivvunspellPublish,
   runLibdivvunFstPublish,
@@ -279,6 +284,14 @@ async function runPipeline(args: any) {
     }
     case "lang-tts-textproc-deploy": {
       await runLangTtsTextprocDeploy()
+      break
+    }
+    case "dict-build": {
+      await runDictBuild()
+      break
+    }
+    case "dict-deploy": {
+      await runDictDeploy()
       break
     }
     case "kbdgen-deploy": {
@@ -580,6 +593,8 @@ async function runCi(_args: any) {
         pipeline = pipelineDesktopKeyboard()
       } else if (builder.env.repoName.startsWith("lang-")) {
         pipeline = await pipelineLang()
+      } else if (builder.env.repoName.startsWith("dict-")) {
+        pipeline = pipelineDict()
       } else {
         throw new Error(`Unknown repo: ${builder.env.repoName}`)
       }
