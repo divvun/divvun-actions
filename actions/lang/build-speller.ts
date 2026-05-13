@@ -1,7 +1,9 @@
 import * as fs from "@std/fs"
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import { globFiles } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
+import { Tar } from "~/util/shared.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
 import { setupGiellaCoreDependencies } from "./common.ts"
 
@@ -169,6 +171,14 @@ export default async function langSpellerBuild(
   })
 
   await builder.uploadArtifacts("build/tools/spellcheckers/*.zhfst")
+
+  const hfstolFiles = await globFiles("build/src/fst/*.hfstol")
+  if (hfstolFiles.length > 0) {
+    await Tar.createFlatPkt(hfstolFiles, "fst-bundle.pkt.tar.zst")
+    await builder.uploadArtifacts("fst-bundle.pkt.tar.zst")
+  } else {
+    logger.info("No .hfstol files found, skipping FST bundle")
+  }
 
   // Glob the zhfst files made available in the spellcheckers directory.
   // Associate their prefixes as their lang code.

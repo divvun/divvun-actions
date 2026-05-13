@@ -261,10 +261,14 @@ export async function runLangDeploy() {
   await builder.downloadArtifacts("*.pkt.tar.zst", ".")
   await builder.downloadArtifacts("*.exe", ".")
   await builder.downloadArtifacts("*.pkg", ".")
+  await builder.downloadArtifacts("fst-bundle.pkt.tar.zst", ".")
 
   const windowsFiles = await globOneFile("*.exe")
   const macosFiles = await globOneFile("*.pkg")
-  const mobileFiles = await globOneFile("*.pkt.tar.zst")
+  const mobileFiles = await globOneFile("*-mobile.pkt.tar.zst")
+  const fstBundle = (await fs.exists("fst-bundle.pkt.tar.zst"))
+    ? "fst-bundle.pkt.tar.zst"
+    : null
 
   logger.info("Deploying language files:")
   logger.info(`- Windows: ${windowsFiles}`)
@@ -315,10 +319,17 @@ export async function runLangDeploy() {
     await Deno.rename(macosFiles, versionedMacosFile)
     await Deno.rename(mobileFiles, versionedMobileFile)
 
+    const versionedFstFile =
+      `fst-${langCode}_${versionWithBuild}_noarch-all.pkt.tar.zst`
+    if (fstBundle) {
+      await Deno.rename(fstBundle, versionedFstFile)
+    }
+
     const artifacts = [
       versionedWindowsFile,
       versionedMacosFile,
       versionedMobileFile,
+      ...(fstBundle ? [versionedFstFile] : []),
     ]
     const allSecrets = await builder.secrets()
     const { checksumFile, signatureFile } = await createSignedChecksums(
@@ -405,10 +416,17 @@ export async function runLangDeploy() {
     await Deno.rename(macosFiles, versionedMacosFile)
     await Deno.rename(mobileFiles, versionedMobileFile)
 
+    const versionedFstFile =
+      `fst-${langCode}_${devVersion}_noarch-all.pkt.tar.zst`
+    if (fstBundle) {
+      await Deno.rename(fstBundle, versionedFstFile)
+    }
+
     const artifacts = [
       versionedWindowsFile,
       versionedMacosFile,
       versionedMobileFile,
+      ...(fstBundle ? [versionedFstFile] : []),
     ]
     const allSecrets = await builder.secrets()
     const { checksumFile, signatureFile } = await createSignedChecksums(
