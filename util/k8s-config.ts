@@ -2,7 +2,9 @@ import YAML from "yaml"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 
-const K8S_CONFIG_REPO = "https://github.com/divvun/k8s-config.git"
+const K8S_CONFIG_REPO = "git@github.com:divvun/k8s-config.git"
+const COMMIT_AUTHOR_NAME = "divvun-actions"
+const COMMIT_AUTHOR_EMAIL = "divvun-actions@users.noreply.github.com"
 
 export type BumpKustomizeImageTagOptions = {
   /** Full image name without tag, e.g. "ghcr.io/divvun/borealium". */
@@ -18,34 +20,10 @@ export type BumpKustomizeImageTagOptions = {
 export async function bumpKustomizeImageTag(
   opts: BumpKustomizeImageTagOptions,
 ): Promise<void> {
-  const secrets = await builder.secrets()
-  const githubUsername = secrets.get("github/username")
-  const githubToken = secrets.get("github/token")
-  await builder.redactSecret(githubToken)
-
   const tempDir = await Deno.makeTempDir({ prefix: "k8s-config-bump-" })
   try {
-    const askPassPath = `${tempDir}/git-askpass.sh`
-    await Deno.writeTextFile(
-      askPassPath,
-      `#!/bin/sh
-case "$1" in
-  *Username*) printf '%s\\n' "$GITHUB_USERNAME" ;;
-  *Password*) printf '%s\\n' "$GITHUB_TOKEN" ;;
-  *) exit 1 ;;
-esac
-`,
-    )
-    await Deno.chmod(askPassPath, 0o700)
-
-    const gitEnv = {
-      GIT_ASKPASS: askPassPath,
-      GIT_TERMINAL_PROMPT: "0",
-      GITHUB_USERNAME: githubUsername,
-      GITHUB_TOKEN: githubToken,
-    }
     const git = (args: string[], cwd: string) =>
-      builder.exec("git", args, { cwd, env: gitEnv })
+      builder.exec("git", args, { cwd })
 
     await git(
       ["clone", "--depth", "1", K8S_CONFIG_REPO, "k8s-config"],
@@ -90,11 +68,8 @@ esac
       throw new Error(`git diff --quiet failed: ${diff.stderr}`)
     }
 
-    await git(["config", "user.name", githubUsername], repoDir)
-    await git(
-      ["config", "user.email", `${githubUsername}@users.noreply.github.com`],
-      repoDir,
-    )
+    await git(["config", "user.name", COMMIT_AUTHOR_NAME], repoDir)
+    await git(["config", "user.email", COMMIT_AUTHOR_EMAIL], repoDir)
     await git(["add", opts.kustomizationPath], repoDir)
     await git(["commit", "-m", opts.commitMessage], repoDir)
     await git(["push", "origin", "HEAD"], repoDir)
