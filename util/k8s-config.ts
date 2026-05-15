@@ -1,6 +1,7 @@
 import YAML from "yaml"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
+import { makeTempDir } from "~/util/temp.ts"
 
 const K8S_CONFIG_REPO = "git@github.com:divvun/k8s-config.git"
 const COMMIT_AUTHOR_NAME = "divvun-actions"
@@ -20,60 +21,57 @@ export type BumpKustomizeImageTagOptions = {
 export async function bumpKustomizeImageTag(
   opts: BumpKustomizeImageTagOptions,
 ): Promise<void> {
-  const tempDir = await Deno.makeTempDir({ prefix: "k8s-config-bump-" })
-  try {
-    const git = (args: string[], cwd: string) =>
-      builder.exec("git", args, { cwd })
+  await using tempDir = await makeTempDir({ prefix: "k8s-config-bump-" })
 
-    await git(
-      ["clone", "--depth", "1", K8S_CONFIG_REPO, "k8s-config"],
-      tempDir,
-    )
+  const git = (args: string[], cwd: string) =>
+    builder.exec("git", args, { cwd })
 
-    const repoDir = `${tempDir}/k8s-config`
-    const manifestPath = `${repoDir}/${opts.kustomizationPath}`
-    const source = await Deno.readTextFile(manifestPath)
-    const doc = YAML.parseDocument(source)
+  await git(
+    ["clone", "--depth", "1", K8S_CONFIG_REPO, "k8s-config"],
+    tempDir.path,
+  )
 
-    const images = doc.get("images") as YAML.YAMLSeq | null
-    if (!images || !YAML.isSeq(images)) {
-      throw new Error(`No images: sequence in ${opts.kustomizationPath}`)
-    }
-    const entry = images.items.find((item) =>
-      YAML.isMap(item) && item.get("name") === opts.imageName
-    ) as YAML.YAMLMap | undefined
-    if (!entry) {
-      throw new Error(
-        `No images entry for ${opts.imageName} in ${opts.kustomizationPath}`,
-      )
-    }
-    entry.set("newTag", opts.tag)
-    entry.delete("digest")
+  const repoDir = `${tempDir.path}/k8s-config`
+  const manifestPath = `${repoDir}/${opts.kustomizationPath}`
+  const source = await Deno.readTextFile(manifestPath)
+  const doc = YAML.parseDocument(source)
 
-    await Deno.writeTextFile(manifestPath, String(doc))
-
-    const diff = await builder.output("git", [
-      "diff",
-      "--quiet",
-      "--",
-      opts.kustomizationPath,
-    ], { cwd: repoDir })
-    if (diff.status.code === 0) {
-      logger.info(
-        `${opts.imageName} already at ${opts.tag} in ${opts.kustomizationPath}`,
-      )
-      return
-    }
-    if (diff.status.code !== 1) {
-      throw new Error(`git diff --quiet failed: ${diff.stderr}`)
-    }
-
-    await git(["config", "user.name", COMMIT_AUTHOR_NAME], repoDir)
-    await git(["config", "user.email", COMMIT_AUTHOR_EMAIL], repoDir)
-    await git(["add", opts.kustomizationPath], repoDir)
-    await git(["commit", "-m", opts.commitMessage], repoDir)
-    await git(["push", "origin", "HEAD"], repoDir)
-  } finally {
-    await Deno.remove(tempDir, { recursive: true })
+  const images = doc.get("images") as YAML.YAMLSeq | null
+  if (!images || !YAML.isSeq(images)) {
+    throw new Error(`No images: sequence in ${opts.kustomizationPath}`)
   }
+  const entry = images.items.find((item) =>
+    YAML.isMap(item) && item.get("name") === opts.imageName
+  ) as YAML.YAMLMap | undefined
+  if (!entry) {
+    throw new Error(
+      `No images entry for ${opts.imageName} in ${opts.kustomizationPath}`,
+    )
+  }
+  entry.set("newTag", opts.tag)
+  entry.delete("digest")
+
+  await Deno.writeTextFile(manifestPath, String(doc))
+
+  const diff = await builder.output("git", [
+    "diff",
+    "--quiet",
+    "--",
+    opts.kustomizationPath,
+  ], { cwd: repoDir })
+  if (diff.status.code === 0) {
+    logger.info(
+      `${opts.imageName} already at ${opts.tag} in ${opts.kustomizationPath}`,
+    )
+    return
+  }
+  if (diff.status.code !== 1) {
+    throw new Error(`git diff --quiet failed: ${diff.stderr}`)
+  }
+
+  await git(["config", "user.name", COMMIT_AUTHOR_NAME], repoDir)
+  await git(["config", "user.email", COMMIT_AUTHOR_EMAIL], repoDir)
+  await git(["add", opts.kustomizationPath], repoDir)
+  await git(["commit", "-m", opts.commitMessage], repoDir)
+  await git(["push", "origin", "HEAD"], repoDir)
 }
