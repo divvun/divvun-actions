@@ -30,7 +30,11 @@ import {
   pipelineDivvunActions,
   runDivvunActionsBuildImage,
 } from "./pipelines/divvun-actions.ts"
-import { pipelineBorealium, runBorealiumDeploy } from "./pipelines/borealium.ts"
+import {
+  pipelineBorealium,
+  runBorealiumBumpManifest,
+  runBorealiumDeploy,
+} from "./pipelines/borealium.ts"
 import {
   pipelineKeyboardViewer,
   runKeyboardViewerBuild,
@@ -339,6 +343,10 @@ async function runPipeline(args: any) {
     }
     case "borealium-deploy": {
       await runBorealiumDeploy()
+      break
+    }
+    case "borealium-bump-manifest": {
+      await runBorealiumBumpManifest()
       break
     }
     case "keyboard-viewer-lint": {
