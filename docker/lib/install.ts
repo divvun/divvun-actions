@@ -40,15 +40,14 @@ export type DownloadAndExtractOpts = {
     /** Destination file (absolute). */
     to: string
   }
-  /** `tar.gz`, `tgz`, `zip`, `txz`, `tar.xz`, `deb`. Defaults based on URL suffix. */
-  kind?: "tar.gz" | "tgz" | "zip" | "txz" | "tar.xz" | "deb"
+  /** Archive format. Inferred from the URL suffix if omitted. */
+  kind?: "tar.gz" | "tar.xz" | "zip" | "deb"
 }
 
-function inferKind(url: string): DownloadAndExtractOpts["kind"] {
+function inferKind(url: string): NonNullable<DownloadAndExtractOpts["kind"]> {
   if (url.endsWith(".tar.gz") || url.endsWith(".tgz")) return "tar.gz"
+  if (url.endsWith(".tar.xz") || url.endsWith(".txz")) return "tar.xz"
   if (url.endsWith(".zip")) return "zip"
-  if (url.endsWith(".txz")) return "txz"
-  if (url.endsWith(".tar.xz")) return "tar.xz"
   if (url.endsWith(".deb")) return "deb"
   throw new Error(`Cannot infer archive kind from URL: ${url}`)
 }
@@ -64,14 +63,7 @@ export function downloadAndExtractLinux(
     throw new Error("downloadAndExtractLinux called on windows")
   }
   const kind = opts.kind ?? inferKind(opts.url)
-  const archiveName = {
-    "tar.gz": "archive.tar.gz",
-    "tgz": "archive.tgz",
-    "zip": "archive.zip",
-    "txz": "archive.txz",
-    "tar.xz": "archive.tar.xz",
-    "deb": "archive.deb",
-  }[kind]
+  const archiveName = `archive.${kind}`
 
   const lines: string[] = [`curl -fsSL "${opts.url}" -o ${archiveName}`]
 
@@ -100,11 +92,7 @@ function extractCmd(
 ): string {
   switch (kind) {
     case "tar.gz":
-    case "tgz":
-      return `tar -xzf ${archive} -C ${dest}`
     case "tar.xz":
-      return `tar -xf ${archive} -C ${dest}`
-    case "txz":
       return `bsdtar -xf ${archive} -C ${dest}`
     case "zip":
       return `unzip -q ${archive} -d ${dest}`

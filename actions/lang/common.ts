@@ -3,7 +3,58 @@ import * as fs from "@std/fs"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 
+const GTLEXTOOLS_SPEC = "git+https://github.com/divvun/GiellaLTLexTools"
+
+async function ensureGtlextoolsVenv(): Promise<void> {
+  const cacheRoot = Deno.env.get("BUILDKITE_PLUGIN_FS_CACHE_FOLDER") ??
+    path.join(
+      Deno.env.get("HOME") ?? "/tmp",
+      ".cache",
+      "divvun-actions",
+    )
+  const venvPath = path.join(cacheRoot, "gtlextools-venv")
+  const venvBin = path.join(venvPath, "bin")
+
+  if (!(await fs.exists(venvPath))) {
+    logger.info(`Creating gtlextools venv at ${venvPath}`)
+    await fs.ensureDir(cacheRoot)
+    const venv = new Deno.Command("uv", {
+      args: ["venv", venvPath],
+      stdout: "inherit",
+      stderr: "inherit",
+    }).spawn()
+    const code = (await venv.status).code
+    if (code !== 0) {
+      throw new Error(`uv venv failed with exit code ${code}`)
+    }
+  }
+
+  logger.info("Refreshing GiellaLTLexTools in cached venv")
+  const install = new Deno.Command("uv", {
+    args: [
+      "pip",
+      "install",
+      "--upgrade",
+      "--python",
+      path.join(venvBin, "python"),
+      GTLEXTOOLS_SPEC,
+    ],
+    stdout: "inherit",
+    stderr: "inherit",
+  }).spawn()
+  const code = (await install.status).code
+  if (code !== 0) {
+    throw new Error(
+      `uv pip install GiellaLTLexTools failed with exit code ${code}`,
+    )
+  }
+
+  builder.addPath(venvBin)
+}
+
 export async function setupGiellaCoreDependencies(): Promise<void> {
+  await ensureGtlextoolsVenv()
+
   // Check ../giella-core and ../shared-mul
   const giellaCorePath = path.join(Deno.cwd(), "..", "giella-core")
   if (await fs.exists(giellaCorePath)) {

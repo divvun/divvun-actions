@@ -246,11 +246,6 @@ ENV PATH="$VULKAN_SDK/bin:$PATH"
 # git-lfs init
 RUN git lfs install
 
-# pipx install GiellaLTLexTools (gtlemmatest, gtspelltest, ...)
-ARG GIELLALTLEXTOOLS_CACHE_BUST=0
-RUN pipx install git+https://github.com/divvun/GiellaLTLexTools
-ENV PATH="/root/.local/bin:$PATH"
-
 # Buildkite fs-cache folder
 RUN mkdir -p $BUILDKITE_PLUGIN_FS_CACHE_FOLDER
 
