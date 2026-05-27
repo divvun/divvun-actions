@@ -4,9 +4,17 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
 import { GitHub } from "~/util/github.ts"
-import { Tar, Zip } from "~/util/shared.ts"
+import { Tar, versionAsDev, Zip } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
+
+// Feature flags. Flip back to true when these flows are ready.
+const PLAYGROUND_ENABLED = false
+const MUSL_ENABLED = false
+
+function isMuslEnabled(t: string): boolean {
+  return MUSL_ENABLED || !t.includes("-musl")
+}
 
 // Main branch builds all targets for testing
 const MAIN_TARGETS = [
@@ -66,11 +74,16 @@ function os(target: string): string {
 
 export async function pipelineDivvunRuntime() {
   // Use release targets if building a tag, otherwise main targets
-  const isRelease = builder.env.tag && builder.env.tag.match(/^v/)
-  const cliTargets = isRelease ? CLI_RELEASE_TARGETS : MAIN_TARGETS
-  const playgroundTargets = isRelease
-    ? PLAYGROUND_RELEASE_TARGETS
-    : MAIN_TARGETS
+  const isRelease = !!builder.env.tag?.match(/^v/)
+  const isMainBranch = builder.env.branch === "main"
+  const cliTargets = (isRelease ? CLI_RELEASE_TARGETS : MAIN_TARGETS).filter(
+    isMuslEnabled,
+  )
+  const playgroundTargets = !PLAYGROUND_ENABLED
+    ? []
+    : (isRelease ? PLAYGROUND_RELEASE_TARGETS : MAIN_TARGETS).filter(
+      isMuslEnabled,
+    )
 
   // Load version from Cargo.toml
   const cargoTomlText = await Deno.readTextFile("Cargo.toml")
@@ -273,25 +286,40 @@ export async function pipelineDivvunRuntime() {
     }
   }
 
-  const pipeline: BuildkitePipeline = {
-    steps: [
-      {
-        group: "Build",
-        key: "build",
-        steps: [...uiBuildSteps, ...buildSteps, ...libBuildSteps],
-      },
-    ],
+  const groups: BuildkitePipeline["steps"] = [
+    {
+      group: "CLI",
+      key: "cli",
+      steps: buildSteps,
+    },
+    {
+      group: "Static libs",
+      key: "lib",
+      steps: libBuildSteps,
+    },
+  ]
+
+  if (PLAYGROUND_ENABLED && uiBuildSteps.length > 0) {
+    groups.push({
+      group: "Playground",
+      key: "playground",
+      steps: uiBuildSteps,
+    })
   }
 
-  if (builder.env.tag && builder.env.tag.match(/^v/)) {
+  const pipeline: BuildkitePipeline = { steps: groups }
+
+  if (isRelease || isMainBranch) {
+    const publishDeps = ["cli", "lib"]
+    if (PLAYGROUND_ENABLED && uiBuildSteps.length > 0) {
+      publishDeps.push("playground")
+    }
     pipeline.steps.push(
       command({
-        label: "Publish",
+        label: `Publish (${isRelease ? "Release" : "Dev"})`,
         command: "divvun-actions run divvun-runtime-publish",
-        agents: {
-          queue: "linux",
-        },
-        depends_on: "build",
+        agents: { queue: "linux" },
+        depends_on: publishDeps,
       }),
     )
   }
@@ -300,26 +328,58 @@ export async function pipelineDivvunRuntime() {
 }
 
 export async function runDivvunRuntimePublish() {
-  if (!builder.env.tag) {
-    throw new Error("No tag found, cannot publish")
+  const isRelease = !!builder.env.tag?.match(/^v/)
+  const isMainBranch = builder.env.branch === "main"
+
+  if (!isRelease && !isMainBranch) {
+    throw new Error(
+      "divvun-runtime-publish requires a version tag or main branch",
+    )
   }
 
   if (!builder.env.repo) {
     throw new Error("No repo found, cannot publish")
   }
 
+  // Resolve the publish version: tagged release uses the tag verbatim;
+  // dev-latest derives a semver-compliant version from Cargo.toml + the build
+  // timestamp + build number.
+  let version: string
+  if (isRelease) {
+    version = builder.env.tag!
+  } else {
+    const cargoTomlText = await Deno.readTextFile("Cargo.toml")
+    const versionMatch = cargoTomlText.match(/version\s*=\s*"(.*?)"/)
+    const cargoVersion = versionMatch?.[1]
+    if (typeof cargoVersion !== "string") {
+      throw new Error("Could not determine version from Cargo.toml")
+    }
+    version = `v${
+      versionAsDev(
+        cargoVersion,
+        builder.env.buildTimestamp,
+        builder.env.buildNumber,
+      )
+    }`
+  }
+
+  const cliPublishTargets = CLI_RELEASE_TARGETS.filter(isMuslEnabled)
+  const playgroundPublishTargets = PLAYGROUND_ENABLED
+    ? PLAYGROUND_RELEASE_TARGETS.filter(isMuslEnabled)
+    : []
+
   using tempDir = await makeTempDir()
 
   // Download CLI artifacts
   await Promise.all(
-    CLI_RELEASE_TARGETS.map((target) =>
+    cliPublishTargets.map((target) =>
       builder.downloadArtifacts(`divvun-runtime-${target}`, tempDir.path)
     ),
   )
 
   // Download playground artifacts
   await Promise.all(
-    PLAYGROUND_RELEASE_TARGETS.map((target) => {
+    playgroundPublishTargets.map((target) => {
       if (os(target) === "linux") {
         return builder.downloadArtifacts(
           `divvun-rt-playground-${target}.AppImage`,
@@ -337,14 +397,14 @@ export async function runDivvunRuntimePublish() {
 
   const allArtifacts: string[] = []
 
-  // Move playground artifacts to archive path with tag
-  for (const target of PLAYGROUND_RELEASE_TARGETS) {
+  // Move playground artifacts to archive path with version suffix.
+  for (const target of playgroundPublishTargets) {
     if (os(target) === "linux") {
       const artifactName = `divvun-rt-playground-${target}.AppImage`
       const sourcePath = path.join(tempDir.path, artifactName)
       const destPath = path.join(
         archivePath.path,
-        `divvun-rt-playground-${target}_${builder.env.tag!}.AppImage`,
+        `divvun-rt-playground-${target}_${version}.AppImage`,
       )
       await fs.move(sourcePath, destPath, { overwrite: true })
       allArtifacts.push(destPath)
@@ -353,7 +413,7 @@ export async function runDivvunRuntimePublish() {
       const sourcePath = path.join(tempDir.path, artifactName)
       const destPath = path.join(
         archivePath.path,
-        `${artifactName}_${builder.env.tag!}.tar.gz`,
+        `${artifactName}_${version}.tar.gz`,
       )
       await fs.move(sourcePath, destPath, { overwrite: true })
       allArtifacts.push(destPath)
@@ -372,17 +432,17 @@ export async function runDivvunRuntimePublish() {
 
   for (const target of LIB_RELEASE_TARGETS) {
     const srcName = `libdivvun_runtime-${target}.tar.xz`
-    const destName = `libdivvun_runtime-${target}-${builder.env.tag!}.tar.xz`
+    const destName = `libdivvun_runtime-${target}-${version}.tar.xz`
     const sourcePath = path.join(tempDir.path, srcName)
     const destPath = path.join(archivePath.path, destName)
     await fs.move(sourcePath, destPath, { overwrite: true })
     allArtifacts.push(destPath)
   }
 
-  for (const target of CLI_RELEASE_TARGETS) {
+  for (const target of cliPublishTargets) {
     const ext = target.includes("windows") ? "zip" : "tgz"
-    const outPath = `${archivePath.path}/divvun-runtime-${target}-${builder.env
-      .tag!}.${ext}`
+    const outPath =
+      `${archivePath.path}/divvun-runtime-${target}-${version}.${ext}`
     const inputPath = `${tempDir.path}/divvun-runtime-${target}${
       target.includes("windows") ? ".exe" : ""
     }`
@@ -391,8 +451,8 @@ export async function runDivvunRuntimePublish() {
       await Deno.chmod(inputPath, 0o755)
     }
 
-    const stagingDir = `divvun-runtime-${target}-${builder.env.tag!}`
-    await Deno.mkdir(`divvun-runtime-${target}-${builder.env.tag!}`)
+    const stagingDir = `divvun-runtime-${target}-${version}`
+    await Deno.mkdir(stagingDir)
     await Deno.copyFile(
       inputPath,
       `${stagingDir}/divvun-runtime${target.includes("windows") ? ".exe" : ""}`,
@@ -420,9 +480,17 @@ export async function runDivvunRuntimePublish() {
   await fs.move(signatureFile, signatureDest, { overwrite: true })
 
   const gh = new GitHub(builder.env.repo)
-  await gh.createRelease(
-    builder.env.tag!,
-    [`${archivePath.path}/*`],
-    { latest: true },
-  )
+  if (isRelease) {
+    await gh.createRelease(
+      builder.env.tag!,
+      [`${archivePath.path}/*`],
+      { latest: true },
+    )
+  } else {
+    await gh.updateRelease(
+      "dev-latest",
+      [`${archivePath.path}/*`],
+      { draft: false, prerelease: true, name: version },
+    )
+  }
 }
