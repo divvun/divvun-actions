@@ -1,0 +1,88 @@
+import * as path from "@std/path"
+import * as builder from "~/builder.ts"
+import { bundleLibreOfficeOutto } from "~/actions/divvunspell-libreoffice/bundle-outto.ts"
+import { download } from "~/util/download.ts"
+import logger from "~/util/log.ts"
+import { makeTempDir } from "~/util/temp.ts"
+import { versions } from "~/docker/versions.ts"
+import { resolveExtensionVersion } from "./version.ts"
+
+export type WindowsArch = "x86_64" | "aarch64"
+
+const ARCHS: WindowsArch[] = ["x86_64", "aarch64"]
+
+export function isWindowsArch(value: string): value is WindowsArch {
+  return (ARCHS as string[]).includes(value)
+}
+
+function targetTriple(arch: WindowsArch): string {
+  return `${arch}-pc-windows-msvc`
+}
+
+function oxtArtifact(arch: WindowsArch): string {
+  return `divvunspell-libreoffice-windows-${arch}.oxt`
+}
+
+function installerArtifact(arch: WindowsArch): string {
+  return `divvunspell-libreoffice-windows-${arch}.exe`
+}
+
+export async function runLibreOfficeExtensionWindowsOxt(arch: WindowsArch) {
+  const runtimeVersion = versions.divvunRuntime
+  const target = targetTriple(arch)
+  using stage = await makeTempDir({ prefix: "divvun-runtime-lib-" })
+
+  await builder.group("Downloading divvun-runtime static lib", async () => {
+    const archiveName = `libdivvun_runtime-${target}-v${runtimeVersion}.tar.xz`
+    const url =
+      `https://github.com/divvun/divvun-runtime/releases/download/v${runtimeVersion}/${archiveName}`
+    const archivePath = await download(url, { path: stage.path })
+    await builder.exec("bsdtar", ["-xJf", archivePath, "-C", stage.path])
+  })
+
+  const outputPath = path.resolve(oxtArtifact(arch))
+  const libRoot = path.join(stage.path, `libdivvun_runtime-${target}`)
+
+  await builder.group("Building .oxt", async () => {
+    await builder.exec("pwsh", ["-File", "./make-oxt-windows.ps1"], {
+      env: {
+        DIVVUN_RUNTIME_LIB: libRoot,
+        TARGET: target,
+        OUTPUT_OXT: outputPath,
+      },
+    })
+  })
+
+  await builder.group("Uploading .oxt", async () => {
+    await builder.uploadArtifacts(outputPath)
+  })
+}
+
+export async function runLibreOfficeExtensionWindowsInstaller(
+  arch: WindowsArch,
+) {
+  using tempDir = await makeTempDir({ prefix: "lo-win-installer-" })
+
+  const oxtName = oxtArtifact(arch)
+  await builder.group("Downloading .oxt", async () => {
+    await builder.downloadArtifacts(oxtName, tempDir.path)
+  })
+
+  const oxtPath = path.join(tempDir.path, oxtName)
+  const version = await resolveExtensionVersion()
+  const installerPath = path.resolve(installerArtifact(arch))
+
+  await builder.group("Building outto installer", async () => {
+    const result = await bundleLibreOfficeOutto({
+      platform: "windows",
+      oxtPath,
+      version,
+      outputPath: installerPath,
+    })
+    logger.info(`outto produced ${result.payloadPath}`)
+  })
+
+  await builder.group("Uploading installer", async () => {
+    await builder.uploadArtifacts(installerPath)
+  })
+}

@@ -12,9 +12,11 @@ import { createSignedChecksums } from "~/util/hash.ts"
 const MAIN_TARGETS = [
   "aarch64-unknown-linux-musl",
   "x86_64-unknown-linux-musl",
+  "x86_64-unknown-linux-gnu",
   "aarch64-pc-windows-msvc",
   "x86_64-pc-windows-msvc",
   "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
   "aarch64-apple-ios",
 ]
 
@@ -23,6 +25,16 @@ const CLI_RELEASE_TARGETS = [
   // "aarch64-unknown-linux-musl",
   "x86_64-unknown-linux-musl",
   "aarch64-apple-darwin",
+]
+
+// Static library release targets. Static libs are consumed by downstream
+// builds (e.g. divvunspell-libreoffice) that link divvun-runtime in-process.
+const LIB_RELEASE_TARGETS = [
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+  "aarch64-pc-windows-msvc",
+  "x86_64-unknown-linux-gnu",
 ]
 
 // Playground release targets (just Apple Darwin for now)
@@ -139,6 +151,60 @@ export async function pipelineDivvunRuntime() {
     }
   }
 
+  // Static lib builds — always run for all five lib targets so failures are
+  // surfaced on every build. Packaged on publish.
+  const libBuildSteps: CommandStep[] = []
+
+  for (const target of LIB_RELEASE_TARGETS) {
+    const artifactName = `libdivvun_runtime-${target}.tar.xz`
+    const stageDir = `libdivvun_runtime-${target}`
+
+    if (target.includes("apple")) {
+      libBuildSteps.push(command({
+        label: `lib-build-${target}`,
+        key: `lib-build-${target}`,
+        command: [
+          `./x build-lib --target ${target}`,
+          `mkdir -p ${stageDir}`,
+          `cp target/${target}/release/libdivvun_runtime.a ${stageDir}/`,
+          `cp target/${target}/release/divvun_runtime.h ${stageDir}/`,
+          `tar -cJf ${artifactName} ${stageDir}`,
+          `buildkite-agent artifact upload ${artifactName}`,
+        ],
+        agents: { queue: "macos" },
+      }))
+    } else if (os(target) === "windows") {
+      const llvmArch = target.includes("aarch64") ? "ARM64" : "x64"
+      libBuildSteps.push(command({
+        label: `lib-build-${target}`,
+        key: `lib-build-${target}`,
+        command: [
+          `$$env:PATH = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; .\\x.ps1 build-lib --target ${target}`,
+          `New-Item -ItemType Directory -Force -Path ${stageDir} | Out-Null`,
+          `Copy-Item target/${target}/release/divvun_runtime.lib ${stageDir}/`,
+          `Copy-Item target/${target}/release/divvun_runtime.h ${stageDir}/`,
+          `bsdtar -cJf ${artifactName} ${stageDir}`,
+          `buildkite-agent artifact upload ${artifactName}`,
+        ],
+        agents: { queue: "windows" },
+      }))
+    } else {
+      libBuildSteps.push(command({
+        label: `lib-build-${target}`,
+        key: `lib-build-${target}`,
+        command: [
+          `./x build-lib --target ${target}`,
+          `mkdir -p ${stageDir}`,
+          `cp target/${target}/release/libdivvun_runtime.a ${stageDir}/`,
+          `cp target/${target}/release/divvun_runtime.h ${stageDir}/`,
+          `tar -cJf ${artifactName} ${stageDir}`,
+          `buildkite-agent artifact upload ${artifactName}`,
+        ],
+        agents: { queue: "linux" },
+      }))
+    }
+  }
+
   const uiBuildSteps: CommandStep[] = []
 
   for (const target of playgroundTargets) {
@@ -212,7 +278,7 @@ export async function pipelineDivvunRuntime() {
       {
         group: "Build",
         key: "build",
-        steps: [...uiBuildSteps, ...buildSteps],
+        steps: [...uiBuildSteps, ...buildSteps, ...libBuildSteps],
       },
     ],
   }
@@ -292,6 +358,25 @@ export async function runDivvunRuntimePublish() {
       await fs.move(sourcePath, destPath, { overwrite: true })
       allArtifacts.push(destPath)
     }
+  }
+
+  // Download static libs and rename with version suffix.
+  await Promise.all(
+    LIB_RELEASE_TARGETS.map((target) =>
+      builder.downloadArtifacts(
+        `libdivvun_runtime-${target}.tar.xz`,
+        tempDir.path,
+      )
+    ),
+  )
+
+  for (const target of LIB_RELEASE_TARGETS) {
+    const srcName = `libdivvun_runtime-${target}.tar.xz`
+    const destName = `libdivvun_runtime-${target}-${builder.env.tag!}.tar.xz`
+    const sourcePath = path.join(tempDir.path, srcName)
+    const destPath = path.join(archivePath.path, destName)
+    await fs.move(sourcePath, destPath, { overwrite: true })
+    allArtifacts.push(destPath)
   }
 
   for (const target of CLI_RELEASE_TARGETS) {

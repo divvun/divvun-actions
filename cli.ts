@@ -82,6 +82,16 @@ import {
   runDonateSpeechDeployWindows,
 } from "./pipelines/donate-speech/mod.ts"
 import {
+  pipelineLibreOfficeExtension,
+  runLibreOfficeExtensionLinuxOxt,
+  runLibreOfficeExtensionMacosInstaller,
+  runLibreOfficeExtensionMacosOxt,
+  runLibreOfficeExtensionPublish,
+  runLibreOfficeExtensionWindowsInstaller,
+  runLibreOfficeExtensionWindowsOxt,
+} from "./pipelines/divvunspell-libreoffice/mod.ts"
+import { isWindowsArch } from "./pipelines/divvunspell-libreoffice/windows.ts"
+import {
   pipelinePdfStrings,
   runPdfStringsPublish,
 } from "./pipelines/pdf-strings/mod.ts"
@@ -417,6 +427,42 @@ async function runPipeline(args: any) {
       await runDonateSpeechDeployWindows()
       break
     }
+    case "libreoffice-extension-build-oxt-macos": {
+      await runLibreOfficeExtensionMacosOxt()
+      break
+    }
+    case "libreoffice-extension-installer-macos": {
+      await runLibreOfficeExtensionMacosInstaller()
+      break
+    }
+    case "libreoffice-extension-build-oxt-linux": {
+      await runLibreOfficeExtensionLinuxOxt()
+      break
+    }
+    case "libreoffice-extension-build-oxt-windows": {
+      const arch = String(args._[1] ?? "")
+      if (!isWindowsArch(arch)) {
+        throw new Error(
+          `Usage: libreoffice-extension-build-oxt-windows <x86_64|aarch64>`,
+        )
+      }
+      await runLibreOfficeExtensionWindowsOxt(arch)
+      break
+    }
+    case "libreoffice-extension-installer-windows": {
+      const arch = String(args._[1] ?? "")
+      if (!isWindowsArch(arch)) {
+        throw new Error(
+          `Usage: libreoffice-extension-installer-windows <x86_64|aarch64>`,
+        )
+      }
+      await runLibreOfficeExtensionWindowsInstaller(arch)
+      break
+    }
+    case "libreoffice-extension-publish": {
+      await runLibreOfficeExtensionPublish()
+      break
+    }
     case "debug": {
       logger.info("Environment:")
       logger.info(JSON.stringify(builder.env, null, 2))
@@ -590,6 +636,10 @@ async function runCi(_args: any) {
     }
     case "Kielipankki-donatespeech-app": {
       pipeline = pipelineDonateSpeech()
+      break
+    }
+    case "divvunspell-libreoffice": {
+      pipeline = pipelineLibreOfficeExtension()
       break
     }
     case "static-lib-build": {
