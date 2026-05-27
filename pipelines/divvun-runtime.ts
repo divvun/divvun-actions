@@ -24,7 +24,6 @@ const MAIN_TARGETS = [
   "aarch64-pc-windows-msvc",
   "x86_64-pc-windows-msvc",
   "aarch64-apple-darwin",
-  "aarch64-apple-ios",
 ]
 
 // CLI release targets
