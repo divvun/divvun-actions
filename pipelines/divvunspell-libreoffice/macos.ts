@@ -1,48 +1,39 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { bundleLibreOfficeOutto } from "~/actions/divvunspell-libreoffice/bundle-outto.ts"
-import { download } from "~/util/download.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
-import { versions } from "~/docker/versions.ts"
 import { resolveExtensionVersion } from "./version.ts"
+import { downloadDivvunRuntimeLib } from "./runtime-dep.ts"
 
 const OXT_ARTIFACT = "divvunspell-libreoffice-macos.oxt"
 const INSTALLER_ARTIFACT = "divvunspell-libreoffice-macos.app.zip"
 
 export async function runLibreOfficeExtensionMacosOxt() {
-  const runtimeVersion = versions.divvunRuntime
+  const target = "aarch64-apple-darwin"
   using stage = await makeTempDir({ prefix: "divvun-runtime-lib-" })
 
-  const archEnv: Record<string, string> = {}
-  for (const arch of ["aarch64", "x86_64"] as const) {
-    const targetTriple = `${arch}-apple-darwin`
-    const archiveName =
-      `libdivvun_runtime-${targetTriple}-v${runtimeVersion}.tar.xz`
-    const url =
-      `https://github.com/divvun/divvun-runtime/releases/download/v${runtimeVersion}/${archiveName}`
+  await builder.group("Downloading divvun-runtime lib", async () => {
+    const archivePath = await downloadDivvunRuntimeLib(target, stage.path)
+    await builder.exec("tar", ["-xJf", archivePath, "-C", stage.path])
+  })
 
-    await builder.group(`Downloading divvun-runtime (${arch})`, async () => {
-      const archivePath = await download(url, { path: stage.path })
-      await builder.exec("tar", ["-xJf", archivePath, "-C", stage.path])
-    })
-
-    archEnv[`DIVVUN_RUNTIME_LIB_${arch.toUpperCase()}`] = path.join(
-      stage.path,
-      `libdivvun_runtime-${targetTriple}`,
-    )
-  }
-
-  const outputPath = path.resolve(OXT_ARTIFACT)
+  const extracted = path.join(stage.path, `libdivvun_runtime-${target}`)
+  const fakeRuntimeDir = await buildFakeRuntimeDir(stage.path)
 
   await builder.group("Building .oxt", async () => {
     await builder.exec("./make-oxt-macos.sh", [], {
-      env: { ...archEnv, OUTPUT_OXT: outputPath },
+      env: {
+        DIVVUN_RUNTIME_DIR: fakeRuntimeDir,
+        RUNTIME_LIB: path.join(extracted, "lib"),
+        RUNTIME_INC: path.join(extracted, "include"),
+      },
     })
   })
 
   await builder.group("Uploading .oxt", async () => {
-    await builder.uploadArtifacts(outputPath)
+    await Deno.rename("macos.oxt", OXT_ARTIFACT)
+    await builder.uploadArtifacts(OXT_ARTIFACT)
   })
 }
 
@@ -80,4 +71,16 @@ export async function runLibreOfficeExtensionMacosInstaller() {
     ])
     await builder.uploadArtifacts(archivePath)
   })
+}
+
+// The outer make-oxt-*.sh scripts always invoke `$DIVVUN_RUNTIME_DIR/x
+// build-lib` even when RUNTIME_LIB is overridden, so we need a directory with
+// an executable `x` stub that exits 0 to satisfy the script's preflight.
+async function buildFakeRuntimeDir(stageRoot: string): Promise<string> {
+  const dir = path.join(stageRoot, "divvun-runtime-stub")
+  await Deno.mkdir(dir, { recursive: true })
+  const xPath = path.join(dir, "x")
+  await Deno.writeTextFile(xPath, "#!/bin/sh\nexit 0\n")
+  await Deno.chmod(xPath, 0o755)
+  return dir
 }

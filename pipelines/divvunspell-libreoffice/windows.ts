@@ -1,11 +1,10 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { bundleLibreOfficeOutto } from "~/actions/divvunspell-libreoffice/bundle-outto.ts"
-import { download } from "~/util/download.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
-import { versions } from "~/docker/versions.ts"
 import { resolveExtensionVersion } from "./version.ts"
+import { downloadDivvunRuntimeLib } from "./runtime-dep.ts"
 
 export type WindowsArch = "x86_64" | "aarch64"
 
@@ -28,33 +27,34 @@ function installerArtifact(arch: WindowsArch): string {
 }
 
 export async function runLibreOfficeExtensionWindowsOxt(arch: WindowsArch) {
-  const runtimeVersion = versions.divvunRuntime
   const target = targetTriple(arch)
   using stage = await makeTempDir({ prefix: "divvun-runtime-lib-" })
 
-  await builder.group("Downloading divvun-runtime static lib", async () => {
-    const archiveName = `libdivvun_runtime-${target}-v${runtimeVersion}.tar.xz`
-    const url =
-      `https://github.com/divvun/divvun-runtime/releases/download/v${runtimeVersion}/${archiveName}`
-    const archivePath = await download(url, { path: stage.path })
+  await builder.group("Downloading divvun-runtime lib", async () => {
+    const archivePath = await downloadDivvunRuntimeLib(target, stage.path)
     await builder.exec("bsdtar", ["-xJf", archivePath, "-C", stage.path])
   })
 
-  const outputPath = path.resolve(oxtArtifact(arch))
-  const libRoot = path.join(stage.path, `libdivvun_runtime-${target}`)
+  const extracted = path.join(stage.path, `libdivvun_runtime-${target}`)
 
   await builder.group("Building .oxt", async () => {
-    await builder.exec("pwsh", ["-File", "./make-oxt-windows.ps1"], {
-      env: {
-        DIVVUN_RUNTIME_LIB: libRoot,
-        TARGET: target,
-        OUTPUT_OXT: outputPath,
+    // -SkipRuntimeBuild bypasses the build.ps1 lookup; we supply prebuilt libs
+    // via RUNTIME_LIB / RUNTIME_INC.
+    await builder.exec(
+      "pwsh",
+      ["-File", "./make-oxt-windows.ps1", "-SkipRuntimeBuild"],
+      {
+        env: {
+          RUNTIME_LIB: path.join(extracted, "lib"),
+          RUNTIME_INC: path.join(extracted, "include"),
+        },
       },
-    })
+    )
   })
 
   await builder.group("Uploading .oxt", async () => {
-    await builder.uploadArtifacts(outputPath)
+    await Deno.rename("windows.oxt", oxtArtifact(arch))
+    await builder.uploadArtifacts(oxtArtifact(arch))
   })
 }
 
