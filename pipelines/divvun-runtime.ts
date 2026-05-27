@@ -179,7 +179,7 @@ export async function pipelineDivvunRuntime() {
         command: [
           `./x build-lib --target ${target}`,
           `mkdir -p ${stageDir}/lib ${stageDir}/include`,
-          `cp target/${target}/release/libdivvun_runtime_ffi.dylib ${stageDir}/lib/`,
+          `cp target/${target}/release/libdivvun_runtime.dylib ${stageDir}/lib/`,
           `cp target/${target}/release/libdivvun_runtime.a ${stageDir}/lib/`,
           `cp bindings/c/divvun_runtime.h ${stageDir}/include/`,
           `tar -cJf ${artifactName} ${stageDir}`,
@@ -198,8 +198,8 @@ export async function pipelineDivvunRuntime() {
           `$$env:PATH = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; .\\x.ps1 build-lib --target ${target}`,
           `New-Item -ItemType Directory -Force -Path ${stageDir}/lib | Out-Null`,
           `New-Item -ItemType Directory -Force -Path ${stageDir}/include | Out-Null`,
-          `Copy-Item target/${target}/release/divvun_runtime_ffi.dll ${stageDir}/lib/`,
-          `Copy-Item target/${target}/release/divvun_runtime_ffi.dll.lib ${stageDir}/lib/`,
+          `Copy-Item target/${target}/release/divvun_runtime.dll ${stageDir}/lib/`,
+          `Copy-Item target/${target}/release/divvun_runtime.dll.lib ${stageDir}/lib/`,
           `Copy-Item target/${target}/release/divvun_runtime.lib ${stageDir}/lib/`,
           `Copy-Item bindings/c/divvun_runtime.h ${stageDir}/include/`,
           `bsdtar -cJf ${artifactName} ${stageDir}`,
@@ -216,7 +216,7 @@ export async function pipelineDivvunRuntime() {
         command: [
           `./x build-lib --target ${target}`,
           `mkdir -p ${stageDir}/lib ${stageDir}/include`,
-          `cp target/${target}/release/libdivvun_runtime_ffi.so ${stageDir}/lib/`,
+          `cp target/${target}/release/libdivvun_runtime.so ${stageDir}/lib/`,
           `cp target/${target}/release/libdivvun_runtime.a ${stageDir}/lib/`,
           `cp bindings/c/divvun_runtime.h ${stageDir}/include/`,
           `tar -cJf ${artifactName} ${stageDir}`,
