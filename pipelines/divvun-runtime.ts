@@ -24,7 +24,6 @@ const MAIN_TARGETS = [
   "aarch64-pc-windows-msvc",
   "x86_64-pc-windows-msvc",
   "aarch64-apple-darwin",
-  "x86_64-apple-darwin",
   "aarch64-apple-ios",
 ]
 
@@ -40,7 +39,6 @@ const CLI_RELEASE_TARGETS = [
 // pick whichever they need.
 const LIB_RELEASE_TARGETS = [
   "aarch64-apple-darwin",
-  "x86_64-apple-darwin",
   "x86_64-pc-windows-msvc",
   "aarch64-pc-windows-msvc",
   "x86_64-unknown-linux-gnu",
@@ -184,7 +182,7 @@ export async function pipelineDivvunRuntime() {
           `mkdir -p ${stageDir}/lib ${stageDir}/include`,
           `cp target/${target}/release/libdivvun_runtime.dylib ${stageDir}/lib/`,
           `cp target/${target}/release/libdivvun_runtime.a ${stageDir}/lib/`,
-          `cp target/${target}/release/divvun_runtime.h ${stageDir}/include/`,
+          `cp bindings/c/divvun_runtime.h ${stageDir}/include/`,
           `tar -cJf ${artifactName} ${stageDir}`,
           `buildkite-agent artifact upload ${artifactName}`,
         ],
@@ -201,7 +199,7 @@ export async function pipelineDivvunRuntime() {
           `New-Item -ItemType Directory -Force -Path ${stageDir}/include | Out-Null`,
           `Copy-Item target/${target}/release/divvun_runtime.dll ${stageDir}/lib/`,
           `Copy-Item target/${target}/release/divvun_runtime*.lib ${stageDir}/lib/`,
-          `Copy-Item target/${target}/release/divvun_runtime.h ${stageDir}/include/`,
+          `Copy-Item bindings/c/divvun_runtime.h ${stageDir}/include/`,
           `bsdtar -cJf ${artifactName} ${stageDir}`,
           `buildkite-agent artifact upload ${artifactName}`,
         ],
@@ -216,7 +214,7 @@ export async function pipelineDivvunRuntime() {
           `mkdir -p ${stageDir}/lib ${stageDir}/include`,
           `cp target/${target}/release/libdivvun_runtime.so ${stageDir}/lib/`,
           `cp target/${target}/release/libdivvun_runtime.a ${stageDir}/lib/`,
-          `cp target/${target}/release/divvun_runtime.h ${stageDir}/include/`,
+          `cp bindings/c/divvun_runtime.h ${stageDir}/include/`,
           `tar -cJf ${artifactName} ${stageDir}`,
           `buildkite-agent artifact upload ${artifactName}`,
         ],
