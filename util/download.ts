@@ -33,13 +33,18 @@ export async function download(url: string, options: {
       throw new Error(`Process exited with code ${status.code}`)
     }
   } else {
+    // --fail turns HTTP >=400 into a non-zero exit; otherwise curl will
+    // happily write the error page (e.g. GitHub's "Not Found" stub) to the
+    // output file and the caller can't tell anything went wrong.
     const proc = new Deno.Command("curl", {
-      args: ["-L", "-o", downloadPath, url],
+      args: ["--fail", "-L", "-o", downloadPath, url],
     })
     const status = await proc.spawn().status
 
     if (status.code !== 0) {
-      throw new Error(`Process exited with code ${status.code}`)
+      throw new Error(
+        `curl failed (exit ${status.code}) downloading ${url}`,
+      )
     }
   }
 
