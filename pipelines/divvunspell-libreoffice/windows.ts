@@ -37,6 +37,14 @@ export async function runLibreOfficeExtensionWindowsOxt(arch: WindowsArch) {
 
   const extracted = path.join(stage.path, `libdivvun_runtime-${target}`)
 
+  // Surface what's actually in the archive so build failures upstream of us
+  // (e.g. missing staticlib) are debuggable from the .oxt build log.
+  await builder.group("Inspecting extracted lib", async () => {
+    for await (const entry of Deno.readDir(path.join(extracted, "lib"))) {
+      logger.info(`lib/${entry.name}`)
+    }
+  })
+
   await builder.group("Building .oxt", async () => {
     await builder.exec(
       "pwsh",
