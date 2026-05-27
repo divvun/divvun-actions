@@ -38,11 +38,9 @@ export async function runLibreOfficeExtensionWindowsOxt(arch: WindowsArch) {
   const extracted = path.join(stage.path, `libdivvun_runtime-${target}`)
 
   await builder.group("Building .oxt", async () => {
-    // -SkipRuntimeBuild bypasses the build.ps1 lookup; we supply prebuilt libs
-    // via RUNTIME_LIB / RUNTIME_INC.
     await builder.exec(
       "pwsh",
-      ["-File", "./make-oxt-windows.ps1", "-SkipRuntimeBuild"],
+      ["-File", "./make-oxt-windows.ps1"],
       {
         env: {
           RUNTIME_LIB: path.join(extracted, "lib"),
