@@ -37,9 +37,9 @@ import {
 } from "./pipelines/borealium.ts"
 import {
   pipelineKeyboardViewer,
-  runKeyboardViewerBuild,
+  runKeyboardViewerBumpManifest,
+  runKeyboardViewerDeploy,
   runKeyboardViewerLint,
-  runKeyboardViewerPush,
 } from "./pipelines/keyboard-viewer.ts"
 import {
   pipelineDict,
@@ -353,12 +353,12 @@ async function runPipeline(args: any) {
       await runKeyboardViewerLint()
       break
     }
-    case "keyboard-viewer-build": {
-      await runKeyboardViewerBuild()
+    case "keyboard-viewer-deploy": {
+      await runKeyboardViewerDeploy()
       break
     }
-    case "keyboard-viewer-push": {
-      await runKeyboardViewerPush()
+    case "keyboard-viewer-bump-manifest": {
+      await runKeyboardViewerBumpManifest()
       break
     }
     case "libpahkat-android": {

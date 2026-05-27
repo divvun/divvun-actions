@@ -1,6 +1,7 @@
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
+import { bumpArgoHelmImageTag } from "~/util/k8s-config.ts"
 
 function command(input: CommandStep): CommandStep {
   return {
@@ -22,19 +23,19 @@ export function pipelineKeyboardViewer(): BuildkitePipeline {
         agents: { queue: "linux" },
       }),
       command({
-        key: "build",
-        label: "Build",
-        command: "divvun-actions run keyboard-viewer-build",
+        key: "build-push",
+        label: "Build & Push",
+        command: "divvun-actions run keyboard-viewer-deploy",
         agents: { queue: "linux" },
+        branches: "main",
         depends_on: "lint",
       }),
       command({
-        key: "push",
-        label: "Push",
-        command: "divvun-actions run keyboard-viewer-push",
+        label: "Bump k8s app manifest",
+        command: "divvun-actions run keyboard-viewer-bump-manifest",
         agents: { queue: "linux" },
         branches: "main",
-        depends_on: "build",
+        depends_on: "build-push",
       }),
     ],
   }
@@ -47,18 +48,38 @@ export async function runKeyboardViewerLint() {
   await builder.exec("deno", ["check"])
 }
 
-export async function runKeyboardViewerBuild() {
+export async function runKeyboardViewerDeploy() {
+  const tag = `sha-${builder.env.commit}`
+
   await builder.exec("docker", [
     "build",
     "-t",
     "ghcr.io/divvun/keyboard-viewer:latest",
+    "-t",
+    `ghcr.io/divvun/keyboard-viewer:${tag}`,
     ".",
   ])
+
+  await builder.group("Pushing image", async () => {
+    await Promise.all([
+      builder.exec("docker", ["push", "ghcr.io/divvun/keyboard-viewer:latest"]),
+      builder.exec("docker", ["push", `ghcr.io/divvun/keyboard-viewer:${tag}`]),
+    ])
+  })
+
+  await builder.setMetadata("keyboard-viewer-tag", tag)
 }
 
-export async function runKeyboardViewerPush() {
-  await builder.exec("docker", [
-    "push",
-    "ghcr.io/divvun/keyboard-viewer:latest",
-  ])
+export async function runKeyboardViewerBumpManifest() {
+  const tag = (await builder.metadata("keyboard-viewer-tag")).trim()
+  if (tag.length === 0) {
+    throw new Error("Buildkite metadata keyboard-viewer-tag was empty")
+  }
+
+  await bumpArgoHelmImageTag({
+    imageName: "ghcr.io/divvun/keyboard-viewer",
+    tag,
+    applicationPath: "apps/services/keyboard-viewer-app.yaml",
+    commitMessage: `Update Keyboard Viewer image to ${tag}`,
+  })
 }
