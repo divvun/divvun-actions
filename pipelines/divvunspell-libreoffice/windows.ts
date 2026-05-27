@@ -3,6 +3,7 @@ import * as builder from "~/builder.ts"
 import { bundleLibreOfficeOutto } from "~/actions/divvunspell-libreoffice/bundle-outto.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
+import { execWithMsvcEnv, msvcArchFor } from "~/util/msvc-env.ts"
 import { resolveExtensionVersion } from "./version.ts"
 import { downloadDivvunRuntimeLib } from "./runtime-dep.ts"
 
@@ -46,16 +47,12 @@ export async function runLibreOfficeExtensionWindowsOxt(arch: WindowsArch) {
   })
 
   await builder.group("Building .oxt", async () => {
-    await builder.exec(
-      "pwsh",
-      ["-File", "./make-oxt-windows.ps1"],
-      {
-        env: {
-          RUNTIME_LIB: path.join(extracted, "lib"),
-          RUNTIME_INC: path.join(extracted, "include"),
-        },
+    await execWithMsvcEnv(msvcArchFor(target), "./make-oxt-windows.ps1", {
+      env: {
+        RUNTIME_LIB: path.join(extracted, "lib"),
+        RUNTIME_INC: path.join(extracted, "include"),
       },
-    )
+    })
   })
 
   await builder.group("Uploading .oxt", async () => {
