@@ -35,8 +35,9 @@ const CLI_RELEASE_TARGETS = [
   "aarch64-apple-darwin",
 ]
 
-// Static library release targets. Static libs are consumed by downstream
-// builds (e.g. divvunspell-libreoffice) that link divvun-runtime in-process.
+// Library release targets. Each artifact contains both the cdylib
+// (.dylib/.so/.dll) and the staticlib (.a/.lib) for the target — consumers
+// pick whichever they need.
 const LIB_RELEASE_TARGETS = [
   "aarch64-apple-darwin",
   "x86_64-apple-darwin",
@@ -164,8 +165,8 @@ export async function pipelineDivvunRuntime() {
     }
   }
 
-  // Static lib builds — always run for all five lib targets so failures are
-  // surfaced on every build. Packaged on publish.
+  // Library builds — always run for all five lib targets so failures are
+  // surfaced on every build. Each archive bundles cdylib + staticlib + header.
   const libBuildSteps: CommandStep[] = []
 
   for (const target of LIB_RELEASE_TARGETS) {
@@ -179,6 +180,7 @@ export async function pipelineDivvunRuntime() {
         command: [
           `./x build-lib --target ${target}`,
           `mkdir -p ${stageDir}`,
+          `cp target/${target}/release/libdivvun_runtime.dylib ${stageDir}/`,
           `cp target/${target}/release/libdivvun_runtime.a ${stageDir}/`,
           `cp target/${target}/release/divvun_runtime.h ${stageDir}/`,
           `tar -cJf ${artifactName} ${stageDir}`,
@@ -194,7 +196,8 @@ export async function pipelineDivvunRuntime() {
         command: [
           `$$env:PATH = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; .\\x.ps1 build-lib --target ${target}`,
           `New-Item -ItemType Directory -Force -Path ${stageDir} | Out-Null`,
-          `Copy-Item target/${target}/release/divvun_runtime.lib ${stageDir}/`,
+          `Copy-Item target/${target}/release/divvun_runtime.dll ${stageDir}/`,
+          `Copy-Item target/${target}/release/divvun_runtime*.lib ${stageDir}/`,
           `Copy-Item target/${target}/release/divvun_runtime.h ${stageDir}/`,
           `bsdtar -cJf ${artifactName} ${stageDir}`,
           `buildkite-agent artifact upload ${artifactName}`,
@@ -208,6 +211,7 @@ export async function pipelineDivvunRuntime() {
         command: [
           `./x build-lib --target ${target}`,
           `mkdir -p ${stageDir}`,
+          `cp target/${target}/release/libdivvun_runtime.so ${stageDir}/`,
           `cp target/${target}/release/libdivvun_runtime.a ${stageDir}/`,
           `cp target/${target}/release/divvun_runtime.h ${stageDir}/`,
           `tar -cJf ${artifactName} ${stageDir}`,
@@ -293,7 +297,7 @@ export async function pipelineDivvunRuntime() {
       steps: buildSteps,
     },
     {
-      group: "Static libs",
+      group: "Libs",
       key: "lib",
       steps: libBuildSteps,
     },
@@ -420,7 +424,7 @@ export async function runDivvunRuntimePublish() {
     }
   }
 
-  // Download static libs and rename with version suffix.
+  // Download libs and rename with version suffix.
   await Promise.all(
     LIB_RELEASE_TARGETS.map((target) =>
       builder.downloadArtifacts(
