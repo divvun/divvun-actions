@@ -166,7 +166,9 @@ export async function pipelineDivvunRuntime() {
   }
 
   // Library builds — always run for all five lib targets so failures are
-  // surfaced on every build. Each archive bundles cdylib + staticlib + header.
+  // surfaced on every build. Each archive lays out lib/ (cdylib + staticlib)
+  // and include/ (headers) so consumers can drop the contents straight into a
+  // sysroot-style prefix.
   const libBuildSteps: CommandStep[] = []
 
   for (const target of LIB_RELEASE_TARGETS) {
@@ -179,10 +181,10 @@ export async function pipelineDivvunRuntime() {
         key: `lib-build-${target}`,
         command: [
           `./x build-lib --target ${target}`,
-          `mkdir -p ${stageDir}`,
-          `cp target/${target}/release/libdivvun_runtime.dylib ${stageDir}/`,
-          `cp target/${target}/release/libdivvun_runtime.a ${stageDir}/`,
-          `cp target/${target}/release/divvun_runtime.h ${stageDir}/`,
+          `mkdir -p ${stageDir}/lib ${stageDir}/include`,
+          `cp target/${target}/release/libdivvun_runtime.dylib ${stageDir}/lib/`,
+          `cp target/${target}/release/libdivvun_runtime.a ${stageDir}/lib/`,
+          `cp target/${target}/release/divvun_runtime.h ${stageDir}/include/`,
           `tar -cJf ${artifactName} ${stageDir}`,
           `buildkite-agent artifact upload ${artifactName}`,
         ],
@@ -195,10 +197,11 @@ export async function pipelineDivvunRuntime() {
         key: `lib-build-${target}`,
         command: [
           `$$env:PATH = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; .\\x.ps1 build-lib --target ${target}`,
-          `New-Item -ItemType Directory -Force -Path ${stageDir} | Out-Null`,
-          `Copy-Item target/${target}/release/divvun_runtime.dll ${stageDir}/`,
-          `Copy-Item target/${target}/release/divvun_runtime*.lib ${stageDir}/`,
-          `Copy-Item target/${target}/release/divvun_runtime.h ${stageDir}/`,
+          `New-Item -ItemType Directory -Force -Path ${stageDir}/lib | Out-Null`,
+          `New-Item -ItemType Directory -Force -Path ${stageDir}/include | Out-Null`,
+          `Copy-Item target/${target}/release/divvun_runtime.dll ${stageDir}/lib/`,
+          `Copy-Item target/${target}/release/divvun_runtime*.lib ${stageDir}/lib/`,
+          `Copy-Item target/${target}/release/divvun_runtime.h ${stageDir}/include/`,
           `bsdtar -cJf ${artifactName} ${stageDir}`,
           `buildkite-agent artifact upload ${artifactName}`,
         ],
@@ -210,10 +213,10 @@ export async function pipelineDivvunRuntime() {
         key: `lib-build-${target}`,
         command: [
           `./x build-lib --target ${target}`,
-          `mkdir -p ${stageDir}`,
-          `cp target/${target}/release/libdivvun_runtime.so ${stageDir}/`,
-          `cp target/${target}/release/libdivvun_runtime.a ${stageDir}/`,
-          `cp target/${target}/release/divvun_runtime.h ${stageDir}/`,
+          `mkdir -p ${stageDir}/lib ${stageDir}/include`,
+          `cp target/${target}/release/libdivvun_runtime.so ${stageDir}/lib/`,
+          `cp target/${target}/release/libdivvun_runtime.a ${stageDir}/lib/`,
+          `cp target/${target}/release/divvun_runtime.h ${stageDir}/include/`,
           `tar -cJf ${artifactName} ${stageDir}`,
           `buildkite-agent artifact upload ${artifactName}`,
         ],
