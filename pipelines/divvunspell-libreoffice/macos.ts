@@ -61,6 +61,7 @@ export async function runLibreOfficeExtensionMacosInstaller() {
   })
 
   await builder.group("Archiving .app", async () => {
+    // ditto into the cwd so the buildkite artifact key is just the basename.
     const archivePath = path.resolve(INSTALLER_ARTIFACT)
     await builder.exec("ditto", [
       "-c",
@@ -69,7 +70,7 @@ export async function runLibreOfficeExtensionMacosInstaller() {
       payloadPath!,
       archivePath,
     ])
-    await builder.uploadArtifacts(archivePath)
+    await builder.uploadArtifacts(INSTALLER_ARTIFACT, { cwd: Deno.cwd() })
   })
 }
 
