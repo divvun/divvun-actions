@@ -33,8 +33,6 @@ const ARTIFACTS = [
   "divvunspell-libreoffice-linux-x86_64.oxt",
   "divvunspell-libreoffice-windows-x86_64.oxt",
   "divvunspell-libreoffice-windows-x86_64.exe",
-  "divvunspell-libreoffice-windows-aarch64.oxt",
-  "divvunspell-libreoffice-windows-aarch64.exe",
 ] as const
 
 export function pipelineLibreOfficeExtension(): BuildkitePipeline {
@@ -46,8 +44,6 @@ export function pipelineLibreOfficeExtension(): BuildkitePipeline {
   const linuxOxtKey = "build-oxt-linux"
   const winX64OxtKey = "build-oxt-windows-x86_64"
   const winX64InstallerKey = "installer-windows-x86_64"
-  const winArm64OxtKey = "build-oxt-windows-aarch64"
-  const winArm64InstallerKey = "installer-windows-aarch64"
 
   const publishDeps = [
     macosOxtKey,
@@ -55,8 +51,6 @@ export function pipelineLibreOfficeExtension(): BuildkitePipeline {
     linuxOxtKey,
     winX64OxtKey,
     winX64InstallerKey,
-    winArm64OxtKey,
-    winArm64InstallerKey,
   ]
 
   const steps: BuildkitePipeline["steps"] = [
@@ -90,7 +84,7 @@ export function pipelineLibreOfficeExtension(): BuildkitePipeline {
       ],
     },
     {
-      group: "Windows x86_64",
+      group: "Windows",
       steps: [
         command({
           key: winX64OxtKey,
@@ -106,26 +100,6 @@ export function pipelineLibreOfficeExtension(): BuildkitePipeline {
           depends_on: winX64OxtKey,
           command:
             "divvun-actions run libreoffice-extension-installer-windows x86_64",
-        }),
-      ],
-    },
-    {
-      group: "Windows aarch64",
-      steps: [
-        command({
-          key: winArm64OxtKey,
-          label: "Build .oxt",
-          agents: { queue: "windows" },
-          command:
-            "divvun-actions run libreoffice-extension-build-oxt-windows aarch64",
-        }),
-        command({
-          key: winArm64InstallerKey,
-          label: "Build installer",
-          agents: { queue: "windows" },
-          depends_on: winArm64OxtKey,
-          command:
-            "divvun-actions run libreoffice-extension-installer-windows aarch64",
         }),
       ],
     },
