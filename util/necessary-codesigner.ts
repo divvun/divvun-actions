@@ -1,6 +1,31 @@
 import { makeTempDir } from "~/util/temp.ts"
 import * as path from "@std/path"
 
+// rsigncode is a Rust port of osslsigncode (see
+// ~/git/necessary/divvun/rsigncode). It supports the same detached-signing
+// workflow but uses long-form flags (--in / --out / --sigin) and ships as a
+// single static binary, so we don't depend on chocolatey's stale osslsigncode.
+
+async function runSigncode(
+  subcommand: string,
+  args: string[],
+): Promise<void> {
+  const res = await new Deno.Command("rsigncode", {
+    args: [subcommand, ...args],
+    stdout: "piped",
+    stderr: "piped",
+  }).output()
+  if (!res.success) {
+    const stderr = new TextDecoder().decode(res.stderr).trim()
+    const stdout = new TextDecoder().decode(res.stdout).trim()
+    throw new Error(
+      `rsigncode ${subcommand} failed (exit ${res.code})\n` +
+        `  stderr: ${stderr || "(empty)"}\n` +
+        `  stdout: ${stdout || "(empty)"}`,
+    )
+  }
+}
+
 export async function necessaryCodeSign(
   inputFile: string,
   bearerToken: string,
@@ -11,20 +36,12 @@ export async function necessaryCodeSign(
   const outputFile = path.join(tempDir.path, "signed.exe")
 
   // Step 1: Extract data to sign
-  const extractRes = await new Deno.Command("osslsigncode", {
-    args: ["extract-data", "-in", inputFile, "-out", tosignPath],
-    stdout: "piped",
-    stderr: "piped",
-  }).output()
-  if (!extractRes.success) {
-    const stderr = new TextDecoder().decode(extractRes.stderr).trim()
-    const stdout = new TextDecoder().decode(extractRes.stdout).trim()
-    throw new Error(
-      `osslsigncode extract-data failed (exit ${extractRes.code}) on ${inputFile}\n` +
-        `  stderr: ${stderr || "(empty)"}\n` +
-        `  stdout: ${stdout || "(empty)"}`,
-    )
-  }
+  await runSigncode("extract-data", [
+    "--in",
+    inputFile,
+    "--out",
+    tosignPath,
+  ])
 
   // Step 2: Send to signing service
   const tosignData = await Deno.readFile(tosignPath)
@@ -39,28 +56,17 @@ export async function necessaryCodeSign(
   await Deno.writeFile(signedPath, new Uint8Array(await response.arrayBuffer()))
 
   // Step 3: Attach signature to original file
-  const attachProc = new Deno.Command("osslsigncode", {
-    args: [
-      "attach-signature",
-      "-sigin",
-      signedPath,
-      "-in",
-      inputFile,
-      "-out",
-      outputFile,
-    ],
-  }).spawn()
-  if (!(await attachProc.status).success) {
-    throw new Error("osslsigncode attach-signature failed")
-  }
+  await runSigncode("attach-signature", [
+    "--sigin",
+    signedPath,
+    "--in",
+    inputFile,
+    "--out",
+    outputFile,
+  ])
 
   // Verify the signature was correctly applied
-  const verifyProc = new Deno.Command("osslsigncode", {
-    args: ["verify", "-in", outputFile],
-  }).spawn()
-  if (!(await verifyProc.status).success) {
-    throw new Error("osslsigncode verify failed: signature verification failed")
-  }
+  await runSigncode("verify", ["--in", outputFile])
 
   await Deno.copyFile(outputFile, inputFile)
 }
