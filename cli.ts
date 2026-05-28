@@ -27,6 +27,10 @@ import {
 import { pipelineBox, runBoxPublish } from "./pipelines/box.ts"
 import { pipelineOutto, runOuttoPublish } from "./pipelines/outto.ts"
 import {
+  pipelineRsigncode,
+  runRsigncodePublish,
+} from "./pipelines/rsigncode.ts"
+import {
   pipelineDivvunActions,
   runDivvunActionsBuildImage,
 } from "./pipelines/divvun-actions.ts"
@@ -328,6 +332,10 @@ async function runPipeline(args: any) {
       await runOuttoPublish()
       break
     }
+    case "rsigncode-publish": {
+      await runRsigncodePublish()
+      break
+    }
     case "divvun-actions-build-image": {
       const target = args._[1] as string
       const pushArg = args._[2] as string
@@ -608,6 +616,10 @@ async function runCi(_args: any) {
     }
     case "outto": {
       pipeline = pipelineOutto()
+      break
+    }
+    case "rsigncode": {
+      pipeline = pipelineRsigncode()
       break
     }
     case "divvun-actions": {
