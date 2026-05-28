@@ -73,27 +73,33 @@ export async function runLibreOfficeExtensionWindowsInstaller(
 
   const oxtPath = path.join(tempDir.path, oxtName)
   const version = await resolveExtensionVersion()
-  const requestedPath = path.resolve(installerArtifact(arch))
+  const installerName = installerArtifact(arch)
+  // Build into the current working directory (the repo checkout) so the
+  // buildkite artifact key is just the basename — uploadArtifacts stores
+  // whatever path string you hand it.
+  const outputPath = path.resolve(installerName)
 
-  let producedPath: string
   await builder.group("Building outto installer", async () => {
     const result = await bundleLibreOfficeOutto({
       platform: "windows",
       oxtPath,
       version,
-      outputPath: requestedPath,
+      outputPath,
     })
-    producedPath = result.payloadPath
     if (result.unsigned) {
+      // outto's fallback writes *.UNSIGNED.exe; rename to the canonical name
+      // so the publish step's artifact list doesn't need to know about the
+      // sign-failure path.
       logger.warning(
-        `outto produced an UNSIGNED installer at ${producedPath} — signing failed and was bypassed`,
+        `outto produced an UNSIGNED installer at ${result.payloadPath} — signing failed and was bypassed; renaming to ${installerName} for upload`,
       )
+      await Deno.rename(result.payloadPath, outputPath)
     } else {
-      logger.info(`outto produced ${producedPath}`)
+      logger.info(`outto produced ${result.payloadPath}`)
     }
   })
 
   await builder.group("Uploading installer", async () => {
-    await builder.uploadArtifacts(producedPath!)
+    await builder.uploadArtifacts(installerName, { cwd: Deno.cwd() })
   })
 }
