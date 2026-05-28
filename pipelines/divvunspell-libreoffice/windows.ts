@@ -73,19 +73,27 @@ export async function runLibreOfficeExtensionWindowsInstaller(
 
   const oxtPath = path.join(tempDir.path, oxtName)
   const version = await resolveExtensionVersion()
-  const installerPath = path.resolve(installerArtifact(arch))
+  const requestedPath = path.resolve(installerArtifact(arch))
 
+  let producedPath: string
   await builder.group("Building outto installer", async () => {
     const result = await bundleLibreOfficeOutto({
       platform: "windows",
       oxtPath,
       version,
-      outputPath: installerPath,
+      outputPath: requestedPath,
     })
-    logger.info(`outto produced ${result.payloadPath}`)
+    producedPath = result.payloadPath
+    if (result.unsigned) {
+      logger.warning(
+        `outto produced an UNSIGNED installer at ${producedPath} — signing failed and was bypassed`,
+      )
+    } else {
+      logger.info(`outto produced ${producedPath}`)
+    }
   })
 
   await builder.group("Uploading installer", async () => {
-    await builder.uploadArtifacts(installerPath)
+    await builder.uploadArtifacts(producedPath!)
   })
 }

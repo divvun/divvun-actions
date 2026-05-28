@@ -11,11 +11,19 @@ export async function necessaryCodeSign(
   const outputFile = path.join(tempDir.path, "signed.exe")
 
   // Step 1: Extract data to sign
-  const extractProc = new Deno.Command("osslsigncode", {
+  const extractRes = await new Deno.Command("osslsigncode", {
     args: ["extract-data", "-in", inputFile, "-out", tosignPath],
-  }).spawn()
-  if (!(await extractProc.status).success) {
-    throw new Error("osslsigncode extract-data failed")
+    stdout: "piped",
+    stderr: "piped",
+  }).output()
+  if (!extractRes.success) {
+    const stderr = new TextDecoder().decode(extractRes.stderr).trim()
+    const stdout = new TextDecoder().decode(extractRes.stdout).trim()
+    throw new Error(
+      `osslsigncode extract-data failed (exit ${extractRes.code}) on ${inputFile}\n` +
+        `  stderr: ${stderr || "(empty)"}\n` +
+        `  stdout: ${stdout || "(empty)"}`,
+    )
   }
 
   // Step 2: Send to signing service
