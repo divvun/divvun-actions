@@ -27,6 +27,7 @@ function command(input: CommandStep): CommandStep {
 
 function queue(target: string): string {
   if (target.includes("-musl")) return "alpine"
+  if (target.includes("linux")) return "linux"
   if (target.includes("windows")) return "windows"
   if (target.includes("apple")) return "macos"
   throw new Error(`Unknown queue for target: ${target}`)
