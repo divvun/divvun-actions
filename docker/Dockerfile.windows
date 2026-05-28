@@ -69,9 +69,6 @@ RUN Invoke-WebRequest -Uri https://x.giellalt.org/bsdtar.zip -OutFile bsdtar.zip
     Expand-Archive bsdtar.zip -DestinationPath C:\bin ; \
     Remove-Item -Force bsdtar.zip
 
-# choco install osslsigncode
-RUN choco install osslsigncode -y
-
 # MSYS2 (2025-08-30)
 RUN Invoke-WebRequest -Uri "https://github.com/msys2/msys2-installer/releases/download/2025-08-30/msys2-x86_64-20250830.exe" -OutFile msys2-installer.exe ; \
     Start-Process -Wait -FilePath .\msys2-installer.exe -ArgumentList @('install', '--root', 'C:\MSYS2', '--confirm-command') ; \
@@ -103,6 +100,16 @@ RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
 
 # rust-nightly (rust-src)
 RUN rustup toolchain install nightly --component rust-src
+
+# rsigncode (from dev-latest)
+RUN $resp = Invoke-RestMethod 'https://api.github.com/repos/divvun/rsigncode/releases/tags/dev-latest' ; \
+    $asset = $resp.assets | Where-Object { $_.name -match '^rsigncode-x86_64-pc-windows-msvc-.+\.zip$' } | Select-Object -First 1 ; \
+    if (-not $asset) { throw 'no rsigncode-x86_64-pc-windows-msvc asset on dev-latest' } ; \
+    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile rsigncode.zip ; \
+    Expand-Archive rsigncode.zip -DestinationPath rsigncode-tmp ; \
+    Copy-Item rsigncode-tmp\rsigncode-x86_64-pc-windows-msvc-*\rsigncode.exe C:\bin\rsigncode.exe ; \
+    Remove-Item -Force rsigncode.zip ; \
+    Remove-Item -Recurse -Force rsigncode-tmp
 
 # outto (dev-latest)
 RUN $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/divvun/outto/releases/tags/dev-latest' ; \
