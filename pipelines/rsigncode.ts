@@ -126,12 +126,14 @@ export async function runRsigncodePublish() {
 
   using tempDir = await makeTempDir()
   await Promise.all(
-    TARGETS.map((target) =>
-      builder.downloadArtifacts(
-        `target/${target}/release/${binaryName(target)}`,
+    TARGETS.map((target) => {
+      // Windows upload stores the artifact key with backslashes.
+      const sep = target.includes("windows") ? "\\" : "/"
+      return builder.downloadArtifacts(
+        `target${sep}${target}${sep}release${sep}${binaryName(target)}`,
         tempDir.path,
       )
-    ),
+    }),
   )
 
   using archivePath = await makeTempDir({ prefix: "rsigncode-" })
