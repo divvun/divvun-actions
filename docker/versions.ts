@@ -14,7 +14,6 @@ export const versions = {
   vcpkg: "2025.10.17",
   nodeChocoVersion: "24.11.1",
   openssh: "9.8.3.0",
-  osslsigncodeChocoVersion: undefined,
   alpine: "3.23",
   innosetup: undefined,
   msys2: "2025-08-30",
