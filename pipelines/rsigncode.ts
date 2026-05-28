@@ -8,10 +8,8 @@ import { createSignedChecksums } from "~/util/hash.ts"
 import { Tar, versionAsDev, Zip } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
-// musl x86_64 covers both `alpine` and `linux` agents (statically linked,
-// portable). Windows + Apple Silicon covered separately.
 const TARGETS = [
-  "x86_64-unknown-linux-musl",
+  "x86_64-unknown-linux-gnu",
   "x86_64-pc-windows-msvc",
   "aarch64-pc-windows-msvc",
   "aarch64-apple-darwin",
