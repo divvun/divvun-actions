@@ -1,74 +1,45 @@
-import * as fs from "@std/fs"
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
+import { makeTempDir } from "~/util/temp.ts"
 
-const IDENTITY = "Developer ID Application"
+/** Empty entitlements, applied to components that must not inherit the app sandbox. */
+const EMPTY_ENTITLEMENTS = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict/>
+</plist>
+`
 
-interface CodesignOptions {
-  /** Path to an entitlements plist to embed. Frameworks must not get one. */
-  entitlements?: string
-  /** Identifier prefix (codesign --prefix), used for loose binaries like luac. */
-  prefix?: string
-}
+/** Bundle-relative path of the sandboxed LSP host XPC service. */
+const LSP_HOST = "Contents/XPCServices/SubEthaEditLSPHost.xpc"
+/** Bundle-relative path of the sandboxed luac helper shipped in the Lua mode. */
+const LUAC =
+  "Contents/Resources/Modes/Lua.seemode/Contents/Resources/Scripts/shell/luac"
+/** Bundle-relative path of Sparkle, whose updater must not run sandboxed. */
+const SPARKLE = "Contents/Frameworks/Sparkle.framework"
 
-/**
- * Sign a single component with a hardened runtime and a secure timestamp.
- * Both are required for notarization; the repo's own SEEThirdPartyResign.sh
- * omits them, which is why divvun-actions signs everything itself.
- */
-async function codesignDeep(target: string, options: CodesignOptions = {}) {
-  const args = [
-    "--force",
-    "--timestamp",
-    "--options",
-    "runtime",
-    "--sign",
-    IDENTITY,
-  ]
-
-  if (options.prefix != null) {
-    args.push("--prefix", options.prefix)
+async function exists(p: string): Promise<boolean> {
+  try {
+    await Deno.stat(p)
+    return true
+  } catch {
+    return false
   }
-
-  if (options.entitlements != null) {
-    args.push("--entitlements", options.entitlements)
-  }
-
-  args.push(target)
-
-  logger.info(`codesign: ${path.basename(target)}`)
-  await builder.exec("codesign", args)
-}
-
-async function expandDirs(pattern: string): Promise<string[]> {
-  const result: string[] = []
-  for await (const entry of fs.expandGlob(pattern)) {
-    if (entry.isDirectory) {
-      result.push(entry.path)
-    }
-  }
-  return result
-}
-
-async function expandFiles(pattern: string): Promise<string[]> {
-  const result: string[] = []
-  for await (const entry of fs.expandGlob(pattern)) {
-    if (entry.isFile) {
-      result.push(entry.path)
-    }
-  }
-  return result
 }
 
 /**
  * Authoritatively code-sign a built SubEthaEdit.app for Developer ID
- * distribution + notarization. Signs every nested component inside-out with a
- * hardened runtime and secure timestamp, applying per-component entitlements
- * for the three sandboxed pieces (luac, the LSP host XPC service, and the app
- * itself). This deliberately replaces the bundle's existing signatures, so
- * whatever the Xcode build produced (including the legacy resign script) does
- * not matter.
+ * distribution + notarization, using rcodesign with the Developer ID cert from
+ * the vault (`macos/appPem`). This is the divvun signing path — there is no
+ * Developer ID identity in the build agents' keychain.
+ *
+ * `--for-notarization` enables the hardened runtime + a secure timestamp on
+ * every Mach-O. Entitlements are applied per component via rcodesign's scoped
+ * settings: the app (and anything not scoped) gets the sandbox entitlements,
+ * the two sandboxed helpers keep their own narrower ones, and Sparkle is signed
+ * without the sandbox so its updater still works. This replaces the bundle's
+ * existing signatures, so whatever the Xcode build produced does not matter.
  *
  * @param appPath Path to the built `SubEthaEdit.app`.
  * @param entitlementsDir Directory holding the entitlement plists
@@ -78,90 +49,59 @@ export async function signSubethaedit(
   appPath: string,
   entitlementsDir: string,
 ) {
-  const appEntitlements = path.join(entitlementsDir, "SubEthaEdit.entitlements")
-  const lspEntitlements = path.join(
+  using tempDir = await makeTempDir({ prefix: "subethaedit-sign-" })
+
+  const pemFile = path.join(tempDir.path, "devid.pem")
+  const emptyEntitlements = path.join(tempDir.path, "empty.entitlements")
+
+  const secrets = await builder.secrets()
+  await Deno.writeTextFile(pemFile, secrets.get("macos/appPem"))
+  await Deno.writeTextFile(emptyEntitlements, EMPTY_ENTITLEMENTS)
+
+  const appEntitlements = path.resolve(
+    entitlementsDir,
+    "SubEthaEdit.entitlements",
+  )
+  const lspEntitlements = path.resolve(
     entitlementsDir,
     "SubEthaEditLSPHost.entitlements",
   )
-  const luacEntitlements = path.join(entitlementsDir, "LuaC.entitlements")
+  const luacEntitlements = path.resolve(entitlementsDir, "LuaC.entitlements")
 
-  // 1. Sparkle's nested code first (inside-out): the Autoupdate binary and the
-  //    embedded Updater.app, before the framework bundle that contains them.
-  for (
-    const autoupdate of await expandFiles(
-      path.join(
-        appPath,
-        "Contents/Frameworks/Sparkle.framework/Versions/*/Resources/Autoupdate",
-      ),
-    )
-  ) {
-    await codesignDeep(autoupdate)
-  }
-  for (
-    const updater of await expandDirs(
-      path.join(
-        appPath,
-        "Contents/Frameworks/Sparkle.framework/Versions/*/Resources/Updater.app",
-      ),
-    )
-  ) {
-    await codesignDeep(updater)
-  }
+  // The app (and, by default, anything not scoped below) gets the sandbox.
+  const args = [
+    "sign",
+    "--pem-file",
+    pemFile,
+    "--for-notarization",
+    "-e",
+    appEntitlements,
+  ]
 
-  // 2. All embedded frameworks (Sparkle + the four third-party ones). Frameworks
-  //    never carry entitlements.
-  for (
-    const framework of await expandDirs(
-      path.join(appPath, "Contents/Frameworks/*.framework"),
-    )
-  ) {
-    await codesignDeep(framework)
+  // Scoped overrides, but only for components that actually exist in the build
+  // (an App Store cleanup phase may strip some), so rcodesign doesn't error on
+  // a missing path.
+  const scopes: Array<[string, string]> = [
+    [LSP_HOST, lspEntitlements],
+    [LUAC, luacEntitlements],
+    [SPARKLE, emptyEntitlements],
+  ]
+  for (const [relPath, entitlements] of scopes) {
+    if (await exists(path.join(appPath, relPath))) {
+      args.push("-e", `${relPath}:${entitlements}`)
+    } else {
+      logger.warning(`Skipping signing scope (not found in bundle): ${relPath}`)
+    }
   }
 
-  // 3. Spotlight importer(s).
-  for (
-    const mdimporter of await expandDirs(
-      path.join(appPath, "Contents/Library/Spotlight/*.mdimporter"),
-    )
-  ) {
-    await codesignDeep(mdimporter)
-  }
+  args.push(appPath)
 
-  // 4. The sandboxed luac helper shipped as a loose resource binary in the Lua
-  //    mode. Keeps its own entitlements and identifier prefix.
-  for (
-    const luac of await expandFiles(
-      path.join(appPath, "Contents/Resources/Modes/Lua.seemode/**/luac"),
-    )
-  ) {
-    await codesignDeep(luac, {
-      entitlements: luacEntitlements,
-      prefix: "org.lua.",
-    })
-  }
+  logger.info(`Signing ${appPath} with rcodesign (Developer ID, notarization)`)
+  await builder.exec("rcodesign", args)
 
-  // 5. XPC services. The LSP host is sandboxed and inherits; anything else just
-  //    gets a hardened runtime.
-  for (
-    const xpc of await expandDirs(
-      path.join(appPath, "Contents/XPCServices/*.xpc"),
-    )
-  ) {
-    const isLspHost = path.basename(xpc) === "SubEthaEditLSPHost.xpc"
-    await codesignDeep(xpc, {
-      entitlements: isLspHost ? lspEntitlements : undefined,
-    })
-  }
-
-  // 6. Re-seal the whole app last with its sandbox entitlements.
-  await codesignDeep(appPath, { entitlements: appEntitlements })
-
-  // Fail fast if the bundle isn't internally consistent.
-  await builder.exec("codesign", [
-    "--verify",
-    "--deep",
-    "--strict",
-    "--verbose=2",
+  const info = await builder.output("rcodesign", [
+    "print-signature-info",
     appPath,
   ])
+  logger.info("rcodesign print-signature-info:", info.stdout)
 }

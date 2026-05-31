@@ -11,13 +11,10 @@ import { logXcodeVersion } from "~/util/xcode.ts"
 
 const WORKSPACE = "SubEthaEdit.xcworkspace"
 const SCHEME = "SubEthaEdit"
-const DEVELOPMENT_TEAM = "S76GCAG929"
 /** Directory in the checkout holding the per-target entitlement plists. */
 const ENTITLEMENTS_DIR = "SubEthaEdit-Mac"
 /** Built product path under the xcodebuild derived data dir. */
 const APP_PATH = "build/Build/Products/Release/SubEthaEdit.app"
-/** Login keychain holding the Developer ID identity on the macOS agents. */
-const LOGIN_KEYCHAIN = "/Users/admin/Library/Keychains/login.keychain-db"
 /** Buildkite metadata key carrying the artifact name across to publish. */
 const ARTIFACT_META_KEY = "subethaedit-artifact"
 
@@ -77,16 +74,9 @@ export async function runSubethaeditBuildMacOS() {
     await builder.exec("git", ["submodule", "update", "--init", "--recursive"])
   })
 
-  await builder.group("Unlocking keychain", async () => {
-    await builder.exec("security", [
-      "unlock-keychain",
-      "-p",
-      "admin",
-      LOGIN_KEYCHAIN,
-    ])
-  })
-
-  await builder.group("Building SubEthaEdit (Release)", async () => {
+  await builder.group("Building SubEthaEdit (Release, unsigned)", async () => {
+    // Build unsigned: the agents have no Developer ID identity in the keychain,
+    // and signing happens afterwards via rcodesign + the vault cert.
     await builder.exec("xcodebuild", [
       "-workspace",
       WORKSPACE,
@@ -96,10 +86,8 @@ export async function runSubethaeditBuildMacOS() {
       "Release",
       "-derivedDataPath",
       "build",
-      `DEVELOPMENT_TEAM=${DEVELOPMENT_TEAM}`,
-      "CODE_SIGN_IDENTITY=Developer ID Application",
-      "ENABLE_HARDENED_RUNTIME=YES",
-      "OTHER_CODE_SIGN_FLAGS=--timestamp",
+      "CODE_SIGNING_ALLOWED=NO",
+      "CODE_SIGNING_REQUIRED=NO",
       "build",
     ])
   })
