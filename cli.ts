@@ -598,7 +598,8 @@ async function runCi(_args: any) {
   logger.info("Running CI")
 
   let pipeline: BuildkitePipeline
-  switch (builder.env.repoName) {
+  const repoName = builder.env.repoName.toLowerCase()
+  switch (repoName) {
     case "divvunspell":
       pipeline = pipelineDivvunspell()
       break
@@ -659,7 +660,7 @@ async function runCi(_args: any) {
       pipeline = pipelinePdfStrings()
       break
     }
-    case "Kielipankki-donatespeech-app": {
+    case "kielipankki-donatespeech-app": {
       pipeline = pipelineDonateSpeech()
       break
     }
@@ -676,11 +677,11 @@ async function runCi(_args: any) {
       break
     }
     default: {
-      if (builder.env.repoName.startsWith("keyboard-")) {
+      if (repoName.startsWith("keyboard-")) {
         pipeline = pipelineDesktopKeyboard()
-      } else if (builder.env.repoName.startsWith("lang-")) {
+      } else if (repoName.startsWith("lang-")) {
         pipeline = await pipelineLang()
-      } else if (builder.env.repoName.startsWith("dict-")) {
+      } else if (repoName.startsWith("dict-")) {
         pipeline = pipelineDict()
       } else {
         throw new Error(`Unknown repo: ${builder.env.repoName}`)
