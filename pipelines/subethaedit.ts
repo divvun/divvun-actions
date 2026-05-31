@@ -53,6 +53,31 @@ export function pipelineSubethaedit(): BuildkitePipeline {
   return { steps }
 }
 
+/** Run xcodebuild with its stdout streamed through xcbeautify. */
+async function xcodebuild(args: string[]) {
+  const xcb = new Deno.Command("xcodebuild", {
+    args,
+    stdout: "piped",
+    stderr: "inherit",
+  }).spawn()
+
+  const beautify = new Deno.Command("xcbeautify", {
+    stdin: "piped",
+    stdout: "inherit",
+    stderr: "inherit",
+  }).spawn()
+
+  // pipeTo drains xcodebuild's stdout into xcbeautify and closes its stdin on EOF.
+  await xcb.stdout.pipeTo(beautify.stdin)
+
+  const status = await xcb.status
+  await beautify.status
+
+  if (!status.success) {
+    throw new Error(`xcodebuild exited with code ${status.code}`)
+  }
+}
+
 /** Read CFBundleShortVersionString from the built app, falling back to the tag. */
 async function readAppVersion(appPath: string): Promise<string> {
   const result = await builder.output("/usr/libexec/PlistBuddy", [
@@ -96,7 +121,7 @@ export async function runSubethaeditBuildMacOS() {
   await builder.group("Building SubEthaEdit (Release, unsigned)", async () => {
     // Build unsigned: the agents have no Developer ID identity in the keychain,
     // and signing happens afterwards via rcodesign + the vault cert.
-    await builder.exec("xcodebuild", [
+    await xcodebuild([
       "-workspace",
       WORKSPACE,
       "-scheme",
