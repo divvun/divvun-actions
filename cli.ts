@@ -100,6 +100,11 @@ import {
   runPdfStringsPublish,
 } from "./pipelines/pdf-strings/mod.ts"
 import { pipelineStaticLibBuild } from "./pipelines/static-lib-build/mod.ts"
+import {
+  pipelineSubethaedit,
+  runSubethaeditBuildMacOS,
+  runSubethaeditPublish,
+} from "./pipelines/subethaedit.ts"
 import macosSign from "./services/macos-codesign.ts"
 import sign from "./services/windows-codesign.ts"
 import { makeTempFile } from "./util/temp.ts"
@@ -471,6 +476,14 @@ async function runPipeline(args: any) {
       await runLibreOfficeExtensionPublish()
       break
     }
+    case "subethaedit-build-macos": {
+      await runSubethaeditBuildMacOS()
+      break
+    }
+    case "subethaedit-publish": {
+      await runSubethaeditPublish()
+      break
+    }
     case "debug": {
       logger.info("Environment:")
       logger.info(JSON.stringify(builder.env, null, 2))
@@ -656,6 +669,10 @@ async function runCi(_args: any) {
     }
     case "static-lib-build": {
       pipeline = pipelineStaticLibBuild()
+      break
+    }
+    case "subethaedit": {
+      pipeline = pipelineSubethaedit()
       break
     }
     default: {

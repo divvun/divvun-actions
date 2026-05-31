@@ -60,6 +60,21 @@ export default async function sign(
   logger.info("rcodesign print-signature-info:", assessResult.stdout)
 }
 
+/**
+ * Notarize and (for bundles) staple an already-signed file with the Apple
+ * Notary Service. Use this when signing was done elsewhere (e.g. codesign
+ * with a keychain identity) and only notarization is needed.
+ */
+export async function notarizeAndStaple(inputFile: string) {
+  using tempDir = await makeTempDir({ prefix: "rcodesign-notary-" })
+  const keyJson = path.join(tempDir.path, "key.json")
+
+  const secrets = await builder.secrets()
+  await Deno.writeTextFile(keyJson, secrets.get("macos/rcodesignKeyJson"))
+
+  await notarize(inputFile, keyJson)
+}
+
 async function notarize(inputFile: string, keyJson: string) {
   const fileInfo = await Deno.stat(inputFile)
   const isDirectory = fileInfo.isDirectory
