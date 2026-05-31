@@ -74,6 +74,25 @@ export async function runSubethaeditBuildMacOS() {
     await builder.exec("git", ["submodule", "update", "--init", "--recursive"])
   })
 
+  await builder.group("Preparing OgreKit (onigmo.h)", async () => {
+    // OgreKit references RegularExpression/onigmo.h as a public header, but the
+    // file is git-ignored and ships only inside the vendored Onigmo tarball.
+    // Extract it so OgreKit can build on a fresh checkout.
+    const result = await builder.output("tar", [
+      "-xzf",
+      "OgreKit/RegularExpression/oniguruma/onigmo-6.2.0.tar.gz",
+      "-O",
+      "onigmo-6.2.0/onigmo.h",
+    ])
+    if (result.status.code !== 0) {
+      throw new Error(`Failed to extract onigmo.h: ${result.stderr}`)
+    }
+    await Deno.writeTextFile(
+      "OgreKit/RegularExpression/onigmo.h",
+      result.stdout,
+    )
+  })
+
   await builder.group("Building SubEthaEdit (Release, unsigned)", async () => {
     // Build unsigned: the agents have no Developer ID identity in the keychain,
     // and signing happens afterwards via rcodesign + the vault cert.
