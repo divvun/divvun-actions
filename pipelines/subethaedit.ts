@@ -7,7 +7,7 @@ import * as target from "~/target.ts"
 import { GitHub } from "~/util/github.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
-import { logXcodeVersion } from "~/util/xcode.ts"
+import { logXcodeVersion, xcodebuild } from "~/util/xcode.ts"
 
 const WORKSPACE = "SubEthaEdit.xcworkspace"
 const SCHEME = "SubEthaEdit"
@@ -51,31 +51,6 @@ export function pipelineSubethaedit(): BuildkitePipeline {
   }
 
   return { steps }
-}
-
-/** Run xcodebuild with its stdout streamed through xcbeautify. */
-async function xcodebuild(args: string[]) {
-  const xcb = new Deno.Command("xcodebuild", {
-    args,
-    stdout: "piped",
-    stderr: "inherit",
-  }).spawn()
-
-  const beautify = new Deno.Command("xcbeautify", {
-    stdin: "piped",
-    stdout: "inherit",
-    stderr: "inherit",
-  }).spawn()
-
-  // pipeTo drains xcodebuild's stdout into xcbeautify and closes its stdin on EOF.
-  await xcb.stdout.pipeTo(beautify.stdin)
-
-  const status = await xcb.status
-  await beautify.status
-
-  if (!status.success) {
-    throw new Error(`xcodebuild exited with code ${status.code}`)
-  }
 }
 
 /** Read CFBundleShortVersionString from the built app, falling back to the tag. */
