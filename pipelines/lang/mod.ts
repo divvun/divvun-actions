@@ -3,6 +3,9 @@ import * as semver from "@std/semver"
 import * as toml from "@std/toml"
 import * as yaml from "@std/yaml"
 import grammarBundle from "~/actions/grammar/bundle.ts"
+import proofingBundle, {
+  type ProofingTarget,
+} from "~/actions/proofing/bundle.ts"
 import langGrammarBuild from "~/actions/lang/build-grammar.ts"
 import langSpellerBuild from "~/actions/lang/build-speller.ts"
 import langTtsTextprocBuild from "~/actions/lang/build-tts-textproc.ts"
@@ -21,7 +24,11 @@ import spellerBundle, {
   type InstallerKind,
 } from "../../actions/speller/bundle.ts"
 import spellerDeploy from "../../actions/speller/deploy.ts"
-import { SpellerManifest, SpellerType } from "../../actions/speller/manifest.ts"
+import {
+  deriveLangTag,
+  SpellerManifest,
+  SpellerType,
+} from "../../actions/speller/manifest.ts"
 import { NIGHTLY_CHANNEL } from "../../actions/version.ts"
 import logger from "../../util/log.ts"
 
@@ -56,6 +63,7 @@ export type BuildProps = {
 const SPELLER_RELEASE_TAG = /^speller-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 const GRAMMAR_RELEASE_TAG = /^grammar-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 const TTS_TEXTPROC_RELEASE_TAG = /^tts-textproc-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
+const PROOFING_RELEASE_TAG = /^x-proofing-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 
 function isConfigActive(config: BuildProps | undefined | null): boolean {
   if (!config) return false
@@ -648,6 +656,150 @@ export async function runLangGrammarDeploy() {
   }
 }
 
+export async function runLangProofingBundle(
+  { target }: { target: ProofingTarget },
+) {
+  await builder.downloadArtifacts("build/tools/grammarcheckers/*.drb", ".")
+
+  const drbFiles = await globFiles("build/tools/grammarcheckers/*.drb")
+  if (drbFiles.length === 0) {
+    throw new Error("Missing .drb file for proofing bundle")
+  }
+
+  let manifest: SpellerManifest
+  try {
+    manifest = toml.parse(
+      await Deno.readTextFile("./manifest.toml"),
+    ) as SpellerManifest
+  } catch (e) {
+    logger.error("Failed to read manifest.toml:", e)
+    throw e
+  }
+
+  const langTag = deriveLangTag()
+  const packageId = `x-proofing-${langTag}`
+  const grammarName = manifest.package.grammar?.name ?? langTag
+  const baseVersion = manifest.package.grammar?.version ??
+    manifest.package.speller.version
+
+  const isProofingReleaseTag = PROOFING_RELEASE_TAG.test(builder.env.tag ?? "")
+  const tagVersion = builder.env.tag
+    ? extractVersionFromTag(builder.env.tag)
+    : null
+  const version = isProofingReleaseTag && tagVersion
+    ? tagVersion
+    : versionAsDev(
+      baseVersion,
+      builder.env.buildTimestamp,
+      builder.env.buildNumber,
+    )
+
+  await proofingBundle({
+    target,
+    packageId,
+    langTag,
+    name: `${grammarName} (proofing)`,
+    version,
+    buildNumber: parseInt(builder.env.buildNumber ?? "1"),
+    drbPath: drbFiles[0],
+  })
+}
+
+export async function runLangProofingDeploy() {
+  const isProofingReleaseTag = PROOFING_RELEASE_TAG.test(builder.env.tag ?? "")
+  const isMainBranch = builder.env.branch === "main"
+
+  await builder.downloadArtifacts("x-proofing-*_noarch-macos.app.zip", ".")
+  await builder.downloadArtifacts("x-proofing-*_noarch-windows*.exe", ".")
+  await builder.downloadArtifacts("x-proofing-*_noarch-linux.pkt.tar.zst", ".")
+
+  const macosFile = await globOneFile("x-proofing-*_noarch-macos.app.zip")
+  const windowsFile = await globOneFile("x-proofing-*_noarch-windows*.exe")
+  const linuxFile = await globOneFile("x-proofing-*_noarch-linux.pkt.tar.zst")
+
+  logger.info("Deploying proofing packages:")
+  logger.info(`- macOS: ${macosFile}`)
+  logger.info(`- Windows: ${windowsFile}`)
+  logger.info(`- Linux: ${linuxFile}`)
+
+  if (!macosFile || !windowsFile || !linuxFile) {
+    throw new Error("Missing required proofing artifacts for deployment")
+  }
+
+  if (!builder.env.repo) {
+    throw new Error("No repository information available")
+  }
+
+  let manifest: SpellerManifest
+  try {
+    manifest = toml.parse(
+      await Deno.readTextFile("./manifest.toml"),
+    ) as SpellerManifest
+  } catch (e) {
+    logger.error("Failed to read manifest.toml:", e)
+    throw e
+  }
+
+  const langTag = deriveLangTag()
+  const packageName = `x-proofing-${langTag}`
+  const artifacts = [macosFile, windowsFile, linuxFile]
+
+  if (isProofingReleaseTag) {
+    if (!builder.env.tag) {
+      throw new Error("No tag information available")
+    }
+    const tagVersion = extractVersionFromTag(builder.env.tag)
+    if (!tagVersion) {
+      throw new Error(`Could not extract version from tag: ${builder.env.tag}`)
+    }
+    const prerelease = isPrerelease(tagVersion)
+
+    const { checksumFile, signatureFile } = await createSignedChecksums(
+      artifacts,
+      await builder.secrets(),
+    )
+
+    logger.info(`Creating GitHub release for proofing version ${tagVersion}`)
+    logger.info(`Pre-release: ${prerelease}`)
+    logger.info(`Artifacts: ${artifacts.join(", ")}`)
+
+    const gh = new GitHub(builder.env.repo)
+    await gh.createRelease(
+      builder.env.tag,
+      [...artifacts, checksumFile, signatureFile],
+      { prerelease },
+    )
+    logger.info("Proofing GitHub release created successfully")
+  } else if (isMainBranch) {
+    const devVersion = versionAsDev(
+      manifest.package.grammar?.version ?? manifest.package.speller.version,
+      builder.env.buildTimestamp,
+      builder.env.buildNumber,
+    )
+    const releaseTag = `x-proofing-${langTag}/dev-latest`
+
+    const { checksumFile, signatureFile } = await createSignedChecksums(
+      artifacts,
+      await builder.secrets(),
+    )
+
+    logger.info(
+      `Creating dev-latest GitHub release for proofing version ${devVersion}`,
+    )
+    logger.info(`Release tag: ${releaseTag}`)
+    logger.info(`Artifacts: ${artifacts.join(", ")}`)
+
+    const releaseName = `${packageName}/v${devVersion}`
+    const gh = new GitHub(builder.env.repo)
+    await gh.updateRelease(
+      releaseTag,
+      [...artifacts, checksumFile, signatureFile],
+      { draft: false, prerelease: true, name: releaseName },
+    )
+    logger.info("Proofing dev-latest GitHub release updated successfully")
+  }
+}
+
 export async function runLangTtsTextprocDeploy() {
   const isTtsReleaseTag = TTS_TEXTPROC_RELEASE_TAG.test(builder.env.tag ?? "")
   const isMainBranch = builder.env.branch === "main"
@@ -770,8 +922,9 @@ export async function pipelineLang() {
   const isTtsTextprocReleaseTag = TTS_TEXTPROC_RELEASE_TAG.test(
     builder.env.tag ?? "",
   )
+  const isProofingReleaseTag = PROOFING_RELEASE_TAG.test(builder.env.tag ?? "")
   const isReleaseTag = isSpellerReleaseTag || isGrammarReleaseTag ||
-    isTtsTextprocReleaseTag
+    isTtsTextprocReleaseTag || isProofingReleaseTag
 
   const extra: Record<string, string> =
     LARGE_BUILDS.includes(builder.env.repoName) ? { size: "large" } : {}
@@ -834,6 +987,10 @@ export async function pipelineLang() {
   const isSpellerDeploy = isSpellerReleaseTag || builder.env.branch === "main"
   const isGrammarDeploy = isGrammarReleaseTag || builder.env.branch === "main"
   const isTtsTextprocDeploy = isTtsTextprocReleaseTag ||
+    builder.env.branch === "main"
+  // Proofing is experimental, additive, and derived from the grammar .drb, so it
+  // rides the grammar build/deploy conditions (main branch or its own tag).
+  const isProofingDeploy = isProofingReleaseTag ||
     builder.env.branch === "main"
 
   // Build phase steps array
@@ -965,6 +1122,29 @@ export async function pipelineLang() {
     }))
   }
 
+  // Experimental proofing packages (x-proofing-<lang>): wrap the grammar .drb
+  // per-OS. soft_fail keeps them from blocking the legacy speller/grammar chain.
+  if (buildConfig?.["grammar-checkers"] === true && isProofingDeploy) {
+    for (
+      const [os, queue] of [
+        ["macos", "macos"],
+        ["windows", "windows"],
+        ["linux", "linux"],
+      ] as const
+    ) {
+      bundleSteps.push(command({
+        label: `Bundle Proofing (${os})`,
+        key: `proofing-bundle-${os}`,
+        command: `divvun-actions run lang-proofing-bundle ${os}`,
+        depends_on: "grammar-build",
+        soft_fail: true,
+        agents: {
+          queue,
+        },
+      }))
+    }
+  }
+
   // Deploy phase steps array (only on deploy)
   const deploySteps: CommandStep[] = []
 
@@ -990,6 +1170,22 @@ export async function pipelineLang() {
       })`,
       command: "divvun-actions run lang-grammar-deploy",
       depends_on: "grammar-bundle",
+      agents: {
+        queue: "linux",
+      },
+    }))
+  }
+
+  if (buildConfig?.["grammar-checkers"] === true && isProofingDeploy) {
+    deploySteps.push(command({
+      label: `Deploy Proofing (${isProofingReleaseTag ? "Release" : "Dev"})`,
+      command: "divvun-actions run lang-proofing-deploy",
+      depends_on: [
+        "proofing-bundle-macos",
+        "proofing-bundle-windows",
+        "proofing-bundle-linux",
+      ],
+      soft_fail: true,
       agents: {
         queue: "linux",
       },

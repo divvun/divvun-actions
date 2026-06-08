@@ -8,10 +8,10 @@
 
 import * as path from "@std/path"
 import * as toml from "@std/toml"
-import * as builder from "~/builder.ts"
 import { makeOuttoInstaller } from "~/actions/outto/lib.ts"
 import macosSign from "~/services/macos-codesign.ts"
 import * as target from "~/target.ts"
+import { codesignBundle } from "~/util/codesign-bundle.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import { OuttoBuilder } from "~/util/outto.ts"
 import { type SpellerManifest, SpellerType } from "./manifest.ts"
@@ -247,35 +247,6 @@ async function buildMacOS(
   await macosSign(result.path)
 
   return { payloadPath: result.path, unsigned: false }
-}
-
-async function codesignBundle(bundleDir: string): Promise<void> {
-  const appCodeSignId =
-    "Developer ID Application: The University of Tromso (2K5J2584NX)"
-
-  await builder.exec("security", ["find-identity", "-v", "-p", "codesigning"])
-  await builder.exec("security", [
-    "unlock-keychain",
-    "-p",
-    "admin",
-    "/Users/admin/Library/Keychains/login.keychain-db",
-  ])
-
-  const result = await builder.output("timeout", [
-    "60s",
-    "codesign",
-    "-f",
-    "-v",
-    "-s",
-    appCodeSignId,
-    bundleDir,
-  ])
-
-  if (result.status.code !== 0) {
-    throw new Error(
-      `bundle signing failed: ${result.stderr}\nexit code: ${result.status.code}`,
-    )
-  }
 }
 
 function bundleInfoPlist(

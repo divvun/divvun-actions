@@ -64,6 +64,8 @@ import {
   runLangGrammarBundle,
   runLangGrammarDeploy,
   runLangGrammarTest,
+  runLangProofingBundle,
+  runLangProofingDeploy,
   runLangSpellerBuild,
   runLangSpellerTest,
   runLangTtsTextprocBuild,
@@ -299,6 +301,16 @@ async function runPipeline(args: any) {
     }
     case "lang-grammar-deploy": {
       await runLangGrammarDeploy()
+      break
+    }
+    case "lang-proofing-bundle": {
+      await runLangProofingBundle({
+        target: args._[1],
+      })
+      break
+    }
+    case "lang-proofing-deploy": {
+      await runLangProofingDeploy()
       break
     }
     case "lang-tts-textproc-build": {
