@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 // Buildkite implementation of the builder interface
 
+import * as path from "@std/path"
 import { buildkite as getEnv, Env } from "~/util/env.ts"
 import logger from "~/util/log.ts"
 import { OpenBao, SecretsStore } from "~/util/openbao.ts"
@@ -238,10 +239,27 @@ export async function group(name: string, callback: () => Promise<void>) {
 }
 
 export async function uploadArtifacts(
-  path: string,
-  { cwd }: { cwd?: string } = {},
+  filePath: string,
+  { cwd, preserveAbsolutePath }: {
+    cwd?: string
+    preserveAbsolutePath?: boolean
+  } = {},
 ) {
-  await exec("buildkite-agent", ["artifact", "upload", path], {
+  // buildkite stores each artifact under its path relative to the upload cwd, so
+  // an absolute path lands under the whole /opt/.../builds/... prefix and later
+  // relative download globs can't match it. By default, upload an absolute path
+  // under its basename (run buildkite-agent from the file's own directory) so it
+  // lands at the artifact root. Pass preserveAbsolutePath to keep the old
+  // full-path behaviour.
+  if (path.isAbsolute(filePath) && !preserveAbsolutePath) {
+    await exec(
+      "buildkite-agent",
+      ["artifact", "upload", path.basename(filePath)],
+      { cwd: path.dirname(filePath) },
+    )
+    return
+  }
+  await exec("buildkite-agent", ["artifact", "upload", filePath], {
     cwd,
   })
 }
