@@ -94,7 +94,10 @@ async function buildMacOS(
   await codesignBundle(bundleDir, APP_CODESIGN_ID)
 
   const oBuilder = new OuttoBuilder(stage.path, "macos")
-    .id(props.packageId)
+    // outto requires a reverse-DNS package id (must contain a dot). The
+    // experimental x-proofing-<tag> name lives in the artifact filename only;
+    // this matches the bundle's CFBundleIdentifier.
+    .id(`${BUNDLE_PREFIX}.${props.langTag}`)
     .name(props.name)
     .version(props.version)
     .publisher(PUBLISHER)
@@ -151,7 +154,9 @@ async function buildWindows(
   // language leaves the shared dir (and other languages' .drb) intact; outto
   // still removes the tracked <tag>.drb file itself.
   const oBuilder = new OuttoBuilder(stage.path, "windows")
-    .id(props.packageId)
+    // outto requires a reverse-DNS package id (must contain a dot). The
+    // experimental x-proofing-<tag> name lives in the artifact filename only.
+    .id(`${BUNDLE_PREFIX}.${props.langTag}`)
     .name(props.name)
     .version(props.version)
     .publisher(PUBLISHER)
