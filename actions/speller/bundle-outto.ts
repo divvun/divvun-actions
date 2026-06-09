@@ -88,7 +88,9 @@ async function buildWindows(
 
   // Build the outto manifest in the stage.
   const oBuilder = new OuttoBuilder(stage.path, "windows")
-    .id(props.packageId)
+    // outto requires a reverse-DNS package id (must contain a dot); the
+    // speller-<tag> name lives in the artifact filename only.
+    .id(`no.divvun.speller.${props.langTag}`)
     .name(`${props.spellerName} Speller`)
     .version(props.version)
     .publisher("Universitetet i Tromsø - Norges arktiske universitet")
@@ -213,7 +215,9 @@ async function buildMacOS(
 
   // outto manifest. Install location: /Library/Services/<bundle> via #{app}.
   const oBuilder = new OuttoBuilder(stage.path, "macos")
-    .id(props.packageId)
+    // outto requires a reverse-DNS package id (must contain a dot); the
+    // speller-<tag> name lives in the artifact filename only.
+    .id(`no.divvun.speller.${props.langTag}`)
     .name(`${props.spellerName} Speller`)
     .version(props.version)
     .publisher("Universitetet i Tromsø - Norges arktiske universitet")
