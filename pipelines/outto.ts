@@ -1,5 +1,6 @@
 import * as fs from "@std/fs"
 import * as path from "@std/path"
+import * as toml from "@std/toml"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
@@ -179,6 +180,26 @@ export function pipelineOutto(): BuildkitePipeline {
   return { steps }
 }
 
+// Resolve a crate's version, following `version.workspace = true` inheritance
+// to the workspace root Cargo.toml's [workspace.package].
+async function readCrateVersion(crateTomlPath: string): Promise<string> {
+  // deno-lint-ignore no-explicit-any
+  const crate = toml.parse(await Deno.readTextFile(crateTomlPath)) as any
+  const version = crate?.package?.version
+  if (typeof version === "string") {
+    return version
+  }
+  if (version?.workspace === true) {
+    // deno-lint-ignore no-explicit-any
+    const root = toml.parse(await Deno.readTextFile("Cargo.toml")) as any
+    const workspaceVersion = root?.workspace?.package?.version
+    if (typeof workspaceVersion === "string") {
+      return workspaceVersion
+    }
+  }
+  throw new Error(`Could not determine version from ${crateTomlPath}`)
+}
+
 export async function runOuttoPublish() {
   const isRelease = builder.env.tag?.match(/^v/)
   const isMainBranch = builder.env.branch === "main"
@@ -226,14 +247,8 @@ export async function runOuttoPublish() {
   if (isRelease) {
     version = builder.env.tag!
   } else {
-    const cargoTomlText = await Deno.readTextFile("crates/cli/Cargo.toml")
-    const versionMatch = cargoTomlText.match(/version\s*=\s*"(.*?)"/)
-    const cargoVersion = versionMatch?.[1]
-    if (typeof cargoVersion !== "string") {
-      throw new Error("Could not determine version from crates/cli/Cargo.toml")
-    }
     version = versionAsDev(
-      cargoVersion,
+      await readCrateVersion("crates/cli/Cargo.toml"),
       builder.env.buildTimestamp,
       builder.env.buildNumber,
     )
