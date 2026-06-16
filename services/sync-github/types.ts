@@ -5,6 +5,7 @@ export type SyncGithubProps = {
   }
   github: {
     apiKey?: string
+    repoNames?: string[]
     orgs?: {
       name: string
       repoPattern?: RegExp
@@ -110,7 +111,7 @@ export type SyncStatus = {
 }
 
 // Constants
-export const V_REGEX = /^# v: (.*)$/
+export const V_REGEX = /^# version: (.*)$/m
 export const CUR_VERSION = 1
 export const BUILDKITE_CLUSTER_ID = "6b73d337-bcdc-432b-9017-0767786acb3f"
 

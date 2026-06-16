@@ -6,6 +6,7 @@ import {
   updateBuildkitePipeline,
 } from "./buildkite-client.ts"
 import { extractMaturityTag } from "./formatters.ts"
+import { PIPELINE_STEPS } from "./types.ts"
 import type { SyncGithubProps, SyncStatus } from "./types.ts"
 
 export async function applyFixes(
@@ -27,7 +28,45 @@ export async function applyFixes(
     logger.info(`✅ Created pipeline: ${newPipeline.name} (${newPipeline.url})`)
   }
 
-  // Fix 2: Create missing webhooks
+  // Fix 2: Update undeclared or stale managed pipeline configuration
+  const pipelineConfigOutOfDate = results.filter((r) =>
+    r.pipeline &&
+    r.discrepancies.some((d) =>
+      d.code === "undeclared-configuration" || d.code === "version-mismatch"
+    )
+  )
+
+  for await (
+    const _result of pooledMap(
+      3,
+      pipelineConfigOutOfDate,
+      async (result) => {
+        if (!result.pipeline) return
+
+        logger.info(
+          `🧩 Updating managed pipeline configuration for ${result.repoName}...`,
+        )
+        try {
+          await updateBuildkitePipeline(
+            buildkiteProps,
+            result.pipeline,
+            { configuration: `${PIPELINE_STEPS}\n` },
+          )
+          logger.info(
+            `✅ Updated managed pipeline configuration for ${result.repoName}`,
+          )
+        } catch (error) {
+          logger.error(
+            `❌ Failed to update pipeline configuration for ${result.repoName}: ${error}`,
+          )
+        }
+      },
+    )
+  ) {
+    // pooledMap iteration
+  }
+
+  // Fix 3: Create missing webhooks
   const noWebhooks = results.filter((r) =>
     r.discrepancies.some((d) => d.code === "no-webhook") && r.pipeline
   )
@@ -58,7 +97,7 @@ export async function applyFixes(
     // pooledMap iteration
   }
 
-  // Fix 3: Update branch configuration
+  // Fix 4: Update branch configuration
   const noBranchConfig = results.filter((r) =>
     r.discrepancies.some((d) => d.code === "branch-configuration-missing") &&
     r.pipeline
@@ -103,7 +142,7 @@ export async function applyFixes(
     // pooledMap iteration
   }
 
-  // Fix 4: Enable build_tags
+  // Fix 5: Enable build_tags
   const tagsNotEnabled = results.filter((r) =>
     r.discrepancies.some((d) => d.code === "tags-not-enabled") && r.pipeline
   )
@@ -134,7 +173,7 @@ export async function applyFixes(
     // pooledMap iteration
   }
 
-  // Fix 5: Set build filter
+  // Fix 6: Set build filter
   const filterNotSet = results.filter((r) =>
     r.discrepancies.some((d) => d.code === "filter-not-set") && r.pipeline
   )
@@ -169,7 +208,7 @@ export async function applyFixes(
     // pooledMap iteration
   }
 
-  // Fix 6: Enable skip_queued_branch_builds
+  // Fix 7: Enable skip_queued_branch_builds
   const skipQueuedNotEnabled = results.filter((r) =>
     r.discrepancies.some((d) => d.code === "skip-queued-not-enabled") &&
     r.pipeline
@@ -208,7 +247,7 @@ export async function applyFixes(
     // pooledMap iteration
   }
 
-  // Fix 7: Sync maturity tags
+  // Fix 8: Sync maturity tags
   const maturityTagsMismatch = results.filter((r) =>
     r.discrepancies.some((d) => d.code === "maturity-tags-mismatch") &&
     r.pipeline &&

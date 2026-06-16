@@ -6,12 +6,34 @@ import { assessStatus } from "./assessor.ts"
 import { applyFixes } from "./fixer.ts"
 import { extractMaturityValue, prettyPrintSyncResults } from "./formatters.ts"
 import type {
+  GithubRepo,
   GithubWebhook,
   PackageChannels,
   StatusEntry,
   SyncGithubProps,
   SyncStatus,
 } from "./types.ts"
+
+function selectRepos(
+  repos: GithubRepo[],
+  githubProps: Required<SyncGithubProps["github"]>,
+): GithubRepo[] {
+  const repoNames = githubProps.repoNames ?? []
+  if (repoNames.length > 0) {
+    const selected = repos.filter((repo) => repoNames.includes(repo.name))
+    const foundNames = new Set(selected.map((repo) => repo.name))
+    for (const repoName of repoNames) {
+      if (!foundNames.has(repoName)) {
+        logger.warning(`⚠️ Requested repo was not found: ${repoName}`)
+      }
+    }
+    return selected
+  }
+
+  return repos.filter((repo) => {
+    return repo.name.includes("lang-") || repo.name.includes("keyboard-")
+  })
+}
 
 /**
  * Get sync status for all repositories (read-only, no fixes applied)
@@ -27,9 +49,7 @@ export async function getStatus(props: SyncGithubProps): Promise<SyncStatus[]> {
 
   logger.info("🔍 Getting repos...")
   const allRepos = await listGithubRepos(githubProps)
-  const repos = allRepos.filter((repo) => {
-    return repo.name.includes("lang-") || repo.name.includes("keyboard-")
-  })
+  const repos = selectRepos(allRepos, githubProps)
 
   logger.info("🔄 Assessing sync status...")
   const results: SyncStatus[] = []
@@ -75,9 +95,7 @@ export async function syncAndFix(
 
   logger.info("🔍 Getting repos...")
   const allRepos = await listGithubRepos(githubProps)
-  const repos = allRepos.filter((repo) => {
-    return repo.name.includes("lang-") || repo.name.includes("keyboard-")
-  })
+  const repos = selectRepos(allRepos, githubProps)
 
   logger.info("🔄 Assessing sync status...")
   const results: SyncStatus[] = []

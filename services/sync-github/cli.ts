@@ -34,6 +34,7 @@ OPTIONS:
   --bk-org <org>         Buildkite organization name (required for most commands)
   --gh-key <key>         GitHub API key (required for most commands)
   --gh-orgs <orgs>       Comma-separated list of GitHub orgs (required for most commands)
+  --repo <owner/name>    Limit status/sync to one repo; comma-separated names are accepted
   --output <path>        Write status.json to specified path (optional, for status command)
   --dry-run              Preview changes without making them (for clear-dev-releases)
 
@@ -54,6 +55,12 @@ EXAMPLES:
     --bk-key=\${BK_TOKEN} --bk-org=divvun \\
     --gh-key=\${GH_TOKEN} --gh-orgs=divvun,giellalt
 
+  # Sync only one repository
+  deno run services/sync-github/cli.ts sync \\
+    --bk-key=\${BK_TOKEN} --bk-org=divvun \\
+    --gh-key=\${GH_TOKEN} --gh-orgs=divvun \\
+    --repo=divvun/keyboard-viewer
+
   # List GitHub repositories
   deno run services/sync-github/cli.ts list-repos \\
     --gh-key=\${GH_TOKEN} --gh-orgs=divvun,giellalt
@@ -72,9 +79,19 @@ EXAMPLES:
 `)
 }
 
+function parseRepoNames(value: unknown): string[] | undefined {
+  if (typeof value !== "string") return undefined
+
+  const repoNames = value.split(",").map((repoName) => repoName.trim()).filter(
+    (repoName) => repoName.length > 0,
+  )
+
+  return repoNames.length > 0 ? repoNames : undefined
+}
+
 if (import.meta.main) {
   const args = parseArgs(Deno.args, {
-    string: ["bk-key", "bk-org", "gh-key", "gh-orgs", "output"],
+    string: ["bk-key", "bk-org", "gh-key", "gh-orgs", "repo", "output"],
     boolean: ["help", "dry-run"],
   })
 
@@ -88,7 +105,10 @@ if (import.meta.main) {
     "help",
   ]
 
-  if (!command || !validCommands.includes(command) || args.help) {
+  if (
+    !command || !validCommands.includes(command) || args.help ||
+    command === "help"
+  ) {
     showHelp()
     Deno.exit(command === "help" ? 0 : 1)
   }
@@ -100,6 +120,7 @@ if (import.meta.main) {
     },
     github: {
       apiKey: args["gh-key"],
+      repoNames: parseRepoNames(args["repo"]),
       orgs: args["gh-orgs"]?.split(",").map((org) => ({
         name: org,
       })),
