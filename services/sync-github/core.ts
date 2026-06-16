@@ -11,6 +11,7 @@ import type {
   PackageChannels,
   StatusEntry,
   SyncGithubProps,
+  SyncOptions,
   SyncStatus,
 } from "./types.ts"
 
@@ -84,6 +85,7 @@ export async function getStatus(props: SyncGithubProps): Promise<SyncStatus[]> {
  */
 export async function syncAndFix(
   props: SyncGithubProps,
+  options: SyncOptions = {},
 ): Promise<SyncStatus[]> {
   const githubProps = props.github as Required<SyncGithubProps["github"]>
   const buildkiteProps = props.buildkite as Required<
@@ -124,8 +126,12 @@ export async function syncAndFix(
 
   prettyPrintSyncResults(results)
 
-  logger.info("\n🔧 Applying fixes...")
-  await applyFixes(results, githubProps, buildkiteProps)
+  logger.info(
+    options.dryRun
+      ? "\n🔎 Dry run: previewing fixes..."
+      : "\n🔧 Applying fixes...",
+  )
+  await applyFixes(results, githubProps, buildkiteProps, options)
 
   return results
 }

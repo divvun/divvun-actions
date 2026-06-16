@@ -7,19 +7,27 @@ import {
 } from "./buildkite-client.ts"
 import { extractMaturityTag } from "./formatters.ts"
 import { PIPELINE_STEPS } from "./types.ts"
-import type { SyncGithubProps, SyncStatus } from "./types.ts"
+import type { SyncGithubProps, SyncOptions, SyncStatus } from "./types.ts"
 
 export async function applyFixes(
   results: SyncStatus[],
   githubProps: Required<SyncGithubProps["github"]>,
   buildkiteProps: Required<SyncGithubProps["buildkite"]>,
+  options: SyncOptions = {},
 ): Promise<void> {
+  const dryRun = options.dryRun === true
+
   // Fix 1: Create missing pipelines
   const noPipelines = results.filter((r) =>
     r.discrepancies.some((d) => d.code === "no-pipeline")
   )
 
   for (const result of noPipelines) {
+    if (dryRun) {
+      logger.info(`🚀 Would create pipeline for ${result.repoName}`)
+      continue
+    }
+
     logger.info(`🚀 Creating pipeline for ${result.repoName}...`)
     const newPipeline = await createBuildkitePipeline(
       buildkiteProps,
@@ -42,6 +50,13 @@ export async function applyFixes(
       pipelineConfigOutOfDate,
       async (result) => {
         if (!result.pipeline) return
+
+        if (dryRun) {
+          logger.info(
+            `🧩 Would update managed pipeline configuration for ${result.repoName}`,
+          )
+          return
+        }
 
         logger.info(
           `🧩 Updating managed pipeline configuration for ${result.repoName}...`,
@@ -78,6 +93,13 @@ export async function applyFixes(
       async (result) => {
         if (!result.pipeline) return
 
+        if (dryRun) {
+          logger.info(
+            `🔗 Would create webhook for ${result.repoName}: ${result.pipeline.webhook_url}`,
+          )
+          return
+        }
+
         logger.info(`🔗 Creating webhook for ${result.repoName}...`)
         try {
           const webhook = await createBuildkiteWebhook(
@@ -110,21 +132,25 @@ export async function applyFixes(
       async (result) => {
         if (!result.pipeline) return
 
+        let newBranchConfig = "!gh-pages"
+        if (
+          result.pipeline.branch_configuration &&
+          result.pipeline.branch_configuration.trim()
+        ) {
+          newBranchConfig = `${result.pipeline.branch_configuration} !gh-pages`
+        }
+
+        if (dryRun) {
+          logger.info(
+            `🌿 Would update branch configuration for ${result.repoName}: ${newBranchConfig}`,
+          )
+          return
+        }
+
         logger.info(
           `🌿 Updating branch configuration for ${result.repoName}...`,
         )
         try {
-          let newBranchConfig = "!gh-pages"
-
-          // If there's an existing branch configuration, append to it
-          if (
-            result.pipeline.branch_configuration &&
-            result.pipeline.branch_configuration.trim()
-          ) {
-            newBranchConfig =
-              `${result.pipeline.branch_configuration} !gh-pages`
-          }
-
           await updateBuildkitePipeline(
             buildkiteProps,
             result.pipeline,
@@ -153,6 +179,11 @@ export async function applyFixes(
       tagsNotEnabled,
       async (result) => {
         if (!result.pipeline) return
+
+        if (dryRun) {
+          logger.info(`🏷️  Would enable build_tags for ${result.repoName}`)
+          return
+        }
 
         logger.info(`🏷️  Enabling build_tags for ${result.repoName}...`)
         try {
@@ -185,6 +216,16 @@ export async function applyFixes(
       async (result) => {
         if (!result.pipeline) return
 
+        const filterCondition =
+          `build.branch != "gh-pages" && build.tag !~ /dev-latest$/`
+
+        if (dryRun) {
+          logger.info(
+            `🔍 Would set build filter for ${result.repoName}: ${filterCondition}`,
+          )
+          return
+        }
+
         logger.info(`🔍 Setting build filter for ${result.repoName}...`)
         try {
           await updateBuildkitePipeline(
@@ -192,8 +233,7 @@ export async function applyFixes(
             result.pipeline,
             {
               filter_enabled: true,
-              filter_condition:
-                `build.branch != "gh-pages" && build.tag !~ /dev-latest$/`,
+              filter_condition: filterCondition,
             },
           )
           logger.info(`✅ Set build filter for ${result.repoName}`)
@@ -220,6 +260,13 @@ export async function applyFixes(
       skipQueuedNotEnabled,
       async (result) => {
         if (!result.pipeline) return
+
+        if (dryRun) {
+          logger.info(
+            `⏭️  Would enable skip_queued_branch_builds for ${result.repoName}`,
+          )
+          return
+        }
 
         logger.info(
           `⏭️  Enabling skip_queued_branch_builds for ${result.repoName}...`,
@@ -264,14 +311,20 @@ export async function applyFixes(
         const expectedMaturityTag = extractMaturityTag(result.repo.topics)
         if (!expectedMaturityTag) return
 
+        const otherTags = result.pipeline.tags.filter((tag) =>
+          !tag.startsWith(":package: ")
+        )
+        const newTags = [...otherTags, expectedMaturityTag]
+
+        if (dryRun) {
+          logger.info(
+            `📦 Would update maturity tag for ${result.repoName}: ${expectedMaturityTag}`,
+          )
+          return
+        }
+
         logger.info(`📦 Updating maturity tag for ${result.repoName}...`)
         try {
-          // Remove old :package: tags and add the new one
-          const otherTags = result.pipeline.tags.filter((tag) =>
-            !tag.startsWith(":package: ")
-          )
-          const newTags = [...otherTags, expectedMaturityTag]
-
           await updateBuildkitePipeline(
             buildkiteProps,
             result.pipeline,

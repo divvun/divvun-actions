@@ -13,6 +13,10 @@ export type SyncGithubProps = {
   }
 }
 
+export type SyncOptions = {
+  dryRun?: boolean
+}
+
 export type GithubRepo = {
   name: string
   description: string | null

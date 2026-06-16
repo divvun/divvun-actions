@@ -36,7 +36,7 @@ OPTIONS:
   --gh-orgs <orgs>       Comma-separated list of GitHub orgs (required for most commands)
   --repo <owner/name>    Limit status/sync to one repo; comma-separated names are accepted
   --output <path>        Write status.json to specified path (optional, for status command)
-  --dry-run              Preview changes without making them (for clear-dev-releases)
+  --dry-run              Preview changes without making them (for sync/clear-dev-releases)
 
 EXAMPLES:
   # Check sync status (read-only)
@@ -60,6 +60,12 @@ EXAMPLES:
     --bk-key=\${BK_TOKEN} --bk-org=divvun \\
     --gh-key=\${GH_TOKEN} --gh-orgs=divvun \\
     --repo=divvun/keyboard-viewer
+
+  # Preview fixes for one repository
+  deno run services/sync-github/cli.ts sync \\
+    --bk-key=\${BK_TOKEN} --bk-org=divvun \\
+    --gh-key=\${GH_TOKEN} --gh-orgs=divvun \\
+    --repo=divvun/keyboard-viewer --dry-run
 
   # List GitHub repositories
   deno run services/sync-github/cli.ts list-repos \\
@@ -171,7 +177,7 @@ if (import.meta.main) {
 
     case "sync": {
       requiredArgs(["bk-key", "bk-org", "gh-key", "gh-orgs"], args)
-      await syncAndFix(props)
+      await syncAndFix(props, { dryRun: args["dry-run"] })
       break
     }
 
