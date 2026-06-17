@@ -114,11 +114,11 @@ export async function runDonateSpeechDeployAndroid() {
   using tempDir = await makeTempDir()
 
   await builder.group("Downloading artifacts", async () => {
-    await builder.downloadArtifacts("**/*.aab", tempDir.path)
+    await builder.downloadArtifacts("*.aab", tempDir.path)
   })
 
   await builder.group("Uploading to Google Play", async () => {
-    const aabPath = await globOneFile("**/*.aab", { root: tempDir.path })
+    const aabPath = await globOneFile("*.aab", { root: tempDir.path })
     if (!aabPath) {
       throw new Error("No AAB found in downloaded artifacts")
     }

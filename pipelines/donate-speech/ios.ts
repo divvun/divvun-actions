@@ -81,11 +81,11 @@ export async function runDonateSpeechDeployIOS() {
   using tempDir = await makeTempDir()
 
   await builder.group("Downloading artifacts", async () => {
-    await builder.downloadArtifacts("**/*.ipa", tempDir.path)
+    await builder.downloadArtifacts("*.ipa", tempDir.path)
   })
 
   await builder.group("Uploading to App Store Connect", async () => {
-    const ipaPath = await globOneFile("**/*.ipa", { root: tempDir.path })
+    const ipaPath = await globOneFile("*.ipa", { root: tempDir.path })
     if (!ipaPath) {
       throw new Error("No IPA found in downloaded artifacts")
     }
