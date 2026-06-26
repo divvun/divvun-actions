@@ -19,10 +19,6 @@ export async function runDonateSpeechBuildAndroid() {
     await builder.exec("pnpm", ["install", "--frozen-lockfile"])
   })
 
-  await builder.group("Initializing Android project", async () => {
-    await builder.exec("pnpm", ["tauri", "android", "init"])
-  })
-
   // Patch the generated build.gradle.kts to add signing config and version code
   await builder.group("Configuring signing and version code", async () => {
     const buildNumber = builder.env.buildNumber ?? "1"
