@@ -6,6 +6,7 @@ import { makeTempDir } from "~/util/temp.ts"
 import { execWithMsvcEnv, msvcArchFor } from "~/util/msvc-env.ts"
 import { resolveExtensionVersion } from "./version.ts"
 import { downloadDivvunRuntimeLib } from "./runtime-dep.ts"
+import { buildOxtregWindows } from "./oxtreg-build.ts"
 
 export type WindowsArch = "x86_64" | "aarch64"
 
@@ -79,11 +80,17 @@ export async function runLibreOfficeExtensionWindowsInstaller(
   // whatever path string you hand it.
   const outputPath = path.resolve(installerName)
 
+  let oxtregPath: string
+  await builder.group("Building oxtreg", async () => {
+    oxtregPath = await buildOxtregWindows(targetTriple(arch), tempDir.path)
+  })
+
   await builder.group("Building outto installer", async () => {
     const result = await bundleLibreOfficeOutto({
       platform: "windows",
       oxtPath,
       version,
+      oxtregPath: oxtregPath!,
       outputPath,
     })
     if (result.unsigned) {

@@ -1,12 +1,15 @@
-# Register or deregister the divvunspell-libreoffice .oxt against every
-# LibreOffice install discovered on the system.
+# Register or deregister the divvunspell-libreoffice .oxt into the shared
+# (all-users) extension cache of every LibreOffice install on the system,
+# using oxtreg (no unopkg, no LibreOffice tooling).
 #
 # Usage:
 #   install-extension.ps1 -Action add    -Target <path-to-oxt>
 #   install-extension.ps1 -Action remove -Target <extension-id>
 #
-# Exits 0 even if no LibreOffice is found. Per-install failures are logged
-# but do not abort the loop.
+# outto runs this elevated from the installer's after_install / before_uninstall
+# hook. oxtreg --shared writes <install>\share\uno_packages\cache directly, so
+# the extension is registered for all users (picked up on each user's next
+# launch). Exits 0 when no LibreOffice is found so the hook does not fail.
 
 param(
     [Parameter(Mandatory=$true)][ValidateSet('add','remove')][string]$Action,
@@ -14,6 +17,15 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
+
+$here = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$oxtreg = Join-Path $here 'oxtreg.exe'
+if (-not (Test-Path $oxtreg)) {
+    Write-Error "[divvunspell-libreoffice] oxtreg not found at $oxtreg"
+    exit 1
+}
+
+$subcommand = if ($Action -eq 'add') { 'install' } else { 'uninstall' }
 
 $searchRoots = @(
     $env:ProgramFiles,
@@ -23,18 +35,16 @@ $searchRoots = @(
 $found = $false
 foreach ($root in $searchRoots) {
     Get-ChildItem -Path $root -Filter 'LibreOffice*' -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-        $unopkg = Join-Path $_.FullName 'program\unopkg.exe'
-        if (Test-Path $unopkg) {
-            $found = $true
-            Write-Host "[divvunspell-libreoffice] $Action via $unopkg"
+        $install = $_.FullName
+        # A real install has program\soffice.exe; skip stray directories.
+        if (-not (Test-Path (Join-Path $install 'program\soffice.exe'))) { return }
 
-            $extra = @()
-            if ($Action -eq 'add') { $extra += '--suppress-license' }
+        $found = $true
+        Write-Host "[divvunspell-libreoffice] $subcommand (shared) for $install via oxtreg"
 
-            & $unopkg $Action '--shared' @extra $Target
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host "[divvunspell-libreoffice] $unopkg exited $LASTEXITCODE (continuing)"
-            }
+        & $oxtreg '--shared' $install $subcommand $Target
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "[divvunspell-libreoffice] oxtreg exited $LASTEXITCODE for $install (continuing)"
         }
     }
 }

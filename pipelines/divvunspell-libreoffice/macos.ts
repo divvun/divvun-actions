@@ -5,6 +5,7 @@ import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import { resolveExtensionVersion } from "./version.ts"
 import { downloadDivvunRuntimeLib } from "./runtime-dep.ts"
+import { buildOxtregMacos } from "./oxtreg-build.ts"
 
 const OXT_ARTIFACT = "divvunspell-libreoffice-macos.oxt"
 const INSTALLER_ARTIFACT = "divvunspell-libreoffice-macos.app.zip"
@@ -48,12 +49,18 @@ export async function runLibreOfficeExtensionMacosInstaller() {
   const version = await resolveExtensionVersion()
   const appOutputPath = path.resolve(tempDir.path, "Divvun for LibreOffice.app")
 
+  let oxtregPath: string
+  await builder.group("Building oxtreg", async () => {
+    oxtregPath = await buildOxtregMacos(tempDir.path)
+  })
+
   let payloadPath: string
   await builder.group("Building outto installer", async () => {
     const result = await bundleLibreOfficeOutto({
       platform: "macos",
       oxtPath,
       version,
+      oxtregPath: oxtregPath!,
       outputPath: appOutputPath,
     })
     payloadPath = result.payloadPath

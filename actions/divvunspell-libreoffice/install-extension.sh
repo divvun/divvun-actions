@@ -1,14 +1,15 @@
 #!/bin/bash
-# Register or deregister the divvunspell-libreoffice .oxt against every
-# LibreOffice install discovered on the system.
+# Register or deregister the divvunspell-libreoffice .oxt for the console
+# user's LibreOffice profile using oxtreg (no unopkg, no LibreOffice tooling).
 #
 # Usage:
 #   install-extension.sh add    <path-to-oxt>
 #   install-extension.sh remove <extension-id>
 #
-# Exits 0 even if no LibreOffice is found, so a missing LibreOffice does not
-# fail the surrounding installer hook. Per-install failures are logged but
-# do not abort the loop — partial success is preferable to an aborted install.
+# outto runs this from the installer's after_install / before_uninstall hook
+# as root. oxtreg writes the per-user extension cache, so we drop to the
+# console user (the human at the machine). Exits 0 when there is no console
+# user so a headless/CI install does not fail the surrounding hook.
 
 set -u
 
@@ -19,43 +20,33 @@ fi
 
 action="$1"
 target="$2"
+here="$(cd "$(dirname "$0")" && pwd)"
+oxtreg="$here/oxtreg"
 
 case "$action" in
-    add|remove) ;;
+    add)    subcommand="install" ;;
+    remove) subcommand="uninstall" ;;
     *)
         echo "Unknown action: $action" >&2
         exit 2
         ;;
 esac
 
-find_unopkgs() {
-    local roots=(
-        "/Applications"
-        "$HOME/Applications"
-    )
-    for root in "${roots[@]}"; do
-        [ -d "$root" ] || continue
-        find "$root" -maxdepth 4 -path "*/LibreOffice*.app/Contents/MacOS/unopkg" 2>/dev/null
-    done
-}
-
-extra_args=()
-if [ "$action" = "add" ]; then
-    extra_args+=("--suppress-license")
+if [ ! -x "$oxtreg" ]; then
+    echo "[divvunspell-libreoffice] oxtreg not found at $oxtreg" >&2
+    exit 1
 fi
 
-found_any=false
-while IFS= read -r unopkg; do
-    [ -n "$unopkg" ] || continue
-    found_any=true
-    echo "[divvunspell-libreoffice] $action via $unopkg"
-    if ! "$unopkg" "$action" --shared "${extra_args[@]}" "$target"; then
-        echo "[divvunspell-libreoffice] $unopkg failed (continuing)"
-    fi
-done < <(find_unopkgs)
+console_user="$(stat -f%Su /dev/console 2>/dev/null)"
+if [ -z "$console_user" ] || [ "$console_user" = "root" ]; then
+    echo "[divvunspell-libreoffice] No console user; skipping $subcommand." >&2
+    exit 0
+fi
 
-if [ "$found_any" = false ]; then
-    echo "[divvunspell-libreoffice] No LibreOffice installation found; skipping."
+echo "[divvunspell-libreoffice] $subcommand for $console_user via oxtreg"
+if ! sudo -u "$console_user" -H "$oxtreg" "$subcommand" "$target"; then
+    echo "[divvunspell-libreoffice] oxtreg $subcommand failed for $console_user" >&2
+    exit 1
 fi
 
 exit 0

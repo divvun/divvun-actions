@@ -4,10 +4,12 @@
 //   - Windows: signed .exe (via divvun-actions.bat sign)
 //   - macOS:   notarized .app (signed via rcodesign + notarised)
 //
-// The installer ships a small discovery script alongside the .oxt that walks
-// every LibreOffice install on the system and runs `unopkg add --shared`
-// (or `remove --shared`) against each one. Multiple LibreOffice versions and
-// non-default install paths are all handled.
+// The installer ships the .oxt, the `oxtreg` registration tool, and a small
+// install-extension script alongside each other. After install (and before
+// uninstall) the script runs oxtreg to write the extension cache directly —
+// no unopkg, no LibreOffice tooling at install time:
+//   - macOS:   the console user's per-user profile (running as that user).
+//   - Windows: the shared (all-users) cache of every LibreOffice install.
 
 import * as path from "@std/path"
 import { makeOuttoInstaller } from "~/actions/outto/lib.ts"
@@ -35,6 +37,8 @@ export type BundleOuttoProps = {
   oxtPath: string
   /** Semver-compatible version string (e.g. 0.5.0 or 0.5.0-dev.20260527T...). */
   version: string
+  /** Path to the oxtreg binary to ship (oxtreg.exe on windows, oxtreg on macos). */
+  oxtregPath: string
   /** Final installer output path. Should end in .exe (windows) or .app (macos). */
   outputPath: string
 }
@@ -63,7 +67,9 @@ async function bundleWindows(
   using stage = await makeTempDir({ prefix: "outto-lo-win-" })
 
   const oxtName = "divvunspell.oxt"
+  const oxtregName = "oxtreg.exe"
   await Deno.copyFile(props.oxtPath, path.join(stage.path, oxtName))
+  await Deno.copyFile(props.oxtregPath, path.join(stage.path, oxtregName))
   await Deno.copyFile(
     path.join(SCRIPTS_DIR, WINDOWS_SCRIPT),
     path.join(stage.path, WINDOWS_SCRIPT),
@@ -81,6 +87,7 @@ async function bundleWindows(
     .upgradePolicy("overwrite")
     .removeAppDirOnUninstall(true)
     .file({ source: oxtName, dest: "#{app}", overwrite: "always" })
+    .file({ source: oxtregName, dest: "#{app}", overwrite: "always" })
     .file({ source: WINDOWS_SCRIPT, dest: "#{app}", overwrite: "always" })
     .run({
       phase: "after_install",
@@ -141,7 +148,11 @@ async function bundleMacOS(
   using stage = await makeTempDir({ prefix: "outto-lo-mac-" })
 
   const oxtName = "divvunspell.oxt"
+  const oxtregName = "oxtreg"
   await Deno.copyFile(props.oxtPath, path.join(stage.path, oxtName))
+  const stagedOxtreg = path.join(stage.path, oxtregName)
+  await Deno.copyFile(props.oxtregPath, stagedOxtreg)
+  await Deno.chmod(stagedOxtreg, 0o755)
   const stagedScript = path.join(stage.path, MACOS_SCRIPT)
   await Deno.copyFile(path.join(SCRIPTS_DIR, MACOS_SCRIPT), stagedScript)
   await Deno.chmod(stagedScript, 0o755)
@@ -158,6 +169,7 @@ async function bundleMacOS(
     .upgradePolicy("overwrite")
     .removeAppDirOnUninstall(true)
     .file({ source: oxtName, dest: "#{app}", overwrite: "always" })
+    .file({ source: oxtregName, dest: "#{app}", overwrite: "always" })
     .file({ source: MACOS_SCRIPT, dest: "#{app}", overwrite: "always" })
     .run({
       phase: "after_install",
