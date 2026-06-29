@@ -40,6 +40,11 @@ export async function runDonateSpeechBuildIOS() {
 
   await builder.group("Initializing iOS project", async () => {
     await builder.exec("pnpm", ["tauri", "ios", "init"])
+    // tauri ios init regenerates Info.plist, so set the display name after
+    await builder.exec("/usr/libexec/PlistBuddy", [
+      "-c", "Set :CFBundleDisplayName Jietnašiella",
+      "src-tauri/gen/apple/tauri-app_iOS/Info.plist",
+    ])
   })
 
   await builder.group("Generating app icons", async () => {
