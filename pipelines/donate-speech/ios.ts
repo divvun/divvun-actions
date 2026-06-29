@@ -38,15 +38,6 @@ export async function runDonateSpeechBuildIOS() {
     await builder.exec("pnpm", ["install", "--frozen-lockfile"])
   })
 
-  await builder.group("Initializing iOS project", async () => {
-    await builder.exec("pnpm", ["tauri", "ios", "init"])
-    // tauri ios init regenerates Info.plist, so set the display name after
-    await builder.exec("/usr/libexec/PlistBuddy", [
-      "-c", "Add :CFBundleDisplayName string Jietnašiella",
-      "src-tauri/gen/apple/tauri-app_iOS/Info.plist",
-    ])
-  })
-
   await builder.group("Generating app icons", async () => {
     await builder.exec("pnpm", ["tauri", "icon", "src-tauri/icons/app-icon.png"])
   })
