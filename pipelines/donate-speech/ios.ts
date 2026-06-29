@@ -45,6 +45,10 @@ export async function runDonateSpeechBuildIOS() {
       "-c", "Add :CFBundleDisplayName string Jietnašiella",
       "src-tauri/gen/apple/tauri-app_iOS/Info.plist",
     ])
+    await builder.exec("/usr/libexec/PlistBuddy", [
+      "-c", "Add :ITSAppUsesNonExemptEncryption bool false",
+      "src-tauri/gen/apple/tauri-app_iOS/Info.plist",
+    ])
   })
 
   await builder.group("Generating app icons", async () => {
