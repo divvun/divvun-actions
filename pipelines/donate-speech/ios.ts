@@ -42,7 +42,7 @@ export async function runDonateSpeechBuildIOS() {
     await builder.exec("pnpm", ["tauri", "ios", "init"])
     // tauri ios init regenerates Info.plist, so set the display name after
     await builder.exec("/usr/libexec/PlistBuddy", [
-      "-c", "Set :CFBundleDisplayName Jietnašiella",
+      "-c", "Add :CFBundleDisplayName string Jietnašiella",
       "src-tauri/gen/apple/tauri-app_iOS/Info.plist",
     ])
   })
