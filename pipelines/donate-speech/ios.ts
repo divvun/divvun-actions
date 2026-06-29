@@ -38,6 +38,10 @@ export async function runDonateSpeechBuildIOS() {
     await builder.exec("pnpm", ["install", "--frozen-lockfile"])
   })
 
+  await builder.group("Generating app icons", async () => {
+    await builder.exec("pnpm", ["tauri", "icon", "src-tauri/icons/app-icon.png"])
+  })
+
   await builder.group("Building iOS app", async () => {
     await builder.exec("pnpm", [
       "tauri",
