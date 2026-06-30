@@ -46,6 +46,12 @@ import {
   runKeyboardViewerLint,
 } from "./pipelines/keyboard-viewer.ts"
 import {
+  pipelineDrbKicker,
+  runDrbKickerBumpManifest,
+  runDrbKickerDeploy,
+  runDrbKickerLint,
+} from "./pipelines/drb-kicker.ts"
+import {
   pipelineDict,
   runDictBuild,
   runDictDeploy,
@@ -396,6 +402,18 @@ async function runPipeline(args: any) {
       await runKeyboardViewerBumpManifest()
       break
     }
+    case "drb-kicker-lint": {
+      await runDrbKickerLint()
+      break
+    }
+    case "drb-kicker-deploy": {
+      await runDrbKickerDeploy()
+      break
+    }
+    case "drb-kicker-bump-manifest": {
+      await runDrbKickerBumpManifest()
+      break
+    }
     case "libpahkat-android": {
       await runLibpahkatAndroid()
       break
@@ -658,6 +676,10 @@ async function runCi(_args: any) {
     }
     case "keyboard-viewer": {
       pipeline = pipelineKeyboardViewer()
+      break
+    }
+    case "drb-kicker": {
+      pipeline = pipelineDrbKicker()
       break
     }
     case "pahkat": {
