@@ -12,7 +12,7 @@ RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositor
     echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories
 
 # System packages (apk)
-RUN apk update && apk upgrade && apk add --no-cache \
+RUN echo "Get cache-busted, loser" && apk update && apk upgrade && apk add --no-cache \
     autoconf \
     automake \
     bash \
@@ -44,7 +44,6 @@ RUN apk update && apk upgrade && apk add --no-cache \
     llvm21-dev \
     make \
     ninja \
-    openssh \
     openssl-dev \
     patch \
     patchelf \
@@ -114,7 +113,6 @@ RUN mkdir -p /opt/sysroot-aarch64 && \
     llvm21-dev \
     make \
     ninja \
-    openssh \
     openssl-dev \
     patch \
     patchelf \

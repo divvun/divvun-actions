@@ -114,7 +114,13 @@ export function renderImage(def: ImageDef): string {
   if (def.apkPackages && def.apkPackages.length > 0) {
     const pkgs = def.apkPackages.map((p) => `    ${p}`).join(" \\\n")
     out.push(`# System packages (apk)`)
-    out.push(`RUN apk update && apk upgrade && apk add --no-cache \\`)
+    // Change the echo string to invalidate the cached apk layer. Needed when a
+    // bad apk state (e.g. a mid-publish Alpine mirror index where a split
+    // package pair is briefly inconsistent) gets baked into the Docker layer
+    // cache and makes `apk add` fail deterministically on every rebuild.
+    out.push(
+      `RUN echo "Get cache-busted, loser" && apk update && apk upgrade && apk add --no-cache \\`,
+    )
     out.push(pkgs)
     out.push("")
   }
