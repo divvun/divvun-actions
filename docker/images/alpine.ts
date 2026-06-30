@@ -46,7 +46,6 @@ const ALPINE_PACKAGES = [
   "llvm21-dev",
   "make",
   "ninja",
-  "openssh",
   "openssl-dev",
   "patch",
   "patchelf",

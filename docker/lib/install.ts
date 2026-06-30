@@ -119,7 +119,8 @@ export function aptInstall(packages: string[]): string {
 export function apkInstall(packages: string[]): string {
   const pkgLines = packages.map((p) => `    ${p}`).join(" \\\n")
   return [
-    `RUN apk update && apk upgrade && apk add --no-cache \\`,
+    // Change the echo string to force a poisoned apk layer to rebuild.
+    `RUN echo "Get cache-busted, loser" && apk update && apk upgrade && apk add --no-cache \\`,
     pkgLines,
   ].join("\n")
 }
