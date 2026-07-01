@@ -29,6 +29,19 @@ export type BumpArgoHelmImageTagOptions = {
   commitMessage: string
 }
 
+export type BumpChartImageTagOptions = {
+  /** Full image name without tag, e.g. "ghcr.io/divvun/divvun-worker-grammar". */
+  imageName: string
+  /** New tag (e.g. "sha-deadbeef"). */
+  tag: string
+  /** Path within the k8s-config repo to the chart's values.yaml. */
+  valuesPath: string
+  /** Top-level image key in the values, e.g. "workerImage" or "image". */
+  imageKey: string
+  /** Commit message for the bump. */
+  commitMessage: string
+}
+
 type UpdateK8sConfigFileOptions = {
   /** Path within the k8s-config repo to edit. */
   path: string
@@ -141,6 +154,35 @@ export async function bumpArgoHelmImageTag(
       image.set("tag", opts.tag)
       helm.set("values", String(valuesDoc))
 
+      return String(doc)
+    },
+  })
+}
+
+/**
+ * Bump an image tag in a chart's `values.yaml` — a plain data file, so this is
+ * a straight YAML edit (unlike an ApplicationSet, whose `helm.values` is a
+ * Go-templated string). Used to pin worker images: the ApplicationSets defer to
+ * the chart default, and CD patches the default here.
+ */
+export async function bumpChartImageTag(
+  opts: BumpChartImageTagOptions,
+): Promise<void> {
+  await updateK8sConfigFile({
+    path: opts.valuesPath,
+    commitMessage: opts.commitMessage,
+    update(source) {
+      const doc = YAML.parseDocument(source)
+      const image = doc.get(opts.imageKey) as YAML.YAMLMap | null
+      if (!image || !YAML.isMap(image)) {
+        throw new Error(`No ${opts.imageKey} map in ${opts.valuesPath}`)
+      }
+      if (image.get("repository") !== opts.imageName) {
+        throw new Error(
+          `Expected ${opts.imageKey}.repository ${opts.imageName} in ${opts.valuesPath}`,
+        )
+      }
+      image.set("tag", opts.tag)
       return String(doc)
     },
   })

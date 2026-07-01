@@ -52,6 +52,11 @@ import {
   runDrbKickerLint,
 } from "./pipelines/drb-kicker.ts"
 import {
+  pipelineDivvunWorkerGrammar,
+  runDivvunWorkerGrammarBumpManifest,
+  runDivvunWorkerGrammarDeploy,
+} from "./pipelines/divvun-worker-grammar.ts"
+import {
   pipelineDict,
   runDictBuild,
   runDictDeploy,
@@ -414,6 +419,14 @@ async function runPipeline(args: any) {
       await runDrbKickerBumpManifest()
       break
     }
+    case "divvun-worker-grammar-deploy": {
+      await runDivvunWorkerGrammarDeploy()
+      break
+    }
+    case "divvun-worker-grammar-bump-manifest": {
+      await runDivvunWorkerGrammarBumpManifest()
+      break
+    }
     case "libpahkat-android": {
       await runLibpahkatAndroid()
       break
@@ -680,6 +693,10 @@ async function runCi(_args: any) {
     }
     case "drb-kicker": {
       pipeline = pipelineDrbKicker()
+      break
+    }
+    case "divvun-worker-grammar": {
+      pipeline = pipelineDivvunWorkerGrammar()
       break
     }
     case "pahkat": {
