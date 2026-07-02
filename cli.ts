@@ -52,10 +52,12 @@ import {
   runDrbKickerLint,
 } from "./pipelines/drb-kicker.ts"
 import {
-  pipelineDivvunWorkerGrammar,
-  runDivvunWorkerGrammarBumpManifest,
-  runDivvunWorkerGrammarDeploy,
-} from "./pipelines/divvun-worker-grammar.ts"
+  DIVVUN_WORKER_GRAMMAR,
+  DIVVUN_WORKER_SPELLER,
+  pipelineWorkerCd,
+  runWorkerCdBumpManifest,
+  runWorkerCdDeploy,
+} from "./pipelines/worker-cd.ts"
 import {
   pipelineDict,
   runDictBuild,
@@ -420,11 +422,19 @@ async function runPipeline(args: any) {
       break
     }
     case "divvun-worker-grammar-deploy": {
-      await runDivvunWorkerGrammarDeploy()
+      await runWorkerCdDeploy(DIVVUN_WORKER_GRAMMAR)
       break
     }
     case "divvun-worker-grammar-bump-manifest": {
-      await runDivvunWorkerGrammarBumpManifest()
+      await runWorkerCdBumpManifest(DIVVUN_WORKER_GRAMMAR)
+      break
+    }
+    case "divvun-worker-speller-deploy": {
+      await runWorkerCdDeploy(DIVVUN_WORKER_SPELLER)
+      break
+    }
+    case "divvun-worker-speller-bump-manifest": {
+      await runWorkerCdBumpManifest(DIVVUN_WORKER_SPELLER)
       break
     }
     case "libpahkat-android": {
@@ -696,7 +706,11 @@ async function runCi(_args: any) {
       break
     }
     case "divvun-worker-grammar": {
-      pipeline = pipelineDivvunWorkerGrammar()
+      pipeline = pipelineWorkerCd(DIVVUN_WORKER_GRAMMAR)
+      break
+    }
+    case "divvun-worker-speller": {
+      pipeline = pipelineWorkerCd(DIVVUN_WORKER_SPELLER)
       break
     }
     case "pahkat": {
