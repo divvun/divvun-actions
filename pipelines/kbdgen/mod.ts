@@ -68,7 +68,7 @@ export function pipelineKbdgen() {
       } else {
         const cargoCmd = os !== "linux" || arch === "x86_64-unknown-linux-gnu"
           ? "cargo"
-          : "rustup update && cross"
+          : "cross"
 
         steps.push(command({
           key: buildKey,
