@@ -212,8 +212,8 @@ RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/pahkat-uploader?platform
     bsdtar -xf pahkat-uploader.txz -C /usr/local && \
     rm pahkat-uploader.txz
 
-# kbdgen (nightly)
-RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/kbdgen?platform=linux&channel=nightly' -o kbdgen.txz && \
+# kbdgen (dev)
+RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/kbdgen?platform=linux&channel=dev' -o kbdgen.txz && \
     bsdtar -xf kbdgen.txz -C /usr/local && \
     rm kbdgen.txz
 

@@ -158,7 +158,7 @@ export default defineImage({
     libtorch(),
     openbao(),
     pahkatUploader(),
-    kbdgen(),
+    kbdgen({ channel: "dev" }),
     thfstTools(),
     awsCli(),
     divvunRuntime(),
