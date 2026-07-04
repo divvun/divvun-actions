@@ -110,6 +110,11 @@ export async function runDivvunActionsBuildImage(
 
   const buildArgs = ["build"]
   if (spec.platform) buildArgs.push("--platform", spec.platform)
+  // Escape hatch for when an upstream dependency (e.g. a tool fetched via
+  // `curl` mid-Dockerfile) has moved but the layer instruction text hasn't,
+  // so Docker's cache would otherwise keep serving the stale layer. Set via
+  // a Buildkite "New Build" environment variable override.
+  if (Deno.env.get("DOCKER_NO_CACHE") === "true") buildArgs.push("--no-cache")
   buildArgs.push("-t", ref, "-f", `docker/Dockerfile.${target}`, "docker")
 
   await builder.exec("docker", buildArgs)
