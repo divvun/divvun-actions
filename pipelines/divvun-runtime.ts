@@ -139,7 +139,7 @@ export async function pipelineDivvunRuntime() {
         label: `build-${target}`,
         command: [
           `uv venv --python 3.12; $$env:PATH = "$$PWD\\.venv\\Scripts;C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; .\\x.ps1 build --target ${target}`,
-          `mv ${targetFile} .\\${artifactName}-${target}`,
+          `if (Test-Path ${targetFile}) { Move-Item ${targetFile} .\\${artifactName}-${target} } else { Write-Host '--- ${artifactName} not at ${targetFile}; searching target for it'; Get-ChildItem -Recurse -Filter ${artifactName} target -ErrorAction SilentlyContinue | ForEach-Object FullName | Write-Host; exit 1 }`,
           `buildkite-agent artifact upload ${artifactName}-${target}`,
         ],
         agents: {
@@ -196,6 +196,7 @@ export async function pipelineDivvunRuntime() {
         key: `lib-build-${target}`,
         command: [
           `uv venv --python 3.12; $$env:PATH = "$$PWD\\.venv\\Scripts;C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; .\\x.ps1 build-lib --target ${target}`,
+          `Write-Host '--- target/${target}/release contents'; Get-ChildItem target/${target}/release -ErrorAction SilentlyContinue | ForEach-Object Name | Write-Host`,
           `New-Item -ItemType Directory -Force -Path ${stageDir}/lib | Out-Null`,
           `New-Item -ItemType Directory -Force -Path ${stageDir}/include | Out-Null`,
           `Copy-Item target/${target}/release/divvun_runtime.dll ${stageDir}/lib/`,
