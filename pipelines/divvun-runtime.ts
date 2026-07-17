@@ -138,8 +138,8 @@ export async function pipelineDivvunRuntime() {
       buildSteps.push(command({
         label: `build-${target}`,
         command: [
-          `uv venv --python 3.12; $$env:PATH = "$$PWD\\.venv\\Scripts;C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; .\\x.ps1 build --target ${target}`,
-          `if (Test-Path ${targetFile}) { Move-Item ${targetFile} .\\${artifactName}-${target} } else { Write-Host '--- ${artifactName} not at ${targetFile}; searching target for it'; Get-ChildItem -Recurse -Filter ${artifactName} target -ErrorAction SilentlyContinue | ForEach-Object FullName | Write-Host; exit 1 }`,
+          `uv venv --python 3.12; uv pip install pyyaml setuptools; $$env:PATH = "$$PWD\\.venv\\Scripts;C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; .\\x.ps1 build --target ${target}; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }`,
+          `Move-Item ${targetFile} .\\${artifactName}-${target}`,
           `buildkite-agent artifact upload ${artifactName}-${target}`,
         ],
         agents: {
@@ -195,8 +195,7 @@ export async function pipelineDivvunRuntime() {
         label: `lib-build-${target}`,
         key: `lib-build-${target}`,
         command: [
-          `uv venv --python 3.12; $$env:PATH = "$$PWD\\.venv\\Scripts;C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; .\\x.ps1 build-lib --target ${target}`,
-          `Write-Host '--- target/${target}/release contents'; Get-ChildItem target/${target}/release -ErrorAction SilentlyContinue | ForEach-Object Name | Write-Host`,
+          `uv venv --python 3.12; uv pip install pyyaml setuptools; $$env:PATH = "$$PWD\\.venv\\Scripts;C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; .\\x.ps1 build-lib --target ${target}; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }`,
           `New-Item -ItemType Directory -Force -Path ${stageDir}/lib | Out-Null`,
           `New-Item -ItemType Directory -Force -Path ${stageDir}/include | Out-Null`,
           `Copy-Item target/${target}/release/divvun_runtime.dll ${stageDir}/lib/`,
@@ -275,7 +274,7 @@ export async function pipelineDivvunRuntime() {
       uiBuildSteps.push(command({
         label: `Playground (${target}) - Build`,
         command: [
-          `uv venv --python 3.12; $$env:PATH = "$$PWD\\.venv\\Scripts;C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; echo '--- Building UI'; .\\x.ps1 build-ui --target ${target}`,
+          `uv venv --python 3.12; uv pip install pyyaml setuptools; $$env:PATH = "$$PWD\\.venv\\Scripts;C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; echo '--- Building UI'; .\\x.ps1 build-ui --target ${target}; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }`,
           `copy ".\\playground\\src-tauri\\target\\${target}\\release\\bundle\\msi\\Divvun Runtime Playground.msi" .`,
           `ren "Divvun Runtime Playground.msi" "divvun-rt-playground-${target}.msi"`,
           `buildkite-agent artifact upload divvun-rt-playground-${target}.msi`,
