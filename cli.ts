@@ -38,6 +38,7 @@ import {
   pipelineBorealium,
   runBorealiumBumpManifest,
   runBorealiumDeploy,
+  runBorealiumLint,
 } from "./pipelines/borealium.ts"
 import {
   pipelineKeyboardViewer,
@@ -387,6 +388,10 @@ async function runPipeline(args: any) {
     }
     case "divvun-worker-tts-publish": {
       await runDivvunWorkerTtsPublish()
+      break
+    }
+    case "borealium-lint": {
+      await runBorealiumLint()
       break
     }
     case "borealium-deploy": {
