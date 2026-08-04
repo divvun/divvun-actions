@@ -36,6 +36,7 @@ import {
 } from "./pipelines/divvun-actions.ts"
 import {
   pipelineBorealium,
+  runBorealiumBuild,
   runBorealiumBumpManifest,
   runBorealiumDeploy,
   runBorealiumLint,
@@ -392,6 +393,10 @@ async function runPipeline(args: any) {
     }
     case "borealium-lint": {
       await runBorealiumLint()
+      break
+    }
+    case "borealium-build": {
+      await runBorealiumBuild()
       break
     }
     case "borealium-deploy": {

@@ -23,12 +23,18 @@ export function pipelineBorealium(): BuildkitePipeline {
         agents: { queue: "linux" },
       }),
       command({
+        key: "build",
+        label: "Build",
+        command: "divvun-actions run borealium-build",
+        agents: { queue: "linux" },
+      }),
+      command({
         label: "Build & Push",
         key: "borealium-deploy",
         command: "divvun-actions run borealium-deploy",
         agents: { queue: "linux" },
         branches: "main",
-        depends_on: "lint",
+        depends_on: ["lint", "build"],
       }),
       command({
         label: "Bump k8s app manifest",
@@ -46,6 +52,11 @@ export async function runBorealiumLint() {
   await builder.exec("deno", ["lint"])
   await builder.exec("deno", ["install"])
   await builder.exec("deno", ["check"])
+}
+
+export async function runBorealiumBuild() {
+  await builder.exec("deno", ["install"])
+  await builder.exec("deno", ["task", "build"])
 }
 
 export async function runBorealiumDeploy() {
