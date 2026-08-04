@@ -21,11 +21,13 @@ export function pipelineBorealium(): BuildkitePipeline {
         key: "borealium-deploy",
         command: "divvun-actions run borealium-deploy",
         agents: { queue: "linux" },
+        branches: "main",
       }),
       command({
         label: "Bump k8s app manifest",
         command: "divvun-actions run borealium-bump-manifest",
         agents: { queue: "linux" },
+        branches: "main",
         depends_on: "borealium-deploy",
       }),
     ],
