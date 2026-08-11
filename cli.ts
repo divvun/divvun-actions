@@ -30,6 +30,8 @@ import {
   pipelineRsigncode,
   runRsigncodePublish,
 } from "./pipelines/rsigncode.ts"
+import { pipelineHfstRs, runHfstRsPublish } from "./pipelines/hfst-rs.ts"
+import { pipelineCg3Rs, runCg3RsPublish } from "./pipelines/cg3-rs.ts"
 import {
   pipelineDivvunActions,
   runDivvunActionsBuildImage,
@@ -368,6 +370,14 @@ async function runPipeline(args: any) {
       await runRsigncodePublish()
       break
     }
+    case "hfst-rs-publish": {
+      await runHfstRsPublish()
+      break
+    }
+    case "cg3-rs-publish": {
+      await runCg3RsPublish()
+      break
+    }
     case "divvun-actions-build-image": {
       const target = args._[1] as string
       const pushArg = args._[2] as string
@@ -697,6 +707,14 @@ async function runCi(_args: any) {
     }
     case "rsigncode": {
       pipeline = pipelineRsigncode()
+      break
+    }
+    case "hfst-rs": {
+      pipeline = pipelineHfstRs()
+      break
+    }
+    case "cg3-rs": {
+      pipeline = pipelineCg3Rs()
       break
     }
     case "divvun-actions": {
