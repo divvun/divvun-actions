@@ -5,6 +5,23 @@ import logger from "~/util/log.ts"
 
 const GTLEXTOOLS_SPEC = "git+https://github.com/divvun/GiellaLTLexTools"
 
+/** Where docker/tools/{hfst,cg3}.ts stage the Rust binaries in the images. */
+const DIVVUN_RUST_BIN = "/opt/divvun/bin"
+
+/**
+ * Repos switched over to the Rust hfst/cg3. That directory is deliberately
+ * left off PATH in the images so the apt C++ tools stay the default; listing a
+ * repo here opts its giella build and test steps into the Rust toolchain.
+ *
+ * `pipelineLang()` reads the same predicate to tag the affected step labels
+ * with "(Rust)", so a glance at the build tells you which toolchain ran.
+ */
+export const RUST_TOOLCHAIN_REPOS = ["lang-kal"]
+
+export function usesRustToolchain(): boolean {
+  return RUST_TOOLCHAIN_REPOS.includes(builder.env.repoName)
+}
+
 async function ensureGtlextoolsVenv(): Promise<void> {
   const cacheRoot = Deno.env.get("BUILDKITE_PLUGIN_FS_CACHE_FOLDER") ??
     path.join(
@@ -53,6 +70,14 @@ async function ensureGtlextoolsVenv(): Promise<void> {
 }
 
 export async function setupGiellaCoreDependencies(): Promise<void> {
+  // Prepend before anything else runs: giella-core's make below, and every
+  // autogen/configure/make in the callers, are spawned without an explicit
+  // env and so inherit this process's PATH.
+  if (usesRustToolchain()) {
+    logger.info(`Using Rust hfst/cg3 from ${DIVVUN_RUST_BIN}`)
+    builder.addPath(DIVVUN_RUST_BIN)
+  }
+
   await ensureGtlextoolsVenv()
 
   // Check ../giella-core and ../shared-mul

@@ -11,6 +11,7 @@ import langSpellerBuild from "~/actions/lang/build-speller.ts"
 import langTtsTextprocBuild from "~/actions/lang/build-tts-textproc.ts"
 import langBuild from "~/actions/lang/build.ts"
 import langCheck from "~/actions/lang/check.ts"
+import { usesRustToolchain } from "~/actions/lang/common.ts"
 import langGrammarTest from "~/actions/lang/test-grammar.ts"
 import langSpellerTest from "~/actions/lang/test-speller.ts"
 import * as builder from "~/builder.ts"
@@ -929,6 +930,11 @@ export async function pipelineLang() {
   const extra: Record<string, string> =
     LARGE_BUILDS.includes(builder.env.repoName) ? { size: "large" } : {}
 
+  // Steps that shell out to hfst/cg3 get tagged so the toolchain in use is
+  // visible from the build page. setupGiellaCoreDependencies() does the actual
+  // PATH switch off the same predicate.
+  const toolchainTag = usesRustToolchain() ? " (Rust)" : ""
+
   // Read build configuration to check if grammar-checkers are enabled
   let buildConfig: BuildProps | undefined
   try {
@@ -942,7 +948,7 @@ export async function pipelineLang() {
   // Separate build steps for spellers and grammar checkers
   const spellerBuildStep = command({
     key: "speller-build",
-    label: "Build Spellers",
+    label: `Build Spellers${toolchainTag}`,
     command: "divvun-actions run lang-speller-build",
     agents: {
       queue: "linux",
@@ -956,7 +962,7 @@ export async function pipelineLang() {
 
   const grammarBuildStep = command({
     key: "grammar-build",
-    label: "Build Grammar Checkers",
+    label: `Build Grammar Checkers${toolchainTag}`,
     command: "divvun-actions run lang-grammar-build",
     depends_on: "speller-build",
     agents: {
@@ -971,7 +977,7 @@ export async function pipelineLang() {
 
   const ttsTextprocBuildStep = command({
     key: "tts-textproc-build",
-    label: "Build TTS Text Processor",
+    label: `Build TTS Text Processor${toolchainTag}`,
     command: "divvun-actions run lang-tts-textproc-build",
     agents: {
       queue: "linux",
@@ -1021,7 +1027,7 @@ export async function pipelineLang() {
   if (!isReleaseTag) {
     testSteps.push(command({
       key: "speller-test",
-      label: "Test Spellers",
+      label: `Test Spellers${toolchainTag}`,
       command: "divvun-actions run lang-speller-test",
       depends_on: "speller-build",
       soft_fail: true,
@@ -1037,7 +1043,7 @@ export async function pipelineLang() {
     ) {
       testSteps.push(command({
         key: "grammar-test",
-        label: "Test Grammar Checkers",
+        label: `Test Grammar Checkers${toolchainTag}`,
         command: "divvun-actions run lang-grammar-test",
         depends_on: "grammar-build",
         soft_fail: true,
