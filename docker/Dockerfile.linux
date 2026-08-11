@@ -222,6 +222,35 @@ RUN curl -fsSL 'https://pahkat.uit.no/artifacts/thfst-tools_1.0.0-alpha.2_linux_
     bsdtar -xf thfst-tools.txz -C /usr/local && \
     rm thfst-tools.txz
 
+# hfst (dev-latest, /opt/divvun/bin, off PATH)
+RUN set -eu && \
+    URL=$(curl -fsSL https://api.github.com/repos/divvun/hfst-rs/releases/tags/dev-latest \
+          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*hfst-x86_64-unknown-linux-musl-[^"]*\.tgz"' \
+          | head -1 \
+          | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
+    test -n "$URL" || { echo 'no hfst-x86_64-unknown-linux-musl asset on dev-latest' >&2; exit 1; } && \
+    curl -fsSL "$URL" -o /tmp/hfst.tgz && \
+    tar -xf /tmp/hfst.tgz -C /tmp && \
+    install -d /opt/divvun/bin && \
+    install -m 755 /tmp/hfst-x86_64-unknown-linux-musl-*/hfst /opt/divvun/bin/hfst && \
+    /opt/divvun/bin/hfst install-symlinks /opt/divvun/bin && \
+    test -L /opt/divvun/bin/hfst-lexc || { echo 'hfst install-symlinks produced no symlinks' >&2; exit 1; } && \
+    rm -rf /tmp/hfst.tgz /tmp/hfst-x86_64-unknown-linux-musl-*
+
+# cg3 (dev-latest, /opt/divvun/bin, off PATH)
+RUN set -eu && \
+    URL=$(curl -fsSL https://api.github.com/repos/divvun/cg3-rs/releases/tags/dev-latest \
+          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*cg3-x86_64-unknown-linux-musl-[^"]*\.tgz"' \
+          | head -1 \
+          | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
+    test -n "$URL" || { echo 'no cg3-x86_64-unknown-linux-musl asset on dev-latest' >&2; exit 1; } && \
+    curl -fsSL "$URL" -o /tmp/cg3.tgz && \
+    tar -xf /tmp/cg3.tgz -C /tmp && \
+    install -d /opt/divvun/bin && \
+    install -m 755 /tmp/cg3-x86_64-unknown-linux-musl-*/* /opt/divvun/bin/ && \
+    test -x /opt/divvun/bin/vislcg3 || { echo 'cg3 archive is missing vislcg3' >&2; exit 1; } && \
+    rm -rf /tmp/cg3.tgz /tmp/cg3-x86_64-unknown-linux-musl-*
+
 # aws-cli v2
 RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
     unzip awscliv2.zip && \

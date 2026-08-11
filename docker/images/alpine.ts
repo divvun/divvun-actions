@@ -2,9 +2,11 @@ import { defineImage } from "../lib/image.ts"
 import {
   alpineSysroot,
   b3sum,
+  cg3,
   clangSymlinks,
   gh,
   gitLfsInit,
+  hfst,
   minisign,
   mkdir,
   openbao,
@@ -91,6 +93,8 @@ export default defineImage({
     gh(),
     minisign(),
     pahkatUploader(),
+    hfst(),
+    cg3(),
     gitLfsInit(),
     mkdir({
       path: "$BUILDKITE_PLUGIN_FS_CACHE_FOLDER",
