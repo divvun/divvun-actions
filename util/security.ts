@@ -163,6 +163,27 @@ export interface SetupSigningFromMatchOptions {
   matchPassword: string
 }
 
+// Match installs profiles to ~/Library/Developer/Xcode/UserData/Provisioning Profiles/<UUID>.mobileprovision
+// and never removes old ones, so on a persistent build agent this directory
+// accumulates profiles from every past cert renewal.
+async function findMatchingProfiles(
+  profilesDir: string,
+  bundleId: string,
+): Promise<string[]> {
+  const matches: string[] = []
+  for await (const entry of Deno.readDir(profilesDir)) {
+    if (!entry.name.endsWith(".mobileprovision")) continue
+
+    const fullPath = path.join(profilesDir, entry.name)
+    const data = await Deno.readFile(fullPath)
+    const text = new TextDecoder("utf-8", { fatal: false }).decode(data)
+    if (text.includes(bundleId)) {
+      matches.push(fullPath)
+    }
+  }
+  return matches
+}
+
 /**
  * Set up iOS signing credentials via fastlane match.
  * Creates a temporary keychain, imports certs via match, exports the
@@ -193,6 +214,26 @@ export async function setupSigningFromMatch(
     // (required for security find-identity to recognize the distribution cert)
     const wwdrCertPath = await downloadAppleWWDRCA("G3")
     await Security.import(keychainName, wwdrCertPath)
+
+    const profilesDir = path.join(
+      Deno.env.get("HOME")!,
+      "Library/Developer/Xcode/UserData/Provisioning Profiles",
+    )
+
+    // On a persistent build agent this directory can hold profiles from past
+    // cert renewals. Clear out anything for this bundle ID before running
+    // match, so the profile we pick up afterwards can't be a stale leftover.
+    try {
+      const stale = await findMatchingProfiles(profilesDir, bundleId)
+      for (const staleProfile of stale) {
+        await Deno.remove(staleProfile)
+        logger.info(`Removed stale provisioning profile: ${staleProfile}`)
+      }
+    } catch (err) {
+      if (!(err instanceof Deno.errors.NotFound)) {
+        throw err
+      }
+    }
 
     // Run fastlane match to install cert into keychain
     await builder.exec("fastlane", [
@@ -248,32 +289,25 @@ export async function setupSigningFromMatch(
     const certificate = encodeBase64(certData)
     logger.info(`Exported certificate from keychain (${certData.length} bytes)`)
 
-    // Read the provisioning profile installed by match.
-    // Match installs profiles to ~/Library/Developer/Xcode/UserData/Provisioning Profiles/<UUID>.mobileprovision
-    const profilesDir = path.join(
-      Deno.env.get("HOME")!,
-      "Library/Developer/Xcode/UserData/Provisioning Profiles",
-    )
+    // Read the provisioning profile installed by match. The pre-match
+    // cleanup above guarantees at most one profile for this bundle ID can
+    // exist here now.
+    const matches = await findMatchingProfiles(profilesDir, bundleId)
 
-    let profilePath: string | null = null
-    for await (const entry of Deno.readDir(profilesDir)) {
-      if (!entry.name.endsWith(".mobileprovision")) continue
-
-      const fullPath = path.join(profilesDir, entry.name)
-      const data = await Deno.readFile(fullPath)
-      const text = new TextDecoder("utf-8", { fatal: false }).decode(data)
-      if (text.includes(bundleId)) {
-        profilePath = fullPath
-        break
-      }
-    }
-
-    if (!profilePath) {
+    if (matches.length === 0) {
       throw new Error(
         `No provisioning profile for ${bundleId} found in ${profilesDir}`,
       )
     }
+    if (matches.length > 1) {
+      throw new Error(
+        `Expected exactly one provisioning profile for ${bundleId} after cleanup, found ${matches.length}: ${
+          matches.join(", ")
+        }`,
+      )
+    }
 
+    const profilePath = matches[0]
     logger.info(`Found provisioning profile: ${profilePath}`)
     const profileData = await Deno.readFile(profilePath)
     const mobileProvision = encodeBase64(profileData)
