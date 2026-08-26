@@ -4,6 +4,7 @@ import * as builder from "~/builder.ts"
 import { ExpectedError } from "~/util/error.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
+import { updateDependencyRepo } from "./common.ts"
 
 class Autotools {
   private directory: string
@@ -185,15 +186,7 @@ export default async function langBuild(
   // Check ../giella-core and ../shared-mul
   const giellaCorePath = path.join(Deno.cwd(), "..", "giella-core")
   if (await fs.exists(giellaCorePath)) {
-    // git pull
-    const proc = new Deno.Command("git", {
-      args: ["pull"],
-      cwd: giellaCorePath,
-    }).spawn()
-    const status = await proc.status
-    if (status.code !== 0) {
-      throw new Error(`Failed to update giella-core: ${status.code}`)
-    }
+    await updateDependencyRepo(giellaCorePath, "giella-core")
 
     const proc2 = new Deno.Command("make", { cwd: giellaCorePath }).spawn()
     const status2 = await proc2.status
@@ -204,15 +197,7 @@ export default async function langBuild(
 
   const sharedMulPath = path.join(Deno.cwd(), "..", "shared-mul")
   if (await fs.exists(sharedMulPath)) {
-    // git pull
-    const proc = new Deno.Command("git", {
-      args: ["pull"],
-      cwd: sharedMulPath,
-    }).spawn()
-    const status = await proc.status
-    if (status.code !== 0) {
-      throw new Error(`Failed to update shared-mul: ${status.code}`)
-    }
+    await updateDependencyRepo(sharedMulPath, "shared-mul")
   }
 
   const flags = deriveAutogenFlags(buildConfig)
