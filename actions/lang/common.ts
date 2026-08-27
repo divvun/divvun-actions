@@ -16,7 +16,7 @@ const DIVVUN_RUST_BIN = "/opt/divvun/bin"
  * `pipelineLang()` reads the same predicate to tag the affected step labels
  * with "(Rust)", so a glance at the build tells you which toolchain ran.
  */
-export const RUST_TOOLCHAIN_REPOS = ["lang-kal"]
+export const RUST_TOOLCHAIN_REPOS = ["lang-kal", "lang-sme"]
 
 export function usesRustToolchain(): boolean {
   return RUST_TOOLCHAIN_REPOS.includes(builder.env.repoName)

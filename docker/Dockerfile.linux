@@ -222,13 +222,15 @@ RUN curl -fsSL 'https://pahkat.uit.no/artifacts/thfst-tools_1.0.0-alpha.2_linux_
     bsdtar -xf thfst-tools.txz -C /usr/local && \
     rm thfst-tools.txz
 
-# hfst (dev-latest, /opt/divvun/bin, off PATH)
+# hfst (dev-latest @ 2026-08-27, /opt/divvun/bin, off PATH)
 RUN set -eu && \
+    echo 'hfst dev-latest refresh: 2026-08-27' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/hfst-rs/releases/tags/dev-latest \
           | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*hfst-x86_64-unknown-linux-musl-[^"]*\.tgz"' \
           | head -1 \
           | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
     test -n "$URL" || { echo 'no hfst-x86_64-unknown-linux-musl asset on dev-latest' >&2; exit 1; } && \
+    echo "installing $URL" && \
     curl -fsSL "$URL" -o /tmp/hfst.tgz && \
     tar -xf /tmp/hfst.tgz -C /tmp && \
     install -d /opt/divvun/bin && \
@@ -237,13 +239,15 @@ RUN set -eu && \
     test -L /opt/divvun/bin/hfst-lexc || { echo 'hfst install-symlinks produced no symlinks' >&2; exit 1; } && \
     rm -rf /tmp/hfst.tgz /tmp/hfst-x86_64-unknown-linux-musl-*
 
-# cg3 (dev-latest, /opt/divvun/bin, off PATH)
+# cg3 (dev-latest @ 2026-08-27, /opt/divvun/bin, off PATH)
 RUN set -eu && \
+    echo 'cg3 dev-latest refresh: 2026-08-27' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/cg3-rs/releases/tags/dev-latest \
           | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*cg3-x86_64-unknown-linux-musl-[^"]*\.tgz"' \
           | head -1 \
           | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
     test -n "$URL" || { echo 'no cg3-x86_64-unknown-linux-musl asset on dev-latest' >&2; exit 1; } && \
+    echo "installing $URL" && \
     curl -fsSL "$URL" -o /tmp/cg3.tgz && \
     tar -xf /tmp/cg3.tgz -C /tmp && \
     install -d /opt/divvun/bin && \

@@ -6,6 +6,16 @@ const TARGET = "x86_64-unknown-linux-musl"
 const PREFIX = "/opt/divvun/bin"
 
 /**
+ * Bump to pull a newer `dev-latest` build into the image.
+ *
+ * The RUN below is otherwise byte-identical from one generation to the next,
+ * so Docker reuses the cached layer forever and the image keeps whichever
+ * binaries it happened to fetch first, no matter how far `dev-latest` has
+ * moved. This token is echoed inside the RUN so changing it is a cache miss.
+ */
+const REFRESH = "2026-08-27"
+
+/**
  * Install the Rust cg3 tools from the rolling `dev-latest` release on
  * divvun/cg3-rs: vislcg3, cg-comp, cg-proc, cg-conv, cg-relabel, cg-mwesplit.
  *
@@ -22,7 +32,7 @@ export function cg3(opts: { prefix?: string } = {}): Tool {
   const prefix = opts.prefix ?? PREFIX
 
   return {
-    name: `cg3 (${RELEASE_TAG}, ${prefix}, off PATH)`,
+    name: `cg3 (${RELEASE_TAG} @ ${REFRESH}, ${prefix}, off PATH)`,
     render: (ctx) => {
       if (ctx.platform === "windows") {
         throw new Error(
@@ -34,11 +44,13 @@ export function cg3(opts: { prefix?: string } = {}): Tool {
       // grep instead of jq so we don't add a dependency just for this.
       return [
         `RUN set -eu && \\`,
+        `    echo 'cg3 ${RELEASE_TAG} refresh: ${REFRESH}' && \\`,
         `    URL=$(curl -fsSL https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG} \\`,
         `          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*cg3-${TARGET}-[^"]*\\.tgz"' \\`,
         `          | head -1 \\`,
         `          | sed -E 's/.*"(https:[^"]+)"$/\\1/') && \\`,
         `    test -n "$URL" || { echo 'no cg3-${TARGET} asset on ${RELEASE_TAG}' >&2; exit 1; } && \\`,
+        `    echo "installing $URL" && \\`,
         `    curl -fsSL "$URL" -o /tmp/cg3.tgz && \\`,
         `    tar -xf /tmp/cg3.tgz -C /tmp && \\`,
         `    install -d ${prefix} && \\`,
