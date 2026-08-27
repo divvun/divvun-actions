@@ -96,7 +96,7 @@ RUN apt-get update && \
     librsvg2-dev && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
-# android SDK (platform=android-35, build-tools=35.0.1, ndk=28.2.13676358)
+# android SDK (platform=android-36, build-tools=36.0.0, ndk=28.2.13676358)
 RUN curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip -o commandlinetools.zip && \
     mkdir -p ~/Android/sdk/cmdline-tools && \
     unzip commandlinetools.zip -d ~/Android/sdk/cmdline-tools && \
@@ -105,8 +105,8 @@ RUN curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-1
     yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses && \
     $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
     "platform-tools" \
-    "platforms;android-35" \
-    "build-tools;35.0.1" \
+    "platforms;android-36" \
+    "build-tools;36.0.0" \
     "ndk;28.2.13676358"
 
 # clang-21 symlinks as default

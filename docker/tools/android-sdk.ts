@@ -18,8 +18,8 @@ export type AndroidSdkOpts = {
 export function androidSdk(opts: AndroidSdkOpts = {}): Tool {
   const url = opts.commandLineToolsUrl ??
     "https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip"
-  const platform = opts.platform ?? "android-35"
-  const buildTools = opts.buildTools ?? "35.0.1"
+  const platform = opts.platform ?? "android-36"
+  const buildTools = opts.buildTools ?? "36.0.0"
   const ndk = opts.ndkVersion ?? versions.ndk
   return {
     name:
