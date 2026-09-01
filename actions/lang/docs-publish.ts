@@ -20,6 +20,18 @@ import { readTestlogs, type TestlogsManifest } from "./testlogs.ts"
  */
 const DOCS_DATA_BRANCH = "docs-data"
 
+/**
+ * Link to this build's log. The docs pages are public, so point at the
+ * `builds.giellalt.org` mirror rather than `buildkite.com` (which needs a
+ * Buildkite org seat to view).
+ */
+function buildLogUrl(): string | null {
+  const slug = builder.env.pipelineSlug ?? builder.env.repoName
+  return builder.env.buildNumber
+    ? `https://builds.giellalt.org/pipelines/${slug}/builds/${builder.env.buildNumber}`
+    : null
+}
+
 // --- testlogs.json --------------------------------------------------------
 
 /**
@@ -31,18 +43,12 @@ const DOCS_DATA_BRANCH = "docs-data"
  * Returns the list of files written.
  */
 async function buildTestlogs(testlogsDir: string): Promise<string[]> {
-  const org = builder.env.organizationSlug ?? "divvun"
-  const slug = builder.env.pipelineSlug ?? builder.env.repoName
-  const buildUrl = builder.env.buildNumber
-    ? `https://buildkite.com/${org}/${slug}/builds/${builder.env.buildNumber}`
-    : null
-
   const { summaries, details } = await readTestlogs(testlogsDir)
 
   const manifest: TestlogsManifest = {
     generated: new Date().toISOString(),
     commit: builder.env.commit ?? null,
-    build_url: buildUrl,
+    build_url: buildLogUrl(),
     suites: summaries,
   }
 
@@ -231,16 +237,12 @@ export async function runLangDocsPublish() {
   const testlogAssets = await buildTestlogs("docs/testlogs")
 
   // Provenance for the docs pages (they show "data from <commit>, <n> ago").
-  const org = builder.env.organizationSlug ?? "divvun"
-  const slug = builder.env.pipelineSlug ?? builder.env.repoName
   await Deno.writeTextFile(
     "meta.json",
     JSON.stringify({
       generated: new Date().toISOString(),
       commit: builder.env.commit ?? null,
-      build_url: builder.env.buildNumber
-        ? `https://buildkite.com/${org}/${slug}/builds/${builder.env.buildNumber}`
-        : null,
+      build_url: buildLogUrl(),
     }),
   )
 
