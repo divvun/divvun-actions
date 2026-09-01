@@ -1059,9 +1059,9 @@ export async function pipelineLang() {
   }
 
   // Docs data (badge JSON + report.json + testlogs.json) → the repo's rolling
-  // `docs-data` orphan branch, which the docs site and README badges read by
-  // `raw.githubusercontent.com` URL. main only, soft_fail — never blocks a
-  // build. See docs/badgedata-artifact-migration.md.
+  // `generated/docs-data` orphan branch, which the docs site and README badges
+  // read by `raw.githubusercontent.com` URL. main only, soft_fail — never
+  // blocks a build. See docs/badgedata-artifact-migration.md.
   const docsSteps: CommandStep[] = []
   if (!isReleaseTag && builder.env.branch === "main") {
     docsSteps.push(command({

@@ -13,12 +13,13 @@ import { readTestlogs, type TestlogsManifest } from "./testlogs.ts"
 
 /**
  * Rolling orphan branch the docs site + README badges read from, via
- * `raw.githubusercontent.com/<repo>/docs-data/<file>` (the one GitHub host that
- * sends `access-control-allow-origin: *`, so the browser can `fetch()` it).
- * Force-pushed on every `main` build — one commit, no history. See
- * docs/badgedata-artifact-migration.md.
+ * `raw.githubusercontent.com/<repo>/generated/docs-data/<file>` (the one GitHub
+ * host that sends `access-control-allow-origin: *`, so the browser can
+ * `fetch()` it). Force-pushed on every `main` build — one commit, no history.
+ * The `generated/` prefix makes git clients fold it into one collapsible
+ * folder. See docs/badgedata-artifact-migration.md.
  */
-const DOCS_DATA_BRANCH = "docs-data"
+const DOCS_DATA_BRANCH = "generated/docs-data"
 
 /**
  * Link to this build's log. The docs pages are public, so point at the
@@ -256,10 +257,10 @@ export async function runLangDocsPublish() {
 
   // Force-push a fresh orphan commit: the branch is a transport buffer for the
   // latest build's data, not an archive. Files land at the branch root, so the
-  // raw URL is `.../<repo>/docs-data/<basename>`.
-  // `[skip ci]` so the push to docs-data doesn't spawn a (doomed) lang build
-  // on that branch — Buildkite honours it in the HEAD commit message. Without
-  // it the repo's CI status badge would flip to that failure.
+  // raw URL is `.../<repo>/generated/docs-data/<basename>`.
+  // `[skip ci]` so the push doesn't spawn a (doomed) lang build on that branch
+  // — Buildkite honours it in the HEAD commit message. Without it the repo's
+  // CI status badge would flip to that failure.
   const gh = new GitHub(builder.env.repo)
   await gh.publishBranch(
     DOCS_DATA_BRANCH,
