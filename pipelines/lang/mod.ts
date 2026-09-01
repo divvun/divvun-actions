@@ -7,6 +7,7 @@ import proofingBundle, {
   type ProofingTarget,
 } from "~/actions/proofing/bundle.ts"
 import langGrammarBuild from "~/actions/lang/build-grammar.ts"
+import { runLangDocsPublish } from "~/actions/lang/docs-publish.ts"
 import langSpellerBuild from "~/actions/lang/build-speller.ts"
 import langTtsTextprocBuild from "~/actions/lang/build-tts-textproc.ts"
 import langBuild from "~/actions/lang/build.ts"
@@ -32,6 +33,8 @@ import {
 } from "../../actions/speller/manifest.ts"
 import { NIGHTLY_CHANNEL } from "../../actions/version.ts"
 import logger from "../../util/log.ts"
+
+export { runLangDocsPublish }
 
 function command(input: CommandStep): CommandStep {
   return {
@@ -1055,6 +1058,25 @@ export async function pipelineLang() {
     }
   }
 
+  // Docs data (badge JSON + report.json + testlogs.json) → the repo's rolling
+  // `docs-latest` GitHub Release, which the docs site and README badges read by
+  // URL. main only, soft_fail — never blocks a build.
+  // See docs/badgedata-artifact-migration.md.
+  const docsSteps: CommandStep[] = []
+  if (!isReleaseTag && builder.env.branch === "main") {
+    docsSteps.push(command({
+      key: "docs-publish",
+      label: "Publish Docs Data",
+      command: "divvun-actions run lang-docs-publish",
+      depends_on: "speller-test",
+      soft_fail: true,
+      agents: {
+        queue: "linux",
+        ...extra,
+      },
+    }))
+  }
+
   // Bundle phase steps array (only on deploy)
   const bundleSteps: CommandStep[] = []
   // Outto validation steps go into their own side group so they're isolated
@@ -1228,6 +1250,14 @@ export async function pipelineLang() {
       group: "Test",
       key: "test",
       steps: testSteps,
+    })
+  }
+
+  if (docsSteps.length > 0) {
+    steps.push({
+      group: "Docs",
+      key: "docs",
+      steps: docsSteps,
     })
   }
 

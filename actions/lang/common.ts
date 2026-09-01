@@ -211,6 +211,20 @@ export async function runLangTests(opts: {
 
   const status = await proc.status
 
+  // `make check` writes the per-suite lemma-test JSON into docs/testlogs/
+  // (gtlemmatest/gtspelltest -J). Hand it to the docs-publish step, which
+  // turns it into the testlogs manifest on the rolling release. Upload before
+  // the exit-on-failure below: failing tests are exactly when these logs
+  // matter. Only the speller run does this, so grammar tests don't upload a
+  // second identical copy.
+  if (label === "speller") {
+    try {
+      await builder.uploadArtifacts("docs/testlogs/*-lemmas.json")
+    } catch (e) {
+      logger.warning(`Failed to upload testlogs: ${e}`)
+    }
+  }
+
   // Exit with the actual test exit code - soft_fail in pipeline config handles continuation
   if (status.code !== 0) {
     logger.error(`${label} tests failed with exit code ${status.code}`)
