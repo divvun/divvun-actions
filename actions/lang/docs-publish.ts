@@ -255,6 +255,9 @@ export async function runLangDocsPublish() {
   // Force-push a fresh orphan commit: the branch is a transport buffer for the
   // latest build's data, not an archive. Files land at the branch root, so the
   // raw URL is `.../<repo>/docs-data/<basename>`.
+  // `[skip ci]` so the push to docs-data doesn't spawn a (doomed) lang build
+  // on that branch — Buildkite honours it in the HEAD commit message. Without
+  // it the repo's CI status badge would flip to that failure.
   const gh = new GitHub(builder.env.repo)
   await gh.publishBranch(
     DOCS_DATA_BRANCH,
@@ -263,7 +266,7 @@ export async function runLangDocsPublish() {
       orphan: true,
       message: `docs data: ${builder.env.commit?.slice(0, 8) ?? "?"} (build ${
         builder.env.buildNumber ?? "?"
-      })`,
+      }) [skip ci]`,
     },
   )
 
