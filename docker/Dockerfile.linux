@@ -54,6 +54,7 @@ RUN apt-get update && \
     flex \
     git-lfs \
     imagemagick \
+    jq \
     just \
     libarchive-tools \
     libboost-all-dev \
@@ -266,6 +267,13 @@ RUN curl -fsSL "https://github.com/divvun/divvun-runtime/releases/download/v0.3.
     bsdtar -xf divvun-runtime.tgz && \
     cp divvun-runtime-x86_64*/divvun-runtime /usr/local/bin/divvun-runtime && \
     rm -rf divvun-runtime.tgz divvun-runtime-x86_64*
+
+# divvunspell@1.0.0-beta.13
+RUN curl -fsSL "https://github.com/divvun/divvunspell/releases/download/divvunspell/v1.0.0-beta.13/divvunspell-x86_64-unknown-linux-gnu-v1.0.0-beta.13.tgz" -o divvunspell.tgz && \
+    tar -xf divvunspell.tgz && \
+    install -m 755 divvunspell-x86_64-unknown-linux-gnu-v1.0.0-beta.13/divvunspell /usr/local/bin/divvunspell && \
+    rm -rf divvunspell.tgz divvunspell-x86_64-unknown-linux-gnu-v1.0.0-beta.13 && \
+    divvunspell --version
 
 # minisign@0.12
 RUN curl -fsSL "https://github.com/jedisct1/minisign/releases/download/0.12/minisign-0.12-linux.tar.gz" -o "minisign.tar.gz" && \
