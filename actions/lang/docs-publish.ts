@@ -12,11 +12,13 @@ import {
 import { readTestlogs, type TestlogsManifest } from "./testlogs.ts"
 
 /**
- * Rolling release the docs site + README badges read from. Updated in place on
- * every `main` build — same pattern as the `speller-<lang>/dev-latest`
- * nightlies. See docs/badgedata-artifact-migration.md.
+ * Rolling orphan branch the docs site + README badges read from, via
+ * `raw.githubusercontent.com/<repo>/docs-data/<file>` (the one GitHub host that
+ * sends `access-control-allow-origin: *`, so the browser can `fetch()` it).
+ * Force-pushed on every `main` build — one commit, no history. See
+ * docs/badgedata-artifact-migration.md.
  */
-const DOCS_RELEASE_TAG = "docs-latest"
+const DOCS_DATA_BRANCH = "docs-data"
 
 // --- testlogs.json --------------------------------------------------------
 
@@ -228,24 +230,42 @@ export async function runLangDocsPublish() {
   const badgeAssets = await generateDocsData(buildConfig)
   const testlogAssets = await buildTestlogs("docs/testlogs")
 
-  const assets = [...badgeAssets, ...testlogAssets]
-  logger.info(`Publishing ${assets.length} assets to ${DOCS_RELEASE_TAG}:`)
+  // Provenance for the docs pages (they show "data from <commit>, <n> ago").
+  const org = builder.env.organizationSlug ?? "divvun"
+  const slug = builder.env.pipelineSlug ?? builder.env.repoName
+  await Deno.writeTextFile(
+    "meta.json",
+    JSON.stringify({
+      generated: new Date().toISOString(),
+      commit: builder.env.commit ?? null,
+      build_url: builder.env.buildNumber
+        ? `https://buildkite.com/${org}/${slug}/builds/${builder.env.buildNumber}`
+        : null,
+    }),
+  )
+
+  const assets = [...badgeAssets, ...testlogAssets, "meta.json"]
+  logger.info(`Publishing ${assets.length} files to ${DOCS_DATA_BRANCH}:`)
   for (const a of assets) logger.info(`  ${a}`)
 
   if (!builder.env.repo) {
     throw new Error("No repository information available")
   }
 
-  // updateRelease creates the docs-latest tag on first run and thereafter just
-  // swaps the assets. The tag then points at that first commit forever, which
-  // is cosmetic: the releases/download/docs-latest/<file> URLs resolve via the
-  // release regardless, and testlogs.json carries the real `commit`.
+  // Force-push a fresh orphan commit: the branch is a transport buffer for the
+  // latest build's data, not an archive. Files land at the branch root, so the
+  // raw URL is `.../<repo>/docs-data/<basename>`.
   const gh = new GitHub(builder.env.repo)
-  await gh.updateRelease(DOCS_RELEASE_TAG, assets, {
-    draft: false,
-    prerelease: true,
-    name: "Docs data (latest main build)",
-  })
+  await gh.publishBranch(
+    DOCS_DATA_BRANCH,
+    assets.map((a) => ({ path: path.basename(a), source: a })),
+    {
+      orphan: true,
+      message: `docs data: ${builder.env.commit?.slice(0, 8) ?? "?"} (build ${
+        builder.env.buildNumber ?? "?"
+      })`,
+    },
+  )
 
   logger.info("Docs data published")
 }

@@ -1,28 +1,75 @@
-# Move badgedata & test data out of `lang-` repos → rolling GitHub Release
+# Move badgedata & test data out of `lang-` repos → rolling `docs-data` branch
 
 Tracking issue: [divvun/divvun-actions#19](https://github.com/divvun/divvun-actions/issues/19)
 
 ## Goal
 
 `lang-` repos stop carrying generated data on `main`. Every `main` build on
-Buildkite regenerates it and publishes it to a **rolling GitHub Release**
-(`docs-latest`) on that repo. The docs site and README badges consume it by
-**stable URL / runtime fetch**, so the docs pipeline and the language build
-never need to be synchronised.
+Buildkite regenerates it and publishes it to a **rolling orphan branch**
+(`docs-data`) on that repo. The docs site and README badges consume it by
+**stable URL / runtime fetch** from `raw.githubusercontent.com`, so the docs
+pipeline and the language build never need to be synchronised.
 
 ### Principle
 
 The docs site *references* build outputs by stable URL; it does not embed them
 at build time. Consequences:
 
-- **Badges** → shields.io `endpoint` badges pointed at release-asset URLs.
-  Update live, server-side. No docs rebuild.
+- **Badges** → shields.io `endpoint` badges pointed at
+  `raw.githubusercontent.com/giellalt/<repo>/docs-data/<file>.json`. Update
+  live, server-side. No docs rebuild.
 - **Typos report** → the `accuracy-viewer` SPA `fetch()`es `report.json` from
-  the release URL at runtime. No docs rebuild.
+  the same `docs-data` URL at runtime. No docs rebuild.
 - **testlogs** → one committed shell page + a theme renderer that fetches
-  `testlogs.json` from the release URL. No docs rebuild.
+  `testlogs.json` from the `docs-data` URL. No docs rebuild.
 - `giellalt/.github`'s `docs.yml` is **not touched**. No `on: push` change, no
   cross-system trigger, no `actions:write` token in Buildkite.
+
+### Why a branch and not a GitHub Release
+
+The first cut of this used a rolling `docs-latest` **Release** (same pattern as
+the `speller-<lang>/dev-latest` nightlies). It works for shields.io — which
+fetches server-side — but **not for the browser**: a release asset URL
+(`github.com/<o>/<r>/releases/download/<tag>/<file>`) 302s to
+`release-assets.githubusercontent.com`, and **neither hop sends
+`Access-Control-Allow-Origin`**, so a cross-origin `fetch()` from
+`giellalt.github.io` is blocked by CORS. `raw.githubusercontent.com` sends
+`access-control-allow-origin: *` and is CDN-fronted with no meaningful rate
+limit; the `api.github.com` asset-download endpoint also works but is
+rate-limited to 60 req/hr per IP unauthenticated. So the data has to be on a
+**git ref** that `raw.githubusercontent.com` can serve.
+
+`docs-data` is an **orphan branch, force-pushed on every successful `main`
+build** — it always holds exactly the latest build's generated data, one
+commit, no history. `main` never carries the files, so a normal working
+checkout is unaffected. A *full* `git clone` fetches all branches and so gets
+`docs-data`'s current tree (≈1 KB of badge JSON for a healthy repo; a few MB
+for a repo with megabytes of persistent test failures — but it never grows).
+
+### History: `docs-data` (transport) vs `docs-metrics` (trend)
+
+`docs-data` is a transport buffer, not an archive — the browser pages only ever
+need the *current* payload. Keeping full history there is not viable:
+`lang-sme`'s `report.json` is **11 MB** (it embeds the per-word result array;
+only the ~600-byte `.summary` carries trend signal) and it churns almost
+entirely every build; active repos build `main` several times a day. That is
+GB/year on one branch, un-prunable without rewriting the ref.
+
+The trend use case — "how has the speller improved over time" — needs only the
+compact summaries, and those are cheap to keep forever (~1 KB/build). **Planned
+follow-up, not built yet:** a normal-history `docs-metrics` branch (or a single
+shared `giellalt/lang-metrics` repo) that appends one `metrics.jsonl` line per
+build:
+
+```json
+{"commit":"a1b2c3d4","date":"2026-09-01T10:42:14Z","build":238,
+ "lemmas":12345,"first_position_pct":83.2,"top_five_pct":94.8,
+ "true_positive":10673,"suites":{"nouns":100.0,"verbs":98.1}}
+```
+
+Decoupling it from `docs-data` keeps "I want trends" independent of "I need a
+CORS-friendly blob store". Ship `docs-data` first; add `docs-metrics` when
+someone asks.
 
 ### Data classes
 
@@ -33,6 +80,27 @@ at build time. Consequences:
 
 Buildkite will publish **all** of them (it can regenerate Class 1 trivially), so
 there is one canonical source.
+
+### Is any of badgedata hand-authored? (No.)
+
+Every `docs/badgedata/*.json` + `report.json` target in giella-core's
+`am-shared/docs-dir-include.am` is a `FORCE` target — regenerated
+unconditionally on every `make`. None is meant to be hand-edited:
+
+| File | Source of truth | Needs FST/speller build? |
+|---|---|---|
+| `fst-lemmacount.json` | `count-all-lemmas.sh` over the lexc source | no |
+| `fst-version.json` | `AC_INIT([...],[x.y.z])` in `configure.ac` | no |
+| `speller-version.json` | `AC_SUBST([SPELLERVERSION],[...])` in `configure.ac` | no |
+| `fst-variants.json` | `.build-config.yml` + configure-substituted vars | no (needs `configure`) |
+| `fst-maturity.json` | **GitHub repo topics API** (`maturity-beta` → yellow) — reads nothing in the repo | no |
+| `speller-suggestions.json` | derived from `report.json` `.summary` | yes |
+| `report.json` | `divvunspell accuracy` on the built `.zhfst` + `typos.tsv` | yes |
+
+The only maintainer-set knobs are the **GitHub repo topic** for maturity (lives
+on GitHub, not the repo) and version strings in `configure.ac`. The badge JSON
+is a generated cache. `make badgedata` stays available for local preview — it
+just writes to a gitignored path.
 
 ---
 
@@ -55,7 +123,8 @@ there is one canonical source.
   swap, `-J` in the 5 test `.sh.in` scripts, `rev_id 333`.
 - **jekyll-theme-giellalt** `testlogs-client-render` – `assets/js/testlogs.js`
   + CSS.
-- **divvun-actions** `lang-docs-publish` – the `docs-publish` step + action.
+- **divvun-actions** `lang-docs-artifacts` – the `docs-publish` step + action.
+- **lang-olo** `testlogs-client-render` (also merged to `main`) – test bed.
 
 ### Loose ends to settle first
 
@@ -79,62 +148,49 @@ Repo: `giellalt/giella-core`
   dirtied giella-core checkout on every build.
 - [ ] Drop the generated files from any committed `doc_DATA` / `EXTRA_DIST`
   expectation so `make` / `make install` don't expect them in the source tree.
-- [ ] **`$(DIVVUN_ACCURACY)` is undefined** – it is referenced in
-  `docs-dir-include.am` but no `configure.ac` / m4 sets it, so the `report.json`
-  and (removed) `speller-report` recipes silently run with an empty command.
-  Add an `AC_SUBST` / `AC_PATH_PROG` (it is the `accuracy` subcommand of
-  `divvunspell`, which m4 already probes as `$DIVVUNSPELL`). Needed for
-  `report.json` to actually generate in CI.
+- [x] **`$(DIVVUN_ACCURACY)` was undefined** – fixed in `bbd4c2ab`: the
+  `report.json` recipe now calls `$(DIVVUNSPELL) accuracy` (the same binary m4
+  already probes for the spellchecker tests).
 - [ ] **`.gitignore`** – ignore `docs/badgedata/`, `docs/testlogs/`,
   `docs/report.json`, `docs/typosreport/report*.json`.
 - [ ] Confirm the Class 1 badge scripts still run standalone in the
   `giellalt/.github` `docs.yml` context (they already do — `make-maturity`
-  curls the topics API, `make-version` uses git, `make-lemmacount` greps lexc,
-  `make-fst-variants` reads `.build-config.yml` + configure vars).
+  curls the topics API, `make-version` greps `configure.ac`, `make-lemmacount`
+  greps lexc, `make-fst-variants` reads `.build-config.yml` + configure vars).
 
 ## Workstream 2 — divvun-actions: the producer
 
 Repo: `divvun/divvun-actions`
 
-- [ ] **`pipelines/lang/mod.ts`** – add a `Docs` group with one step:
+- [x] **`pipelines/lang/mod.ts`** – a `Docs` group with one step:
   - key `docs-publish`, label `Publish Docs Data`
   - `command: "divvun-actions run lang-docs-publish"`
   - `main` branch only, `soft_fail: true`
-  - `depends_on` the speller-test (and grammar-test, when enabled) steps
+  - `depends_on: "speller-test"`
   - `agents: { queue: "linux", ...extra }`
-- [ ] **`actions/lang/docs-publish.ts`** – new action + `runLangDocsPublish` in
-  `pipelines/lang/mod.ts`:
-  1. Reuse the `runLangTests` preamble (`downloadAndExtractSpellerSnapshot` +
-     `setupGiellaCoreDependencies` + re-`configure`) so the built speller is on
-     disk. The test step already ran `make check` and uploaded
-     `docs/testlogs/*-lemmas.json`; download that artifact.
+- [x] **`actions/lang/docs-publish.ts`** – `runLangDocsPublish`:
+  1. Reuse the `runLangTests` preamble
+     (`downloadAndExtractSpellerSnapshot` + `setupGiellaCoreDependencies` +
+     re-`configure`) so the built speller is on disk. Download the
+     `docs/testlogs/*-lemmas.json` artifact the test step uploaded.
   2. In `build/docs`, `make` the badge + report targets, guarded by
-     `.build-config.yml` flags:
-     `badgedata/fst-lemmacount.json badgedata/fst-maturity.json
-     badgedata/fst-version.json badgedata/fst-variants.json
-     badgedata/speller-version.json badgedata/speller-suggestions.json
-     report.json`
-     plus the variant files `badgedata/speller-suggestions-<variant>.json`.
-  3. Read the per-suite `docs/testlogs/*-lemmas.json` that
-     `gtlemmatest`/`gtspelltest -J` wrote (GiellaLTLexTools >= 0.10.0), and
-     from them write a small **`testlogs.json`** manifest plus one
-     **`testlogs-<pos>.json`** per failing suite (schema below).
-     `actions/lang/testlogs.ts` does this — no markdown parsing. The full
-     failure list is kept — no cap; `gtlemmatest`'s own `--oov-limit` (10000)
-     is the only limit and shows up as `truncated`.
-  4. Assemble release assets:
-     - loose: the 6 (+ N variant) badge `*.json`
-     - `report.json` (+ `report-<variant>.json`)
-     - `testlogs.json` + `testlogs-<pos>.json` (one per failing suite)
-  5. `const gh = new GitHub(builder.env.repo);
-     await gh.updateRelease("docs-latest", [...assets],
-     { draft: false, prerelease: true, name: "Docs data (latest main build)" })`
-     — same mechanism as the existing `speller-<lang>/dev-latest` nightlies.
-  6. Point the `docs-latest` git tag at the built commit (`git tag -f` + push,
-     or `gh release edit --target <sha>`) so the release page shows the right
-     commit.
-- [ ] Verify `divvun-accuracy` / `divvunspell accuracy` is on the linux CI
-  image (needed for `report.json`); add to the Dockerfile if not.
+     `.build-config.yml` flags (`generateDocsData`). **TODO(CI):** the
+     `fst-variants.json` make-target name and the variant reports
+     (`report-<v>.json` / `speller-suggestions-<v>.json`) are not verified
+     against a real build yet — every step is warn-not-throw.
+  3. `actions/lang/testlogs.ts` reads the per-suite `*-lemmas.json`
+     (gtlemmatest / gtspelltest `-J`, no markdown parsing) → `testlogs.json`
+     manifest + one `testlogs-<id>.json` per failing suite. Full failure list,
+     no cap; `--oov-limit` (10000) is the only limit and shows as `truncated`.
+  4. Assemble the file set: badge `*.json` (+ N variant), `report.json`
+     (+ `report-<v>.json`), `testlogs.json` + `testlogs-<id>.json`, `meta.json`
+     (`{generated, commit, build_url}`).
+  5. **`GitHub.publishBranch("docs-data", files, { orphan: true, message })`**
+     — force-pushes a fresh single-commit orphan branch via the GitHub Git Data
+     API (`gh api .../git/{blobs,trees,commits,refs}`), no working-tree
+     checkout. Authenticated by the same `gh` token that the release path used.
+- [ ] Verify `divvunspell accuracy` is on the linux CI image (needed for
+  `report.json`); add to the Dockerfile if not.
 
 ### testlogs schema
 
@@ -154,7 +210,7 @@ this on open:
 }
 ```
 
-`testlogs-<pos>.json` — one per suite that has failures; fetched only when that
+`testlogs-<id>.json` — one per suite that has failures; fetched only when that
 suite is expanded. `failures` is the `gtlemmatest`/`gtspelltest -J` record,
 verbatim (the renderer formats it):
 
@@ -195,29 +251,32 @@ Repos: `template-lang-und` + 170 `lang-` repos
   the shields `url=` from
   `…raw.githubusercontent.com/giellalt/__REPO__/main/docs/badgedata/X.json`
   to
-  `…github.com/giellalt/__REPO__/releases/download/docs-latest/X.json`.
+  `…raw.githubusercontent.com/giellalt/__REPO__/docs-data/X.json`.
   Bump `rev_id`.
 - [ ] **`gut apply` script** across `^lang-` to make the same substitution in
   each repo's `README.md` + `docs/index-header.md` (content-anchored `perl`,
-  like the `speller-report` removal). Bump each repo's `.gut/delta.toml`.
-  `gut commit` + `gut push`.
+  like the `speller-report` removal). Skip any repo with no `docs-data` branch
+  yet (`git ls-remote --heads origin docs-data`) so a badge never points at a
+  missing ref. Bump each repo's `.gut/delta.toml`. `gut commit` + `gut push`.
 - [ ] *(optional, later)* teach giella-core's `$(INDEX)` rule to emit the badge
   block so the URL pattern lives in exactly one place going forward.
 
-> shields.io fetches endpoint URLs server-side, so GitHub's
-> `application/octet-stream` content-type and the redirect to
-> `objects.githubusercontent.com` are fine.
+> shields.io fetches endpoint URLs server-side; `raw.githubusercontent.com`
+> sends a JSON content-type and `access-control-allow-origin: *`, so it works
+> for both shields and the browser.
 
 ## Workstream 4 — typos report viewer: runtime fetch
 
 Repo: `giellalt/accuracy-viewer` (the Svelte source for
 `docs/typosreport/bundle.js`) — **confirm exact repo name**
 
-- [ ] Change `fetch("report.json")` and the variant-discovery
-  `fetch("../badgedata/fst-variants.json")` to fetch from
-  `https://github.com/<owner>/<repo>/releases/download/docs-latest/…`.
-  Derive `<owner>/<repo>` from `window.location` (Pages host + path) or a
-  `data-` attribute on the mount node injected at Jekyll build time.
+- [ ] Today the viewer `fetch()`es `report.json` and
+  `../badgedata/fst-variants.json` **same-origin** from the Pages site, so it
+  has no CORS problem *yet* — moving those files off the repo creates one.
+  Change both fetches to
+  `https://raw.githubusercontent.com/<owner>/<repo>/docs-data/…`.
+  Derive `<owner>/<repo>` from a `data-` attribute on the mount node injected
+  at Jekyll build time (`{{ site.github.repository_nwo }}`), same as testlogs.
 - [ ] Rebuild the bundle; re-sync `bundle.js` / `bundle.css` into
   `template-lang-und/docs/typosreport/`; bump `rev_id`; propagate via `gut`.
 - [ ] Keep `docs/typosreport/{index.html,bundle.js,bundle.css,global.css}`
@@ -243,11 +302,11 @@ Repos: `divvun/GiellaLTLexTools`, `giellalt/template-lang-und`,
   each failing suite is a `<details>` that fetches its `testlogs-<id>.json`
   on first open and formats the `-J` failure records (no-generation /
   wrong-generation / analyses, or speller suggestions) into bullet lists.
-  Provenance line; graceful "no results yet" fallback.
+  Provenance line; graceful "no results yet" fallback (404 on the manifest =
+  branch not published yet). **Now points at the `docs-data` raw URL.**
 - [ ] Theme CSS: `.testlogs-summary`, `.testlogs-note`, `#testlogs details`
-  (~20 lines; table + `<code>` styling already exists).
-- [ ] **`template-lang-und/docs/testlogs/index.html`** – replace the current
-  `index.md` with the shell page:
+  (~20 lines; done on the branch).
+- [ ] **`template-lang-und/docs/testlogs/index.html`** – replaces `index.md`:
 
   ```html
   ---
@@ -259,8 +318,8 @@ Repos: `divvun/GiellaLTLexTools`, `giellalt/template-lang-und`,
   <p>Detailed lemma-test results, published per build and loaded live —
      not committed to the repo.</p>
   <div id="testlogs"
-       data-src="https://github.com/{{ site.github.repository_nwo }}/releases/download/docs-latest/testlogs.json">
-    <p class="testlogs-loading">Loading latest test results…</p>
+       data-src="https://raw.githubusercontent.com/{{ site.github.repository_nwo }}/docs-data/testlogs.json">
+    <p class="testlogs-note">Loading latest test results…</p>
   </div>
   <script src="{{ '/assets/js/testlogs.js' | relative_url }}" defer></script>
   ```
@@ -282,8 +341,8 @@ Repos: `template-lang-und` + 170 `lang-` repos
 - [ ] `.gitignore` (repo + `docs/.gitignore`, and in the template): add
   `docs/badgedata/`, `docs/testlogs/`, `docs/report.json`,
   `docs/typosreport/report*.json`.
-- [ ] Git history is **left intact** (decision from #19 planning) — stop the
-  growth, don't rewrite.
+- [ ] Git history on `main` is **left intact** (decision from #19 planning) —
+  stop the growth, don't rewrite.
 
 ## Workstream 7 — giellalt/.github: verify only
 
@@ -291,8 +350,8 @@ Repos: `template-lang-und` + 170 `lang-` repos
   changes (badge targets still present; they now just also get published by
   Buildkite).
 - [ ] *(later cleanup)* the docs-workflow-generated `docs/badgedata/*.json` are
-  now unused (shields reads the release URL). Can drop the badge targets from
-  the docs build once everything is cut over.
+  now unused (shields reads the `docs-data` URL). Can drop the badge targets
+  from the docs build once everything is cut over.
 
 ---
 
@@ -304,160 +363,153 @@ treatment:
 - **Producers** (giella-core, GiellaLTLexTools, divvun-actions, theme) — the
   new behaviour is additive, `soft_fail`, or behind an on-demand flag, and it
   **cannot be verified end to end without running in prod CI** (a branch build
-  won't populate real `docs-latest` releases). So: normal PR review, merge to
-  main, let the releases populate, iterate on `docs-publish` from there. A bad
+  won't populate a real `docs-data` branch). So: normal PR review, merge to
+  main, let `docs-data` populate, iterate on `docs-publish` from there. A bad
   publish is fixed by the next build — that is the whole point of a rolling
-  release.
+  branch.
 - **The per-repo flip** (badge URLs, `git rm`, `index.html`) — user-visible
   (every language's README), and it has already bitten us twice via `gut`. This
   stays **conservative**: canary → soak → batched `gut apply` with a tested
   revert script.
 
-The flip is *inherently* incremental — it's a commit in each repo — so you
-control the pace regardless.
-
 ### Phase 0 — warm-up: push the speller-report removal
 
-Unrelated to the artifact work, already done and reviewed, low risk (removes
-dead links/files). Push it first to re-prove the `gut apply → gut commit → gut
-push` flow on something safe.
+Unrelated to the artifact work, already done and reviewed, low risk.
 
-- [ ] merge giella-core `remove-speller-report` (done: `a0a016e4` on main)
+- [x] merge giella-core `remove-speller-report` (`a0a016e4` on main)
 - [ ] `gut push -r '^lang-'` the 170 local `speller-report` commits
-- [ ] template `testlogs-client-render` also carries the `index.md`→`index.html`
-      swap — hold it until Phase 3
 
 ### Phase 1 — land the producers (main)
 
 Merge order matters (GiellaLTLexTools before its callers):
 
-1. [x] **giella-core** `docs: fix report.json recipe…` (`bbd4c2ab`, main).
-   Inert for existing flows (the `report.json` target isn't reached by
-   `make check` or the docs workflow); only `docs-publish` calls it.
-2. [x] **GiellaLTLexTools** `json-output` (v0.10.0) → main, **pushed**.
-   `divvun-actions` installs it with `uv pip install --upgrade git+…@main`
-   on every build, so the next CI run has it. `-L` behaviour is byte-identical.
+1. [x] **giella-core** `bbd4c2ab` (main, unpushed) — inert for existing flows;
+   only `docs-publish` reaches the `report.json` target.
+2. [x] **GiellaLTLexTools** `json-output` (v0.10.0) → **pushed** (branch).
+   `divvun-actions` installs it with `uv pip install --upgrade git+…` on every
+   build. `-L` behaviour is byte-identical.
 3. [ ] **template-lang-und** — `-J` in the 5 test `.sh.in` scripts (rev 333).
-   Land this so `make check` starts writing `docs/testlogs/*-lemmas.json`.
-   Test it in one repo first (apply the template change, `make check`, inspect
-   the JSON) — see Phase 1.5.
-4. [ ] **divvun-actions** `lang-docs-publish` → **PR with real review** (new
-   prod CI behaviour + it writes GitHub releases and force-pushes a
-   `docs-latest` tag to every lang repo). After merge, every `lang-` `main`
-   build publishes `docs-latest`. Nothing consumes it yet.
+   Test in one repo first (Phase 1.5).
+4. [ ] **divvun-actions** `lang-docs-artifacts` → PR with real review (new prod
+   CI behaviour; it force-pushes a `docs-data` branch to every lang repo).
+   After merge, every `lang-` `main` build publishes `docs-data`. Nothing
+   consumes it yet.
 
-### Phase 1.5 — prove `-J` in one repo
+### Phase 1.5 — prove `-J` + the publish path in one repo (`lang-olo`)
 
-Before merging the divvun-actions PR: apply the template `.sh.in` change to one
-repo (`gut template apply -r '^lang-sme$'`, or by hand), ensure
-`gtlemmatest --version` is >= 0.10.0, run `make check`, and confirm
-`docs/testlogs/*-lemmas.json` appear and parse. Feed one through
-`actions/lang/testlogs.ts` (`deno test`, or a scratch script) to confirm the
-manifest + per-suite output.
+`lang-olo` is the test bed (small speller, real failures, builds fast):
 
-### Phase 2 — verify the releases (no repo changes)
+- [x] `-J` in the 5 `.sh.in` scripts on `lang-olo` `testlogs-client-render`
+  (also merged to `main`).
+- [x] `docs/testlogs/index.html` shell page; `_config.yml` `remote_theme`
+  pinned to the theme's `testlogs-client-render` branch.
+- [ ] Point `index.html` `data-src` at the `docs-data` raw URL.
+- [ ] Run a `main` build → confirm `docs-publish` force-pushes `docs-data` with
+  `testlogs.json` + `testlogs-<id>.json` + badge JSON + `meta.json`.
+- [ ] `https://giellalt.github.io/lang-olo/testlogs/` renders the summary and a
+  failing suite expands.
 
-Let `docs-latest` populate. Check a spread of repos:
+### Phase 2 — verify across a spread (no repo changes)
+
+Let `docs-data` populate. Check:
 
 | repo | why |
 |---|---|
 | `lang-sme` | healthy, spellers + grammar + dialects |
 | `lang-nno` | tests badly broken (the `truncated` / large-file path) |
-| `lang-smj` or another variant repo | dialect/area/alt-orth report variants |
+| a variant repo | dialect/area/alt-orth report variants |
 | a small analyser-only repo | no speller → no `report.json` / speller badges |
 
-For each: badge JSONs are valid shields endpoints; `testlogs.json` manifest +
-`testlogs-<pos>.json` present and well-formed; `report.json` present and
-non-empty (spellers only); `docs-latest` release + tag exist.
+For each: badge JSONs are valid shields endpoints; `testlogs.json` +
+`testlogs-<id>.json` present and well-formed; `report.json` present and
+non-empty (spellers only); `docs-data` branch exists with one commit.
 
-Fix the `TODO(CI)` items in `docs-publish.ts` (make target names, VPATH paths,
+Fix the `TODO(CI)` items in `docs-publish.ts` (make-target names, VPATH paths,
 variant reports) as divvun-actions PRs — each fix re-publishes on the next
-build. Stay in this phase until a handful of repos look right.
+build.
 
 ### Phase 3 — land the theme + canary the flip
 
-4. [ ] **jekyll-theme-giellalt** `testlogs-client-render` → PR → main. Inert:
-   `testlogs.js` only loads on a page that includes it, which no repo has yet.
-5. [ ] Canary **`lang-sme`, `lang-nno`, one variant repo** — one hand-made
+5. [ ] **jekyll-theme-giellalt** `testlogs-client-render` → PR → main. Inert:
+   `testlogs.js` only loads on a page that includes it.
+6. [ ] Canary **`lang-sme`, `lang-nno`, one variant repo** — one hand-made
    commit each:
    - swap `docs/testlogs/index.md` → the new `index.html`
-   - flip README + `docs/index-header.md` badge `url=` to
-     `…/releases/download/docs-latest/…`
+   - flip README + `docs/index-header.md` badge `url=` to the `docs-data` URL
    - `git rm -r docs/badgedata` and `git rm docs/testlogs/*-lemmas.{md,json}`
-   - **keep** `docs/typosreport/` (incl. `report.json`) — that waits for
-     Phase 4
+   - **keep** `docs/typosreport/` (incl. `report.json`) — that waits for Phase 4
    - add `.gitignore` entries
-   - Push, watch: Pages build green, README badges render, `/testlogs/` summary
-     + expand works (incl. the broken `lang-nno` path).
+   - Push, watch: Pages build green, README badges render, `/testlogs/` works.
    - **Soak 3–7 days.**
 
 ### Phase 4 — typos report viewer
 
-6. [ ] **accuracy-viewer** (Workstream 4): `fetch()` `report.json` +
-   `fst-variants.json` from the release URL; rebuild bundle; sync into the
+7. [ ] **accuracy-viewer** (Workstream 4): `fetch()` `report.json` +
+   `fst-variants.json` from the `docs-data` URL; rebuild bundle; sync into the
    template; canary on the same three repos.
-7. [ ] Once green, the canary repos drop `docs/typosreport/report*.json` too.
+8. [ ] Once green, the canary repos drop `docs/typosreport/report*.json` too.
 
 ### Phase 5 — batch the flip to all 170
 
-8. [ ] One `gut apply` script doing Phase 3's + Phase 4's per-repo edits.
-   - skip any repo with no `docs-latest` release (report them; trigger a build)
+9. [ ] One `gut apply` script doing Phase 3's + Phase 4's per-repo edits.
+   - skip any repo with no `docs-data` branch (report them; trigger a build)
    - bump each repo's `.gut/delta.toml`
    - `gut commit` + spot-check ~5 + `gut push`
-9. [ ] Keep a **revert script** ready (restore files from `git`, restore badge
-   URLs) — same shape as the rollout script.
+10. [ ] Keep a **revert script** ready (restore files from `git`, restore badge
+    URLs).
 
 ### Phase 6 — cleanup
 
-10. [ ] **giellalt/.github** (Workstream 7): the badge targets in `make -C docs`
-    are now vestigial; drop them. Optional.
-11. [ ] Once the JSON path is proven everywhere, consider dropping `-L`
-    (markdown) from the test `.sh.in` scripts — the `-E` editor-open still
-    works off a temp file. Keep it while local devs still open the `.md` logs.
+11. [ ] **giellalt/.github** (Workstream 7): drop the now-vestigial badge
+    targets from `make -C docs`. Optional.
+12. [ ] Once the JSON path is proven everywhere, consider dropping `-L`
+    (markdown) from the test `.sh.in` scripts. Keep it while local devs still
+    open the `.md` logs.
+13. [ ] *(when asked)* add the `docs-metrics` branch / `giellalt/lang-metrics`
+    append for accuracy trends.
 
 ## Rollback per phase
 
 | phase | to undo |
 |---|---|
-| 0–2, 3-step-4 | revert the PR; next build/deploy is back to normal; stale releases are harmless |
+| 0–2 | revert the PR; next build is back to normal; a stale `docs-data` branch is harmless (or `git push origin --delete docs-data`) |
 | 3 canary, 4 | per-repo `git revert` restores the committed files + old badge URLs |
 | 5 | run the revert script over `^lang-` |
 
 ## Verification checklist
 
-- `docs-latest` release on a canary repo carries: badge `*.json`,
-  `report.json` (spellers), `testlogs.json` + `testlogs-<pos>.json`.
-- `https://img.shields.io/endpoint?url=…/releases/download/docs-latest/fst-maturity.json`
+- `docs-data` branch on a canary repo carries: badge `*.json`, `report.json`
+  (spellers), `testlogs.json` + `testlogs-<id>.json`, `meta.json` — one orphan
+  commit, no history.
+- `https://img.shields.io/endpoint?url=…raw.githubusercontent.com/giellalt/<repo>/docs-data/fst-maturity.json`
   renders.
 - Canary Pages build green; `/testlogs/` summary loads instantly, a failing
   suite expands and fetches its file; `/typosreport/` loads (Phase 4+).
-- `git clone --filter=blob:none` size of a canary repo stops growing
-  build-over-build.
-- Break a lemma test on a branch → merge → next `main` build's `docs-latest`
-  and the live `/testlogs/` page reflect it, with no docs rebuild.
+- `git clone` size of a canary repo's `main` stops growing build-over-build;
+  `docs-data`'s tree doesn't accumulate.
+- Break a lemma test on a branch → merge → next `main` build's `docs-data` and
+  the live `/testlogs/` page reflect it, with no docs rebuild.
 
 ---
 
 ## Follow-ups / out of scope
 
-- `corpus-` repos — same pattern, separate pass (needs a survey of what they
-  generate and who consumes it).
+- **`docs-metrics`** — the compact accuracy-trend log (see "History" above).
+- `corpus-` repos — same pattern, separate pass.
 - `keyboard` / `dict` / `speech` repo types — later.
 - **`gut` cannot delete files** removed from a template's `required` list —
   template file removals always need a manual `git rm` pass. Raise with the
   `gut` maintainer.
 - `gut template apply` is patch-based and fragile against any local divergence;
   never use it for bulk reformatting — use `gut apply` scripts.
-- After the `speller-report` push, `.gut/delta.toml` sits at `rev 331` (=
-  current template HEAD). Running `gut template apply` before the template
-  advances to `rev 332` errors with `can't seem to find a patch` and needs
-  `--abort`. Harmless; resolved once a real template change lands.
 
 ## Open questions
 
 - Exact repo name for the `accuracy-viewer` Svelte source.
-- Keep publishing Class 1 badges from the `docs.yml` build as a redundant
-  path, or make Buildkite the sole publisher?
-- Add a `gtlemmatest` version gate to giella-core's `configure.ac` (like the
-  `divvunspell` one) so an agent with GiellaLTLexTools < 0.10.0 fails cleanly
-  at configure rather than with an argparse error mid-`make check`?
+- Keep publishing Class 1 badges from the `docs.yml` build as a redundant path,
+  or make Buildkite the sole publisher?
+- Add a `gtlemmatest` version gate to giella-core's `configure.ac` so an agent
+  with GiellaLTLexTools < 0.10.0 fails cleanly at configure rather than with an
+  argparse error mid-`make check`?
+- `docs-data` as a true orphan (force-push, no history) is the plan; revisit if
+  a per-build diff of the badge JSON turns out to be worth keeping cheaply.
