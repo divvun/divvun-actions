@@ -5,6 +5,7 @@ import * as builder from "~/builder.ts"
 import { GitHub } from "~/util/github.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
+import { makeTempDir } from "~/util/temp.ts"
 import { restoreBuiltWorkspace } from "./common.ts"
 import { readTestlogs, type TestlogsManifest } from "./testlogs.ts"
 
@@ -209,7 +210,7 @@ export async function runLangDocsPublish() {
 
   // Everything to publish is assembled in one throwaway directory, flat, under
   // its final name — nothing is written into the checkout's tracked paths.
-  const outDir = await Deno.makeTempDir({ prefix: "docs-data-" })
+  const outDir = (await makeTempDir({ prefix: "docs-data-" })).path
   try {
     // testlogs/*-lemmas.json are produced by `make check` in the test step
     // (gtlemmatest/gtspelltest -J), which uploads them as artifacts. A repo
