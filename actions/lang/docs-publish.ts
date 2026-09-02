@@ -34,13 +34,16 @@ function buildLogUrl(): string | null {
 
 /**
  * From the per-suite JSON that `gtlemmatest`/`gtspelltest -J` wrote during
- * `make check`, produce `testlogs.json` (small manifest, one summary row per
- * suite) and one `testlogs-<id>.json` (full failure list) per failing suite.
- * The docs page loads the manifest, then fetches a suite's file only when
- * opened, so no single request is large even for a badly broken build.
- * Returns the list of files written.
+ * `make check`, write `testlogs.json` (small manifest, one summary row per
+ * suite) plus one `testlogs-<id>.json` (full failure list) per failing suite
+ * into `outDir`. The docs page loads the manifest, then fetches a suite's file
+ * only when opened, so no single request is large even for a badly broken
+ * build.
  */
-async function buildTestlogs(testlogsDir: string): Promise<string[]> {
+async function buildTestlogs(
+  testlogsDir: string,
+  outDir: string,
+): Promise<void> {
   const { summaries, details } = await readTestlogs(testlogsDir)
 
   const manifest: TestlogsManifest = {
@@ -50,16 +53,17 @@ async function buildTestlogs(testlogsDir: string): Promise<string[]> {
     suites: summaries,
   }
 
-  const files = ["testlogs.json"]
-  await Deno.writeTextFile("testlogs.json", JSON.stringify(manifest))
+  await Deno.writeTextFile(
+    path.join(outDir, "testlogs.json"),
+    JSON.stringify(manifest),
+  )
 
   for (const detail of details) {
-    const name = `testlogs-${detail.id}.json`
-    await Deno.writeTextFile(name, JSON.stringify(detail))
-    files.push(name)
+    await Deno.writeTextFile(
+      path.join(outDir, `testlogs-${detail.id}.json`),
+      JSON.stringify(detail),
+    )
   }
-
-  return files
 }
 
 // --- badge + report generation ------------------------------------------
@@ -96,8 +100,8 @@ async function repoName(): Promise<string> {
 }
 
 /**
- * Regenerate the badge JSON + `report.json` from the built + configured tree by
- * calling the giella-core scripts directly (same invocations as
+ * Regenerate the badge JSON + `report.json` into `outDir` by calling the
+ * giella-core scripts directly (same invocations as
  * am-shared/docs-dir-include.am). The Class 1 badges need no FST build;
  * `report.json` and the `speller-suggestions` badge derived from it need the
  * built speller, which the snapshot restores.
@@ -108,24 +112,16 @@ async function repoName(): Promise<string> {
  * `speller-suggestions-<v>.json`) for dialect/area/alt-orth languages are not
  * handled yet — see giella-core's `speller-variant-reports` target.
  */
-async function generateDocsData(buildConfig: BuildProps): Promise<string[]> {
-  const assets: string[] = []
-  const badgeDir = "docs/badgedata"
-  await fs.ensureDir(badgeDir)
+async function generateDocsData(
+  buildConfig: BuildProps,
+  outDir: string,
+): Promise<void> {
   const root = Deno.cwd()
   const scripts = path.join(GTCORE, "scripts")
 
-  const emit = async (
-    name: string,
-    cmd: string,
-    args: string[],
-  ) => {
-    const out = path.join(badgeDir, name)
-    if (await run(cmd, args, { outFile: out })) {
-      assets.push(out)
-    } else {
-      logger.warning(`Failed to generate ${name}`)
-    }
+  const emit = async (name: string, cmd: string, args: string[]) => {
+    if (await run(cmd, args, { outFile: path.join(outDir, name) })) return
+    logger.warning(`Failed to generate ${name}`)
   }
 
   await emit("fst-lemmacount.json", "bash", [
@@ -153,23 +149,20 @@ async function generateDocsData(buildConfig: BuildProps): Promise<string[]> {
       cwd: path.join(root, "build", "docs"),
     })
   ) {
-    let found = false
-    for (
-      const cand of [
-        "build/docs/badgedata/fst-variants.json",
-        "docs/badgedata/fst-variants.json",
-      ]
-    ) {
+    // VPATH build: make may land it in builddir or (fallback) srcdir.
+    const made = [
+      "build/docs/badgedata/fst-variants.json",
+      "docs/badgedata/fst-variants.json",
+    ]
+    let copied = false
+    for (const cand of made) {
       if (await fs.exists(cand)) {
-        if (cand !== "docs/badgedata/fst-variants.json") {
-          await Deno.copyFile(cand, "docs/badgedata/fst-variants.json")
-        }
-        assets.push("docs/badgedata/fst-variants.json")
-        found = true
+        await Deno.copyFile(cand, path.join(outDir, "fst-variants.json"))
+        copied = true
         break
       }
     }
-    if (!found) {
+    if (!copied) {
       logger.warning("make succeeded but produced no fst-variants.json")
     }
   } else {
@@ -177,25 +170,21 @@ async function generateDocsData(buildConfig: BuildProps): Promise<string[]> {
   }
 
   if (buildConfig.spellers) {
-    const report = "docs/typosreport/report.json"
-    await fs.ensureDir("docs/typosreport")
+    const reportOut = path.join(outDir, "report.json")
     if (
       await run("bash", ["-c", "make -j$(nproc) report.json"], {
         cwd: path.join(root, "build", "docs"),
       }) && await fs.exists("build/docs/report.json")
     ) {
-      await Deno.copyFile("build/docs/report.json", report)
-      assets.push(report)
+      await Deno.copyFile("build/docs/report.json", reportOut)
       await emit("speller-suggestions.json", "bash", [
         path.join(scripts, "make-spellerbadge-json.sh"),
-        report,
+        reportOut,
       ])
     } else {
       logger.warning("Failed to generate report.json")
     }
   }
-
-  return assets
 }
 
 // --- entry point --------------------------------------------------------
@@ -214,54 +203,64 @@ export async function runLangDocsPublish() {
   // Restore the same built + configured tree the speller-test step uses.
   await restoreBuiltWorkspace("speller-configure-flags")
 
-  // testlogs/*-lemmas.json are produced by `make check` in the test step
-  // (gtlemmatest/gtspelltest -J), which uploads them as artifacts. A repo with
-  // no morphology/speller tests uploads nothing — that's fine, the manifest is
-  // just empty.
-  try {
-    await builder.downloadArtifacts("docs/testlogs/*-lemmas.json", ".")
-  } catch (e) {
-    logger.warning(`No testlogs artifacts: ${e}`)
-  }
-
-  const badgeAssets = await generateDocsData(buildConfig)
-  const testlogAssets = await buildTestlogs("docs/testlogs")
-
-  // Provenance for the docs pages (they show "data from <commit>, <n> ago").
-  await Deno.writeTextFile(
-    "meta.json",
-    JSON.stringify({
-      generated: new Date().toISOString(),
-      commit: builder.env.commit ?? null,
-      build_url: buildLogUrl(),
-    }),
-  )
-
-  const assets = [...badgeAssets, ...testlogAssets, "meta.json"]
-  logger.info(`Publishing ${assets.length} files to ${DOCS_DATA_BRANCH}:`)
-  for (const a of assets) logger.info(`  ${a}`)
-
   if (!builder.env.repo) {
     throw new Error("No repository information available")
   }
 
-  // Force-push a fresh orphan commit: the branch is a transport buffer for the
-  // latest build's data, not an archive. Files land at the branch root, so the
-  // raw URL is `.../<repo>/generated/docs-data/<basename>`.
-  // `[skip ci]` so the push doesn't spawn a (doomed) lang build on that branch
-  // — Buildkite honours it in the HEAD commit message. Without it the repo's
-  // CI status badge would flip to that failure.
-  const gh = new GitHub(builder.env.repo)
-  await gh.publishBranch(
-    DOCS_DATA_BRANCH,
-    assets.map((a) => ({ path: path.basename(a), source: a })),
-    {
+  // Everything to publish is assembled in one throwaway directory, flat, under
+  // its final name — nothing is written into the checkout's tracked paths.
+  const outDir = await Deno.makeTempDir({ prefix: "docs-data-" })
+  try {
+    // testlogs/*-lemmas.json are produced by `make check` in the test step
+    // (gtlemmatest/gtspelltest -J), which uploads them as artifacts. A repo
+    // with no morphology/speller tests uploads nothing — that's fine, the
+    // manifest is just empty.
+    try {
+      await builder.downloadArtifacts("docs/testlogs/*-lemmas.json", ".")
+    } catch (e) {
+      logger.warning(`No testlogs artifacts: ${e}`)
+    }
+
+    await generateDocsData(buildConfig, outDir)
+    await buildTestlogs("docs/testlogs", outDir)
+
+    // Provenance for the docs pages (they show "data from <commit>, <n> ago").
+    await Deno.writeTextFile(
+      path.join(outDir, "meta.json"),
+      JSON.stringify({
+        generated: new Date().toISOString(),
+        commit: builder.env.commit ?? null,
+        build_url: buildLogUrl(),
+      }),
+    )
+
+    const files: Array<{ path: string; source: string }> = []
+    for await (const entry of Deno.readDir(outDir)) {
+      if (entry.isFile) {
+        files.push({ path: entry.name, source: path.join(outDir, entry.name) })
+      }
+    }
+    files.sort((a, b) => a.path.localeCompare(b.path))
+
+    logger.info(`Publishing ${files.length} files to ${DOCS_DATA_BRANCH}:`)
+    for (const f of files) logger.info(`  ${f.path}`)
+
+    // Force-push a fresh orphan commit: the branch is a transport buffer for
+    // the latest build's data, not an archive. Files land at the branch root,
+    // so the raw URL is `.../<repo>/generated/docs-data/<name>`.
+    // `[skip ci]` so the push doesn't spawn a (doomed) lang build on that
+    // branch — Buildkite honours it in the HEAD commit message. Without it the
+    // repo's CI status badge would flip to that failure.
+    const gh = new GitHub(builder.env.repo)
+    await gh.publishBranch(DOCS_DATA_BRANCH, files, {
       orphan: true,
       message: `docs data: ${builder.env.commit?.slice(0, 8) ?? "?"} (build ${
         builder.env.buildNumber ?? "?"
       }) [skip ci]`,
-    },
-  )
+    })
 
-  logger.info("Docs data published")
+    logger.info("Docs data published")
+  } finally {
+    await Deno.remove(outDir, { recursive: true }).catch(() => {})
+  }
 }
