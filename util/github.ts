@@ -1,3 +1,4 @@
+import { encodeBase64 } from "@std/encoding/base64"
 import logger from "./log.ts"
 
 export interface GitHubRelease {
@@ -19,6 +20,115 @@ export class GitHub {
 
   constructor(repo: string) {
     this.#repo = repo
+  }
+
+  /** `git@github.com:giellalt/lang-olo.git` / a clone URL → `giellalt/lang-olo`. */
+  #slug(): string {
+    const m = this.#repo.match(/([^/:]+\/[^/:]+?)(?:\.git)?\/?$/)
+    if (!m) {
+      throw new Error(`Cannot derive owner/repo from "${this.#repo}"`)
+    }
+    return m[1]
+  }
+
+  async #api(args: string[], body?: unknown): Promise<unknown> {
+    const proc = new Deno.Command("gh", {
+      args: ["api", ...args],
+      stdin: body === undefined ? "null" : "piped",
+      stdout: "piped",
+      stderr: "piped",
+    }).spawn()
+
+    if (body !== undefined) {
+      const w = proc.stdin.getWriter()
+      await w.write(new TextEncoder().encode(JSON.stringify(body)))
+      await w.close()
+    }
+
+    const { code, stdout, stderr } = await proc.output()
+    if (code !== 0) {
+      throw new Error(
+        `gh api ${args.join(" ")} failed (${code}): ${
+          new TextDecoder().decode(stderr).trim()
+        }`,
+      )
+    }
+    const out = new TextDecoder().decode(stdout).trim()
+    return out ? JSON.parse(out) : null
+  }
+
+  /**
+   * Publish a flat set of files to `branch` via the GitHub Git Data API — no
+   * working-tree checkout. Used for the rolling `docs-data` branch (see
+   * docs/badgedata-artifact-migration.md): with `orphan: true` each build
+   * force-pushes a fresh parentless commit, so the branch always holds exactly
+   * the latest build's generated data and never accumulates history.
+   */
+  async publishBranch(
+    branch: string,
+    files: Array<{ path: string; source: string }>,
+    opts: { message: string; orphan?: boolean },
+  ): Promise<void> {
+    const slug = this.#slug()
+
+    const tree: Array<
+      { path: string; mode: "100644"; type: "blob"; sha: string }
+    > = []
+    for (const f of files) {
+      const bytes = await Deno.readFile(f.source)
+      const blob = await this.#api(
+        ["-X", "POST", `repos/${slug}/git/blobs`, "--input", "-"],
+        { content: encodeBase64(bytes), encoding: "base64" },
+      ) as { sha: string }
+      tree.push({ path: f.path, mode: "100644", type: "blob", sha: blob.sha })
+    }
+
+    // No base_tree: the commit is a complete snapshot of `files`.
+    const treeObj = await this.#api(
+      ["-X", "POST", `repos/${slug}/git/trees`, "--input", "-"],
+      { tree },
+    ) as { sha: string }
+
+    let parents: string[] = []
+    if (!opts.orphan) {
+      try {
+        const ref = await this.#api(
+          [`repos/${slug}/git/ref/heads/${branch}`],
+        ) as { object: { sha: string } }
+        parents = [ref.object.sha]
+      } catch {
+        // branch doesn't exist yet — first publish
+      }
+    }
+
+    const commit = await this.#api(
+      ["-X", "POST", `repos/${slug}/git/commits`, "--input", "-"],
+      { message: opts.message, tree: treeObj.sha, parents },
+    ) as { sha: string }
+
+    logger.info(
+      `Publishing ${files.length} files to ${slug}@${branch} (${
+        commit.sha.slice(0, 8)
+      })`,
+    )
+
+    try {
+      await this.#api(
+        [
+          "-X",
+          "PATCH",
+          `repos/${slug}/git/refs/heads/${branch}`,
+          "--input",
+          "-",
+        ],
+        { sha: commit.sha, force: true },
+      )
+    } catch {
+      await this.#api(
+        ["-X", "POST", `repos/${slug}/git/refs`, "--input", "-"],
+        { ref: `refs/heads/${branch}`, sha: commit.sha },
+      )
+    }
   }
 
   async createRelease(

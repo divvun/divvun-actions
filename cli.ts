@@ -77,6 +77,7 @@ import {
   pipelineLang,
   runLangBundle,
   runLangDeploy,
+  runLangDocsPublish,
   runLangGrammarBuild,
   runLangGrammarBundle,
   runLangGrammarDeploy,
@@ -299,6 +300,10 @@ async function runPipeline(args: any) {
     }
     case "lang-grammar-test": {
       await runLangGrammarTest()
+      break
+    }
+    case "lang-docs-publish": {
+      await runLangDocsPublish()
       break
     }
     case "lang-bundle": {
