@@ -124,25 +124,79 @@ just writes to a gitignored path.
 
 ## Status
 
+The **producer chain is proven end to end** on `lang-olo`. Three of the four
+producers are on `main`; what remains is landing divvun-actions #22, committing
+template-lang-und, and the per-repo flip.
+
+### What's left, in order
+
+1. **Land the last producers:** commit template-lang-und
+   `testlogs-client-render` (bump `rev_id` → **334**; lang-olo already applied
+   333), then merge **divvun-actions #22** (the keystone).
+2. **Phase 2 — verify a spread:** once `docs-publish` runs on every `main`
+   build, check `lang-sme`, `lang-nno` (broken/large), a dialect/variant repo
+   (`report-<v>.json` — the remaining `TODO(CI)`), an analyser-only repo.
+3. **Workstream 1 — giella-core:** move the badge/`report.json` make targets
+   off `$(srcdir)`; add `.gitignore` entries.
+4. **Workstream 4 — accuracy viewer:** DONE as an interim hand-patch of the
+   built `bundle.js` + `index.html` (Svelte source superseded by a Dioxus
+   rewrite in `divvun/divvunspell`; revisit when that's production-ready).
+   Patched in `template-lang-und` + `lang-olo`.
+5. **Workstreams 3 + 6 — the per-repo flip:** revert lang-olo's hand-made
+   commits, use it as the canary for a `gut template apply` of the four
+   template-managed files, then a scripted `gut` pass for badge URLs +
+   `git rm docs/badgedata docs/testlogs docs/typosreport/report*.json`.
+   Canary `lang-sme` + `lang-nno` + a variant repo, soak, then batch to ~170.
+   See **Rollout → the per-repo flip** below.
+6. **Phase 0 (independent):** `gut push -r '^lang-'` the 170 speller-report
+   removal commits.
+7. **Follow-ups:** re-establish the dead CI image auto-update cron; stray
+   `.orig` files; `generated/docs-metrics` trend log (when asked).
+
 ### Done / merged
 
 - [x] **giella-core** – `speller-report` removal merged (`a0a016e4`, PR #456);
-      `report.json` recipe fixed to `$(DIVVUNSPELL) accuracy` (`bbd4c2ab`, main,
-      unpushed).
+      `report.json` recipe fixed to `$(DIVVUNSPELL) accuracy` (`bbd4c2ab`, **on
+      `origin/main`**).
 - [x] **template-lang-und** – `speller-report` removal on `main` (`8cacf2c`).
 - [x] **170 `lang-` repos** – `speller-report` removal committed locally
       (`.gut/delta.toml` → rev 331). **Needs `gut push -r '^lang-'`** (Phase 0).
 - [x] **GiellaLTLexTools** – `-J/--json-file` on `gtlemmatest`/`gtspelltest`,
-      v0.10.0, branch `json-output`, **pushed**.
+      **v0.10.0 on `main`** (`d73db33`, merged 2026-08-31). `divvun-actions`
+      installs it from the default branch, so it lands on the next linux image
+      rebuild.
+- [x] **jekyll-theme-giellalt** – client-side testlogs renderer merged to
+      `main` (`8f30b8d`, PR #9): `assets/js/testlogs.js` reads the
+      `generated/docs-data` raw URL, CSS tidy, "Expand all" find-in-page control.
+      Inert until a page includes it.
+- [x] **divvun-actions** – `divvunspell` CLI + `jq` added to the linux CI image
+      (`df72a99`, **on `origin/main`**). Image rebuilt + pushed, builders
+      recreated. `configure`'s version gate accepts `1.0.0-beta.13`.
+- [x] **End-to-end proven on `lang-olo`** (build 247): `make check` writes the
+      `-J` JSON → `docs-publish` runs `divvunspell accuracy` + `jq` + builds the
+      manifest → force-pushes `generated/docs-data` with `report.json`,
+      `speller-suggestions.json`, `testlogs.json` + `testlogs-{adjectives,nouns,
+      propernouns,speller,verbs}.json`, badges, `meta.json` → the `/testlogs/`
+      and `/typosreport/` pages render it.
 
-### On branches, unpushed
+### On branches / in review
 
+- **divvun-actions** `lang-docs-artifacts` → **PR #22**, pushed, 8 commits
+  ahead of `origin/main`: the `docs-publish` step + action (5), review-feedback
+  fixes (`restoreBuiltWorkspace` extraction, `fst-variants` warning, drop the
+  unrunnable test file), the temp-dir output assembly, and the
+  `util/temp.ts makeTempDir` fix (a direct `Deno.makeTempDir` call errors — the
+  repo patches it to throw).
 - **template-lang-und** `testlogs-client-render` – `index.md`→`index.html`
-  swap, `-J` in the 5 test `.sh.in` scripts, `rev_id 333`.
-- **jekyll-theme-giellalt** `testlogs-client-render` – `assets/js/testlogs.js`
-  - CSS.
-- **divvun-actions** `lang-docs-artifacts` – the `docs-publish` step + action.
-- **lang-olo** `testlogs-client-render` (also merged to `main`) – test bed.
+  swap, `-J` in the 5 test `.sh.in` scripts, typosreport bundle patch,
+  `template.toml` `required` entry. **Uncommitted; needs `rev_id` → 334.**
+- **lang-olo** `main` (pushed) – test bed, 6 hand-made commits: `-J` in the 5
+  `.sh.in` scripts + `docs/testlogs/index.html` (`b552230d`), retarget to
+  `generated/docs-data` (`cf22f1ee`, `ee8d0c9d`), typosreport bundle patch
+  (`eccaee96`) + front-matter fix so the Liquid URL expands (`fc5e0695`).
+  Plus `_config.yml` `remote_theme` pinned to the (now-merged) theme branch —
+  revert to `@main`. These 6 commits get reverted when lang-olo becomes the
+  flip canary (see Rollout).
 
 ### Loose ends to settle first
 
@@ -166,9 +220,10 @@ Repo: `giellalt/giella-core`
       dirtied giella-core checkout on every build.
 - [ ] Drop the generated files from any committed `doc_DATA` / `EXTRA_DIST`
       expectation so `make` / `make install` don't expect them in the source tree.
-- [x] **`$(DIVVUN_ACCURACY)` was undefined** – fixed in `bbd4c2ab`: the
-      `report.json` recipe now calls `$(DIVVUNSPELL) accuracy` (the same binary m4
-      already probes for the spellchecker tests).
+- [x] **`$(DIVVUN_ACCURACY)` was undefined** – fixed in `bbd4c2ab` (on
+      `origin/main`): the `report.json` recipe now calls `$(DIVVUNSPELL)
+      accuracy` (the same binary m4 already probes for the spellchecker tests).
+      `$(DIVVUNSPELL)` resolves once the CI image has the binary (`df72a99`).
 - [ ] **`.gitignore`** – ignore `docs/badgedata/`, `docs/testlogs/`,
       `docs/report.json`, `docs/typosreport/report*.json`.
 - [ ] Confirm the Class 1 badge scripts still run standalone in the
@@ -187,28 +242,37 @@ Repo: `divvun/divvun-actions`
   - `depends_on: "speller-test"`
   - `agents: { queue: "linux", ...extra }`
 - [x] **`actions/lang/docs-publish.ts`** – `runLangDocsPublish`:
-  1. Reuse the `runLangTests` preamble
-     (`downloadAndExtractSpellerSnapshot` + `setupGiellaCoreDependencies` +
-     re-`configure`) so the built speller is on disk. Download the
-     `docs/testlogs/*-lemmas.json` artifact the test step uploaded.
-  2. In `build/docs`, `make` the badge + report targets, guarded by
-     `.build-config.yml` flags (`generateDocsData`). **TODO(CI):** the
-     `fst-variants.json` make-target name and the variant reports
-     (`report-<v>.json` / `speller-suggestions-<v>.json`) are not verified
-     against a real build yet — every step is warn-not-throw.
+  1. `common.ts::restoreBuiltWorkspace("speller-configure-flags")` — the
+     preamble shared with the test step (snapshot download +
+     `setupGiellaCoreDependencies` + re-`configure`) so the built speller is on
+     disk. Download the `docs/testlogs/*-lemmas.json` artifact the test step
+     uploaded.
+  2. Everything is assembled in one throwaway dir
+     (`util/temp.ts::makeTempDir`) under its final flat name — nothing is
+     written into the checkout's tracked paths. `generateDocsData` `make`s the
+     badge + report targets in `build/docs`, guarded by `.build-config.yml`
+     flags. Confirmed on `lang-olo`: badges + `report.json` +
+     `speller-suggestions.json` generate. **TODO(CI):** the `fst-variants.json`
+     make-target name and the per-variant reports (`report-<v>.json` /
+     `speller-suggestions-<v>.json`) are still unverified against a
+     dialect/area/alt-orth repo — every step is warn-not-throw.
   3. `actions/lang/testlogs.ts` reads the per-suite `*-lemmas.json`
      (gtlemmatest / gtspelltest `-J`, no markdown parsing) → `testlogs.json`
      manifest + one `testlogs-<id>.json` per failing suite. Full failure list,
      no cap; `--oov-limit` (10000) is the only limit and shows as `truncated`.
-  4. Assemble the file set: badge `*.json` (+ N variant), `report.json`
-     (+ `report-<v>.json`), `testlogs.json` + `testlogs-<id>.json`, `meta.json`
-     (`{generated, commit, build_url}`).
+  4. `meta.json` (`{generated, commit, build_url}`) is written into the same
+     dir; the publish list is then just "every file in the dir", sorted.
   5. **`GitHub.publishBranch("generated/docs-data", files, { orphan: true, message })`**
      — force-pushes a fresh single-commit orphan branch via the GitHub Git Data
      API (`gh api .../git/{blobs,trees,commits,refs}`), no working-tree
-     checkout. Authenticated by the same `gh` token that the release path used.
-- [ ] Verify `divvunspell accuracy` is on the linux CI image (needed for
-      `report.json`); add to the Dockerfile if not.
+     checkout. Commit message carries `[skip ci]` so the push spawns no build.
+     Authenticated by the same `gh` token that the release path used.
+- [x] **`divvunspell` + `jq` on the linux CI image** – added in `df72a99`
+      (`docker/tools/divvunspell.ts`, pinned `1.0.0-beta.13`, on PATH in
+      `/usr/local/bin`; `jq` in the apt list). Both are needed:
+      `divvunspell accuracy` for `report.json`, `jq` for
+      `make-spellerbadge-json.sh` → `speller-suggestions.json`. Without them
+      `configure` silently set `DIVVUNSPELL=false` and the target failed.
 
 ### testlogs schema
 
@@ -219,7 +283,7 @@ this on open:
 {
   "generated": "2026-09-01T10:42:14Z",
   "commit": "a1b2c3d",
-  "build_url": "https://buildkite.com/divvun/lang-sme/builds/1234",
+  "build_url": "https://builds.giellalt.org/pipelines/lang-sme/builds/1234",
   "suites": [
     {
       "id": "nouns",
@@ -294,20 +358,30 @@ Repos: `template-lang-und` + 170 `lang-` repos
 
 ## Workstream 4 — typos report viewer: runtime fetch
 
-Repo: `giellalt/accuracy-viewer` (the Svelte source for
-`docs/typosreport/bundle.js`) — **confirm exact repo name**
+Source: `divvun/divvunspell`, `support/accuracy-viewer`. As of `d841a4b` it was
+rewritten as a **Dioxus (Rust/WASM)** app; the Svelte version that produced the
+deployed `bundle.js` is at `d841a4b^`. The Dioxus rewrite isn't confirmed
+production-ready, so the interim is a **hand-patch of the built bundle**:
 
-- [ ] Today the viewer `fetch()`es `report.json` and
-      `../badgedata/fst-variants.json` **same-origin** from the Pages site, so it
-      has no CORS problem _yet_ — moving those files off the repo creates one.
-      Change both fetches to
-      `https://raw.githubusercontent.com/<owner>/<repo>/generated/docs-data/…`.
-      Derive `<owner>/<repo>` from a `data-` attribute on the mount node injected
-      at Jekyll build time (`{{ site.github.repository_nwo }}`), same as testlogs.
-- [ ] Rebuild the bundle; re-sync `bundle.js` / `bundle.css` into
-      `template-lang-und/docs/typosreport/`; bump `rev_id`; propagate via `gut`.
-- [ ] Keep `docs/typosreport/{index.html,bundle.js,bundle.css,global.css}`
-      committed — that's the viewer app shell, not generated data.
+- [x] `docs/typosreport/bundle.js` — 2 one-line edits (string literals survive
+      minification): the report URL builder and the `fst-variants.json` fetch
+      both gain a `(window.__DOCS_DATA_BASE__||"")+` prefix. `||""` = graceful
+      fallback to the old same-origin relative fetch on an un-migrated repo.
+- [x] `docs/typosreport/index.html` — one `<script>` setting
+      `window.__DOCS_DATA_BASE__` to
+      `https://raw.githubusercontent.com/{{ site.github.repository_nwo }}/generated/docs-data/`.
+      `fst-variants.json` is published flat there by `docs-publish`, so it moves
+      from `../badgedata/` to the base. **Gotcha:** this file had no YAML front
+      matter, so Jekyll copied it verbatim and the Liquid tag never expanded
+      (viewer 404'd on a literal `{{ … }}` URL). Fixed by adding
+      `---\nlayout: null\n---` — front matter turns on Liquid, `layout: null`
+      keeps the site-wide `defaults` layout from wrapping the standalone doc.
+- Done in `template-lang-und` (joins the `testlogs-client-render` batch) and in
+  `lang-olo` for testing. Propagates via `gut` with the rest of the flip.
+- [ ] Revisit once the Dioxus viewer is production-ready — then this patch and
+      the whole `support/accuracy-viewer` sync get replaced wholesale.
+- Keep `docs/typosreport/{index.html,bundle.js,bundle.css,global.css}`
+  committed — that's the viewer app shell, not generated data.
 
 ## Workstream 5 — testlogs: native JSON + client rendering
 
@@ -317,23 +391,26 @@ Repos: `divvun/GiellaLTLexTools`, `giellalt/template-lang-und`,
 - [x] **GiellaLTLexTools** `-J/--json-file` on `gtlemmatest` / `gtspelltest`
       (branch `json-output`, v0.10.0). Structured per-suite JSON — no markdown
       parsing anywhere downstream.
-- [ ] **`template-lang-und`** – the 5 test scripts
+- [x] **`template-lang-und`** – the 5 test scripts
       (`src/fst/morphology/test/generate-*-lemmas.sh.in`,
       `tools/spellcheckers/test/accept-all-lemmas.sh.in`) pass
       `-J "@abs_top_srcdir@/docs/testlogs/$POS-lemmas.json"` alongside the existing
-      `-L`. Bump `rev_id`. (branch `testlogs-client-render`, done — rev 333.)
-      Requires GiellaLTLexTools >= 0.10.0 on the build agents (CI installs from
-      `main`, so already true; local devs `pipx upgrade`).
-- [ ] **`jekyll-theme-giellalt/assets/js/testlogs.js`** – vanilla renderer:
-      loads the manifest → summary table (Test · Lemmas · Success % · Failures);
-      each failing suite is a `<details>` that fetches its `testlogs-<id>.json`
-      on first open and formats the `-J` failure records (no-generation /
-      wrong-generation / analyses, or speller suggestions) into bullet lists.
-      Provenance line; graceful "no results yet" fallback (404 on the manifest =
-      branch not published yet). **Now points at the `generated/docs-data` raw URL.**
-- [ ] Theme CSS: `.testlogs-summary`, `.testlogs-note`, `#testlogs details`
-      (~20 lines; done on the branch).
-- [ ] **`template-lang-und/docs/testlogs/index.html`** – replaces `index.md`:
+      `-L`. On `testlogs-client-render` (uncommitted). **Bump `rev_id` → 334**
+      at commit. Requires GiellaLTLexTools >= 0.10.0 on the build agents (now on
+      `main`; local devs `pipx upgrade`).
+- [x] **`jekyll-theme-giellalt/assets/js/testlogs.js`** – vanilla renderer
+      (done on branch): loads the manifest → summary table (Test · Lemmas ·
+      Success % · Failures); each failing suite is a `<details>` that fetches
+      its `testlogs-<id>.json` on first open and formats the `-J` failure
+      records (no-generation / wrong-generation / analyses, or speller
+      suggestions) into bullet lists. Provenance line; graceful "no results
+      yet" fallback (404 = branch not published yet). Reads from the
+      `generated/docs-data` raw URL. Also: an **Expand all** control (opens
+      every suite + failure so browser find-in-page can reach the text).
+- [x] Theme CSS (done on branch): summary-table cell padding, one-step
+      disclosure indent for the failure tree, link-styled Expand-all control.
+- [x] **`template-lang-und/docs/testlogs/index.html`** – replaces `index.md`
+      (done on branch):
 
   ```html
   ---
@@ -351,8 +428,9 @@ Repos: `divvun/GiellaLTLexTools`, `giellalt/template-lang-und`,
   <script src="{{ '/assets/js/testlogs.js' | relative_url }}" defer></script>
   ```
 
-- [ ] `template.toml`: remove `docs/testlogs/index.md` from `required`, add
-      `docs/testlogs/index.html`. Bump `rev_id`.
+- [x] `template.toml`: `docs/testlogs/index.md` → `docs/testlogs/index.html` in
+      `required` (done on branch, uncommitted). Still to do at commit: add the
+      `docs/.gitignore` entries and bump `rev_id` → 334.
 
 ## Workstream 6 — repo cleanup
 
@@ -399,6 +477,47 @@ treatment:
   stays **conservative**: canary → soak → batched `gut apply` with a tested
   revert script.
 
+### The per-repo flip: template apply + a scripted pass
+
+Sync check (2026-09): the files changed by hand in `lang-olo` and
+`template-lang-und` are **byte-identical**, and the template-managed ones use
+only `{{ site.github.repository_nwo }}` (a Jekyll runtime var), **no `__REPO__`
+gut placeholders** — so a `gut template apply` drops identical files into every
+repo. Split the work:
+
+**1. Template apply** — the four `required` files:
+`docs/testlogs/index.html` (replaces `index.md`),
+`docs/typosreport/bundle.js`, `docs/typosreport/index.html`, the 5 test
+`.sh.in`, and `docs/.gitignore` (add `docs/badgedata/`, `docs/testlogs/`,
+`docs/typosreport/report*.json`). Commit these to `template-lang-und` `main`,
+**bump `rev_id` → 334**, then `gut template apply` across `^lang-`.
+
+> `docs/_config.yml` is also `required`. `lang-olo` has it pinned to the theme
+> test branch — restore it to `@main` before applying, or the apply resets it
+> anyway (theme is merged now, so `@main` is correct).
+
+**2. Scripted `gut apply` pass** — what template apply can't do:
+
+- `README.md` + `docs/index-header.md` are `optional`, not `required`. Their
+  shields `url=` still points at
+  `…/giellalt/__REPO__/main/docs/badgedata/X.json`; rewrite `main/docs/badgedata`
+  → `generated/docs-data` (content-anchored `perl`, like the `speller-report`
+  removal). Either edit the template's copies and apply with `--optional`, or do
+  it here.
+- `git rm -r --ignore-unmatch docs/badgedata docs/testlogs docs/typosreport/report*.json`
+  — removing already-tracked generated files.
+- Skip any repo with no `generated/docs-data` branch yet
+  (`git ls-remote --heads origin generated/docs-data`) so a badge never points at
+  a missing ref.
+- Bump `.gut/delta.toml`, `gut commit`, spot-check ~5, `gut push`.
+
+**3. Validate on `lang-olo` first.** Its migration content came from 6 isolated
+hand-made commits (`b552230d cf22f1ee ee8d0c9d eccaee96 fc5e0695`, + the
+`_config.yml` pin) that never touched `.gut/` content — a clean revert set.
+Revert them, run both passes, `git diff` against the reverted state: a ~empty
+diff proves the automated path reproduces the hand-made result before it touches
+170 repos.
+
 ### Phase 0 — warm-up: push the speller-report removal
 
 Unrelated to the artifact work, already done and reviewed, low risk.
@@ -410,31 +529,40 @@ Unrelated to the artifact work, already done and reviewed, low risk.
 
 Merge order matters (GiellaLTLexTools before its callers):
 
-1. [x] **giella-core** `bbd4c2ab` (main, unpushed) — inert for existing flows;
-       only `docs-publish` reaches the `report.json` target.
-2. [x] **GiellaLTLexTools** `json-output` (v0.10.0) → **pushed** (branch).
-       `divvun-actions` installs it with `uv pip install --upgrade git+…` on every
-       build. `-L` behaviour is byte-identical.
-3. [ ] **template-lang-und** — `-J` in the 5 test `.sh.in` scripts (rev 333).
-       Test in one repo first (Phase 1.5).
-4. [ ] **divvun-actions** `lang-docs-artifacts` → PR with real review (new prod
-       CI behaviour; it force-pushes a `generated/docs-data` branch to every lang repo).
-       After merge, every `lang-` `main` build publishes `generated/docs-data`. Nothing
-       consumes it yet.
+1. [x] **giella-core** `bbd4c2ab` — **on `origin/main`**. Inert for existing
+       flows; only `docs-publish` reaches the `report.json` target.
+2. [x] **divvun-actions** `df72a99` (CI image: `divvunspell` + `jq`) — **on
+       `origin/main`**, image rebuilt + rolled out.
+3. [x] **GiellaLTLexTools** `json-output` (v0.10.0) — **merged to `main`**
+       (`d73db33`). `-L` byte-identical.
+4. [x] **jekyll-theme-giellalt** `testlogs-client-render` — **merged to `main`**
+       (`8f30b8d`, PR #9). Inert: `testlogs.js` only loads on a page that
+       includes it.
+5. [ ] **template-lang-und** — commit the `testlogs-client-render` set (`-J` in
+       the 5 `.sh.in`, `index.html`, typosreport bundle patch, `template.toml`
+       `required` entry) and **bump `rev_id` → 334** (lang-olo already applied
+       333). Land it.
+6. [ ] **divvun-actions** `lang-docs-artifacts` → **PR #22**, real review (new
+       prod CI behaviour; force-pushes `generated/docs-data` to every lang repo).
+       Pushed, 8 commits. After merge, every `lang-` `main` build publishes
+       `generated/docs-data`; nothing consumes it yet.
 
-### Phase 1.5 — prove `-J` + the publish path in one repo (`lang-olo`)
+### Phase 1.5 — prove `-J` + the publish path in one repo (`lang-olo`) — DONE
 
-`lang-olo` is the test bed (small speller, real failures, builds fast):
+`lang-olo` was the test bed (small speller, real failures, builds fast):
 
-- [x] `-J` in the 5 `.sh.in` scripts on `lang-olo` `testlogs-client-render`
-      (also merged to `main`).
-- [x] `docs/testlogs/index.html` shell page; `_config.yml` `remote_theme`
-      pinned to the theme's `testlogs-client-render` branch.
-- [ ] Point `index.html` `data-src` at the `generated/docs-data` raw URL.
-- [ ] Run a `main` build → confirm `docs-publish` force-pushes `generated/docs-data` with
-      `testlogs.json` + `testlogs-<id>.json` + badge JSON + `meta.json`.
-- [ ] `https://giellalt.github.io/lang-olo/testlogs/` renders the summary and a
-      failing suite expands.
+- [x] `-J` in the 5 `.sh.in` scripts, on `main`.
+- [x] `docs/testlogs/index.html` shell page pointed at `generated/docs-data`;
+      `_config.yml` `remote_theme` pinned to the theme branch.
+- [x] `divvun-actions` pinned to `lang-docs-artifacts` for the run;
+      `docs-publish` force-pushed `generated/docs-data` (build 247) with the
+      full set — badges, `report.json`, `speller-suggestions.json`,
+      `testlogs.json` + 5 `testlogs-<id>.json`, `meta.json`.
+- [x] `https://giellalt.github.io/lang-olo/testlogs/` renders the summary,
+      suites expand, "Expand all" works.
+- Sidequest: the CI image had neither `divvunspell` nor `jq` (→ `df72a99`),
+  and the fleet's image auto-update cron had been dead since 2025-09 (had to
+  run `docker/update.sh --force` by hand on both CI hosts). See follow-ups.
 
 ### Phase 2 — verify across a spread (no repo changes)
 
@@ -455,19 +583,24 @@ Fix the `TODO(CI)` items in `docs-publish.ts` (make-target names, VPATH paths,
 variant reports) as divvun-actions PRs — each fix re-publishes on the next
 build.
 
-### Phase 3 — land the theme + canary the flip
+### Phase 3 — canary the per-repo flip
 
-5. [ ] **jekyll-theme-giellalt** `testlogs-client-render` → PR → main. Inert:
-       `testlogs.js` only loads on a page that includes it.
-6. [ ] Canary **`lang-sme`, `lang-nno`, one variant repo** — one hand-made
-       commit each:
-   - swap `docs/testlogs/index.md` → the new `index.html`
-   - flip README + `docs/index-header.md` badge `url=` to the `generated/docs-data` URL
-   - `git rm -r docs/badgedata` and `git rm docs/testlogs/*-lemmas.{md,json}`
-   - **keep** `docs/typosreport/` (incl. `report.json`) — that waits for Phase 4
-   - add `.gitignore` entries
-   - Push, watch: Pages build green, README badges render, `/testlogs/` works.
-   - **Soak 3–7 days.**
+Theme is on `main` (`8f30b8d`). See **the per-repo flip** below for the method
+(template apply for the 4 managed files + scripted `gut` pass for the rest).
+
+- [ ] **lang-olo first** — revert its 6 hand-made commits, restore `_config.yml`
+      to `@main`, run `gut template apply`, diff against the reverted state
+      (should be ~empty). Proves the template path reproduces the hand-made
+      result. Then the scripted pass. Soak.
+- [ ] Canary **`lang-sme`, `lang-nno`, one variant repo** — same two passes:
+  - template apply: `docs/testlogs/index.html` (replaces `index.md`),
+    `docs/typosreport/{bundle.js,index.html}`, the 5 `.sh.in`, `docs/.gitignore`
+  - scripted: flip README + `docs/index-header.md` badge `url=` to the
+    `generated/docs-data` URL; `git rm -r docs/badgedata` and
+    `git rm docs/testlogs/*-lemmas.{md,json}`
+  - **keep** `docs/typosreport/report*.json` — that waits for Phase 4
+  - Push, watch: Pages build green, README badges render, `/testlogs/` works.
+  - **Soak 3–7 days.**
 
 ### Phase 4 — typos report viewer
 
@@ -521,6 +654,12 @@ build.
 
 ## Follow-ups / out of scope
 
+- **CI image auto-update is dead.** `docker/update-cron.sh` (per-minute cron
+  that `docker pull`s `:ubuntu-latest` and recreates the `builder-*` sysbox
+  agents on an image change) last ran 2025-09-08 on both `ci-linux` and
+  `ci-large`. Every divvun-actions image change since has needed a manual
+  `docker/update.sh --force`. Re-establish it (re-run `docker/setup-cron.sh`,
+  or move it to a systemd timer) so future changes propagate on their own.
 - **`generated/docs-metrics`** — the compact accuracy-trend log (see "History" above).
 - `corpus-` repos — same pattern, separate pass.
 - `keyboard` / `dict` / `speech` repo types — later.
@@ -532,7 +671,8 @@ build.
 
 ## Open questions
 
-- Exact repo name for the `accuracy-viewer` Svelte source.
+- Is the Dioxus (Rust/WASM) `accuracy-viewer` rewrite production-ready? If so,
+  adopt it instead of maintaining the hand-patched Svelte bundle.
 - Keep publishing Class 1 badges from the `docs.yml` build as a redundant path,
   or make Buildkite the sole publisher?
 - Add a `gtlemmatest` version gate to giella-core's `configure.ac` so an agent
