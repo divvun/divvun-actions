@@ -172,21 +172,24 @@ export async function downloadAndExtractSpellerSnapshot(): Promise<void> {
   await Deno.remove("workspace-speller.tar.gz")
 }
 
-export async function runLangTests(opts: {
-  metadataKey: string
-  label: string
-}) {
-  const { metadataKey, label } = opts
-
-  logger.info(`Downloading ${label} workspace snapshot`)
+/**
+ * Restore the built + configured workspace on a fresh agent: download the
+ * speller-build snapshot, ensure the giella-core deps, and re-run `configure`
+ * (not autogen) so the Makefiles carry this agent's absolute paths. The
+ * snapshot keeps its build-machine mtimes, so make treats the compiled
+ * artifacts as up to date and recompiles nothing.
+ *
+ * Shared by the test step and the docs-publish step, which both need a
+ * ready-to-`make` tree without a full rebuild.
+ */
+export async function restoreBuiltWorkspace(
+  configureFlagsMetadataKey: string,
+): Promise<void> {
   await downloadAndExtractSpellerSnapshot()
 
   await setupGiellaCoreDependencies()
 
-  // Re-run configure (not autogen) to regenerate Makefiles with the correct
-  // absolute paths for this agent. The compiled artifacts already have their
-  // original mtimes from the build machine, so make will not recompile them.
-  const configureFlags = await builder.metadata(metadataKey)
+  const configureFlags = await builder.metadata(configureFlagsMetadataKey)
   logger.info("Running configure")
   const configureProc = new Deno.Command("bash", {
     args: ["-c", `../configure ${configureFlags}`],
@@ -198,6 +201,16 @@ export async function runLangTests(opts: {
   if (configureStatus.code !== 0) {
     throw new Error(`configure failed with exit code ${configureStatus.code}`)
   }
+}
+
+export async function runLangTests(opts: {
+  metadataKey: string
+  label: string
+}) {
+  const { metadataKey, label } = opts
+
+  logger.info(`Downloading ${label} workspace snapshot`)
+  await restoreBuiltWorkspace(metadataKey)
 
   logger.info(`Running ${label} tests`)
 

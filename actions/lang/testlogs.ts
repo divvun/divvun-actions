@@ -75,7 +75,7 @@ export type SuiteDetail = {
 
 /** Filename stem (`nouns-lemmas.json`) → suite id (`nouns`). */
 export function suiteIdFromFile(file: string): string {
-  return path.basename(file).replace(/-lemmas\.json$/, "").replace(/\.json$/, "")
+  return path.basename(file, ".json").replace(/-lemmas$/, "")
 }
 
 function toSuite(

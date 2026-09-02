@@ -5,10 +5,7 @@ import * as builder from "~/builder.ts"
 import { GitHub } from "~/util/github.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
-import {
-  downloadAndExtractSpellerSnapshot,
-  setupGiellaCoreDependencies,
-} from "./common.ts"
+import { restoreBuiltWorkspace } from "./common.ts"
 import { readTestlogs, type TestlogsManifest } from "./testlogs.ts"
 
 /**
@@ -156,6 +153,7 @@ async function generateDocsData(buildConfig: BuildProps): Promise<string[]> {
       cwd: path.join(root, "build", "docs"),
     })
   ) {
+    let found = false
     for (
       const cand of [
         "build/docs/badgedata/fst-variants.json",
@@ -167,8 +165,12 @@ async function generateDocsData(buildConfig: BuildProps): Promise<string[]> {
           await Deno.copyFile(cand, "docs/badgedata/fst-variants.json")
         }
         assets.push("docs/badgedata/fst-variants.json")
+        found = true
         break
       }
+    }
+    if (!found) {
+      logger.warning("make succeeded but produced no fst-variants.json")
     }
   } else {
     logger.warning("Failed to generate fst-variants.json")
@@ -209,20 +211,8 @@ export async function runLangDocsPublish() {
   ) as { build?: BuildProps }
   const buildConfig = config?.build ?? {} as BuildProps
 
-  // Restore the built + configured workspace (same preamble as the test step).
-  await downloadAndExtractSpellerSnapshot()
-  await setupGiellaCoreDependencies()
-
-  const configureFlags = await builder.metadata("speller-configure-flags")
-  const configure = new Deno.Command("bash", {
-    args: ["-c", `../configure ${configureFlags}`],
-    cwd: path.join(Deno.cwd(), "build"),
-    stdout: "inherit",
-    stderr: "inherit",
-  }).spawn()
-  if ((await configure.status).code !== 0) {
-    throw new Error("configure failed")
-  }
+  // Restore the same built + configured tree the speller-test step uses.
+  await restoreBuiltWorkspace("speller-configure-flags")
 
   // testlogs/*-lemmas.json are produced by `make check` in the test step
   // (gtlemmatest/gtspelltest -J), which uploads them as artifacts. A repo with
