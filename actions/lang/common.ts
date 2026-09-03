@@ -3,7 +3,7 @@ import * as fs from "@std/fs"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 
-const GTLEXTOOLS_SPEC = "git+https://github.com/divvun/GiellaLTLexTools"
+const GTLEXTOOLS_SPEC = "git+ssh://git@github.com/divvun/GiellaLTLexTools"
 
 /** Where docker/tools/{hfst,cg3}.ts stage the Rust binaries in the images. */
 const DIVVUN_RUST_BIN = "/opt/divvun/bin"
