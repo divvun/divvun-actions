@@ -1,6 +1,17 @@
 import { encodeBase64 } from "@std/encoding/base64"
 import logger from "./log.ts"
 
+/** A non-zero `gh api` exit. `status` is the HTTP code when `gh` reported one. */
+export class GitHubApiError extends Error {
+  readonly status: number | null
+  constructor(message: string, status: number | null) {
+    super(message)
+    this.name = "GitHubApiError"
+    this.status = status
+    Object.setPrototypeOf(this, GitHubApiError.prototype)
+  }
+}
+
 export interface GitHubRelease {
   tagName: string
   name: string
@@ -47,10 +58,11 @@ export class GitHub {
 
     const { code, stdout, stderr } = await proc.output()
     if (code !== 0) {
-      throw new Error(
-        `gh api ${args.join(" ")} failed (${code}): ${
-          new TextDecoder().decode(stderr).trim()
-        }`,
+      const err = new TextDecoder().decode(stderr).trim()
+      const status = err.match(/HTTP (\d{3})/)?.[1]
+      throw new GitHubApiError(
+        `gh api ${args.join(" ")} failed (${code}): ${err}`,
+        status ? Number(status) : null,
       )
     }
     const out = new TextDecoder().decode(stdout).trim()

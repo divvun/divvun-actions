@@ -2,7 +2,8 @@ import * as fs from "@std/fs"
 import * as path from "@std/path"
 import * as yaml from "@std/yaml"
 import * as builder from "~/builder.ts"
-import { GitHub } from "~/util/github.ts"
+import { GitHub, GitHubApiError } from "~/util/github.ts"
+import { ExpectedError } from "~/util/error.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
 import { makeTempDir } from "~/util/temp.ts"
@@ -253,12 +254,36 @@ export async function runLangDocsPublish() {
     // branch — Buildkite honours it in the HEAD commit message. Without it the
     // repo's CI status badge would flip to that failure.
     const gh = new GitHub(builder.env.repo)
-    await gh.publishBranch(DOCS_DATA_BRANCH, files, {
-      orphan: true,
-      message: `docs data: ${builder.env.commit?.slice(0, 8) ?? "?"} (build ${
-        builder.env.buildNumber ?? "?"
-      }) [skip ci]`,
-    })
+    try {
+      await gh.publishBranch(DOCS_DATA_BRANCH, files, {
+        orphan: true,
+        message: `docs data: ${builder.env.commit?.slice(0, 8) ?? "?"} (build ${
+          builder.env.buildNumber ?? "?"
+        }) [skip ci]`,
+      })
+    } catch (e) {
+      // A 404/403 on the Git Data API write means the CI identity (divvunbot)
+      // can't push to this repo. divvunbot gets write access through the
+      // `GiellaLTstaff` / `GiellaLTusers` teams; a repo created without one of
+      // those teams (or with only a project/regional team) hits this. GitHub
+      // masks "authenticated but no write access" as 404 on write endpoints, so
+      // the raw error is misleading — spell the cause out. Still fatal: this is
+      // `soft_fail` in the pipeline, so it stays visible without blocking the
+      // build, and a silent skip would hide a whole language's badges going
+      // stale. See docs/badgedata-artifact-migration.md.
+      if (
+        e instanceof GitHubApiError && (e.status === 404 || e.status === 403)
+      ) {
+        throw ExpectedError.create(
+          `Cannot publish ${DOCS_DATA_BRANCH} to ${builder.env.repo}: ` +
+            `divvunbot has no write access (HTTP ${e.status}). ` +
+            `Fix: give the repo the "GiellaLTstaff" team with write permission ` +
+            `(Settings → Collaborators and teams), or add another team ` +
+            `divvunbot belongs to. This is required for every new lang- repo.`,
+        )
+      }
+      throw e
+    }
 
     logger.info("Docs data published")
   } finally {
