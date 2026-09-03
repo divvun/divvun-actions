@@ -42,6 +42,25 @@ export class GitHub {
     return m[1]
   }
 
+  /**
+   * Resolve `#slug()` to the repo's current `owner/name`. Buildkite's configured
+   * remote can lag a GitHub rename (git redirects transparently, so clone/push
+   * never notice); the REST API answers a renamed path with a 307 that `gh api`
+   * won't follow on writes. A GET *is* followed, and `.full_name` is canonical.
+   */
+  async #canonicalSlug(): Promise<string> {
+    const slug = this.#slug()
+    try {
+      const repo = await this.#api([`repos/${slug}`]) as { full_name?: string }
+      if (repo.full_name && repo.full_name !== slug) {
+        logger.info(`${slug} was renamed to ${repo.full_name}; using that`)
+      }
+      return repo.full_name ?? slug
+    } catch {
+      return slug
+    }
+  }
+
   async #api(args: string[], body?: unknown): Promise<unknown> {
     const proc = new Deno.Command("gh", {
       args: ["api", ...args],
@@ -81,7 +100,7 @@ export class GitHub {
     files: Array<{ path: string; source: string }>,
     opts: { message: string; orphan?: boolean },
   ): Promise<void> {
-    const slug = this.#slug()
+    const slug = await this.#canonicalSlug()
 
     const tree: Array<
       { path: string; mode: "100644"; type: "blob"; sha: string }
