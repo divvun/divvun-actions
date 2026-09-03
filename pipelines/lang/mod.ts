@@ -468,8 +468,11 @@ export async function runLangDeploy() {
       pahkatApiKey: allSecrets.get("pahkat/apiKey"),
     }
 
+    // builder.env.repo is the clone URL (git@github.com:owner/repo.git for
+    // sync-managed pipelines, https://…/owner/repo.git otherwise); the asset URL
+    // needs the bare owner/repo, which env.repoPath already normalises.
     const githubAssetUrl = (filename: string) =>
-      `https://github.com/${builder.env.repo}/releases/download/${releaseTag}/${filename}`
+      `https://github.com/${builder.env.repoPath}/releases/download/${releaseTag}/${filename}`
 
     logger.info(
       "Publishing nightly speller to pahkat (GitHub-hosted artifacts)",
