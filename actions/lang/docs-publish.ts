@@ -102,17 +102,28 @@ async function repoName(): Promise<string> {
 }
 
 /**
- * Regenerate the badge JSON + `report.json` into `outDir` by calling the
- * giella-core scripts directly (same invocations as
+ * Regenerate the badge JSON + `speller-accuracy.json` into `outDir` by
+ * calling the giella-core scripts directly (same invocations as
  * am-shared/docs-dir-include.am). The Class 1 badges need no FST build;
- * `report.json` and the `speller-suggestions` badge derived from it need the
- * built speller, which the snapshot restores.
+ * `speller-accuracy.json` and the `speller-suggestions` badge derived from
+ * it need the built speller, which the snapshot restores.
+ *
+ * Variant accuracy reports (`speller-accuracy-<code>.json`, for
+ * dialect/area/alt-orth/alt-writing-system languages) come from
+ * giella-core's `speller-variant-reports` target
+ * (am-shared/tools-spellcheckers-test-include.am, included from
+ * tools/spellcheckers/test/Makefile.am) — it writes `report.json` /
+ * `report-<code>.json` straight into docs/typosreport/ in the source tree
+ * (not build/), one per configured dialect/area/orthography/writing-system.
+ * When it ran, its report.json also folds in variant-specific typos data via
+ * typos-default-generated.tsv, so it's a strictly better default report than
+ * the plain build/docs/report.json below for multi-variant repos — prefer it
+ * when present. Soft-fail throughout: most repos have no variants, and the
+ * target is a cheap no-op there.
  *
  * TODO(CI): `fst-variants.json` needs autoconf-substituted vars (DIALECTS,
  * AREAS, ...) — generated via `make` below; verify the target name against a
- * real build. Variant reports (`report-<v>.json` /
- * `speller-suggestions-<v>.json`) for dialect/area/alt-orth languages are not
- * handled yet — see giella-core's `speller-variant-reports` target.
+ * real build.
  */
 async function generateDocsData(
   buildConfig: BuildProps,
@@ -172,20 +183,82 @@ async function generateDocsData(
   }
 
   if (buildConfig.spellers) {
-    const reportOut = path.join(outDir, "report.json")
-    if (
+    const reportOut = path.join(outDir, "speller-accuracy.json")
+    const srcTyposreport = path.join(root, "docs", "typosreport")
+
+    // Variant reports first: for a multi-variant repo this also produces the
+    // more complete default docs/typosreport/report.json (see doc comment
+    // above), which the fallback below should not then clobber.
+    const variantsDir = path.join(
+      root,
+      "build",
+      "tools",
+      "spellcheckers",
+      "test",
+    )
+    let variantReportCount = 0
+    if (await fs.exists(variantsDir)) {
+      if (
+        await run("bash", ["-c", "make -j$(nproc) speller-variant-reports"], {
+          cwd: variantsDir,
+        })
+      ) {
+        try {
+          for await (const entry of Deno.readDir(srcTyposreport)) {
+            const m = entry.isFile && entry.name.match(/^report-(.+)\.json$/)
+            if (!m) continue
+            await Deno.copyFile(
+              path.join(srcTyposreport, entry.name),
+              path.join(outDir, `speller-accuracy-${m[1]}.json`),
+            )
+            variantReportCount++
+          }
+        } catch {
+          // No docs/typosreport dir — speller-variant-reports was a no-op
+          // (repo has no dialects/areas/orthographies/writing systems).
+        }
+        if (variantReportCount > 0) {
+          logger.info(
+            `Published ${variantReportCount} variant accuracy report(s)`,
+          )
+        }
+      } else {
+        logger.warning(
+          "speller-variant-reports failed (or this repo has no variants configured)",
+        )
+      }
+    }
+
+    const variantDefaultReport = path.join(srcTyposreport, "report.json")
+    if (variantReportCount > 0 && await fs.exists(variantDefaultReport)) {
+      await Deno.copyFile(variantDefaultReport, reportOut)
+    } else if (
       await run("bash", ["-c", "make -j$(nproc) report.json"], {
         cwd: path.join(root, "build", "docs"),
       }) && await fs.exists("build/docs/report.json")
     ) {
       await Deno.copyFile("build/docs/report.json", reportOut)
+    } else {
+      logger.warning("Failed to generate speller-accuracy.json")
+    }
+
+    if (await fs.exists(reportOut)) {
       await emit("speller-suggestions.json", "bash", [
         path.join(scripts, "make-spellerbadge-json.sh"),
         reportOut,
       ])
-    } else {
-      logger.warning("Failed to generate report.json")
     }
+
+    // Hygiene: docs/typosreport/*.json is already .gitignore'd in every lang
+    // repo, so this isn't needed for git cleanliness — just to avoid stale
+    // generated files lingering in a workspace reused across builds.
+    try {
+      for await (const entry of Deno.readDir(srcTyposreport)) {
+        if (entry.isFile && /^report(-.+)?\.json$/.test(entry.name)) {
+          await Deno.remove(path.join(srcTyposreport, entry.name))
+        }
+      }
+    } catch { /* dir doesn't exist — nothing to clean up */ }
   }
 }
 

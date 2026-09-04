@@ -1061,7 +1061,7 @@ export async function pipelineLang() {
     }
   }
 
-  // Docs data (badge JSON + report.json + testlogs.json) → the repo's rolling
+  // Docs data (badge JSON + speller-accuracy.json + testlogs.json) → the repo's rolling
   // `generated/docs-data` orphan branch, which the docs site and README badges
   // read by `raw.githubusercontent.com` URL. main only, soft_fail — never
   // blocks a build. See docs/badgedata-artifact-migration.md.
