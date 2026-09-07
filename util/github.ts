@@ -162,6 +162,117 @@ export class GitHub {
     }
   }
 
+  /**
+   * Repo facts the docs-data step needs in one place: visibility (which selects
+   * the private publishing path — see `actions/lang/docs-publish.ts`) and the
+   * three GitHub-derived values behind the `license` / `issues` / `DocCI`
+   * badges, which shields.io renders itself for a public repo but 404s on for a
+   * private one. Each lookup soft-fails to a neutral default so a transient API
+   * error can't fail the build over a badge.
+   */
+  async repoMetadata(): Promise<{
+    private: boolean
+    license: string | null
+    openIssues: number
+    docsConclusion: string | null
+  }> {
+    const slug = await this.#canonicalSlug()
+
+    let isPrivate = false
+    let license: string | null = null
+    let openIssues = 0
+    let docsConclusion: string | null = null
+
+    try {
+      const repo = await this.#api([`repos/${slug}`]) as {
+        private?: boolean
+        license?: { spdx_id?: string | null } | null
+      }
+      isPrivate = repo.private ?? false
+      const spdx = repo.license?.spdx_id
+      license = spdx && spdx !== "NOASSERTION" ? spdx : null
+    } catch (e) {
+      logger.warning(`repoMetadata: repos/${slug} lookup failed: ${e}`)
+    }
+
+    try {
+      const res = await this.#api([
+        "search/issues",
+        "-f",
+        `q=repo:${slug} is:issue is:open`,
+        "-F",
+        "per_page=1",
+      ]) as { total_count?: number }
+      openIssues = res.total_count ?? 0
+    } catch (e) {
+      logger.warning(`repoMetadata: open-issue search failed: ${e}`)
+    }
+
+    try {
+      const res = await this.#api([
+        `repos/${slug}/actions/workflows/docs.yml/runs`,
+        "-F",
+        "per_page=1",
+        "-f",
+        "exclude_pull_requests=true",
+      ]) as { workflow_runs?: Array<{ conclusion?: string | null }> }
+      docsConclusion = res.workflow_runs?.[0]?.conclusion ?? null
+    } catch (e) {
+      logger.warning(`repoMetadata: docs.yml run lookup failed: ${e}`)
+    }
+
+    return { private: isPrivate, license, openIssues, docsConclusion }
+  }
+
+  /**
+   * Ask GitHub Actions to rebuild the repo's docs site (the `docs.yml`
+   * workflow). Only used for private repos: their docs site embeds a *copy* of
+   * the `generated/docs-data` branch at build time — it can't read the branch
+   * at view time, because `raw.githubusercontent.com` needs auth and sends no
+   * CORS header — so a rebuild is the only way fresh badge/test data reaches
+   * the page. A public repo's docs page fetches the branch live and needs no
+   * rebuild.
+   *
+   * Prefers `workflow_dispatch` (needs the token's `actions: write`); if that
+   * is refused, falls back to a `repository_dispatch` event named
+   * `docs-data-published` — the template `docs.yml` listens for that too, and
+   * it only needs `contents: write`.
+   */
+  async dispatchDocsWorkflow(ref = "main"): Promise<void> {
+    const slug = await this.#canonicalSlug()
+    try {
+      await this.#api(
+        [
+          "-X",
+          "POST",
+          `repos/${slug}/actions/workflows/docs.yml/dispatches`,
+          "--input",
+          "-",
+        ],
+        { ref },
+      )
+      logger.info(`Triggered docs.yml on ${slug} (workflow_dispatch)`)
+    } catch (e) {
+      if (
+        e instanceof GitHubApiError && (e.status === 403 || e.status === 404)
+      ) {
+        logger.warning(
+          `workflow_dispatch refused on ${slug} (HTTP ${e.status}); ` +
+            `falling back to repository_dispatch`,
+        )
+        await this.#api(
+          ["-X", "POST", `repos/${slug}/dispatches`, "--input", "-"],
+          { event_type: "docs-data-published" },
+        )
+        logger.info(
+          `Triggered repository_dispatch 'docs-data-published' on ${slug}`,
+        )
+        return
+      }
+      throw e
+    }
+  }
+
   async createRelease(
     tag: string,
     artifacts: string[],
