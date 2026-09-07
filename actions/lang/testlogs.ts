@@ -54,6 +54,8 @@ export type SuiteSummary = {
   kind: SuiteKind
   lexc: string | null
   lemmas: number | null
+  /** Lemmas actually checked. Below `lemmas` when `truncated`. */
+  tested: number | null
   success_pct: number | null
   truncated: boolean
   failures: number
@@ -90,6 +92,7 @@ function toSuite(
       kind: speller ? "speller" : "lemma",
       lexc: speller ? null : (json as LemmaSuiteJson).lexc ?? null,
       lemmas: json.lemmas ?? null,
+      tested: json.tested ?? null,
       success_pct: json.success_pct ?? null,
       truncated: Boolean(json.truncated),
       failures: json.failures?.length ?? 0,
