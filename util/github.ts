@@ -28,6 +28,8 @@ export interface GitHubRelease {
 
 export class GitHub {
   #repo: string
+  /** `GET repos/{slug}`, fetched at most once per instance (see `#getRepo`). */
+  #repoData?: Promise<Record<string, unknown>>
 
   constructor(repo: string) {
     this.#repo = repo
@@ -43,6 +45,27 @@ export class GitHub {
   }
 
   /**
+   * `GET repos/{slug}`, memoised for the life of this instance — the docs-data
+   * flow reads it three times (`#canonicalSlug` twice, `repoMetadata` once) and
+   * the repo's identity/visibility/licence don't change mid-build. `gh api`
+   * follows the rename 307 on a GET, so `#slug()` (which can lag a rename) is a
+   * fine path here. A failed fetch is not cached, so a later call can retry.
+   */
+  #getRepo(): Promise<Record<string, unknown>> {
+    return (this.#repoData ??= (async () => {
+      try {
+        return await this.#api([`repos/${this.#slug()}`]) as Record<
+          string,
+          unknown
+        >
+      } catch (e) {
+        this.#repoData = undefined
+        throw e
+      }
+    })())
+  }
+
+  /**
    * Resolve `#slug()` to the repo's current `owner/name`. Buildkite's configured
    * remote can lag a GitHub rename (git redirects transparently, so clone/push
    * never notice); the REST API answers a renamed path with a 307 that `gh api`
@@ -51,11 +74,11 @@ export class GitHub {
   async #canonicalSlug(): Promise<string> {
     const slug = this.#slug()
     try {
-      const repo = await this.#api([`repos/${slug}`]) as { full_name?: string }
-      if (repo.full_name && repo.full_name !== slug) {
-        logger.info(`${slug} was renamed to ${repo.full_name}; using that`)
+      const { full_name } = await this.#getRepo() as { full_name?: string }
+      if (full_name && full_name !== slug) {
+        logger.info(`${slug} was renamed to ${full_name}; using that`)
       }
-      return repo.full_name ?? slug
+      return full_name ?? slug
     } catch {
       return slug
     }
@@ -183,7 +206,7 @@ export class GitHub {
     let license: string | null = null
 
     try {
-      const repo = await this.#api([`repos/${slug}`]) as {
+      const repo = await this.#getRepo() as {
         private?: boolean
         license?: { spdx_id?: string | null } | null
       }
