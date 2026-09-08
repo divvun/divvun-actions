@@ -226,51 +226,30 @@ export class GitHub {
 
   /**
    * Ask GitHub Actions to rebuild the repo's docs site (the `docs.yml`
-   * workflow). Only used for private repos: their docs site embeds a *copy* of
-   * the `generated/docs-data` branch at build time — it can't read the branch
-   * at view time, because `raw.githubusercontent.com` needs auth and sends no
-   * CORS header — so a rebuild is the only way fresh badge/test data reaches
-   * the page. A public repo's docs page fetches the branch live and needs no
-   * rebuild.
+   * workflow), via `workflow_dispatch`. Only used for private repos: their docs
+   * site embeds a *copy* of the `generated/docs-data` branch at build time — it
+   * can't read the branch at view time, because `raw.githubusercontent.com`
+   * needs auth and sends no CORS header — so a rebuild is the only way fresh
+   * badge/test data reaches the page. A public repo's docs page fetches the
+   * branch live and needs no rebuild.
    *
-   * Prefers `workflow_dispatch` (needs the token's `actions: write`); if that
-   * is refused, falls back to a `repository_dispatch` event named
-   * `docs-data-published` — the template `docs.yml` listens for that too, and
-   * it only needs `contents: write`.
+   * Needs the CI token's `actions: write` (the GiellaLT CI identity has it); a
+   * caller that treats a failure here as fatal would be wrong — the build's
+   * data is already published, only the rebuild trigger is best-effort.
    */
   async dispatchDocsWorkflow(ref = "main"): Promise<void> {
     const slug = await this.#canonicalSlug()
-    try {
-      await this.#api(
-        [
-          "-X",
-          "POST",
-          `repos/${slug}/actions/workflows/docs.yml/dispatches`,
-          "--input",
-          "-",
-        ],
-        { ref },
-      )
-      logger.info(`Triggered docs.yml on ${slug} (workflow_dispatch)`)
-    } catch (e) {
-      if (
-        e instanceof GitHubApiError && (e.status === 403 || e.status === 404)
-      ) {
-        logger.warning(
-          `workflow_dispatch refused on ${slug} (HTTP ${e.status}); ` +
-            `falling back to repository_dispatch`,
-        )
-        await this.#api(
-          ["-X", "POST", `repos/${slug}/dispatches`, "--input", "-"],
-          { event_type: "docs-data-published" },
-        )
-        logger.info(
-          `Triggered repository_dispatch 'docs-data-published' on ${slug}`,
-        )
-        return
-      }
-      throw e
-    }
+    await this.#api(
+      [
+        "-X",
+        "POST",
+        `repos/${slug}/actions/workflows/docs.yml/dispatches`,
+        "--input",
+        "-",
+      ],
+      { ref },
+    )
+    logger.info(`Triggered docs.yml rebuild on ${slug}`)
   }
 
   async createRelease(
