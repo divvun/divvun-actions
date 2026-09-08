@@ -8,6 +8,10 @@ import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import { restoreBuiltWorkspace } from "./common.ts"
+import {
+  renderEndpointBadgeSvgs,
+  renderMetadataBadgeSvgs,
+} from "./docs-badges.ts"
 import { readTestlogs, type TestlogsManifest } from "./testlogs.ts"
 
 /**
@@ -282,6 +286,12 @@ export async function runLangDocsPublish() {
     throw new Error("No repository information available")
   }
 
+  const gh = new GitHub(builder.env.repo)
+
+  // One round-trip for repo visibility (which selects the private publishing
+  // path below) and the license / issues / DocCI badge inputs.
+  const repoMeta = await gh.repoMetadata()
+
   // Everything to publish is assembled in one throwaway directory, flat, under
   // its final name — nothing is written into the checkout's tracked paths.
   const outDir = (await makeTempDir({ prefix: "docs-data-" })).path
@@ -298,6 +308,17 @@ export async function runLangDocsPublish() {
 
     await generateDocsData(buildConfig, outDir)
     await buildTestlogs("docs/testlogs", outDir)
+
+    // Pre-render the FST/speller badges as SVGs alongside their JSON: a private
+    // repo can't use shields.io `endpoint` badges (shields fetches the JSON
+    // server-side and unauthenticated → 404), and a public repo loads a
+    // committed SVG faster and without a shields.io dependency. The
+    // license/issues/DocCI SVGs only stand in where shields.io can't reach the
+    // repo, so a public build skips them. See docs-badges.ts.
+    await renderEndpointBadgeSvgs(outDir)
+    if (repoMeta.private) {
+      await renderMetadataBadgeSvgs(outDir, repoMeta)
+    }
 
     // Provenance for the docs pages (they show "data from <commit>, <n> ago").
     await Deno.writeTextFile(
@@ -326,7 +347,6 @@ export async function runLangDocsPublish() {
     // `[skip ci]` so the push doesn't spawn a (doomed) lang build on that
     // branch — Buildkite honours it in the HEAD commit message. Without it the
     // repo's CI status badge would flip to that failure.
-    const gh = new GitHub(builder.env.repo)
     try {
       await gh.publishBranch(DOCS_DATA_BRANCH, files, {
         orphan: true,
@@ -359,6 +379,19 @@ export async function runLangDocsPublish() {
     }
 
     logger.info("Docs data published")
+
+    // A public repo's docs page fetches `generated/docs-data` live from
+    // raw.githubusercontent.com, so the push above is enough. A private repo
+    // can't do that (auth required, no CORS header), so its docs workflow
+    // embeds a copy of the branch at build time — which means the site only
+    // updates when it rebuilds. Kick that rebuild now.
+    if (repoMeta.private) {
+      try {
+        await gh.dispatchDocsWorkflow()
+      } catch (e) {
+        logger.warning(`Could not trigger docs rebuild: ${e}`)
+      }
+    }
   } finally {
     await Deno.remove(outDir, { recursive: true }).catch(() => {})
   }

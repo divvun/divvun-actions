@@ -28,6 +28,8 @@ export interface GitHubRelease {
 
 export class GitHub {
   #repo: string
+  /** `GET repos/{slug}`, fetched at most once per instance (see `#getRepo`). */
+  #repoData?: Promise<Record<string, unknown>>
 
   constructor(repo: string) {
     this.#repo = repo
@@ -43,6 +45,27 @@ export class GitHub {
   }
 
   /**
+   * `GET repos/{slug}`, memoised for the life of this instance — the docs-data
+   * flow reads it three times (`#canonicalSlug` twice, `repoMetadata` once) and
+   * the repo's identity/visibility/licence don't change mid-build. `gh api`
+   * follows the rename 307 on a GET, so `#slug()` (which can lag a rename) is a
+   * fine path here. A failed fetch is not cached, so a later call can retry.
+   */
+  #getRepo(): Promise<Record<string, unknown>> {
+    return (this.#repoData ??= (async () => {
+      try {
+        return await this.#api([`repos/${this.#slug()}`]) as Record<
+          string,
+          unknown
+        >
+      } catch (e) {
+        this.#repoData = undefined
+        throw e
+      }
+    })())
+  }
+
+  /**
    * Resolve `#slug()` to the repo's current `owner/name`. Buildkite's configured
    * remote can lag a GitHub rename (git redirects transparently, so clone/push
    * never notice); the REST API answers a renamed path with a 307 that `gh api`
@@ -51,11 +74,11 @@ export class GitHub {
   async #canonicalSlug(): Promise<string> {
     const slug = this.#slug()
     try {
-      const repo = await this.#api([`repos/${slug}`]) as { full_name?: string }
-      if (repo.full_name && repo.full_name !== slug) {
-        logger.info(`${slug} was renamed to ${repo.full_name}; using that`)
+      const { full_name } = await this.#getRepo() as { full_name?: string }
+      if (full_name && full_name !== slug) {
+        logger.info(`${slug} was renamed to ${full_name}; using that`)
       }
-      return repo.full_name ?? slug
+      return full_name ?? slug
     } catch {
       return slug
     }
@@ -160,6 +183,104 @@ export class GitHub {
         { ref: `refs/heads/${branch}`, sha: commit.sha },
       )
     }
+  }
+
+  /**
+   * Repo facts the docs-data step needs in one place: visibility (which selects
+   * the private publishing path — see `actions/lang/docs-publish.ts`) and, for a
+   * private repo only, the `license` / `issues` / `DocCI` badge inputs.
+   * shields.io renders those three itself for a public repo but 404s on a
+   * private one, so only a private build renders SVGs for them and only a
+   * private build needs to look them up. Each call soft-fails to a neutral
+   * default so a transient API error can't fail the build over a badge.
+   */
+  async repoMetadata(): Promise<{
+    private: boolean
+    license: string | null
+    openIssues: number
+    docsConclusion: string | null
+  }> {
+    const slug = await this.#canonicalSlug()
+
+    let isPrivate = false
+    let license: string | null = null
+
+    try {
+      const repo = await this.#getRepo() as {
+        private?: boolean
+        license?: { spdx_id?: string | null } | null
+      }
+      isPrivate = repo.private ?? false
+      const spdx = repo.license?.spdx_id
+      license = spdx && spdx !== "NOASSERTION" ? spdx : null
+    } catch (e) {
+      logger.warning(`repoMetadata: repos/${slug} lookup failed: ${e}`)
+    }
+
+    if (!isPrivate) {
+      return { private: false, license, openIssues: 0, docsConclusion: null }
+    }
+
+    let openIssues = 0
+    let docsConclusion: string | null = null
+
+    try {
+      const res = await this.#api([
+        "search/issues",
+        "-f",
+        `q=repo:${slug} is:issue is:open`,
+        "-F",
+        "per_page=1",
+      ]) as { total_count?: number }
+      openIssues = res.total_count ?? 0
+    } catch (e) {
+      logger.warning(`repoMetadata: open-issue search failed: ${e}`)
+    }
+
+    try {
+      const res = await this.#api([
+        `repos/${slug}/actions/workflows/docs.yml/runs`,
+        "-F",
+        "per_page=1",
+        "-f",
+        "status=completed",
+        "-f",
+        "exclude_pull_requests=true",
+      ]) as { workflow_runs?: Array<{ conclusion?: string | null }> }
+      docsConclusion = res.workflow_runs?.[0]?.conclusion ?? null
+    } catch (e) {
+      logger.warning(`repoMetadata: docs.yml run lookup failed: ${e}`)
+    }
+
+    return { private: true, license, openIssues, docsConclusion }
+  }
+
+  /**
+   * Ask GitHub Actions to rebuild the repo's docs site (the `docs.yml`
+   * workflow), via `workflow_dispatch`. Only used for private repos: their docs
+   * site embeds a *copy* of the `generated/docs-data` branch at build time — it
+   * can't read the branch at view time, because `raw.githubusercontent.com`
+   * needs auth and sends no CORS header — so a rebuild is the only way fresh
+   * badge/test data reaches the page. A public repo's docs page fetches the
+   * branch live and needs no rebuild.
+   *
+   * Needs the CI token's `actions: write` (the GiellaLT CI identity has it); a
+   * caller that treats a failure here as fatal would be wrong — the build's
+   * data is already published, only the rebuild trigger is best-effort.
+   */
+  async dispatchDocsWorkflow(ref = "main"): Promise<void> {
+    const slug = await this.#canonicalSlug()
+    await this.#api(
+      [
+        "-X",
+        "POST",
+        `repos/${slug}/actions/workflows/docs.yml/dispatches`,
+        "--input",
+        "-",
+      ],
+      { ref },
+    )
+    logger.info(`Triggered docs.yml rebuild on ${slug}`)
   }
 
   async createRelease(
