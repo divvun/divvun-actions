@@ -309,12 +309,16 @@ export async function runLangDocsPublish() {
     await generateDocsData(buildConfig, outDir)
     await buildTestlogs("docs/testlogs", outDir)
 
-    // Pre-render every badge as an SVG alongside its JSON. Private repos can't
-    // use shields.io `endpoint` badges at all (shields fetches the JSON
-    // server-side and unauthenticated → 404), and public repos load a committed
-    // SVG faster and without a shields.io dependency. See docs-badges.ts.
+    // Pre-render the FST/speller badges as SVGs alongside their JSON: a private
+    // repo can't use shields.io `endpoint` badges (shields fetches the JSON
+    // server-side and unauthenticated → 404), and a public repo loads a
+    // committed SVG faster and without a shields.io dependency. The
+    // license/issues/DocCI SVGs only stand in where shields.io can't reach the
+    // repo, so a public build skips them. See docs-badges.ts.
     await renderEndpointBadgeSvgs(outDir)
-    await renderMetadataBadgeSvgs(outDir, repoMeta)
+    if (repoMeta.private) {
+      await renderMetadataBadgeSvgs(outDir, repoMeta)
+    }
 
     // Provenance for the docs pages (they show "data from <commit>, <n> ago").
     await Deno.writeTextFile(

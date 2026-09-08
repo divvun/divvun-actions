@@ -6,20 +6,25 @@ import logger from "~/util/log.ts"
  * Turns the badge JSON that `docs-publish.ts` assembles into pre-rendered SVGs
  * on the `generated/docs-data` branch.
  *
- * Why render at all, and for every repo rather than just private ones:
+ * The FST/speller endpoint badges (`renderEndpointBadgeSvgs`) are rendered for
+ * every repo:
  *
- *   - A private repo has no other option. The docs pages and READMEs point
- *     shields.io `endpoint` badges at `raw.githubusercontent.com/<repo>/…`, and
- *     shields fetches that server-side and unauthenticated — a private repo
- *     answers 404, so the badge renders as an error. The one thing that *can*
- *     read a private repo's data is a committed SVG the viewer's own GitHub
- *     session is allowed to load.
+ *   - A private repo has no other option. The docs pages point shields.io
+ *     `endpoint` badges at `raw.githubusercontent.com/<repo>/…`, and shields
+ *     fetches that server-side and unauthenticated — a private repo answers
+ *     404, so the badge renders as an error. The one thing that *can* read a
+ *     private repo's data is a committed SVG the viewer's own GitHub session is
+ *     allowed to load.
  *   - A public repo gains too: a committed SVG is one CDN hop from
  *     raw.githubusercontent.com, versus browser → shields.io → GitHub API →
  *     render for an endpoint badge, so it paints faster and doesn't blank out
  *     during a shields.io incident or rate-limit. Every main build force-pushes
  *     the branch, and these values only move on a build, so the SVG is as fresh
  *     as the endpoint badge was.
+ *
+ * The license/issues/DocCI badges (`renderMetadataBadgeSvgs`) are rendered for
+ * private repos only — that's the one case where shields.io can't reach the
+ * GitHub API for them; a public build keeps letting shields render those live.
  *
  * `badge-maker` is shields.io's own renderer (`npm:badge-maker`), so the output
  * is visually identical to the endpoint badges these stand in for.
@@ -37,26 +42,26 @@ type EndpointBadge = {
 }
 
 /**
- * The GitHub-derived values behind the `license` / `issues` / `DocCI` badges.
- * shields.io renders these three itself for public repos (and the docs theme
- * keeps letting it), but its GitHub API calls are unauthenticated and 404 on a
- * private repo — so `docs-publish.ts` looks them up with the CI token and hands
- * them here.
+ * The GitHub-derived values behind the `license` / `issues` / `DocCI` badges,
+ * looked up by `GitHub.repoMetadata()` and only for a private repo (where
+ * shields.io's unauthenticated API calls would 404).
  */
 export type RepoBadgeMetadata = {
   /** SPDX id (`GPL-3.0-or-later`), or null for a repo with no detected licence. */
   license: string | null
   /** Open **issues** (not PRs); approximate, refreshed each build. */
   openIssues: number
-  /** `conclusion` of the newest `docs.yml` run: `success` / `failure` / … / null. */
+  /** `conclusion` of the newest completed `docs.yml` run: `success` / `failure` / … / null. */
   docsConclusion: string | null
 }
 
 /**
  * Render `<name>.svg` next to every `<name>.json` in `outDir` that carries a
  * `schemaVersion` (the shields `endpoint` marker): `fst-maturity`,
- * `fst-lemmacount`, `fst-version`, `fst-variants`, `speller-version`,
- * `speller-suggestions` and its `speller-suggestions-<variant>` siblings.
+ * `fst-lemmacount`, `fst-version`, `speller-version`, `speller-suggestions` and
+ * its `speller-suggestions-<variant>` siblings. `fst-variants.json` and the
+ * `speller-accuracy*.json` / `testlogs*.json` data files have no `schemaVersion`
+ * and are skipped.
  */
 export async function renderEndpointBadgeSvgs(outDir: string): Promise<void> {
   let rendered = 0
@@ -90,14 +95,12 @@ export async function renderEndpointBadgeSvgs(outDir: string): Promise<void> {
 }
 
 /**
- * Render `license.svg`, `issues.svg` and `docci.svg` into `outDir` from
- * `meta`. Written for every repo so the branch payload is uniform and no
- * README (a plain Markdown file, so it can't branch on visibility and points
- * every repo at the same SVG URL) is ever left with a dead badge. The values
- * lag to the current build for a public repo, which for a licence, an
- * approximate issue count and a docs-build outcome is immaterial; on a private
- * repo `docci` also trails by one docs run, because publishing the branch is
- * what triggers the next docs build.
+ * Render `license.svg`, `issues.svg` and `docci.svg` into `outDir` from `meta`.
+ * `docs-publish.ts` calls this for private repos only — where the docs theme
+ * reads these three off the branch because shields.io can't reach the GitHub
+ * API for a private repo. The values are as of this build; `docci` in
+ * particular trails by one docs run, because publishing the branch is what
+ * triggers the next docs build.
  */
 export async function renderMetadataBadgeSvgs(
   outDir: string,

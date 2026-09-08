@@ -164,11 +164,12 @@ export class GitHub {
 
   /**
    * Repo facts the docs-data step needs in one place: visibility (which selects
-   * the private publishing path — see `actions/lang/docs-publish.ts`) and the
-   * three GitHub-derived values behind the `license` / `issues` / `DocCI`
-   * badges, which shields.io renders itself for a public repo but 404s on for a
-   * private one. Each lookup soft-fails to a neutral default so a transient API
-   * error can't fail the build over a badge.
+   * the private publishing path — see `actions/lang/docs-publish.ts`) and, for a
+   * private repo only, the `license` / `issues` / `DocCI` badge inputs.
+   * shields.io renders those three itself for a public repo but 404s on a
+   * private one, so only a private build renders SVGs for them and only a
+   * private build needs to look them up. Each call soft-fails to a neutral
+   * default so a transient API error can't fail the build over a badge.
    */
   async repoMetadata(): Promise<{
     private: boolean
@@ -180,8 +181,6 @@ export class GitHub {
 
     let isPrivate = false
     let license: string | null = null
-    let openIssues = 0
-    let docsConclusion: string | null = null
 
     try {
       const repo = await this.#api([`repos/${slug}`]) as {
@@ -194,6 +193,13 @@ export class GitHub {
     } catch (e) {
       logger.warning(`repoMetadata: repos/${slug} lookup failed: ${e}`)
     }
+
+    if (!isPrivate) {
+      return { private: false, license, openIssues: 0, docsConclusion: null }
+    }
+
+    let openIssues = 0
+    let docsConclusion: string | null = null
 
     try {
       const res = await this.#api([
@@ -214,6 +220,8 @@ export class GitHub {
         "-F",
         "per_page=1",
         "-f",
+        "status=completed",
+        "-f",
         "exclude_pull_requests=true",
       ]) as { workflow_runs?: Array<{ conclusion?: string | null }> }
       docsConclusion = res.workflow_runs?.[0]?.conclusion ?? null
@@ -221,7 +229,7 @@ export class GitHub {
       logger.warning(`repoMetadata: docs.yml run lookup failed: ${e}`)
     }
 
-    return { private: isPrivate, license, openIssues, docsConclusion }
+    return { private: true, license, openIssues, docsConclusion }
   }
 
   /**
