@@ -108,9 +108,10 @@ async function repoName(): Promise<string> {
 /**
  * Regenerate the badge JSON + `speller-accuracy.json` into `outDir` by
  * calling the giella-core scripts directly (same invocations as
- * am-shared/docs-dir-include.am). The Class 1 badges need no FST build;
- * `speller-accuracy.json` and the `speller-suggestions` badge derived from
- * it need the built speller, which the snapshot restores.
+ * am-shared/docs-dir-include.am). The Class 1 badges (FST + grammar-checker
+ * version/rule-count) need no FST build; `speller-accuracy.json` and the
+ * `speller-suggestions` badge derived from it need the built speller, which the
+ * snapshot restores.
  *
  * Variant accuracy reports (`speller-accuracy-<code>.json`, for
  * dialect/area/alt-orth/alt-writing-system languages) come from
@@ -158,6 +159,16 @@ async function generateDocsData(
     path.join(scripts, "make-version-json.sh"),
     root,
     "SPELLER",
+  ])
+
+  await emit("gramcheck-version.json", "bash", [
+    path.join(scripts, "make-version-json.sh"),
+    root,
+    "GRAMCHECK",
+  ])
+  await emit("gramcheck-rules.json", "bash", [
+    path.join(scripts, "make-gramcheck-rules-json.sh"),
+    root,
   ])
 
   // fst-variants.json needs configure-substituted make vars, so go through make.
