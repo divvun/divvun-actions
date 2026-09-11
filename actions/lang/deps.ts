@@ -54,6 +54,24 @@ export async function updateDependencyRepo(
   repoPath: string,
   name: string,
 ): Promise<void> {
+  // A checkout with no current branch is not ours to update. Buildkite checks
+  // pipelines out at a fixed commit, detached, so a sibling that is another
+  // pipeline's own checkout (lang-smj beside lang-sma, on an agent that
+  // builds both) looks exactly like this -- and `git pull` in it can only
+  // fail with "You are not currently on a branch". Dependency clones made by
+  // autogen or by this module are on a branch, so they still update.
+  const head = await new Deno.Command("git", {
+    args: ["symbolic-ref", "-q", "--short", "HEAD"],
+    cwd: repoPath,
+  }).output()
+  if (head.code !== 0) {
+    logger.warning(
+      `${name} is checked out at a fixed commit (likely another pipeline's ` +
+        `Buildkite checkout); leaving it as it is`,
+    )
+    return
+  }
+
   logger.info(`Updating ${name}...`)
   if (await gitPull(repoPath)) {
     return
