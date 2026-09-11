@@ -26,20 +26,6 @@ fi
 export DIVVUN_ACTIONS_PLUGIN_DIR=$PLUGIN_DIR
 export PATH="$PLUGIN_DIR/bin:$PATH"
 
-# Nest each pipeline's checkout one level deeper, in a directory of its own.
-# The giella lang builds resolve their sibling dependencies at ../ --
-# giella-core, shared-*, other lang repos, the speller corpora -- and under
-# Buildkite's default layout that parent is shared by every pipeline on the
-# agent. lang-sma updating ../lang-sme as a dependency would then mutate the
-# lang-sme pipeline's own checkout, possibly mid-build. With the extra level,
-# ../ belongs to this pipeline alone. First build after this change re-clones
-# the repo and its dependencies; the old flat checkouts are left behind and
-# can be deleted from the agents at leisure.
-if [[ -n "${BUILDKITE_BUILD_CHECKOUT_PATH:-}" && -n "${BUILDKITE_REPO:-}" ]]; then
-  repo_basename=$(basename "${BUILDKITE_REPO%.git}")
-  export BUILDKITE_BUILD_CHECKOUT_PATH="${BUILDKITE_BUILD_CHECKOUT_PATH}/${repo_basename}"
-fi
-
 if [[ "$(uname)" == "Darwin" ]]; then
   # Ensure that the PATH is set correctly for macOS
   export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
