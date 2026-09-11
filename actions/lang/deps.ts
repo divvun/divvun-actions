@@ -116,12 +116,18 @@ export async function declaredDependencyRepos(
   return [...repos]
 }
 
-/** The speller corpus repos for a language: public and closed. */
+/**
+ * The speller corpus repos for a language: public and closed.
+ *
+ * An `-x-` qualifier in the repo name (lang-sjd-x-private, lang-est-x-utee)
+ * is not part of the language code, so it is stripped: the corpora follow the
+ * base code -- corpus-sjd exists, corpus-sjd-x-private does not.
+ */
 export function corpusRepos(repoName: string): string[] {
   if (!repoName.startsWith("lang-")) {
     return []
   }
-  const lang = repoName.slice("lang-".length)
+  const lang = repoName.slice("lang-".length).replace(/-x-.*$/, "")
   return [`corpus-${lang}`, `corpus-${lang}-x-closed`]
 }
 
