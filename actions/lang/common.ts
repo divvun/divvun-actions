@@ -2,6 +2,7 @@ import * as path from "@std/path"
 import * as fs from "@std/fs"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
+import { ensureLangDependencyRepos } from "./deps.ts"
 
 const GTLEXTOOLS_SPEC = "git+ssh://git@github.com/divvun/GiellaLTLexTools"
 
@@ -69,58 +70,6 @@ async function ensureGtlextoolsVenv(): Promise<void> {
   builder.addPath(venvBin)
 }
 
-async function gitPull(repoPath: string): Promise<boolean> {
-  const proc = new Deno.Command("git", {
-    args: ["pull"],
-    cwd: repoPath,
-  }).spawn()
-  return (await proc.status).code === 0
-}
-
-/**
- * Update a build-dependency checkout in place.
- *
- * giella-core's `make` rewrites tracked files (docs/badgedata/version.json), so
- * on an agent that has built before, a plain `git pull` aborts with "Your local
- * changes would be overwritten by merge" and every subsequent build fails.
- * These checkouts are disposable build inputs rather than somewhere work is
- * authored, so discard the modifications and pull again. A pull that fails for
- * any other reason (diverged branch, network) still throws untouched.
- */
-export async function updateDependencyRepo(
-  repoPath: string,
-  name: string,
-): Promise<void> {
-  logger.info(`Updating ${name}...`)
-  if (await gitPull(repoPath)) {
-    return
-  }
-
-  const status = await new Deno.Command("git", {
-    args: ["status", "--porcelain", "--untracked-files=no"],
-    cwd: repoPath,
-  }).output()
-  const dirty = new TextDecoder().decode(status.stdout).trim()
-  if (dirty === "") {
-    throw new Error(`Failed to update ${name}`)
-  }
-
-  logger.warning(
-    `Discarding local changes in ${name} and retrying:\n${dirty}`,
-  )
-  const restore = new Deno.Command("git", {
-    args: ["checkout", "--", "."],
-    cwd: repoPath,
-  }).spawn()
-  if ((await restore.status).code !== 0) {
-    throw new Error(`Failed to discard local changes in ${name}`)
-  }
-
-  if (!(await gitPull(repoPath))) {
-    throw new Error(`Failed to update ${name}`)
-  }
-}
-
 export async function setupGiellaCoreDependencies(): Promise<void> {
   // Prepend before anything else runs: giella-core's make below, and every
   // autogen/configure/make in the callers, are spawned without an explicit
@@ -132,23 +81,7 @@ export async function setupGiellaCoreDependencies(): Promise<void> {
 
   await ensureGtlextoolsVenv()
 
-  // Check ../giella-core and ../shared-mul
-  const giellaCorePath = path.join(Deno.cwd(), "..", "giella-core")
-  if (await fs.exists(giellaCorePath)) {
-    await updateDependencyRepo(giellaCorePath, "giella-core")
-
-    logger.info("Building giella-core...")
-    const proc2 = new Deno.Command("make", { cwd: giellaCorePath }).spawn()
-    const status2 = await proc2.status
-    if (status2.code !== 0) {
-      throw new Error(`Failed to build giella-core: ${status2.code}`)
-    }
-  }
-
-  const sharedMulPath = path.join(Deno.cwd(), "..", "shared-mul")
-  if (await fs.exists(sharedMulPath)) {
-    await updateDependencyRepo(sharedMulPath, "shared-mul")
-  }
+  await ensureLangDependencyRepos()
 }
 
 export async function downloadAndExtractSpellerSnapshot(): Promise<void> {

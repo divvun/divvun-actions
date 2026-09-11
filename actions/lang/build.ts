@@ -4,7 +4,7 @@ import * as builder from "~/builder.ts"
 import { ExpectedError } from "~/util/error.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
-import { updateDependencyRepo } from "./common.ts"
+import { ensureLangDependencyRepos } from "./deps.ts"
 
 class Autotools {
   private directory: string
@@ -183,22 +183,7 @@ export default async function langBuild(
 
   logger.info(JSON.stringify(buildConfig, null, 2))
 
-  // Check ../giella-core and ../shared-mul
-  const giellaCorePath = path.join(Deno.cwd(), "..", "giella-core")
-  if (await fs.exists(giellaCorePath)) {
-    await updateDependencyRepo(giellaCorePath, "giella-core")
-
-    const proc2 = new Deno.Command("make", { cwd: giellaCorePath }).spawn()
-    const status2 = await proc2.status
-    if (status2.code !== 0) {
-      throw new Error(`Failed to build giella-core: ${status2.code}`)
-    }
-  }
-
-  const sharedMulPath = path.join(Deno.cwd(), "..", "shared-mul")
-  if (await fs.exists(sharedMulPath)) {
-    await updateDependencyRepo(sharedMulPath, "shared-mul")
-  }
+  await ensureLangDependencyRepos({ spellers: buildConfig.spellers })
 
   const flags = deriveAutogenFlags(buildConfig)
   const autotoolsBuilder = new Autotools(Deno.cwd())
