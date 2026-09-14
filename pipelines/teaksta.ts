@@ -146,7 +146,17 @@ async function shortHash(input: string): Promise<string> {
 }
 
 /** `gh release view --json assets` shape: `url` is the browser download URL. */
-type ReleaseAsset = { name: string; url: string }
+type ReleaseAsset = {
+  name: string
+  url: string
+  /**
+   * What the pattern's `*` matched — the version segment of the filename, e.g.
+   * `4.5.2-dev.20260911T084217Z+build.1664`. This is the identity of the model
+   * the release is currently serving: the rolling tag has no version in it,
+   * the asset name does.
+   */
+  version: string
+}
 
 /**
  * The one asset on `tag` whose name matches `pattern`.
@@ -154,13 +164,24 @@ type ReleaseAsset = { name: string; url: string }
  * Both releases are rolling (`dev-latest`), so the tag alone identifies
  * nothing — but the asset *filename* carries the dev version
  * (`teaksta-sme_1.2.3-dev.20260101T000000Z+build.42_noarch-all.drb`), which
- * makes the download URL a content-identifying cache key.
+ * makes the download URL a content-identifying cache key and the captured
+ * version segment the exact thing the image build has to be told.
  */
 async function releaseAsset(
   repo: string,
   tag: string,
   pattern: string,
 ): Promise<ReleaseAsset> {
+  const [prefix, suffix, ...rest] = pattern.split("*")
+  if (suffix === undefined || rest.length > 0) {
+    throw new Error(
+      `Asset pattern needs exactly one '*' (the version segment): ${pattern}`,
+    )
+  }
+  const matcher = new RegExp(
+    `^${escapeRegExp(prefix)}(.+)${escapeRegExp(suffix)}$`,
+  )
+
   const result = await builder.output("gh", [
     "release",
     "view",
@@ -176,11 +197,13 @@ async function releaseAsset(
     )
   }
 
-  const { assets } = JSON.parse(result.stdout) as { assets: ReleaseAsset[] }
-  const matcher = new RegExp(
-    `^${pattern.split("*").map(escapeRegExp).join(".*")}$`,
-  )
-  const matches = assets.filter((a) => matcher.test(a.name))
+  const { assets } = JSON.parse(result.stdout) as {
+    assets: { name: string; url: string }[]
+  }
+  const matches = assets.flatMap((asset) => {
+    const m = matcher.exec(asset.name)
+    return m ? [{ ...asset, version: m[1] }] : []
+  })
   if (matches.length === 0) {
     throw new Error(
       `No asset matching ${pattern} on ${repo}@${tag} (saw: ${
@@ -326,15 +349,65 @@ export async function runTeakstaModels() {
 export async function runTeakstaDeploy() {
   const tag = `sha-${builder.env.commit}`
 
-  // The root Dockerfile builds the whole workspace, wasm bundle included.
+  // The image carries its models, and the Dockerfile refuses to build without
+  // being told which: the version arguments have no defaults, so a bare
+  // `docker build` exits with guidance rather than producing a model-less
+  // image. Resolve the same two assets the `models` step tests against, so the
+  // image that ships is built from the models that were exercised.
+  const bundle = await releaseAsset(
+    LANG_SME_REPO,
+    BUNDLE_RELEASE_TAG,
+    BUNDLE_ASSET_PATTERN,
+  ).catch((e) => {
+    // The one failure worth naming: the image cannot be built at all until
+    // giellalt/lang-sme has published its first teaksta bundle.
+    throw new Error(
+      `Cannot resolve the teaksta bundle, so the image cannot be built — it ` +
+        `carries its models. Waiting on the first ${BUNDLE_RELEASE_TAG} ` +
+        `release from ${LANG_SME_REPO}. ${e}`,
+    )
+  })
+  const fst = await releaseAsset(
+    LANG_SME_REPO,
+    GENERATOR_RELEASE_TAG,
+    GENERATOR_ASSET_PATTERN,
+  )
+
+  logger.info(`Building against bundle ${bundle.version} (${bundle.name})`)
+  logger.info(`Building against FST ${fst.version} (${fst.name})`)
+
+  // The root Dockerfile builds the whole workspace, wasm bundle included, and
+  // fetches the two models by exact asset version.
   await builder.exec("docker", [
     "build",
+    "--build-arg",
+    `TEAKSTA_BUNDLE_VERSION=${bundle.version}`,
+    "--build-arg",
+    `TEAKSTA_FST_VERSION=${fst.version}`,
+    // The Dockerfile otherwise derives each release tag from its version
+    // (`teaksta-sme/v<version without build metadata>`), which is right for a
+    // real release and wrong for these two: both assets currently hang off a
+    // rolling `dev-latest` tag, whose name carries no version at all. Naming
+    // the tags explicitly is needed only for as long as that stays true — once
+    // this pipeline builds against cut `teaksta-sme/vX.Y.Z` and
+    // `speller-sme/vX.Y.Z` releases, both _TAG arguments can go.
+    "--build-arg",
+    `TEAKSTA_BUNDLE_TAG=${BUNDLE_RELEASE_TAG}`,
+    "--build-arg",
+    `TEAKSTA_FST_TAG=${GENERATOR_RELEASE_TAG}`,
     "-t",
     `${IMAGE}:latest`,
     "-t",
     `${IMAGE}:${tag}`,
     ".",
-  ])
+  ], {
+    // The Dockerfile is BuildKit-only: the `# syntax=` directive, the
+    // `--mount=type=cache` mounts over the cargo registry and target dir, and
+    // the `models` named build context are all BuildKit features. It is the
+    // default from Docker 23 and the agent image installs
+    // docker-buildx-plugin, so this is an assertion rather than a fix.
+    env: { DOCKER_BUILDKIT: "1" },
+  })
 
   await builder.group("Pushing image", async () => {
     await Promise.all([
