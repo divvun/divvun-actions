@@ -180,10 +180,25 @@ async function cloneSibling(
 /**
  * Make the language's sibling dependency repos present and current.
  *
- * Build dependencies (giella-core plus whatever configure.ac declares) are
- * updated when present and left to autogen.sh when absent, and a failed
- * update is an error: building against a dependency that cannot be brought
- * current produces wrong results that nothing downstream will notice.
+ * giella-core is cloned + bootstrapped when missing, not just updated when
+ * present: a fresh language checkout's own `./autogen.sh` would normally do
+ * that cloning, but `restoreBuiltWorkspace()` (docs-publish, tests) never
+ * runs autogen.sh -- it configures an already-extracted `build/` snapshot
+ * directly. Since `hooks/environment` nested every pipeline's checkout under
+ * its own parent dir (so `lang-sma` updating `../lang-sme` can't mutate
+ * `lang-sme`'s own checkout mid-build), that parent is no longer shared
+ * across every pipeline on an agent, so a repo whose earlier build steps
+ * haven't happened to land on this exact agent before has no `../giella-core`
+ * sibling at all -- and configure dies outright ("GIELLA_CORE could not be
+ * set"), taking docs-publish and the test steps down with it. Whatever the
+ * caller, giella-core is a hard build requirement with no fallback, so a
+ * failure to clone or bootstrap it is fatal.
+ *
+ * Whatever configure.ac declares beyond giella-core is left to autogen.sh
+ * when absent (not cloned here): unlike giella-core, a missing declared
+ * shared-* repo only downgrades `gt_USE_SHARED` to a configure *warning*
+ * (`gt_SHARED_FAILS`), not an error, so it doesn't produce the same class of
+ * hard failure -- worth doing something about only as a quality follow-up.
  *
  * Corpus repos are updated or shallow-cloned, and every failure is a warning:
  * the weighting falls back to the in-tree corpus by design, the closed repo
@@ -199,12 +214,24 @@ export async function ensureLangDependencyRepos(opts?: {
   const giellaCorePath = path.join(Deno.cwd(), "..", "giella-core")
   if (await fs.exists(giellaCorePath)) {
     await updateDependencyRepo(giellaCorePath, "giella-core")
-
-    logger.info("Building giella-core...")
-    const make = new Deno.Command("make", { cwd: giellaCorePath }).spawn()
-    if ((await make.status).code !== 0) {
-      throw new Error("Failed to build giella-core")
+  } else {
+    if (!(await cloneSibling("giella-core", giellaCorePath))) {
+      throw new Error("Failed to clone giella-core")
     }
+    logger.info("Bootstrapping giella-core...")
+    const bootstrap = new Deno.Command("bash", {
+      args: ["-c", "./autogen.sh && ./configure"],
+      cwd: giellaCorePath,
+    }).spawn()
+    if ((await bootstrap.status).code !== 0) {
+      throw new Error("Failed to bootstrap freshly cloned giella-core")
+    }
+  }
+
+  logger.info("Building giella-core...")
+  const make = new Deno.Command("make", { cwd: giellaCorePath }).spawn()
+  if ((await make.status).code !== 0) {
+    throw new Error("Failed to build giella-core")
   }
 
   for (const repo of await declaredDependencyRepos()) {
