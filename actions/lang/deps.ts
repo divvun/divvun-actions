@@ -194,11 +194,18 @@ async function cloneSibling(
  * caller, giella-core is a hard build requirement with no fallback, so a
  * failure to clone or bootstrap it is fatal.
  *
- * Whatever configure.ac declares beyond giella-core is left to autogen.sh
- * when absent (not cloned here): unlike giella-core, a missing declared
- * shared-* repo only downgrades `gt_USE_SHARED` to a configure *warning*
- * (`gt_SHARED_FAILS`), not an error, so it doesn't produce the same class of
- * hard failure -- worth doing something about only as a quality follow-up.
+ * Declared shared-* repos (configure.ac's gt_USE_SHARED / gt_NEED_SHARED) get
+ * the same clone-when-missing treatment as giella-core, for the same reason
+ * -- but best-effort, not fatal: a plain gt_USE_SHARED only downgrades to a
+ * configure *warning* when the directory is absent, so a failed clone there
+ * is harmless. gt_NEED_SHARED (a handful of repos, adding a pkg-config
+ * version floor on top) is NOT harmless -- it hard-errors
+ * ("giella-shared-mul needs to be updated and installed") if the clone
+ * didn't happen and the version requirement can't be checked. Both
+ * declarations look identical from here (same regex, no way to tell which
+ * macro a given repo uses without parsing configure.ac's actual macro call),
+ * so a failed clone/bootstrap only warns; configure right afterward is the
+ * one place that actually knows whether this repo was required.
  *
  * Corpus repos are updated or shallow-cloned, and every failure is a warning:
  * the weighting falls back to the in-tree corpus by design, the closed repo
@@ -238,9 +245,28 @@ export async function ensureLangDependencyRepos(opts?: {
     const repoPath = path.join(Deno.cwd(), "..", repo)
     if (await fs.exists(repoPath)) {
       await updateDependencyRepo(repoPath, repo)
-    } else {
-      logger.info(
-        `${repo} is not checked out; autogen.sh will clone and bootstrap it`,
+      continue
+    }
+
+    if (!(await cloneSibling(repo, repoPath))) {
+      logger.warning(
+        `${repo} could not be cloned; configure will fail below if it's ` +
+          "actually required (gt_NEED_SHARED), or degrade gracefully if " +
+          "not (gt_USE_SHARED)",
+      )
+      continue
+    }
+
+    logger.info(`Bootstrapping ${repo}...`)
+    const bootstrap = new Deno.Command("bash", {
+      args: ["-c", "./autogen.sh && ./configure"],
+      cwd: repoPath,
+    }).spawn()
+    if ((await bootstrap.status).code !== 0) {
+      logger.warning(
+        `Failed to bootstrap ${repo}; configure will fail below if it's ` +
+          "actually required (gt_NEED_SHARED), or degrade gracefully if " +
+          "not (gt_USE_SHARED)",
       )
     }
   }
