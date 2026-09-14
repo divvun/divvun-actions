@@ -153,9 +153,9 @@ RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/pahkat-uploader?platform
     bsdtar -xf pahkat-uploader.txz -C /usr/local && \
     rm pahkat-uploader.txz
 
-# hfst (dev-latest @ 2026-08-27, /opt/divvun/bin, off PATH)
+# hfst + foma-rs (dev-latest/main @ 2026-09-14, /opt/divvun/bin, off PATH)
 RUN set -eu && \
-    echo 'hfst dev-latest refresh: 2026-08-27' && \
+    echo 'hfst dev-latest refresh: 2026-09-14' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/hfst-rs/releases/tags/dev-latest \
           | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*hfst-x86_64-unknown-linux-musl-[^"]*\.tgz"' \
           | head -1 \
@@ -169,6 +169,12 @@ RUN set -eu && \
     /opt/divvun/bin/hfst install-symlinks /opt/divvun/bin && \
     test -L /opt/divvun/bin/hfst-lexc || { echo 'hfst install-symlinks produced no symlinks' >&2; exit 1; } && \
     rm -rf /tmp/hfst.tgz /tmp/hfst-x86_64-unknown-linux-musl-*
+
+RUN set -eu && \
+    echo 'foma-rs main refresh: 2026-09-14' && \
+    cargo install --locked --git https://github.com/divvun/foma-rs --branch main --bins --root /tmp/foma-install foma && \
+    install -m 755 /tmp/foma-install/bin/foma /tmp/foma-install/bin/flookup /tmp/foma-install/bin/cgflookup /opt/divvun/bin/ && \
+    rm -rf /tmp/foma-install
 
 # cg3 (dev-latest @ 2026-08-27, /opt/divvun/bin, off PATH)
 RUN set -eu && \
