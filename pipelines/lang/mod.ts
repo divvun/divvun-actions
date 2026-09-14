@@ -9,6 +9,7 @@ import proofingBundle, {
 import langGrammarBuild from "~/actions/lang/build-grammar.ts"
 import { runLangDocsPublish } from "~/actions/lang/docs-publish.ts"
 import langSpellerBuild from "~/actions/lang/build-speller.ts"
+import langTeakstaBundleBuild from "~/actions/lang/build-teaksta-bundle.ts"
 import langTtsTextprocBuild from "~/actions/lang/build-tts-textproc.ts"
 import langBuild from "~/actions/lang/build.ts"
 import langCheck from "~/actions/lang/check.ts"
@@ -55,6 +56,12 @@ export type BuildProps = {
   "analysers": boolean
   "grammar-checkers": boolean
   "tts-textproc": boolean
+  /**
+   * Build the teaksta (Konteaksta) divvun-runtime bundle from
+   * `tools/teaksta/`. Implies `grammar-checkers`: the bundle's tokeniser,
+   * whitespace analyser and mwe-dis come out of the grammar checker's .zcheck.
+   */
+  "teaksta-bundle": boolean
   "hyperminimalisation": boolean
   "reversed-intersect": boolean
   "two-step-intersect": boolean
@@ -67,6 +74,7 @@ export type BuildProps = {
 const SPELLER_RELEASE_TAG = /^speller-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 const GRAMMAR_RELEASE_TAG = /^grammar-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 const TTS_TEXTPROC_RELEASE_TAG = /^tts-textproc-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
+const TEAKSTA_RELEASE_TAG = /^teaksta-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 const PROOFING_RELEASE_TAG = /^x-proofing-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 
 function isConfigActive(config: BuildProps | undefined | null): boolean {
@@ -163,6 +171,23 @@ export async function runLangTtsTextprocBuild() {
   }
 
   await langTtsTextprocBuild(buildConfig!)
+}
+
+export async function runLangTeakstaBundleBuild() {
+  const yml = await Deno.readTextFile(".build-config.yml")
+  const config = await yaml.parse(yml) as any
+
+  const buildConfig = config?.build as BuildProps | undefined
+
+  const shouldBuild = isConfigActive(buildConfig)
+
+  if (!shouldBuild) {
+    throw new Error(
+      "No build configuration found in .build-config.yml",
+    )
+  }
+
+  await langTeakstaBundleBuild(buildConfig!)
 }
 
 export async function runLangSpellerTest() {
@@ -917,6 +942,115 @@ export async function runLangTtsTextprocDeploy() {
   }
 }
 
+export async function runLangTeakstaBundleDeploy() {
+  const isTeakstaReleaseTag = TEAKSTA_RELEASE_TAG.test(builder.env.tag ?? "")
+  const isMainBranch = builder.env.branch === "main"
+
+  const bundlePath = "tools/teaksta/bundle.drb"
+  await builder.downloadArtifacts(bundlePath, ".")
+
+  if (!await fs.exists(bundlePath)) {
+    throw new Error("teaksta bundle.drb not found for deployment")
+  }
+
+  if (!builder.env.repo) {
+    throw new Error("No repository information available")
+  }
+
+  let manifest
+  try {
+    manifest = toml.parse(
+      await Deno.readTextFile("./manifest.toml"),
+    ) as any
+  } catch (e) {
+    logger.error("Failed to read manifest.toml:", e)
+    throw e
+  }
+
+  const langMatch = builder.env.repoName?.match(/lang-(.+)/)
+  if (!langMatch) {
+    throw new Error(
+      `Could not extract language code from repo: ${builder.env.repoName}`,
+    )
+  }
+  const langCode = langMatch[1]
+  const packageName = `teaksta-${langCode}`
+
+  if (isTeakstaReleaseTag) {
+    if (!builder.env.tag) {
+      throw new Error("No tag information available")
+    }
+
+    const tagVersion = extractVersionFromTag(builder.env.tag)
+    if (!tagVersion) {
+      throw new Error(`Could not extract version from tag: ${builder.env.tag}`)
+    }
+
+    const prerelease = isPrerelease(tagVersion)
+
+    const versionWithBuild = builder.env.buildNumber
+      ? `${tagVersion}+build.${builder.env.buildNumber}`
+      : tagVersion
+
+    const versionedFile = `${packageName}_${versionWithBuild}_noarch-all.drb`
+    await Deno.rename(bundlePath, versionedFile)
+
+    const { checksumFile, signatureFile } = await createSignedChecksums(
+      [versionedFile],
+      await builder.secrets(),
+    )
+
+    logger.info(`Creating GitHub release for teaksta bundle ${tagVersion}`)
+    logger.info(`Pre-release: ${prerelease}`)
+    logger.info(`Artifact: ${versionedFile}`)
+
+    const gh = new GitHub(builder.env.repo)
+    await gh.createRelease(
+      builder.env.tag,
+      [versionedFile, checksumFile, signatureFile],
+      { prerelease },
+    )
+
+    logger.info("teaksta bundle GitHub release created successfully")
+  } else if (isMainBranch) {
+    // The bundle is assembled from the grammar checker's models, so it tracks
+    // the grammar version where one is declared.
+    const devVersion = versionAsDev(
+      manifest.package["teaksta-bundle"]?.version ??
+        manifest.package.grammar?.version ??
+        manifest.package.speller.version,
+      builder.env.buildTimestamp,
+      builder.env.buildNumber,
+    )
+
+    const releaseTag = `${packageName}/dev-latest`
+
+    const versionedFile = `${packageName}_${devVersion}_noarch-all.drb`
+    await Deno.rename(bundlePath, versionedFile)
+
+    const { checksumFile, signatureFile } = await createSignedChecksums(
+      [versionedFile],
+      await builder.secrets(),
+    )
+
+    logger.info(
+      `Creating dev-latest GitHub release for teaksta bundle ${devVersion}`,
+    )
+    logger.info(`Release tag: ${releaseTag}`)
+    logger.info(`Artifact: ${versionedFile}`)
+
+    const releaseName = `${packageName}/v${devVersion}`
+    const gh = new GitHub(builder.env.repo)
+    await gh.updateRelease(
+      releaseTag,
+      [versionedFile, checksumFile, signatureFile],
+      { draft: false, prerelease: true, name: releaseName },
+    )
+
+    logger.info("teaksta bundle dev-latest GitHub release updated successfully")
+  }
+}
+
 // Anything using more than like 20gb of RAM is considered large
 const LARGE_BUILDS = [
   "lang-kal",
@@ -929,9 +1063,10 @@ export async function pipelineLang() {
   const isTtsTextprocReleaseTag = TTS_TEXTPROC_RELEASE_TAG.test(
     builder.env.tag ?? "",
   )
+  const isTeakstaReleaseTag = TEAKSTA_RELEASE_TAG.test(builder.env.tag ?? "")
   const isProofingReleaseTag = PROOFING_RELEASE_TAG.test(builder.env.tag ?? "")
   const isReleaseTag = isSpellerReleaseTag || isGrammarReleaseTag ||
-    isTtsTextprocReleaseTag || isProofingReleaseTag
+    isTtsTextprocReleaseTag || isTeakstaReleaseTag || isProofingReleaseTag
 
   const extra: Record<string, string> =
     LARGE_BUILDS.includes(builder.env.repoName) ? { size: "large" } : {}
@@ -995,11 +1130,29 @@ export async function pipelineLang() {
     ttsTextprocBuildStep.priority = 10
   }
 
+  const teakstaBundleBuildStep = command({
+    key: "teaksta-bundle-build",
+    label: `Build Teaksta Bundle${toolchainTag}`,
+    command: "divvun-actions run lang-teaksta-bundle-build",
+    // The tokeniser, whitespace analyser and mwe-dis come out of the grammar
+    // checker's .zcheck; see actions/lang/build-teaksta-bundle.ts.
+    depends_on: "grammar-build",
+    agents: {
+      queue: "linux",
+      ...extra,
+    },
+  })
+
+  if (extra.size === "large") {
+    teakstaBundleBuildStep.priority = 10
+  }
+
   // We only deploy on main branch or release tags
   const isSpellerDeploy = isSpellerReleaseTag || builder.env.branch === "main"
   const isGrammarDeploy = isGrammarReleaseTag || builder.env.branch === "main"
   const isTtsTextprocDeploy = isTtsTextprocReleaseTag ||
     builder.env.branch === "main"
+  const isTeakstaDeploy = isTeakstaReleaseTag || builder.env.branch === "main"
   // Proofing is experimental, additive, and derived from the grammar .drb, so it
   // rides the grammar build/deploy conditions (main branch or its own tag).
   const isProofingDeploy = isProofingReleaseTag ||
@@ -1022,9 +1175,23 @@ export async function pipelineLang() {
 
   if (
     isTtsTextprocReleaseTag ||
-    (buildConfig?.["tts-textproc"] === true && !isSpellerReleaseTag)
+    (buildConfig?.["tts-textproc"] === true && !isSpellerReleaseTag &&
+      !isTeakstaReleaseTag)
   ) {
     buildSteps.push(ttsTextprocBuildStep)
+  }
+
+  // The teaksta bundle is assembled from the grammar checker's models, so it
+  // can only be built where the grammar checkers are, and never on a release
+  // tag that suppresses the speller/grammar chain it hangs off.
+  const canBuildTeaksta = buildConfig?.["grammar-checkers"] === true &&
+    !isSpellerReleaseTag && !isTtsTextprocReleaseTag
+
+  if (
+    canBuildTeaksta &&
+    (isTeakstaReleaseTag || buildConfig?.["teaksta-bundle"] === true)
+  ) {
+    buildSteps.push(teakstaBundleBuildStep)
   }
 
   // Test phase steps array (only on non-release builds)
@@ -1233,6 +1400,23 @@ export async function pipelineLang() {
       })`,
       command: "divvun-actions run lang-tts-textproc-deploy",
       depends_on: "tts-textproc-build",
+      agents: {
+        queue: "linux",
+      },
+    }))
+  }
+
+  if (
+    canBuildTeaksta &&
+    (isTeakstaReleaseTag ||
+      (buildConfig?.["teaksta-bundle"] === true && isTeakstaDeploy))
+  ) {
+    deploySteps.push(command({
+      label: `Deploy Teaksta Bundle (${
+        isTeakstaReleaseTag ? "Release" : "Dev"
+      })`,
+      command: "divvun-actions run lang-teaksta-bundle-deploy",
+      depends_on: "teaksta-bundle-build",
       agents: {
         queue: "linux",
       },

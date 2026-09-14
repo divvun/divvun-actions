@@ -56,6 +56,13 @@ import {
   runDrbKickerLint,
 } from "./pipelines/drb-kicker.ts"
 import {
+  pipelineTeaksta,
+  runTeakstaBumpManifest,
+  runTeakstaCheck,
+  runTeakstaDeploy,
+  runTeakstaModels,
+} from "./pipelines/teaksta.ts"
+import {
   DIVVUN_WORKER_GRAMMAR,
   DIVVUN_WORKER_SPELLER,
   pipelineWorkerCd,
@@ -88,6 +95,8 @@ import {
   runLangProofingDeploy,
   runLangSpellerBuild,
   runLangSpellerTest,
+  runLangTeakstaBundleBuild,
+  runLangTeakstaBundleDeploy,
   runLangTtsTextprocBuild,
   runLangTtsTextprocDeploy,
 } from "./pipelines/lang/mod.ts"
@@ -349,6 +358,14 @@ async function runPipeline(args: any) {
       await runLangTtsTextprocDeploy()
       break
     }
+    case "lang-teaksta-bundle-build": {
+      await runLangTeakstaBundleBuild()
+      break
+    }
+    case "lang-teaksta-bundle-deploy": {
+      await runLangTeakstaBundleDeploy()
+      break
+    }
     case "dict-build": {
       await runDictBuild()
       break
@@ -450,6 +467,22 @@ async function runPipeline(args: any) {
     }
     case "drb-kicker-bump-manifest": {
       await runDrbKickerBumpManifest()
+      break
+    }
+    case "teaksta-check": {
+      await runTeakstaCheck()
+      break
+    }
+    case "teaksta-models": {
+      await runTeakstaModels()
+      break
+    }
+    case "teaksta-deploy": {
+      await runTeakstaDeploy()
+      break
+    }
+    case "teaksta-bump-manifest": {
+      await runTeakstaBumpManifest()
       break
     }
     case "divvun-worker-grammar-deploy": {
@@ -742,6 +775,10 @@ async function runCi(_args: any) {
     }
     case "drb-kicker": {
       pipeline = pipelineDrbKicker()
+      break
+    }
+    case "teaksta": {
+      pipeline = pipelineTeaksta()
       break
     }
     case "divvun-worker-grammar": {
