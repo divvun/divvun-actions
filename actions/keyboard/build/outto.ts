@@ -50,6 +50,7 @@ function getKbdId(locale: string, layout: { [key: string]: any }) {
 export async function buildKeyboardWindowsOutto(
   bundlePath: string,
   buildDir: string,
+  options: { sign?: boolean } = {},
 ): Promise<OuttoKeyboardResult> {
   const bundle = await Kbdgen.loadTarget(bundlePath, "windows")
   const project = await Kbdgen.loadProjectBundle(bundlePath)
@@ -104,10 +105,26 @@ export async function buildKeyboardWindowsOutto(
     overwrite: "always",
   })
 
+  const enableCommands: string[] = []
   for (const [locale, layout] of Object.entries(layouts)) {
     if ("windows" in layout) {
-      await addLayoutToOuttoManifest(oBuilder, locale, layout)
+      enableCommands.push(
+        await addLayoutToOuttoManifest(oBuilder, locale, layout),
+      )
     }
+  }
+  // Register the whole bundle before enabling any layout. If kbdi detects a
+  // stale ctfmon cache on the first enable, one refresh sees every new Layout
+  // Id; subsequent enables can verify the live profiles without another restart.
+  // Separate install/enable commands also work with older kbdi payloads.
+  for (const arguments_ of enableCommands) {
+    oBuilder.run({
+      phase: "after_install",
+      command: "#{app}/kbdi.exe",
+      arguments: arguments_,
+      wait: true,
+      show: "hidden",
+    })
   }
 
   const configPath = path.join(buildDir, "outto.toml")
@@ -118,6 +135,16 @@ export async function buildKeyboardWindowsOutto(
   // logic can pick it up.
   const outputName = `install.exe`
   const outputPath = path.join(buildDir, outputName)
+  // Local validation can request an unsigned artifact without invoking any
+  // signing/credential provider. CI retains its existing signed default.
+  if (options.sign === false) {
+    return await makeOuttoInstaller({
+      configPath,
+      sourceDir: buildDir,
+      outputPath,
+      target: "windows",
+    })
+  }
   const signCommand = `${target.projectPath}\\bin\\divvun-actions.bat sign`
 
   let result: { path: string; unsigned: boolean }
@@ -150,7 +177,7 @@ async function addLayoutToOuttoManifest(
   oBuilder: OuttoBuilder,
   locale: string,
   layout: { [key: string]: any },
-): Promise<void> {
+): Promise<string> {
   const target = layoutTarget(layout)
   const kbdId = getKbdId(locale, target)
   const dllName = kbdId + ".dll"
@@ -176,7 +203,6 @@ async function addLayoutToOuttoManifest(
   installArgs.push("-g", `"{${guidStr}}"`)
   installArgs.push("-d", dllName)
   installArgs.push("-n", `"${layoutDisplayName}"`)
-  installArgs.push("-e")
 
   oBuilder.run({
     phase: "after_install",
@@ -194,13 +220,15 @@ async function addLayoutToOuttoManifest(
     show: "hidden",
   })
 
+  const enableArgs = `keyboard_enable -g "{${guidStr}}" -t "${languageCode}"`
   oBuilder.shortcut({
     name: `Enable ${layoutDisplayName}`,
     target: "#{app}/kbdi.exe",
     location: "start_menu",
-    arguments: `keyboard_enable -g "{${guidStr}}" -t ${languageCode}`,
+    arguments: enableArgs,
     description: `Enable ${layoutDisplayName} keyboard layout`,
   })
+  return enableArgs
 }
 
 // ── macOS ─────────────────────────────────────────────────────────────────
