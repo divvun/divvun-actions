@@ -67,6 +67,8 @@ import {
   runDictBuild,
   runDictDeploy,
 } from "./pipelines/dict/mod.ts"
+import { pipelineDocsData } from "./pipelines/docsdata/mod.ts"
+import { runDocsDataPublish } from "./actions/docsdata/publish.ts"
 import {
   pipelineDivvunspell,
   runDivvunspellPublish,
@@ -304,6 +306,10 @@ async function runPipeline(args: any) {
     }
     case "lang-docs-publish": {
       await runLangDocsPublish()
+      break
+    }
+    case "docs-data-publish": {
+      await runDocsDataPublish()
       break
     }
     case "lang-bundle": {
@@ -774,6 +780,10 @@ async function runCi(_args: any) {
       pipeline = pipelineSubethaedit()
       break
     }
+    case "giella-core": {
+      pipeline = pipelineDocsData()
+      break
+    }
     default: {
       if (repoName.startsWith("keyboard-")) {
         pipeline = pipelineDesktopKeyboard()
@@ -781,6 +791,12 @@ async function runCi(_args: any) {
         pipeline = await pipelineLang()
       } else if (repoName.startsWith("dict-")) {
         pipeline = pipelineDict()
+      } else if (
+        repoName.startsWith("shared-") || repoName.startsWith("template-")
+      ) {
+        // No FST/speller build for either family — just the Class-1 badge
+        // publish. See pipelines/docsdata/mod.ts.
+        pipeline = pipelineDocsData()
       } else {
         throw new Error(`Unknown repo: ${builder.env.repoName}`)
       }

@@ -32,7 +32,9 @@ function selectRepos(
   }
 
   return repos.filter((repo) => {
-    return repo.name.includes("lang-") || repo.name.includes("keyboard-")
+    return repo.name.includes("lang-") || repo.name.includes("keyboard-") ||
+      repo.name.includes("shared-") || repo.name.includes("template-") ||
+      repo.name === "giella-core"
   })
 }
 
