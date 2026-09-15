@@ -91,6 +91,7 @@ import {
   runLangGrammarBundle,
   runLangGrammarDeploy,
   runLangGrammarTest,
+  runLangProofingBuild,
   runLangProofingBundle,
   runLangProofingDeploy,
   runLangSpellerBuild,
@@ -338,6 +339,10 @@ async function runPipeline(args: any) {
     }
     case "lang-grammar-deploy": {
       await runLangGrammarDeploy()
+      break
+    }
+    case "lang-proofing-build": {
+      await runLangProofingBuild()
       break
     }
     case "lang-proofing-bundle": {

@@ -1,7 +1,7 @@
 // Build experimental "proofing" packages.
 //
-// A proofing package ships a single Divvun Runtime Bundle (.drb) — which now
-// embeds both speller and grammar functionality — wrapped per-OS so the desktop
+// A proofing package ships a single Divvun Runtime Bundle (.drb), containing
+// spelling and optionally grammar functionality, wrapped per-OS so the desktop
 // consumers (the MacDivvun service and the LibreOffice extension) find it in the
 // unified `proofing` location:
 //

@@ -6,6 +6,12 @@ import grammarBundle from "~/actions/grammar/bundle.ts"
 import proofingBundle, {
   type ProofingTarget,
 } from "~/actions/proofing/bundle.ts"
+import langProofingBuild from "~/actions/lang/build-proofing.ts"
+import {
+  proofingArtifact,
+  proofingPackage,
+  proofingSource,
+} from "~/actions/proofing/source.ts"
 import langGrammarBuild from "~/actions/lang/build-grammar.ts"
 import { runLangDocsPublish } from "~/actions/lang/docs-publish.ts"
 import langSpellerBuild from "~/actions/lang/build-speller.ts"
@@ -688,14 +694,44 @@ export async function runLangGrammarDeploy() {
   }
 }
 
+async function readProofingSource() {
+  const config = yaml.parse(await Deno.readTextFile(".build-config.yml")) as {
+    build?: BuildProps
+  }
+  const source = proofingSource(config?.build)
+  if (!source) {
+    throw new Error(
+      "Proofing requires spellers or grammar-checkers to be enabled",
+    )
+  }
+  return source
+}
+
+export async function runLangProofingBuild() {
+  const source = await readProofingSource()
+  if (source !== "speller") {
+    throw new Error(
+      "Grammar-enabled proofing must use the grammar-build artifact",
+    )
+  }
+  const manifest = toml.parse(
+    await Deno.readTextFile("manifest.toml"),
+  ) as SpellerManifest
+  await langProofingBuild(proofingPackage(source, manifest))
+}
+
 export async function runLangProofingBundle(
   { target }: { target: ProofingTarget },
 ) {
-  await builder.downloadArtifacts("build/tools/grammarcheckers/*.drb", ".")
+  const source = await readProofingSource()
+  const artifact = proofingArtifact(source)
+  await builder.downloadArtifacts(artifact, ".")
 
-  const drbFiles = await globFiles("build/tools/grammarcheckers/*.drb")
-  if (drbFiles.length === 0) {
-    throw new Error("Missing .drb file for proofing bundle")
+  const drbFiles = await globFiles(artifact)
+  if (drbFiles.length !== 1) {
+    throw new Error(
+      `Expected one ${source} .drb file for proofing, found ${drbFiles.length}`,
+    )
   }
 
   let manifest: SpellerManifest
@@ -710,9 +746,8 @@ export async function runLangProofingBundle(
 
   const langTag = deriveLangTag()
   const packageId = `x-proofing-${langTag}`
-  const grammarName = manifest.package.grammar?.name ?? langTag
-  const baseVersion = manifest.package.grammar?.version ??
-    manifest.package.speller.version
+  const info = proofingPackage(source, manifest, langTag)
+  const baseVersion = info.version
 
   const isProofingReleaseTag = PROOFING_RELEASE_TAG.test(builder.env.tag ?? "")
   const tagVersion = builder.env.tag
@@ -730,7 +765,7 @@ export async function runLangProofingBundle(
     target,
     packageId,
     langTag,
-    name: `${grammarName} (proofing)`,
+    name: `${info.name} (proofing)`,
     version,
     buildNumber: parseInt(builder.env.buildNumber ?? "1"),
     drbPath: drbFiles[0],
@@ -804,7 +839,7 @@ export async function runLangProofingDeploy() {
     logger.info("Proofing GitHub release created successfully")
   } else if (isMainBranch) {
     const devVersion = versionAsDev(
-      manifest.package.grammar?.version ?? manifest.package.speller.version,
+      proofingPackage(await readProofingSource(), manifest).version,
       builder.env.buildTimestamp,
       builder.env.buildNumber,
     )
@@ -1153,10 +1188,12 @@ export async function pipelineLang() {
   const isTtsTextprocDeploy = isTtsTextprocReleaseTag ||
     builder.env.branch === "main"
   const isTeakstaDeploy = isTeakstaReleaseTag || builder.env.branch === "main"
-  // Proofing is experimental, additive, and derived from the grammar .drb, so it
-  // rides the grammar build/deploy conditions (main branch or its own tag).
+  // Proofing uses the combined grammar DRB when enabled, otherwise a spelling
+  // pipeline built from the speller workspace. Other product tags never depend
+  // on a proofing producer that their release build omitted.
+  const proofing = proofingSource(buildConfig)
   const isProofingDeploy = isProofingReleaseTag ||
-    builder.env.branch === "main"
+    (!isReleaseTag && builder.env.branch === "main")
 
   // Build phase steps array
   const buildSteps: CommandStep[] = []
@@ -1192,6 +1229,17 @@ export async function pipelineLang() {
     (isTeakstaReleaseTag || buildConfig?.["teaksta-bundle"] === true)
   ) {
     buildSteps.push(teakstaBundleBuildStep)
+  }
+
+  if (proofing === "speller" && isProofingDeploy) {
+    buildSteps.push(command({
+      key: "proofing-build",
+      label: `Build Proofing (spelling only)${toolchainTag}`,
+      command: "divvun-actions run lang-proofing-build",
+      depends_on: "speller-build",
+      soft_fail: true,
+      agents: { queue: "linux", ...extra },
+    }))
   }
 
   // Test phase steps array (only on non-release builds)
@@ -1320,9 +1368,9 @@ export async function pipelineLang() {
     }))
   }
 
-  // Experimental proofing packages (x-proofing-<lang>): wrap the grammar .drb
+  // Experimental proofing packages (x-proofing-<lang>): wrap the selected DRB
   // per-OS. soft_fail keeps them from blocking the legacy speller/grammar chain.
-  if (buildConfig?.["grammar-checkers"] === true && isProofingDeploy) {
+  if (proofing && isProofingDeploy) {
     for (
       const [os, queue] of [
         ["macos", "macos"],
@@ -1334,7 +1382,7 @@ export async function pipelineLang() {
         label: `Bundle Proofing (${os})`,
         key: `proofing-bundle-${os}`,
         command: `divvun-actions run lang-proofing-bundle ${os}`,
-        depends_on: "grammar-build",
+        depends_on: proofing === "grammar" ? "grammar-build" : "proofing-build",
         soft_fail: true,
         agents: {
           queue,
@@ -1374,7 +1422,7 @@ export async function pipelineLang() {
     }))
   }
 
-  if (buildConfig?.["grammar-checkers"] === true && isProofingDeploy) {
+  if (proofing && isProofingDeploy) {
     deploySteps.push(command({
       label: `Deploy Proofing (${isProofingReleaseTag ? "Release" : "Dev"})`,
       command: "divvun-actions run lang-proofing-deploy",

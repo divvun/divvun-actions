@@ -103,6 +103,7 @@ function deriveAutogenFlags(config: BuildProps) {
 
   // Enable spellers but NOT grammar checkers
   flags.push("--enable-spellers")
+  flags.push("--disable-grammarchecker")
   flags.push("--disable-hfst-desktop-spellers")
   flags.push("--enable-hfst-mobile-speller")
 

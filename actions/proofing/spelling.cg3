@@ -1,0 +1,10 @@
+# Mark spelling errors and their surface-form suggestions only.
+MAPPING-PREFIX = & ;
+DELIMITERS = "<.>" "<!>" "<?>" "<...>" "<¶>" ;
+
+ADD:spelled (&typo &SUGGESTWF) (<spelled>) ;
+# Unknown words must still be reported when there are no suggestions.
+ADD:unknown (&typo) (?) ;
+ADD:unknown-plus (&typo) (+?) ;
+ADD:Err/Orth (&typo) (Err/Orth) (NOT 0 (*) - (Err/Orth)) ;
+COPY:Err/Orth (&SUGGEST) EXCEPT (Ex/N Ex/V Ex/A Ex/IV Ex/TV Err/Orth) TARGET (Err/Orth &typo) ;
