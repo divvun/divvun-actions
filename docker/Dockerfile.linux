@@ -225,7 +225,7 @@ RUN curl -fsSL 'https://pahkat.uit.no/artifacts/thfst-tools_1.0.0-alpha.2_linux_
 
 # hfst + foma-rs (dev-latest/main @ 2026-09-14, /opt/divvun/bin, off PATH)
 RUN set -eu && \
-    echo 'hfst dev-latest refresh: 2026-09-14' && \
+    echo 'hfst dev-latest refresh: 2026-09-15' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/hfst-rs/releases/tags/dev-latest \
           | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*hfst-x86_64-unknown-linux-musl-[^"]*\.tgz"' \
           | head -1 \
