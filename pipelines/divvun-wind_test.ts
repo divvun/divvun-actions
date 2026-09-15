@@ -30,19 +30,7 @@ Deno.test("Wind CI dispatch selects the managed Windows build for branches and t
     deepStrictEqual(step.plugins, [
       `ssh://git@github.com/divvun/divvun-actions.git#${target.gitHash}`,
     ])
-    const commands = step.command as string[]
-    ok(commands[0].includes("msvc-env x64"))
-    ok(commands[0].includes("./scripts/ci.ps1 -Build"))
-    ok(commands[0].includes("$$ErrorActionPreference = 'Stop'"))
-    ok(
-      commands[0].endsWith("if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }"),
-    )
-    deepStrictEqual(commands.slice(1), [
-      "buildkite-agent artifact upload target/x86_64-pc-windows-msvc/release/divvun-wind.exe; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }",
-      "buildkite-agent artifact upload target/x86_64-pc-windows-msvc/release/divvun-wind-symbols.exe; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }",
-      "buildkite-agent artifact upload target/x86_64-pc-windows-msvc/release/divvun_keyboard_labels.dll; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }",
-      "buildkite-agent artifact upload 'target/x86_64-pc-windows-msvc/release/*.pdb'; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }",
-    ])
+    strictEqual(step.command, "pwsh -NoProfile -File scripts/buildkite.ps1")
   }
 })
 

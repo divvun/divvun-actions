@@ -2,12 +2,6 @@ import type { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
 
 const TARGET = "x86_64-pc-windows-msvc"
-const RELEASE_DIR = `target/${TARGET}/release`
-const PAYLOADS = [
-  "divvun-wind.exe",
-  "divvun-wind-symbols.exe",
-  "divvun_keyboard_labels.dll",
-]
 
 function command(input: CommandStep): CommandStep {
   return {
@@ -26,15 +20,9 @@ export function pipelineDivvunWind(): BuildkitePipeline {
         key: `check-build-${TARGET}`,
         label: "Windows x64: check, test, build",
         agents: { queue: "windows" },
-        command: [
-          // Buildkite unescapes $$ for the Windows agent's PowerShell. Import
-          // the full MSVC environment and stop before uploading on any failure.
-          `$$ErrorActionPreference = 'Stop'; $$windMsvcEnv = msvc-env x64; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; $$windMsvcEnv | Invoke-Expression; & ./scripts/ci.ps1 -Build; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }`,
-          ...PAYLOADS.map((name) =>
-            `buildkite-agent artifact upload ${RELEASE_DIR}/${name}; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }`
-          ),
-          `buildkite-agent artifact upload '${RELEASE_DIR}/*.pdb'; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }`,
-        ],
+        // Keep PowerShell syntax in the script, outside Buildkite's command
+        // interpolation and shell quoting.
+        command: "pwsh -NoProfile -File scripts/buildkite.ps1",
       }),
     ],
   }
