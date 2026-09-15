@@ -4,8 +4,8 @@
  *     <name>_<target>_<version>.<ext>
  *     hfst_aarch64-apple-darwin_0.1.0-dev.20260915T115329Z+build.97.tgz
  *
- * Underscores separate the three fields. Target triples and versions never
- * contain one, so a filename splits back into its fields on `_` no matter
+ * Underscores separate the three fields. Target underscores are normalized to
+ * hyphens (x86_64 becomes x86-64), so a filename splits back into its fields on `_` no matter
  * how many dashes, dots and pluses the fields themselves carry — which is
  * exactly what the old `<name>-<target>-<version>` shape could not do. (A
  * name may itself contain underscores — `libdivvun_runtime` — so parse by
@@ -14,7 +14,7 @@
  * Every producer (release pipeline) and consumer (docker tool fragment
  * grepping GitHub release JSON) builds its strings here, so the two sides
  * cannot drift apart. Assets published before this convention carry the
- * dash shape; the matcher helpers accept both separators so a consumer
+ * dash shape and x86_64 spelling; the matcher helpers accept both so a consumer
  * following a rolling tag keeps working across the transition, and can
  * tighten to `_` once every rolling release has been republished. A
  * consumer pinned to an old release keeps that release's literal names
@@ -26,6 +26,16 @@
  * their own producer/consumer pairs.
  */
 
+/** Normalize target spelling for release names, without changing build triples. */
+export function assetTarget(target: string): string {
+  return target.replaceAll("_", "-")
+}
+
+/** Shared regex/glob syntax accepting canonical and historical target separators. */
+function compatibleTarget(target: string): string {
+  return assetTarget(target).replaceAll("-", "[-_]")
+}
+
 /** `<name>_<target>_<version>` — the archive's stem, and the staging
  * directory it unpacks to. */
 export function assetStem(
@@ -33,7 +43,7 @@ export function assetStem(
   target: string,
   version: string,
 ): string {
-  return `${name}_${target}_${version}`
+  return `${name}_${assetTarget(target)}_${version}`
 }
 
 /** `<name>_<target>_<version>.<ext>` */
@@ -56,7 +66,7 @@ export function assetGrepPattern(
   target: string,
   ext: string,
 ): string {
-  return `${name}[-_]${target}[-_][^"]*\\.${ext}`
+  return `${name}[-_]${compatibleTarget(target)}[-_][^"]*\\.${ext}`
 }
 
 /**
@@ -65,7 +75,7 @@ export function assetGrepPattern(
  * RUN.
  */
 export function assetGlob(name: string, target: string): string {
-  return `${name}[-_]${target}[-_]*`
+  return `${name}[-_]${compatibleTarget(target)}[-_]*`
 }
 
 /**
@@ -77,5 +87,5 @@ export function assetPsPattern(
   target: string,
   ext: string,
 ): string {
-  return `^${name}[-_]${target}[-_].+\\.${ext}$`
+  return `^${name}[-_]${compatibleTarget(target)}[-_].+\\.${ext}$`
 }

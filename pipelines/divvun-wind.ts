@@ -8,12 +8,13 @@ import {
 } from "~/actions/divvun-wind/bundle.ts"
 import type { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
+import { assetStem, assetTarget } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 import { versionAsDev } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
 const TARGET = "x86_64-pc-windows-msvc"
-const INSTALLER = "divvun-wind-windows-x86_64.exe"
+const INSTALLER = `divvun-wind_${assetTarget(TARGET)}.exe`
 const BUILD = `check-build-${TARGET}`
 const PACKAGE = `installer-${TARGET}`
 
@@ -140,7 +141,17 @@ export async function runWindPublish() {
     await sha256(path.join(artifacts.path, INSTALLER)) !==
       record.installer_sha256
   ) throw new Error("Installer checksum does not match provenance")
-  const files = names.map((name) => path.join(artifacts.path, name))
+  const releaseStem = assetStem("divvun-wind", TARGET, record.version)
+  const files: string[] = []
+  for (const name of names) {
+    const source = path.join(artifacts.path, name)
+    const destination = path.join(
+      artifacts.path,
+      name.replace(INSTALLER.slice(0, -4), releaseStem),
+    )
+    await Deno.rename(source, destination)
+    files.push(destination)
+  }
   const sums = path.join(artifacts.path, "SHA256SUMS")
   await Deno.writeTextFile(
     sums,
