@@ -60,13 +60,14 @@ Deno.test("Wind manifest owns only its startup value and versioned payload; pres
     default_dir: "#{pf}/Divvun/Wind",
     catalogue_dir: "#{commonappdata}/Divvun/Keyboards",
     payloads: ["divvun-wind.exe", "divvun-wind-symbols.exe", "divvunwind.dll"],
-    debugger_packages: ["dbghelp.dll", "symsrv.dll"].map((filename) => ({
+    debugger_packages: ["dbghelp.dll", "msdia140.dll", "symsrv.dll"].map((
+      filename,
+    ) => ({
       id: filename,
       version: "test",
       url: "https://example.invalid",
       sha256: "test",
-      member: filename,
-      filename,
+      files: [{ member: filename, filename }],
     })),
   }, "0.1.0-dev.20260915T120000Z+build.3"))
   const pkg = manifest.package as Record<string, unknown>
@@ -96,6 +97,7 @@ Deno.test("Wind manifest owns only its startup value and versioned payload; pres
     "divvun-wind-symbols.exe",
     "divvunwind.dll",
     "dbghelp.dll",
+    "msdia140.dll",
     "symsrv.dll",
     "LICENSE-MIT",
     "LICENSE-APACHE",

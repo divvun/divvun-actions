@@ -11,8 +11,7 @@ export type DebuggerPackage = {
   version: string
   url: string
   sha256: string
-  member: string
-  filename: string
+  files: Array<{ member: string; filename: string }>
 }
 
 export type WindProduct = {
@@ -74,7 +73,9 @@ export function windManifest(
   for (
     const name of [
       ...product.payloads,
-      ...product.debugger_packages.map((p) => p.filename),
+      ...product.debugger_packages.flatMap((p) =>
+        p.files.map((f) => f.filename)
+      ),
       "LICENSE-MIT",
       "LICENSE-APACHE",
       "THIRD-PARTY-NOTICES.md",
@@ -122,18 +123,23 @@ export async function bundleWind(opts: {
     if (await sha256(archive) !== pkg.sha256) {
       throw new Error(`Checksum mismatch: ${pkg.id}`)
     }
-    await builder.exec("pwsh", [
-      "-NoProfile",
-      "-NonInteractive",
-      "-File",
-      path.join(target.projectPath, "actions/divvun-wind/extract-debugger.ps1"),
-      "-Archive",
-      archive,
-      "-Member",
-      pkg.member,
-      "-Output",
-      path.join(stage.path, pkg.filename),
-    ])
+    for (const file of pkg.files) {
+      await builder.exec("pwsh", [
+        "-NoProfile",
+        "-NonInteractive",
+        "-File",
+        path.join(
+          target.projectPath,
+          "actions/divvun-wind/extract-debugger.ps1",
+        ),
+        "-Archive",
+        archive,
+        "-Member",
+        file.member,
+        "-Output",
+        path.join(stage.path, file.filename),
+      ])
+    }
     await Deno.remove(archive)
     // Preserve Microsoft's original signature; sign only Divvun's payloads.
   }
@@ -175,7 +181,9 @@ export async function bundleWind(opts: {
   for (
     const name of [
       ...opts.product.payloads,
-      ...opts.product.debugger_packages.map((p) => p.filename),
+      ...opts.product.debugger_packages.flatMap((p) =>
+        p.files.map((f) => f.filename)
+      ),
     ]
   ) {
     hashes[name] = await sha256(path.join(stage.path, name))

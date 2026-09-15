@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$windOutto = (Get-Command outto -CommandType Application).Source
+$windOutto = (Get-Command outto -CommandType Application | Select-Object -First 1).Source
 $windToolRoot = Split-Path (Split-Path $windOutto -Parent) -Parent
 $windToolFiles = @(
     $windOutto,
