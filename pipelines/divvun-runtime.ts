@@ -3,6 +3,7 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
+import { assetFileName, assetStem } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 import { Tar, versionAsDev, Zip } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
@@ -415,7 +416,7 @@ export async function runDivvunRuntimePublish() {
       const sourcePath = path.join(tempDir.path, artifactName)
       const destPath = path.join(
         archivePath.path,
-        `divvun-rt-playground-${target}_${version}.AppImage`,
+        assetFileName("divvun-rt-playground", target, version, "AppImage"),
       )
       await fs.move(sourcePath, destPath, { overwrite: true })
       allArtifacts.push(destPath)
@@ -424,7 +425,7 @@ export async function runDivvunRuntimePublish() {
       const sourcePath = path.join(tempDir.path, artifactName)
       const destPath = path.join(
         archivePath.path,
-        `${artifactName}_${version}.tar.gz`,
+        assetFileName("divvun-rt-playground", target, version, "tar.gz"),
       )
       await fs.move(sourcePath, destPath, { overwrite: true })
       allArtifacts.push(destPath)
@@ -443,7 +444,7 @@ export async function runDivvunRuntimePublish() {
 
   for (const target of LIB_RELEASE_TARGETS) {
     const srcName = `libdivvun_runtime-${target}.tar.xz`
-    const destName = `libdivvun_runtime-${target}-${version}.tar.xz`
+    const destName = assetFileName("libdivvun_runtime", target, version, "tar.xz")
     const sourcePath = path.join(tempDir.path, srcName)
     const destPath = path.join(archivePath.path, destName)
     await fs.move(sourcePath, destPath, { overwrite: true })
@@ -453,7 +454,7 @@ export async function runDivvunRuntimePublish() {
   for (const target of cliPublishTargets) {
     const ext = target.includes("windows") ? "zip" : "tgz"
     const outPath =
-      `${archivePath.path}/divvun-runtime-${target}-${version}.${ext}`
+      `${archivePath.path}/${assetFileName("divvun-runtime", target, version, ext)}`
     const inputPath = `${tempDir.path}/divvun-runtime-${target}${
       target.includes("windows") ? ".exe" : ""
     }`
@@ -462,7 +463,7 @@ export async function runDivvunRuntimePublish() {
       await Deno.chmod(inputPath, 0o755)
     }
 
-    const stagingDir = `divvun-runtime-${target}-${version}`
+    const stagingDir = assetStem("divvun-runtime", target, version)
     await Deno.mkdir(stagingDir)
     await Deno.copyFile(
       inputPath,

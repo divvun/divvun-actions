@@ -4,6 +4,7 @@ import * as toml from "@std/toml"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
+import { assetFileName, assetStem } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
 import { Tar, versionAsDev, Zip } from "~/util/shared.ts"
@@ -288,7 +289,7 @@ export async function runCg3RsPublish() {
     const ext = isWindows ? ".exe" : ""
 
     // All six tools go on PATH together, so keep them flat in the archive.
-    const stagingDir = `cg3-${target}-${version}`
+    const stagingDir = assetStem("cg3", target, version)
     await Deno.mkdir(stagingDir)
 
     for (const name of BINARIES) {
@@ -311,7 +312,7 @@ export async function runCg3RsPublish() {
     const archiveExt = isWindows ? "zip" : "tgz"
     const outPath = path.join(
       archivePath.path,
-      `cg3-${target}-${version}.${archiveExt}`,
+      assetFileName("cg3", target, version, archiveExt),
     )
 
     if (isWindows) {

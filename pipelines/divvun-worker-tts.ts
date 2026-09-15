@@ -3,6 +3,7 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
+import { assetFileName, assetStem } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 import { Tar } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
@@ -95,13 +96,13 @@ export async function runDivvunWorkerTtsPublish() {
   for (const target of TARGETS) {
     const outPath = path.join(
       archivePath.path,
-      `divvun-worker-tts-${target}-${builder.env.tag}.tgz`,
+      assetFileName("divvun-worker-tts", target, builder.env.tag ?? "untagged", "tgz"),
     )
     const inputPath = path.join(tempDir.path, `divvun-worker-tts-${target}`)
 
     await Deno.chmod(inputPath, 0o755)
 
-    const stagingDir = `divvun-worker-tts-${target}-${builder.env.tag}`
+    const stagingDir = assetStem("divvun-worker-tts", target, builder.env.tag ?? "untagged")
     await Deno.mkdir(stagingDir)
     await Deno.copyFile(inputPath, path.join(stagingDir, "divvun-worker-tts"))
 

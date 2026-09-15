@@ -3,6 +3,7 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
+import { assetFileName, assetStem } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
 import { Tar, versionAsDev, Zip } from "~/util/shared.ts"
@@ -156,7 +157,7 @@ export async function runRsigncodePublish() {
 
     const stagingDir = path.join(
       tempDir.path,
-      `rsigncode-${target}-${version}`,
+      assetStem("rsigncode", target, version),
     )
     await Deno.mkdir(stagingDir, { recursive: true })
     await Deno.copyFile(inputPath, path.join(stagingDir, bin))
@@ -164,7 +165,7 @@ export async function runRsigncodePublish() {
     const ext = isWindows ? "zip" : "tgz"
     const outPath = path.join(
       archivePath.path,
-      `rsigncode-${target}-${version}.${ext}`,
+      assetFileName("rsigncode", target, version, ext),
     )
     if (isWindows) {
       await Zip.create([stagingDir], outPath)

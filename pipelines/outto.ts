@@ -4,6 +4,7 @@ import * as toml from "@std/toml"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
+import { assetFileName, assetStem } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
 import { Tar, versionAsDev, Zip } from "~/util/shared.ts"
@@ -265,7 +266,7 @@ export async function runOuttoPublish() {
 
     // Mirror the build-release script layout: outto in bin/, runtime
     // helpers in libexec/. Consumers can drop this into a system PATH.
-    const stagingDir = `outto-${target}-${version}`
+    const stagingDir = assetStem("outto", target, version)
     await Deno.mkdir(path.join(stagingDir, "bin"), { recursive: true })
     await Deno.mkdir(path.join(stagingDir, "libexec"), { recursive: true })
 
@@ -292,7 +293,7 @@ export async function runOuttoPublish() {
     const archiveExt = isWindows ? "zip" : "tgz"
     const outPath = path.join(
       archivePath.path,
-      `outto-${target}-${version}.${archiveExt}`,
+      assetFileName("outto", target, version, archiveExt),
     )
 
     if (isWindows) {

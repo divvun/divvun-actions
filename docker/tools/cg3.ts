@@ -1,4 +1,5 @@
 import type { Tool } from "../lib/image.ts"
+import { assetGlob, assetGrepPattern } from "../../util/asset_name.ts"
 
 const REPO = "divvun/cg3-rs"
 const RELEASE_TAG = "dev-latest"
@@ -13,7 +14,7 @@ const PREFIX = "/opt/divvun/bin"
  * binaries it happened to fetch first, no matter how far `dev-latest` has
  * moved. This token is echoed inside the RUN so changing it is a cache miss.
  */
-const REFRESH = "2026-08-27"
+const REFRESH = "2026-09-15"
 
 /**
  * Install the Rust cg3 tools from the rolling `dev-latest` release on
@@ -46,17 +47,17 @@ export function cg3(opts: { prefix?: string } = {}): Tool {
         `RUN set -eu && \\`,
         `    echo 'cg3 ${RELEASE_TAG} refresh: ${REFRESH}' && \\`,
         `    URL=$(curl -fsSL https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG} \\`,
-        `          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*cg3-${TARGET}-[^"]*\\.tgz"' \\`,
+        `          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*${assetGrepPattern("cg3", TARGET, "tgz")}"' \\`,
         `          | head -1 \\`,
         `          | sed -E 's/.*"(https:[^"]+)"$/\\1/') && \\`,
-        `    test -n "$URL" || { echo 'no cg3-${TARGET} asset on ${RELEASE_TAG}' >&2; exit 1; } && \\`,
+        `    test -n "$URL" || { echo 'no cg3 asset for ${TARGET} on ${RELEASE_TAG}' >&2; exit 1; } && \\`,
         `    echo "installing $URL" && \\`,
         `    curl -fsSL "$URL" -o /tmp/cg3.tgz && \\`,
         `    tar -xf /tmp/cg3.tgz -C /tmp && \\`,
         `    install -d ${prefix} && \\`,
-        `    install -m 755 /tmp/cg3-${TARGET}-*/* ${prefix}/ && \\`,
+        `    install -m 755 /tmp/${assetGlob("cg3", TARGET)}/* ${prefix}/ && \\`,
         `    test -x ${prefix}/vislcg3 || { echo 'cg3 archive is missing vislcg3' >&2; exit 1; } && \\`,
-        `    rm -rf /tmp/cg3.tgz /tmp/cg3-${TARGET}-*`,
+        `    rm -rf /tmp/cg3.tgz /tmp/${assetGlob("cg3", TARGET)}`,
       ].join("\n")
     },
   }

@@ -1,4 +1,5 @@
 import type { Tool } from "../lib/image.ts"
+import { assetPsPattern } from "../../util/asset_name.ts"
 
 const RELEASE_TAG = "dev-latest"
 const REPO = "divvun/outto"
@@ -6,13 +7,13 @@ const REPO = "divvun/outto"
 /**
  * Install outto from the rolling `dev-latest` GitHub Release on `divvun/outto`.
  * That release is updated by `pipelineOutto` on every main-branch build —
- * filenames are `outto-<target>-<dev-version>.zip` (Windows) or `.tgz` (macOS),
+ * filenames are `outto_<target>_<dev-version>.zip` (Windows) or `.tgz` (macOS),
  * with version a timestamped dev string, so we discover the asset via the
  * GitHub API rather than guessing the URL.
  *
  * The unzipped tree mirrors `runOuttoPublish`'s layout:
- *   outto-<target>-<version>/bin/outto.exe
- *   outto-<target>-<version>/libexec/{outto-gui,outto-sfx,outto-uninstall}.exe
+ *   outto_<target>_<version>/bin/outto.exe
+ *   outto_<target>_<version>/libexec/{outto-gui,outto-sfx,outto-uninstall}.exe
  * which is what outto's `current_exe()/../libexec` lookup expects.
  *
  * Currently only the Windows image is wired up — Linux/Alpine don't invoke
@@ -31,7 +32,7 @@ export function outto(): Tool {
 
       const apiUrl =
         `https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG}`
-      const assetPattern = "^outto-x86_64-pc-windows-msvc-.*\\.zip$"
+      const assetPattern = assetPsPattern("outto", "x86_64-pc-windows-msvc", "zip")
 
       return [
         `RUN $rel = Invoke-RestMethod -Uri '${apiUrl}' ; \\`,

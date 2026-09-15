@@ -4,6 +4,7 @@ import * as toml from "@std/toml"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
+import { assetFileName, assetStem } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
 import { Tar, versionAsDev, Zip } from "~/util/shared.ts"
@@ -292,14 +293,14 @@ export async function runHfstRsPublish() {
       await Deno.chmod(inputPath, 0o755)
     }
 
-    const stagingDir = `hfst-${target}-${version}`
+    const stagingDir = assetStem("hfst", target, version)
     await Deno.mkdir(stagingDir)
     await Deno.copyFile(inputPath, path.join(stagingDir, name))
 
     const ext = isWindows ? "zip" : "tgz"
     const outPath = path.join(
       archivePath.path,
-      `hfst-${target}-${version}.${ext}`,
+      assetFileName("hfst", target, version, ext),
     )
 
     if (isWindows) {

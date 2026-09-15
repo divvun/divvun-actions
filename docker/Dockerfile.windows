@@ -103,17 +103,17 @@ RUN rustup toolchain install nightly --component rust-src
 
 # rsigncode (from dev-latest)
 RUN $resp = Invoke-RestMethod 'https://api.github.com/repos/divvun/rsigncode/releases/tags/dev-latest' ; \
-    $asset = $resp.assets | Where-Object { $_.name -match '^rsigncode-x86_64-pc-windows-msvc-.+\.zip$' } | Select-Object -First 1 ; \
+    $asset = $resp.assets | Where-Object { $_.name -match '^rsigncode[-_]x86_64-pc-windows-msvc[-_].+\.zip$' } | Select-Object -First 1 ; \
     if (-not $asset) { throw 'no rsigncode-x86_64-pc-windows-msvc asset on dev-latest' } ; \
     Invoke-WebRequest -Uri $asset.browser_download_url -OutFile rsigncode.zip ; \
     Expand-Archive rsigncode.zip -DestinationPath rsigncode-tmp ; \
-    Copy-Item rsigncode-tmp\rsigncode-x86_64-pc-windows-msvc-*\rsigncode.exe C:\bin\rsigncode.exe ; \
+    Copy-Item rsigncode-tmp\rsigncode[-_]x86_64-pc-windows-msvc[-_]*\rsigncode.exe C:\bin\rsigncode.exe ; \
     Remove-Item -Force rsigncode.zip ; \
     Remove-Item -Recurse -Force rsigncode-tmp
 
 # outto (dev-latest)
 RUN $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/divvun/outto/releases/tags/dev-latest' ; \
-    $asset = $rel.assets | Where-Object { $_.name -match '^outto-x86_64-pc-windows-msvc-.*\.zip$' } | Select-Object -First 1 ; \
+    $asset = $rel.assets | Where-Object { $_.name -match '^outto[-_]x86_64-pc-windows-msvc[-_].+\.zip$' } | Select-Object -First 1 ; \
     if (-not $asset) { throw "No outto windows asset on dev-latest" } ; \
     Invoke-WebRequest -Uri $asset.browser_download_url -OutFile outto.zip ; \
     Expand-Archive outto.zip -DestinationPath C:\outto-extract ; \

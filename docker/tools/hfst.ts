@@ -1,4 +1,5 @@
 import type { Tool } from "../lib/image.ts"
+import { assetGlob, assetGrepPattern } from "../../util/asset_name.ts"
 
 const REPO = "divvun/hfst-rs"
 const FOMA_REPO = "divvun/foma-rs"
@@ -13,7 +14,7 @@ const PREFIX = "/opt/divvun/bin"
  * so Docker reuses the cached layers even when the upstream builds change.
  * This token is echoed inside each RUN so changing it is a cache miss.
  */
-const REFRESH = "2026-09-14"
+const REFRESH = "2026-09-15"
 
 /**
  * Install Rust hfst from divvun/hfst-rs `dev-latest`, plus foma-rs tools.
@@ -53,18 +54,18 @@ export function hfst(opts: { prefix?: string } = {}): Tool {
         `RUN set -eu && \\`,
         `    echo 'hfst ${RELEASE_TAG} refresh: ${REFRESH}' && \\`,
         `    URL=$(curl -fsSL https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG} \\`,
-        `          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*hfst-${TARGET}-[^"]*\\.tgz"' \\`,
+        `          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*${assetGrepPattern("hfst", TARGET, "tgz")}"' \\`,
         `          | head -1 \\`,
         `          | sed -E 's/.*"(https:[^"]+)"$/\\1/') && \\`,
-        `    test -n "$URL" || { echo 'no hfst-${TARGET} asset on ${RELEASE_TAG}' >&2; exit 1; } && \\`,
+        `    test -n "$URL" || { echo 'no hfst asset for ${TARGET} on ${RELEASE_TAG}' >&2; exit 1; } && \\`,
         `    echo "installing $URL" && \\`,
         `    curl -fsSL "$URL" -o /tmp/hfst.tgz && \\`,
         `    tar -xf /tmp/hfst.tgz -C /tmp && \\`,
         `    install -d ${prefix} && \\`,
-        `    install -m 755 /tmp/hfst-${TARGET}-*/hfst ${prefix}/hfst && \\`,
+        `    install -m 755 /tmp/${assetGlob("hfst", TARGET)}/hfst ${prefix}/hfst && \\`,
         `    ${prefix}/hfst install-symlinks ${prefix} && \\`,
         `    test -L ${prefix}/hfst-lexc || { echo 'hfst install-symlinks produced no symlinks' >&2; exit 1; } && \\`,
-        `    rm -rf /tmp/hfst.tgz /tmp/hfst-${TARGET}-*`,
+        `    rm -rf /tmp/hfst.tgz /tmp/${assetGlob("hfst", TARGET)}`,
         ``,
         `RUN set -eu && \\`,
         `    echo 'foma-rs main refresh: ${REFRESH}' && \\`,
