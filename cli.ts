@@ -3,7 +3,11 @@ import { parseArgs, ParseOptions } from "@std/cli/parse-args"
 import * as yaml from "@std/yaml"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
 import * as builder from "~/builder.ts"
-import { pipelineMsgrammar } from "~/pipelines/msgrammar.ts"
+import {
+  pipelineMsgrammar,
+  runMsgrammarInstaller,
+  runMsgrammarPublish,
+} from "~/pipelines/msgrammar.ts"
 import { BuildkitePipeline } from "~/builder/pipeline.ts"
 import {
   pipelineDesktopKeyboard,
@@ -403,6 +407,14 @@ async function runPipeline(args: any) {
     }
     case "divvun-wind-installer": {
       await runWindInstaller()
+      break
+    }
+    case "msgrammar-installer": {
+      await runMsgrammarInstaller()
+      break
+    }
+    case "msgrammar-publish": {
+      await runMsgrammarPublish()
       break
     }
     case "divvun-wind-publish": {
