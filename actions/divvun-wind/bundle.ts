@@ -1,6 +1,6 @@
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
-import { makeOuttoInstaller } from "~/actions/outto/lib.ts"
+import { makeOuttoInstaller, windowsOuttoSigning } from "~/actions/outto/lib.ts"
 import sign from "~/services/windows-codesign.ts"
 import * as target from "~/target.ts"
 import { OuttoBuilder } from "~/util/outto.ts"
@@ -156,10 +156,9 @@ export async function bundleWind(opts: {
     outputPath: inner,
     target: "windows",
     ...(opts.signed
-      ? {
-        signCommand:
-          `call "${target.projectPath}\\bin\\divvun-actions.bat" sign "#{file}"`,
-      }
+      ? windowsOuttoSigning(
+        path.join(target.projectPath, "bin/divvun-actions.bat"),
+      )
       : {}),
   })
   // The public executable applies Wind's Windows 11 gate before outto starts.

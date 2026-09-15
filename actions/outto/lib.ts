@@ -28,6 +28,8 @@ export type MakeOuttoInstallerOpts = {
    * config on Windows, rcodesign credentials on macOS).
    */
   signCommand?: string
+  /** Additional environment for outto and its signing subprocesses. */
+  env?: Record<string, string>
   /** Apply zstd compression to the staged payload. */
   compress?: boolean
   /** Compression level 0..22 (only meaningful when compress=true). */
@@ -37,6 +39,25 @@ export type MakeOuttoInstallerOpts = {
 export type OuttoInstallerResult = {
   path: string
   unsigned: boolean
+}
+
+/**
+ * outto currently passes its command to cmd.exe through Rust's normal argv
+ * escaping. Literal quotes become backslash-quotes, which cmd does not unescape.
+ * Expand quoted paths from the child environment after that escaping boundary.
+ */
+export function windowsOuttoSigning(signer: string): {
+  signCommand: string
+  env: Record<string, string>
+} {
+  return {
+    signCommand:
+      "call %DIVVUN_OUTTO_SIGNER% sign %DIVVUN_OUTTO_QUOTE%#{file}%DIVVUN_OUTTO_QUOTE%",
+    env: {
+      DIVVUN_OUTTO_SIGNER: `"${signer}"`,
+      DIVVUN_OUTTO_QUOTE: '"',
+    },
+  }
 }
 
 export async function makeOuttoInstaller(
@@ -66,7 +87,7 @@ export async function makeOuttoInstaller(
 
   logger.debug(`outto ${args.join(" ")}`)
 
-  const proc = new Deno.Command("outto", { args }).spawn()
+  const proc = new Deno.Command("outto", { args, env: opts.env }).spawn()
   const status = await proc.status
   if (!status.success) {
     if (opts.signCommand) {
