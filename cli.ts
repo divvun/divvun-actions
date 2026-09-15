@@ -3,6 +3,7 @@ import { parseArgs, ParseOptions } from "@std/cli/parse-args"
 import * as yaml from "@std/yaml"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
 import * as builder from "~/builder.ts"
+import { pipelineMsgrammar } from "~/pipelines/msgrammar.ts"
 import { BuildkitePipeline } from "~/builder/pipeline.ts"
 import {
   pipelineDesktopKeyboard,
@@ -733,6 +734,10 @@ export async function createCiPipeline(): Promise<BuildkitePipeline> {
   let pipeline: BuildkitePipeline
   const repoName = builder.env.repoName.toLowerCase()
   switch (repoName) {
+    case "msgrammar": {
+      pipeline = pipelineMsgrammar()
+      break
+    }
     case "divvunspell":
       pipeline = pipelineDivvunspell()
       break
