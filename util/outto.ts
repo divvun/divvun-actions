@@ -136,6 +136,7 @@ type PackageMeta = {
 }
 
 type ManifestData = {
+  reboot?: { restart_manager: boolean }
   package: PackageMeta
   privileges?: { required?: "user" | "admin" | "auto"; auto_elevate?: boolean }
   upgrade?: {
@@ -252,6 +253,13 @@ export class OuttoBuilder {
     return this
   }
 
+  /** Windows: whether outto may close applications holding installed files. */
+  restartManager(enabled: boolean): this {
+    this.#requirePlatform("windows", "restartManager")
+    this.#data.reboot = { restart_manager: enabled }
+    return this
+  }
+
   // ── lifecycle policies ──────────────────────────────────────────────────
 
   upgradePolicy(policy: "overwrite" | "side_by_side" | "fail"): this {
@@ -353,6 +361,7 @@ export class OuttoBuilder {
     const output: Record<string, unknown> = {
       package: this.#data.package,
     }
+    if (this.#data.reboot) output.reboot = this.#data.reboot
     if (this.#data.privileges) output.privileges = this.#data.privileges
     if (this.#data.upgrade) output.upgrade = this.#data.upgrade
     if (this.#data.uninstall) output.uninstall = this.#data.uninstall

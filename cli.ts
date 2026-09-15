@@ -25,7 +25,11 @@ import {
   runDivvunWorkerTtsPublish,
 } from "./pipelines/divvun-worker-tts.ts"
 import { pipelineBox, runBoxPublish } from "./pipelines/box.ts"
-import { pipelineDivvunWind } from "./pipelines/divvun-wind.ts"
+import {
+  pipelineDivvunWind,
+  runWindInstaller,
+  runWindPublish,
+} from "./pipelines/divvun-wind.ts"
 import { pipelineOutto, runOuttoPublish } from "./pipelines/outto.ts"
 import {
   pipelineRsigncode,
@@ -394,6 +398,14 @@ async function runPipeline(args: any) {
     }
     case "box-publish": {
       await runBoxPublish()
+      break
+    }
+    case "divvun-wind-installer": {
+      await runWindInstaller()
+      break
+    }
+    case "divvun-wind-publish": {
+      await runWindPublish()
       break
     }
     case "outto-publish": {
