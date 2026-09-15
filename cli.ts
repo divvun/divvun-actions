@@ -25,6 +25,7 @@ import {
   runDivvunWorkerTtsPublish,
 } from "./pipelines/divvun-worker-tts.ts"
 import { pipelineBox, runBoxPublish } from "./pipelines/box.ts"
+import { pipelineDivvunWind } from "./pipelines/divvun-wind.ts"
 import { pipelineOutto, runOuttoPublish } from "./pipelines/outto.ts"
 import {
   pipelineRsigncode,
@@ -716,9 +717,7 @@ async function runPipeline(args: any) {
   }
 }
 
-async function runCi(_args: any) {
-  logger.info("Running CI")
-
+export async function createCiPipeline(): Promise<BuildkitePipeline> {
   let pipeline: BuildkitePipeline
   const repoName = builder.env.repoName.toLowerCase()
   switch (repoName) {
@@ -748,6 +747,10 @@ async function runCi(_args: any) {
     }
     case "box": {
       pipeline = pipelineBox()
+      break
+    }
+    case "divvun-wind": {
+      pipeline = pipelineDivvunWind()
       break
     }
     case "outto": {
@@ -844,6 +847,13 @@ async function runCi(_args: any) {
       }
     }
   }
+
+  return pipeline
+}
+
+async function runCi(_args: any) {
+  logger.info("Running CI")
+  const pipeline = await createCiPipeline()
 
   // Strip undefined values from pipeline object before YAML serialization
   // JSON.stringify removes undefined properties, then parse reconstructs the clean object
