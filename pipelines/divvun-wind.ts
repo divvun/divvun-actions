@@ -10,6 +10,7 @@ import type { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
 import { assetStem, assetTarget } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
+import { createSignedChecksums } from "~/util/hash.ts"
 import { versionAsDev } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
@@ -152,16 +153,12 @@ export async function runWindPublish() {
     await Deno.rename(source, destination)
     files.push(destination)
   }
-  const sums = path.join(artifacts.path, "SHA256SUMS")
-  await Deno.writeTextFile(
-    sums,
-    (await Promise.all(
-      files.map(async (file) =>
-        `${await sha256(file)}  ${path.basename(file)}`
-      ),
-    )).join("\n") + "\n",
+  const { checksumFile, signatureFile } = await createSignedChecksums(
+    files.map((file) => path.basename(file)),
+    await builder.secrets(),
+    artifacts.path,
   )
-  files.push(sums)
+  files.push(checksumFile, signatureFile)
   const gh = new GitHub(builder.env.repo)
   if (mode === "release") {
     await gh.createRelease(builder.env.tag!, files, {

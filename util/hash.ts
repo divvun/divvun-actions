@@ -1,3 +1,4 @@
+import * as path from "@std/path"
 import { crypto } from "@std/crypto/crypto"
 import { SecretsStore } from "./openbao.ts"
 import { makeTempFile } from "./temp.ts"
@@ -22,9 +23,11 @@ export async function blake3Hash(filePath: string): Promise<string> {
 export async function generateBlake3Sums(
   files: string[],
   outputPath: string = "BLAKE3SUMS",
+  cwd?: string,
 ): Promise<void> {
   const cmd = new Deno.Command("b3sum", {
     args: files,
+    cwd,
     stdout: "piped",
     stderr: "piped",
   })
@@ -73,16 +76,18 @@ export async function minisign(
  * Create signed checksums for a list of files.
  * Generates a BLAKE3SUMS file and signs it with minisign.
  * Returns paths to both the checksum file and the signature file.
+ * With `directory`, file names are relative to it and both outputs land there.
  */
 export async function createSignedChecksums(
   files: string[],
   secrets: SecretsStore,
+  directory?: string,
 ): Promise<{ checksumFile: string; signatureFile: string }> {
-  const checksumFile = "BLAKE3SUMS"
-  const signatureFile = "BLAKE3SUMS.minisig"
+  const checksumFile = path.join(directory ?? ".", "BLAKE3SUMS")
+  const signatureFile = `${checksumFile}.minisig`
 
   // Generate checksums
-  await generateBlake3Sums(files, checksumFile)
+  await generateBlake3Sums(files, checksumFile, directory)
 
   // Get signing credentials
   const privateKey = secrets.get("minisign/privateKey")
