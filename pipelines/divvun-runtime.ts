@@ -199,10 +199,17 @@ export async function pipelineDivvunRuntime() {
           `uv venv --python 3.12; uv pip install pyyaml setuptools; $$env:PATH = "$$PWD\\.venv\\Scripts;C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\${llvmArch}\\bin;C:\\MSYS2\\usr\\bin;" + $$env:PATH; .\\x.ps1 build-lib --target ${target}; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }`,
           `New-Item -ItemType Directory -Force -Path ${stageDir}/lib | Out-Null`,
           `New-Item -ItemType Directory -Force -Path ${stageDir}/include | Out-Null`,
-          `Copy-Item target/${target}/release/divvun_runtime.dll ${stageDir}/lib/`,
-          `Copy-Item target/${target}/release/divvun_runtime.dll.lib ${stageDir}/lib/`,
-          `Copy-Item target/${target}/release/divvun_runtime.lib ${stageDir}/lib/`,
-          `Copy-Item bindings/c/divvun_runtime.h ${stageDir}/include/`,
+          // Copy-Item failures are non-terminating in PowerShell, so a build
+          // that left no libraries behind used to copy nothing, tar an empty
+          // lib/, and publish that as a valid artifact -- consumers only found
+          // out when their own link failed. The bash steps get this for free,
+          // since Buildkite runs them under `set -e`. Check up front, dump the
+          // output dir so the reason is in the log, and fail the step.
+          `$$outDir = "target/${target}/release"; $$missing = @('divvun_runtime.dll', 'divvun_runtime.dll.lib', 'divvun_runtime.lib') | Where-Object { -not (Test-Path "$$outDir/$$_") }; if ($$missing) { Write-Host "--- build-lib produced no libraries; missing from $$outDir :"; $$missing | Write-Host; Write-Host "--- $$outDir contents"; Get-ChildItem $$outDir -ErrorAction SilentlyContinue | ForEach-Object Name | Write-Host; exit 1 }`,
+          `Copy-Item -ErrorAction Stop target/${target}/release/divvun_runtime.dll ${stageDir}/lib/`,
+          `Copy-Item -ErrorAction Stop target/${target}/release/divvun_runtime.dll.lib ${stageDir}/lib/`,
+          `Copy-Item -ErrorAction Stop target/${target}/release/divvun_runtime.lib ${stageDir}/lib/`,
+          `Copy-Item -ErrorAction Stop bindings/c/divvun_runtime.h ${stageDir}/include/`,
           `bsdtar -cJf ${artifactName} ${stageDir}`,
           `Write-Host '--- ${artifactName} contents'`,
           `bsdtar -tf ${artifactName}`,
