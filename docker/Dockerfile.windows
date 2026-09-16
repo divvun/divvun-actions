@@ -169,6 +169,13 @@ RUN Invoke-WebRequest -Uri "https://github.com/PowerShell/Win32-OpenSSH/releases
     Remove-Item -Force openssh.msi ; \
     setx /M PATH $($Env:ProgramFiles + '\OpenSSH' + ';' + $Env:PATH)
 
+# known_hosts (github.com)
+RUN $sshDir = Join-Path $env:USERPROFILE '.ssh' ; \
+    New-Item -ItemType Directory -Force -Path $sshDir | Out-Null ; \
+    $knownHosts = Join-Path $sshDir 'known_hosts' ; \
+    ssh-keyscan github.com | Out-File -FilePath $knownHosts -Encoding ascii -Append ; \
+    if (-not (Select-String -Path $knownHosts -Pattern 'github.com' -SimpleMatch -Quiet)) { throw 'ssh-keyscan returned no host key for github.com' }
+
 # vcpkg 2025.10.17
 RUN git clone --depth 1 --branch 2025.10.17 https://github.com/microsoft/vcpkg.git C:\vcpkg ; \
     C:\vcpkg\bootstrap-vcpkg.bat -disableMetrics; \

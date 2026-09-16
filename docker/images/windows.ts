@@ -15,6 +15,7 @@ import {
   innoSetup,
   justWindows,
   kbdgen,
+  knownHosts,
   mkdir,
   msklc,
   msvcEnv,
@@ -77,6 +78,7 @@ export default defineImage({
     gh(),
     uv(),
     opensshWindows(),
+    knownHosts(),
     vcpkg(),
     envVars("Buildkite fs-cache folder", {
       BUILDKITE_PLUGIN_FS_CACHE_FOLDER: "C:\\buildkite-cache",
