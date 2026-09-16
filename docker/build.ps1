@@ -1,11 +1,11 @@
 #!/usr/bin/env pwsh
-$ErrorActionPreference = "Stop"
-
 param(
     [Parameter(Position = 0)]
     [string]$Target,
     [switch]$List
 )
+
+$ErrorActionPreference = "Stop"
 
 Set-Location $PSScriptRoot
 
