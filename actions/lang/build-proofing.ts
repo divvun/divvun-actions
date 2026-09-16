@@ -25,7 +25,7 @@ async function run(command: string, args: string[], cwd: string) {
 
 /** Build a spelling-only DRB from the speller workspace, keeping grammar off. */
 export default async function langProofingBuild(
-  info: { name: string; version: string },
+  info: { name: string; version: string; locales?: string[] },
 ) {
   await restoreBuiltWorkspace("speller-configure-flags")
   const buildDir = path.resolve("build")
@@ -35,7 +35,7 @@ export default async function langProofingBuild(
 
   using stage = await makeTempDir({ prefix: "proofing-speller-" })
   await stageSpellerProofing(buildDir, stage.path)
-  await run("divvun-runtime", [
+  const bundleArgs = [
     "bundle",
     "--type",
     "spellcheck",
@@ -43,7 +43,13 @@ export default async function langProofingBuild(
     info.name,
     "--vers",
     info.version,
-  ], stage.path)
+  ]
+  // Omitted rather than passed empty, so a language that declares no regional
+  // variants leaves the attribute absent instead of asserting it has none.
+  if (info.locales?.length) {
+    bundleArgs.push("--locales", info.locales.join(","))
+  }
+  await run("divvun-runtime", bundleArgs, stage.path)
   // Load and run the default pipeline before uploading: catches invalid models
   // and missing assets at the producer, before the three OS packaging jobs.
   const smoke = await new Deno.Command("divvun-runtime", {

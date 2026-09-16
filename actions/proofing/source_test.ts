@@ -1,5 +1,10 @@
 import { deepStrictEqual, strictEqual } from "node:assert/strict"
-import { proofingArtifact, proofingPackage, proofingSource } from "./source.ts"
+import {
+  proofingArtifact,
+  proofingLocales,
+  proofingPackage,
+  proofingSource,
+} from "./source.ts"
 
 Deno.test("proofing source follows enabled features, not manifest stanzas", () => {
   strictEqual(
@@ -41,4 +46,24 @@ Deno.test("proofing source follows enabled features, not manifest stanzas", () =
     }, "sjd"),
     { name: "sjd", version: "0.1.1" },
   )
+})
+
+Deno.test("proofing locales come from the extra_locales keys", () => {
+  // The real shape, from lang-sme and lang-sjd respectively.
+  deepStrictEqual(
+    proofingLocales({
+      windows: {
+        extra_locales: { "se-NO": "se", "se-SE": "se", "se-FI": "se" },
+      },
+    }),
+    ["se-NO", "se-SE", "se-FI"],
+  )
+  deepStrictEqual(
+    proofingLocales({ windows: { extra_locales: { "sjd-RU": "sjd" } } }),
+    ["sjd-RU"],
+  )
+  // A language with no regional variants must yield nothing, so the caller
+  // omits --locales rather than recording an empty attribute.
+  deepStrictEqual(proofingLocales({ windows: {} }), [])
+  deepStrictEqual(proofingLocales({}), [])
 })

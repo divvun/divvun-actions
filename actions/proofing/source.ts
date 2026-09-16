@@ -14,6 +14,23 @@ export function proofingArtifact(source: ProofingSource): string {
     : "build/tools/proofing/bundle.drb"
 }
 
+/**
+ * BCP-47 tags the language covers, taken from the keys of
+ * `windows.extra_locales` (the values are zhfst prefixes and are irrelevant
+ * here). Lives under `[windows]` for historical reasons, but the tags are not
+ * Windows-specific: LibreOffice's language table is a port of the Microsoft
+ * one, so the same set applies there.
+ *
+ * Passed to `divvun-runtime bundle --locales` so the bundle records which
+ * regional variants to offer, instead of every consumer shipping its own
+ * language table.
+ */
+export function proofingLocales(manifest: {
+  windows?: { extra_locales?: Record<string, string> }
+}): string[] {
+  return Object.keys(manifest.windows?.extra_locales ?? {})
+}
+
 export function proofingPackage(
   source: ProofingSource,
   manifest: {

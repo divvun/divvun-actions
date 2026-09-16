@@ -9,6 +9,7 @@ import proofingBundle, {
 import langProofingBuild from "~/actions/lang/build-proofing.ts"
 import {
   proofingArtifact,
+  proofingLocales,
   proofingPackage,
   proofingSource,
 } from "~/actions/proofing/source.ts"
@@ -717,7 +718,10 @@ export async function runLangProofingBuild() {
   const manifest = toml.parse(
     await Deno.readTextFile("manifest.toml"),
   ) as SpellerManifest
-  await langProofingBuild(proofingPackage(source, manifest))
+  await langProofingBuild({
+    ...proofingPackage(source, manifest),
+    locales: proofingLocales(manifest),
+  })
 }
 
 export async function runLangProofingBundle(
