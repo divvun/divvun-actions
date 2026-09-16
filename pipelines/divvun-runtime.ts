@@ -22,7 +22,6 @@ const MAIN_TARGETS = [
   "aarch64-unknown-linux-musl",
   "x86_64-unknown-linux-musl",
   "x86_64-unknown-linux-gnu",
-  "aarch64-pc-windows-msvc",
   "x86_64-pc-windows-msvc",
   "aarch64-apple-darwin",
 ]
@@ -40,7 +39,6 @@ const CLI_RELEASE_TARGETS = [
 const LIB_RELEASE_TARGETS = [
   "aarch64-apple-darwin",
   "x86_64-pc-windows-msvc",
-  "aarch64-pc-windows-msvc",
   "x86_64-unknown-linux-gnu",
 ]
 
@@ -451,7 +449,12 @@ export async function runDivvunRuntimePublish() {
 
   for (const target of LIB_RELEASE_TARGETS) {
     const srcName = `libdivvun_runtime-${target}.tar.xz`
-    const destName = assetFileName("libdivvun_runtime", target, version, "tar.xz")
+    const destName = assetFileName(
+      "libdivvun_runtime",
+      target,
+      version,
+      "tar.xz",
+    )
     const sourcePath = path.join(tempDir.path, srcName)
     const destPath = path.join(archivePath.path, destName)
     await fs.move(sourcePath, destPath, { overwrite: true })
@@ -460,8 +463,9 @@ export async function runDivvunRuntimePublish() {
 
   for (const target of cliPublishTargets) {
     const ext = target.includes("windows") ? "zip" : "tgz"
-    const outPath =
-      `${archivePath.path}/${assetFileName("divvun-runtime", target, version, ext)}`
+    const outPath = `${archivePath.path}/${
+      assetFileName("divvun-runtime", target, version, ext)
+    }`
     const inputPath = `${tempDir.path}/divvun-runtime-${target}${
       target.includes("windows") ? ".exe" : ""
     }`
