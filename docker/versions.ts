@@ -16,7 +16,9 @@ export const versions = {
   nodeChocoVersion: "24.11.1",
   openssh: "9.8.3.0",
   alpine: "3.23",
-  innosetup: undefined,
+  // Stays on the 6.x line: 7.x installs to a different directory and is not a
+  // drop-in for the existing .iss scripts. 6.x is still maintained upstream.
+  innosetup: "6.7.3",
   msys2: "2025-08-30",
   powershellCore: "7.5.4",
   gitForWindows: "2.47.1",

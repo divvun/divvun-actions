@@ -31,8 +31,10 @@ RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
     iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
 
-# Inno Setup
-RUN Invoke-WebRequest -Uri https://jrsoftware.org/download.php/is.exe?site=2 -OutFile innosetup.exe; \
+# Inno Setup 6.7.3
+RUN Invoke-WebRequest -Uri "https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe" -OutFile innosetup.exe; \
+    $head = Get-Content innosetup.exe -AsByteStream -TotalCount 2; \
+    if ($head.Length -ne 2 -or $head[0] -ne 0x4D -or $head[1] -ne 0x5A) { throw 'innosetup.exe is not a PE image; the download URL likely returned an HTML page' }; \
     Start-Process -FilePath .\innosetup.exe -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-' -Wait; \
     Remove-Item innosetup.exe; \
     setx /M PATH $($Env:PATH + ';C:\Program Files (x86)\Inno Setup 6');
