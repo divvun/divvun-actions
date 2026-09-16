@@ -173,14 +173,14 @@ RUN ~/.cargo/bin/cargo install cross --git https://github.com/cross-rs/cross && 
 # rsigncode (from dev-latest)
 RUN set -eu && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/rsigncode/releases/tags/dev-latest \
-          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*rsigncode[-_]x86_64-unknown-linux-gnu[-_][^"]*\.tgz"' \
+          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*rsigncode[-_]x86[-_]64[-_]unknown[-_]linux[-_]gnu[-_][^"]*\.tgz"' \
           | head -1 \
           | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
     test -n "$URL" || { echo 'no rsigncode asset for x86_64-unknown-linux-gnu on dev-latest' >&2; exit 1; } && \
     curl -fsSL "$URL" -o /tmp/rsigncode.tgz && \
     tar -xf /tmp/rsigncode.tgz -C /tmp && \
-    install -m 755 /tmp/rsigncode[-_]x86_64-unknown-linux-gnu[-_]*/rsigncode /usr/local/bin/rsigncode && \
-    rm -rf /tmp/rsigncode.tgz /tmp/rsigncode[-_]x86_64-unknown-linux-gnu[-_]*
+    install -m 755 /tmp/rsigncode[-_]x86[-_]64[-_]unknown[-_]linux[-_]gnu[-_]*/rsigncode /usr/local/bin/rsigncode && \
+    rm -rf /tmp/rsigncode.tgz /tmp/rsigncode[-_]x86[-_]64[-_]unknown[-_]linux[-_]gnu[-_]*
 
 # b3sum
 RUN curl -fsSL "https://github.com/BLAKE3-team/BLAKE3/releases/latest/download/b3sum_linux_x64_bin" -o /usr/local/bin/b3sum && \
@@ -227,7 +227,7 @@ RUN curl -fsSL 'https://pahkat.uit.no/artifacts/thfst-tools_1.0.0-alpha.2_linux_
 RUN set -eu && \
     echo 'hfst dev-latest refresh: 2026-09-15' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/hfst-rs/releases/tags/dev-latest \
-          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*hfst[-_]x86_64-unknown-linux-musl[-_][^"]*\.tgz"' \
+          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*hfst[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_][^"]*\.tgz"' \
           | head -1 \
           | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
     test -n "$URL" || { echo 'no hfst asset for x86_64-unknown-linux-musl on dev-latest' >&2; exit 1; } && \
@@ -235,10 +235,10 @@ RUN set -eu && \
     curl -fsSL "$URL" -o /tmp/hfst.tgz && \
     tar -xf /tmp/hfst.tgz -C /tmp && \
     install -d /opt/divvun/bin && \
-    install -m 755 /tmp/hfst[-_]x86_64-unknown-linux-musl[-_]*/hfst /opt/divvun/bin/hfst && \
+    install -m 755 /tmp/hfst[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*/hfst /opt/divvun/bin/hfst && \
     /opt/divvun/bin/hfst install-symlinks /opt/divvun/bin && \
     test -L /opt/divvun/bin/hfst-lexc || { echo 'hfst install-symlinks produced no symlinks' >&2; exit 1; } && \
-    rm -rf /tmp/hfst.tgz /tmp/hfst[-_]x86_64-unknown-linux-musl[-_]*
+    rm -rf /tmp/hfst.tgz /tmp/hfst[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*
 
 RUN set -eu && \
     echo 'foma-rs main refresh: 2026-09-15' && \
@@ -250,7 +250,7 @@ RUN set -eu && \
 RUN set -eu && \
     echo 'cg3 dev-latest refresh: 2026-09-15' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/cg3-rs/releases/tags/dev-latest \
-          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*cg3[-_]x86_64-unknown-linux-musl[-_][^"]*\.tgz"' \
+          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*cg3[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_][^"]*\.tgz"' \
           | head -1 \
           | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
     test -n "$URL" || { echo 'no cg3 asset for x86_64-unknown-linux-musl on dev-latest' >&2; exit 1; } && \
@@ -258,9 +258,9 @@ RUN set -eu && \
     curl -fsSL "$URL" -o /tmp/cg3.tgz && \
     tar -xf /tmp/cg3.tgz -C /tmp && \
     install -d /opt/divvun/bin && \
-    install -m 755 /tmp/cg3[-_]x86_64-unknown-linux-musl[-_]*/* /opt/divvun/bin/ && \
+    install -m 755 /tmp/cg3[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*/* /opt/divvun/bin/ && \
     test -x /opt/divvun/bin/vislcg3 || { echo 'cg3 archive is missing vislcg3' >&2; exit 1; } && \
-    rm -rf /tmp/cg3.tgz /tmp/cg3[-_]x86_64-unknown-linux-musl[-_]*
+    rm -rf /tmp/cg3.tgz /tmp/cg3[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*
 
 # aws-cli v2
 RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \

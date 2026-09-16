@@ -157,7 +157,7 @@ RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/pahkat-uploader?platform
 RUN set -eu && \
     echo 'hfst dev-latest refresh: 2026-09-15' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/hfst-rs/releases/tags/dev-latest \
-          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*hfst[-_]x86_64-unknown-linux-musl[-_][^"]*\.tgz"' \
+          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*hfst[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_][^"]*\.tgz"' \
           | head -1 \
           | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
     test -n "$URL" || { echo 'no hfst asset for x86_64-unknown-linux-musl on dev-latest' >&2; exit 1; } && \
@@ -165,10 +165,10 @@ RUN set -eu && \
     curl -fsSL "$URL" -o /tmp/hfst.tgz && \
     tar -xf /tmp/hfst.tgz -C /tmp && \
     install -d /opt/divvun/bin && \
-    install -m 755 /tmp/hfst[-_]x86_64-unknown-linux-musl[-_]*/hfst /opt/divvun/bin/hfst && \
+    install -m 755 /tmp/hfst[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*/hfst /opt/divvun/bin/hfst && \
     /opt/divvun/bin/hfst install-symlinks /opt/divvun/bin && \
     test -L /opt/divvun/bin/hfst-lexc || { echo 'hfst install-symlinks produced no symlinks' >&2; exit 1; } && \
-    rm -rf /tmp/hfst.tgz /tmp/hfst[-_]x86_64-unknown-linux-musl[-_]*
+    rm -rf /tmp/hfst.tgz /tmp/hfst[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*
 
 RUN set -eu && \
     echo 'foma-rs main refresh: 2026-09-15' && \
@@ -180,7 +180,7 @@ RUN set -eu && \
 RUN set -eu && \
     echo 'cg3 dev-latest refresh: 2026-09-15' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/cg3-rs/releases/tags/dev-latest \
-          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*cg3[-_]x86_64-unknown-linux-musl[-_][^"]*\.tgz"' \
+          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*cg3[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_][^"]*\.tgz"' \
           | head -1 \
           | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
     test -n "$URL" || { echo 'no cg3 asset for x86_64-unknown-linux-musl on dev-latest' >&2; exit 1; } && \
@@ -188,9 +188,9 @@ RUN set -eu && \
     curl -fsSL "$URL" -o /tmp/cg3.tgz && \
     tar -xf /tmp/cg3.tgz -C /tmp && \
     install -d /opt/divvun/bin && \
-    install -m 755 /tmp/cg3[-_]x86_64-unknown-linux-musl[-_]*/* /opt/divvun/bin/ && \
+    install -m 755 /tmp/cg3[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*/* /opt/divvun/bin/ && \
     test -x /opt/divvun/bin/vislcg3 || { echo 'cg3 archive is missing vislcg3' >&2; exit 1; } && \
-    rm -rf /tmp/cg3.tgz /tmp/cg3[-_]x86_64-unknown-linux-musl[-_]*
+    rm -rf /tmp/cg3.tgz /tmp/cg3[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*
 
 # git-lfs init
 RUN git lfs install
