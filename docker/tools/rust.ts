@@ -1,6 +1,14 @@
 import type { Tool } from "../lib/image.ts"
+import { versions } from "../versions.ts"
 
 export type RustOpts = {
+  /**
+   * Toolchain to install as the default. Pinned rather than `stable` so the
+   * emitted RUN line changes when the pin moves — an unpinned `stable` install
+   * is a stable cache key, so Docker keeps serving whatever compiler was
+   * current the day the layer was first built.
+   */
+  version?: string
   /** Rust target triples to add on install. */
   targets?: string[]
   /** Extra cargo-binstall packages to install (e.g. "just", "cargo-ndk"). */
@@ -10,14 +18,15 @@ export type RustOpts = {
 }
 
 export function rust(opts: RustOpts = {}): Tool {
+  const version = opts.version ?? versions.rust
   return {
-    name: `rust (targets: ${opts.targets?.join(", ") ?? "default"})`,
+    name: `rust@${version} (targets: ${opts.targets?.join(", ") ?? "default"})`,
     render: (ctx) => {
       if (ctx.platform === "windows") {
         const lines = [
           `Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe`,
         ]
-        const args = ["'-y'"]
+        const args = ["'-y'", "'--default-toolchain'", `'${version}'`]
         for (const t of opts.targets ?? []) {
           args.push("'--target'", `'${t}'`)
         }
@@ -32,7 +41,7 @@ export function rust(opts: RustOpts = {}): Tool {
 
       // bash (ubuntu + alpine)
       const installLine =
-        `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y` +
+        `curl --proto '=https' --tlsv1.2 -sSf ${versions.rustupScriptSource} | sh -s -- -y \\\n    --default-toolchain ${version}` +
         (opts.targets?.map((t) => ` \\\n    -t ${t}`).join("") ?? "")
       const out: string[] = [
         `RUN ${installLine}`,

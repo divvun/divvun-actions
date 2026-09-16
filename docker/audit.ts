@@ -34,6 +34,13 @@ const checks: Check[] = [
     repo: "casey/just",
   },
   {
+    label: "rust",
+    pinned: versions.rust,
+    repo: "rust-lang/rust",
+    // release tags are bare versions, e.g. `1.98.1`
+    tagToVersion: (t) => t,
+  },
+  {
     label: "divvun-runtime",
     pinned: versions.divvunRuntime,
     repo: "divvun/divvun-runtime",

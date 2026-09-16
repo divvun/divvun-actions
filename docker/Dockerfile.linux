@@ -157,8 +157,9 @@ RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.83.1/gh_2.83.1_li
     rm gh.deb && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
-# rust (targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android)
+# rust@1.98.1 (targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    --default-toolchain 1.98.1 \
     -t aarch64-linux-android \
     -t armv7-linux-androideabi \
     -t x86_64-linux-android
