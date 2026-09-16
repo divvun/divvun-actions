@@ -18,7 +18,7 @@ export function gitForWindows(
         `    Remove-Item git-installer.exe`,
         ``,
         `# Add Git to PATH`,
-        `RUN setx /M PATH $($Env:PATH + 'C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\bin;');`,
+        `RUN setx /M PATH $($Env:PATH + ';C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\bin');`,
         ``,
         `# Configure Git for long paths`,
         `RUN git config --global core.longpaths true`,

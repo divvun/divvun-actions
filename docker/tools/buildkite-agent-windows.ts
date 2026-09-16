@@ -17,7 +17,7 @@ export function buildkiteAgentWindows(): Tool {
         ``,
         `RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \\`,
         `    iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/buildkite/agent/main/install.ps1')); \\`,
-        `    setx /M PATH $($Env:PATH + 'C:\\buildkite-agent\\bin;');`,
+        `    setx /M PATH $($Env:PATH + ';C:\\buildkite-agent\\bin');`,
       ].join("\n"),
   }
 }
