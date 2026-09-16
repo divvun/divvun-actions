@@ -4,6 +4,7 @@ import * as uuid from "@std/uuid"
 import { InnoSetupBuilder } from "~/util/inno.ts"
 import logger from "~/util/log.ts"
 import { Kbdgen } from "~/util/shared.ts"
+import { stageWindInstaller, WIND_DIRECTORY, WIND_FILES } from "./wind.ts"
 
 function layoutTarget(layout: { [key: string]: any }) {
   const targets = layout["windows"] || {}
@@ -24,6 +25,8 @@ export async function generateKbdInnoFromBundle(
   const bundle = await Kbdgen.loadTarget(bundlePath, "windows")
   const project = await Kbdgen.loadProjectBundle(bundlePath)
   const layouts = await Kbdgen.loadLayouts(bundlePath)
+
+  await stageWindInstaller(buildDir)
 
   const builder = new InnoSetupBuilder(Deno.cwd())
 
@@ -67,6 +70,14 @@ export async function generateKbdInnoFromBundle(
         "Is64BitInstallMode",
       )
 
+      for (const name of WIND_FILES) {
+        builder.add(
+          `${WIND_DIRECTORY}/${name}`,
+          "{app}\\dependencies\\divvun-wind",
+          ["ignoreversion"],
+        )
+      }
+
       return builder
     })
 
@@ -75,9 +86,17 @@ export async function generateKbdInnoFromBundle(
       await addLayoutToInstaller(builder, locale, layout)
     }
   }
+  builder.run((command) =>
+    command
+      .withFilename("{sys}\\WindowsPowerShell\\v1.0\\powershell.exe")
+      .withParameter(
+        '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\\dependencies\\divvun-wind\\install-wind.ps1""',
+      )
+      .withFlags(["runhidden", "waituntilterminated"])
+  )
   const fileName = path.join(buildDir, `install.all.iss`)
   logger.debug(builder.build())
-  builder.write(fileName)
+  await builder.write(fileName)
   return fileName
 }
 

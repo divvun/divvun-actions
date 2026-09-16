@@ -9,12 +9,13 @@
 import * as path from "@std/path"
 import * as uuid from "@std/uuid"
 import * as builder from "~/builder.ts"
-import { makeOuttoInstaller } from "~/actions/outto/lib.ts"
+import { makeOuttoInstaller, windowsOuttoSigning } from "~/actions/outto/lib.ts"
 import macosSign from "~/services/macos-codesign.ts"
 import * as target from "~/target.ts"
 import { OuttoBuilder } from "~/util/outto.ts"
 import { Kbdgen } from "~/util/shared.ts"
 import logger from "~/util/log.ts"
+import { addWindToOutto, stageWindInstaller } from "./wind.ts"
 
 export type OuttoKeyboardResult = {
   path: string
@@ -127,6 +128,9 @@ export async function buildKeyboardWindowsOutto(
     })
   }
 
+  await stageWindInstaller(buildDir)
+  addWindToOutto(oBuilder)
+
   const configPath = path.join(buildDir, "outto.toml")
   await oBuilder.write(configPath)
   logger.debug(`outto manifest written: ${configPath}`)
@@ -145,7 +149,9 @@ export async function buildKeyboardWindowsOutto(
       target: "windows",
     })
   }
-  const signCommand = `${target.projectPath}\\bin\\divvun-actions.bat sign`
+  const signing = windowsOuttoSigning(
+    path.join(target.projectPath, "bin/divvun-actions.bat"),
+  )
 
   let result: { path: string; unsigned: boolean }
   try {
@@ -154,7 +160,7 @@ export async function buildKeyboardWindowsOutto(
       sourceDir: buildDir,
       outputPath,
       target: "windows",
-      signCommand,
+      ...signing,
     })
   } catch (err) {
     logger.warning(
