@@ -13,6 +13,7 @@ import {
   pipelineDesktopKeyboard,
   pipelineDivvunKeyboard,
   runDesktopKeyboardDeploy,
+  runDesktopKeyboardDeployOutto,
   runDesktopKeyboardMacOS,
   runDesktopKeyboardWindows,
   runDivvunKeyboardAndroid,
@@ -399,6 +400,10 @@ async function runPipeline(args: any) {
     }
     case "divvun-keyboard-deploy-macos": {
       await runDesktopKeyboardDeploy(KeyboardType.MacOS)
+      break
+    }
+    case "divvun-keyboard-deploy-outto": {
+      await runDesktopKeyboardDeployOutto()
       break
     }
     case "box-publish": {

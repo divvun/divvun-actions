@@ -9,6 +9,7 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import { globOneFile } from "~/util/glob.ts"
+import { GitHub } from "~/util/github.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import { logXcodeVersion } from "~/util/xcode.ts"
@@ -257,6 +258,83 @@ export async function runDesktopKeyboardMacOS(
   logger.info("macOS keyboard built and artifact uploaded")
 }
 
+/**
+ * Rolling pre-release the outto keyboard installers are published to.
+ *
+ * The legacy chain deploys to Pahkat, which outto cannot use yet: there is no
+ * Pahkat payload type describing an outto `.exe` or an `.app` bundle installer
+ * (see the note at the top of actions/keyboard/build/outto.ts, and the
+ * hardcoded WindowsExecutableKind.Inno in actions/keyboard/deploy.ts). Until
+ * that lands, publish to GitHub the way outto, divvun-wind and divvun-runtime
+ * already do.
+ */
+const OUTTO_DEV_TAG = "dev-latest"
+
+/** Download one artifact glob, tolerating the producing step having soft-failed. */
+async function downloadOuttoArtifacts(pattern: string, outputDir: string) {
+  try {
+    await builder.downloadArtifacts(pattern, outputDir)
+  } catch {
+    // `buildkite-agent artifact download` exits non-zero when nothing matches.
+    // Both outto builds are soft_fail, so one platform missing is expected
+    // rather than fatal — publishing the one that did build is still useful.
+    logger.warning(`No artifacts matched ${pattern}; skipping`)
+  }
+}
+
+export async function runDesktopKeyboardDeployOutto() {
+  using tempDir = await makeTempDir()
+
+  // Artifact names come from createWindowsPackage/createMacosOuttoArtifact:
+  //   <repoName>_<version>_windows.exe     (.UNSIGNED.exe if signing failed)
+  //   <repoName>_<version>_macos.app.zip
+  // The legacy macOS build uploads a .pkg into this same build, so these
+  // patterns must stay narrow enough to exclude it.
+  await downloadOuttoArtifacts("*_windows.exe", tempDir.path)
+  await downloadOuttoArtifacts("*_macos.app.zip", tempDir.path)
+
+  const files: string[] = []
+  for await (const entry of Deno.readDir(tempDir.path)) {
+    if (!entry.isFile) continue
+    // buildKeyboardWindowsOutto falls back to an unsigned installer rather than
+    // failing the build. An unsigned installer on a public release is worse
+    // than no installer, so drop it and say so loudly.
+    if (entry.name.includes(".UNSIGNED.")) {
+      logger.warning(`Refusing to publish unsigned installer: ${entry.name}`)
+      continue
+    }
+    files.push(path.join(tempDir.path, entry.name))
+  }
+
+  if (files.length === 0) {
+    throw new Error(
+      "No signed outto keyboard installers to publish. Both outto build steps " +
+        "are soft_fail, so check whether they actually produced an artifact.",
+    )
+  }
+
+  // Both the legacy and outto macOS builds write this, and agree on the value.
+  // Only used to name the release, so a miss is not worth failing the deploy.
+  let version: string | undefined
+  try {
+    version = await builder.metadata("macos-version")
+  } catch {
+    logger.warning("No macos-version metadata; leaving the release name as is")
+  }
+
+  logger.info(
+    `Publishing to ${OUTTO_DEV_TAG}: ${
+      files.map((f) => path.basename(f)).join(", ")
+    }`,
+  )
+  const gh = new GitHub(builder.env.repo)
+  await gh.updateRelease(OUTTO_DEV_TAG, files, {
+    draft: false,
+    prerelease: true,
+    name: version ? `v${version}` : undefined,
+  })
+}
+
 export async function runDesktopKeyboardDeploy(keyboardType: KeyboardType) {
   const allSecrets = await builder.secrets()
   const secrets = {
@@ -356,6 +434,47 @@ export function pipelineDivvunKeyboard() {
 }
 
 export function pipelineDesktopKeyboard() {
+  // Only main publishes to the rolling dev-latest release; a branch build
+  // would otherwise overwrite its assets with a one-off.
+  const isMain = builder.env.branch === "main"
+
+  const outtoSteps: CommandStep[] = [
+    command({
+      label: "Build Divvun Keyboard for Windows (outto)",
+      key: "build-windows-outto",
+      command: "divvun-actions run divvun-keyboard-windows outto",
+      soft_fail: true,
+      agents: {
+        queue: "windows",
+      },
+    }),
+    command({
+      label: "Build Divvun Keyboard for macOS (outto)",
+      key: "build-macos-outto",
+      command: "divvun-actions run divvun-keyboard-macos outto",
+      soft_fail: true,
+      agents: {
+        queue: "macos",
+      },
+    }),
+  ]
+
+  if (isMain) {
+    outtoSteps.push(
+      command({
+        label: `Deploy outto installers (${OUTTO_DEV_TAG})`,
+        command: "divvun-actions run divvun-keyboard-deploy-outto",
+        // The builds are soft_fail, so this still runs when one platform did
+        // not produce an installer. It publishes whatever did build and fails
+        // only when nothing signed came out of either.
+        depends_on: ["build-windows-outto", "build-macos-outto"],
+        agents: {
+          queue: "linux",
+        },
+      }),
+    )
+  }
+
   const pipeline: BuildkitePipeline = {
     steps: [
       // TODO: 2025-09-04 re-enable this once windows bundling components are updated.
@@ -393,32 +512,15 @@ export function pipelineDesktopKeyboard() {
           queue: "linux",
         },
       }),
-      // Side group: outto validation builds. Isolated from the legacy
-      // build/deploy chain. Group key "outto" is intentionally not used
-      // in any depends_on; each step is soft_fail.
+      // Side group: outto builds, plus the dev-latest publish on main. Still
+      // isolated from the legacy Pahkat build/deploy chain — group key "outto"
+      // is intentionally not used in any depends_on outside this group, and
+      // the builds stay soft_fail so an outto regression cannot redden a
+      // keyboard build.
       {
-        group: "Outto (validation)",
+        group: "Outto",
         key: "outto",
-        steps: [
-          command({
-            label: "Build Divvun Keyboard for Windows (outto)",
-            key: "build-windows-outto",
-            command: "divvun-actions run divvun-keyboard-windows outto",
-            soft_fail: true,
-            agents: {
-              queue: "windows",
-            },
-          }),
-          command({
-            label: "Build Divvun Keyboard for macOS (outto)",
-            key: "build-macos-outto",
-            command: "divvun-actions run divvun-keyboard-macos outto",
-            soft_fail: true,
-            agents: {
-              queue: "macos",
-            },
-          }),
-        ],
+        steps: outtoSteps,
       },
     ],
   }
