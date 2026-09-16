@@ -4,7 +4,7 @@
 
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
-import { assetGlob } from "~/util/asset_name.ts"
+import { assetGhPattern } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 
 const REPO = "divvun/divvun-runtime"
@@ -29,7 +29,7 @@ export async function downloadDivvunRuntimeLib(
   const gh = new GitHub(REPO)
   await gh.downloadReleaseAssets(
     TAG,
-    `${assetGlob(NAME, target)}.tar.xz`,
+    assetGhPattern(NAME, target, "tar.xz"),
     outputDir,
   )
   // outputDir is created per download, so the archive just fetched is the only

@@ -72,10 +72,29 @@ export function assetGrepPattern(
 /**
  * Shell glob matching the unpacked staging directory of any version, either
  * separator shape. POSIX sh bracket classes, so it works in a Dockerfile
- * RUN.
+ * RUN. Not usable with `gh` — see [assetGhPattern].
  */
 export function assetGlob(name: string, target: string): string {
   return `${name}[-_]${compatibleTarget(target)}[-_]*`
+}
+
+/**
+ * Glob for `gh release download --pattern`, which matches with Go's
+ * `filepath.Match`. That treats a literal `-` leading a bracket expression as
+ * ErrBadPattern and reports it as "no assets match the file pattern", so
+ * [assetGlob]'s `[-_]` classes match *nothing* there — for every target, not
+ * just the one being looked for. Verified against the live API: `BLAKE3SUM[S_]`
+ * matches, `BLAKE3SUM[-S]` does not.
+ *
+ * `?` stands in for each separator instead. It matches any single character,
+ * so it accepts both shapes without a bracket expression.
+ */
+export function assetGhPattern(
+  name: string,
+  target: string,
+  ext: string,
+): string {
+  return `${name}?${assetTarget(target).replaceAll("-", "?")}?*.${ext}`
 }
 
 /**

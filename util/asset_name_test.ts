@@ -2,10 +2,12 @@ import { ok, strictEqual } from "node:assert/strict"
 import { globToRegExp } from "@std/path"
 import {
   assetFileName,
+  assetGhPattern,
   assetGlob,
   assetGrepPattern,
   assetPsPattern,
   assetStem,
+  assetTarget,
 } from "./asset_name.ts"
 
 const version = "0.1.0-dev.20260915T184109Z+build.6"
@@ -48,5 +50,33 @@ Deno.test("download matchers accept canonical and existing release names for eit
       ok(!regex.test(`outto_aarch64-apple-darwin_${version}.zip`))
     }
     ok(!glob.test(`outto_aarch64-apple-darwin_${version}`))
+  }
+})
+
+Deno.test("gh patterns avoid bracket expressions Go's filepath.Match rejects", () => {
+  // A literal `-` leading a bracket expression is ErrBadPattern in Go, which
+  // gh surfaces as "no assets match the file pattern" — so the gh matcher must
+  // not contain one, for any target.
+  for (
+    const target of [
+      "x86_64-pc-windows-msvc",
+      "x86-64-pc-windows-msvc",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-apple-darwin",
+    ]
+  ) {
+    const pattern = assetGhPattern("libdivvun_runtime", target, "tar.xz")
+    ok(!pattern.includes("["), `${pattern} uses a bracket expression`)
+
+    const glob = globToRegExp(pattern)
+    for (
+      const name of [
+        `libdivvun_runtime_${assetTarget(target)}_${version}.tar.xz`,
+        `libdivvun_runtime-${target}-${version}.tar.xz`,
+      ]
+    ) {
+      ok(glob.test(name), `${pattern} rejects ${name}`)
+    }
+    ok(!glob.test(`libdivvun_runtime_some-other-triple_${version}.tar.xz`))
   }
 })
