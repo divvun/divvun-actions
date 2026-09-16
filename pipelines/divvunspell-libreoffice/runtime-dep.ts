@@ -4,10 +4,12 @@
 
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import { assetGlob } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 
 const REPO = "divvun/divvun-runtime"
 const TAG = "dev-latest"
+const NAME = "libdivvun_runtime"
 
 /**
  * Download the libdivvun_runtime archive for `target` into `outputDir` and
@@ -27,15 +29,14 @@ export async function downloadDivvunRuntimeLib(
   const gh = new GitHub(REPO)
   await gh.downloadReleaseAssets(
     TAG,
-    `libdivvun_runtime-${target}-*.tar.xz`,
+    `${assetGlob(NAME, target)}.tar.xz`,
     outputDir,
   )
+  // outputDir is created per download, so the archive just fetched is the only
+  // .tar.xz in it. Matching the name a second time here would mean restating
+  // the convention in a place that cannot be kept in step with asset_name.ts.
   for await (const entry of Deno.readDir(outputDir)) {
-    if (
-      entry.isFile &&
-      entry.name.startsWith(`libdivvun_runtime-${target}-`) &&
-      entry.name.endsWith(".tar.xz")
-    ) {
+    if (entry.isFile && entry.name.endsWith(".tar.xz")) {
       return path.join(outputDir, entry.name)
     }
   }
