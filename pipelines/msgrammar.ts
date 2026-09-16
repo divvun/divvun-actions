@@ -100,7 +100,7 @@ export async function runMsgrammarInstaller() {
     await builder.exec("buildkite-agent", [
       "artifact",
       "download",
-      `target/${MSGRAMMAR_TARGET}/release/${name}`,
+      path.join("target", MSGRAMMAR_TARGET, "release", name),
       downloaded.path,
       "--step",
       BUILD,
