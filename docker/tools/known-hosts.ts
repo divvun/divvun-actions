@@ -1,7 +1,7 @@
 import type { Tool } from "../lib/image.ts"
 
 /**
- * Seed `~/.ssh/known_hosts` at build time.
+ * Seed the machine-wide `known_hosts` at build time.
  *
  * A fresh container has no `~/.ssh` at all, so ssh cannot verify the host key
  * and blocks on the "authenticity of host can't be established" prompt with no
@@ -10,6 +10,12 @@ import type { Tool } from "../lib/image.ts"
  * which means every image update. Baking the entries into the layer makes them
  * survive recreation. The other platforms do the equivalent at runtime; see the
  * ssh-keyscan in util/shared.ts.
+ *
+ * Written to `%ProgramData%\ssh\ssh_known_hosts`, ssh's default
+ * GlobalKnownHostsFile, rather than a user profile: the buildkite agent runs in
+ * the Services session and cannot be relied on to resolve `$env:USERPROFILE` to
+ * the same place an interactive logon does. See [sshIdentity] for the same
+ * problem affecting the key itself.
  */
 export function knownHosts(opts: { hosts?: string[] } = {}): Tool {
   const hosts = opts.hosts ?? ["github.com"]
@@ -17,9 +23,9 @@ export function knownHosts(opts: { hosts?: string[] } = {}): Tool {
     name: `known_hosts (${hosts.join(", ")})`,
     render: () => {
       const lines = [
-        `$sshDir = Join-Path $env:USERPROFILE '.ssh'`,
+        `$sshDir = Join-Path $env:ProgramData 'ssh'`,
         `New-Item -ItemType Directory -Force -Path $sshDir | Out-Null`,
-        `$knownHosts = Join-Path $sshDir 'known_hosts'`,
+        `$knownHosts = Join-Path $sshDir 'ssh_known_hosts'`,
         // ssh-keyscan is a native binary, so a failure sets an exit code rather
         // than tripping $ErrorActionPreference. Check the output instead, so a
         // network blip can't bake an empty known_hosts into the image.

@@ -13,7 +13,7 @@ RUN Invoke-WebRequest -Uri https://github.com/git-for-windows/git/releases/downl
     Remove-Item git-installer.exe
 
 # Add Git to PATH
-RUN setx /M PATH $($Env:PATH + 'C:\Program Files\Git\cmd;C:\Program Files\Git\bin;');
+RUN setx /M PATH $($Env:PATH + ';C:\Program Files\Git\cmd;C:\Program Files\Git\bin');
 
 # Configure Git for long paths
 RUN git config --global core.longpaths true
@@ -24,7 +24,7 @@ ENV BUILDKITE_AGENT_TOKEN="XXX"
 
 RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
     iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/buildkite/agent/main/install.ps1')); \
-    setx /M PATH $($Env:PATH + 'C:\buildkite-agent\bin;');
+    setx /M PATH $($Env:PATH + ';C:\buildkite-agent\bin');
 
 # chocolatey
 RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
@@ -170,11 +170,16 @@ RUN Invoke-WebRequest -Uri "https://github.com/PowerShell/Win32-OpenSSH/releases
     setx /M PATH $($Env:ProgramFiles + '\OpenSSH' + ';' + $Env:PATH)
 
 # known_hosts (github.com)
-RUN $sshDir = Join-Path $env:USERPROFILE '.ssh' ; \
+RUN $sshDir = Join-Path $env:ProgramData 'ssh' ; \
     New-Item -ItemType Directory -Force -Path $sshDir | Out-Null ; \
-    $knownHosts = Join-Path $sshDir 'known_hosts' ; \
+    $knownHosts = Join-Path $sshDir 'ssh_known_hosts' ; \
     ssh-keyscan github.com | Out-File -FilePath $knownHosts -Encoding ascii -Append ; \
     if (-not (Select-String -Path $knownHosts -Pattern 'github.com' -SimpleMatch -Quiet)) { throw 'ssh-keyscan returned no host key for github.com' }
+
+# ssh identity for github.com
+RUN $sshDir = Join-Path $env:ProgramData 'ssh' ; \
+    New-Item -ItemType Directory -Force -Path $sshDir | Out-Null ; \
+    Set-Content -Path (Join-Path $sshDir 'ssh_config') -Value @('Host github.com', '    IdentityFile C:\buildkite-secrets\id_ed25519_buildkite_git', '    StrictHostKeyChecking accept-new') -Encoding ascii
 
 # vcpkg 2025.10.17
 RUN git clone --depth 1 --branch 2025.10.17 https://github.com/microsoft/vcpkg.git C:\vcpkg ; \

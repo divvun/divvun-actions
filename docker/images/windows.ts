@@ -32,6 +32,7 @@ import {
   rustToolchain,
   setUser,
   sshAgentService,
+  sshIdentity,
   uv,
   vcpkg,
 } from "../tools/mod.ts"
@@ -79,6 +80,7 @@ export default defineImage({
     uv(),
     opensshWindows(),
     knownHosts(),
+    sshIdentity(),
     vcpkg(),
     envVars("Buildkite fs-cache folder", {
       BUILDKITE_PLUGIN_FS_CACHE_FOLDER: "C:\\buildkite-cache",
