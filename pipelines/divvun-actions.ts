@@ -37,8 +37,20 @@ function command(input: CommandStep): CommandStep {
 }
 
 export function pipelineDivvunActions(): BuildkitePipeline {
-  const isMain = builder.env.branch === "main"
+  // Images are built only for tagged releases. They take a long time, the
+  // agents pull `:latest` on their own schedule, and rebuilding on every commit
+  // to main means the layer cache is the only thing standing between a routine
+  // change and a full four-image rebuild.
+  //
+  // DOCKER_BUILD_IMAGES=true forces a build without tagging, set as a Buildkite
+  // "New Build" environment variable override — same escape hatch as
+  // DOCKER_NO_CACHE below, and the way to roll out an image fix between
+  // releases.
+  const isRelease = !!builder.env.tag?.match(/^v/)
+  const isForced = Deno.env.get("DOCKER_BUILD_IMAGES") === "true"
 
+  // The drift check is cheap and catches generated Dockerfiles falling out of
+  // step with docker/images/*.ts, so it runs on every build regardless.
   const steps: BuildkitePipeline["steps"] = [
     command({
       key: "drift-check",
@@ -46,8 +58,13 @@ export function pipelineDivvunActions(): BuildkitePipeline {
       command: ["deno task docker:check"],
       agents: { queue: "linux" },
     }),
-    { wait: null },
   ]
+
+  if (!isRelease && !isForced) {
+    return { steps }
+  }
+
+  steps.push({ wait: null })
 
   for (const spec of TARGET_SPECS) {
     const dependsOn = spec.dependsOn ? [spec.dependsOn] : ["drift-check"]
@@ -56,9 +73,7 @@ export function pipelineDivvunActions(): BuildkitePipeline {
         key: `build-${spec.target}`,
         label: `:whale: Build ${spec.target}`,
         command: [
-          `divvun-actions run divvun-actions-build-image ${spec.target} ${
-            isMain ? "push" : "no-push"
-          }`,
+          `divvun-actions run divvun-actions-build-image ${spec.target} push`,
         ],
         agents: { queue: spec.queue },
         depends_on: dependsOn,
