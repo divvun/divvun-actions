@@ -125,8 +125,8 @@ export async function runMsgrammarInstaller() {
 
 export async function verifyMsgrammarInstaller(
   artifacts: string,
-  version: string,
-): Promise<void> {
+  expectedVersion?: string,
+): Promise<string> {
   const record = JSON.parse(
     await Deno.readTextFile(
       path.join(artifacts, INSTALLER.replace(".exe", ".build.json")),
@@ -134,10 +134,12 @@ export async function verifyMsgrammarInstaller(
   )
   if (
     record.signed !== true || record.commit !== builder.env.commit ||
-    record.target !== MSGRAMMAR_TARGET || record.version !== version
+    record.target !== MSGRAMMAR_TARGET ||
+    (expectedVersion !== undefined && record.version !== expectedVersion)
   ) {
     throw new Error("Installer provenance does not match this signed build")
   }
+  parseVersion(record.version)
   if (
     await sha256(path.join(artifacts, INSTALLER)) !== record.installer_sha256 ||
     await sha256(
@@ -146,6 +148,7 @@ export async function verifyMsgrammarInstaller(
   ) {
     throw new Error("Installer or manifest checksum does not match provenance")
   }
+  return record.version
 }
 
 export async function runMsgrammarPublish() {
@@ -155,7 +158,9 @@ export async function runMsgrammarPublish() {
       "msgrammar publication requires main or a version tag, outside a pull request",
     )
   }
-  const version = await msgrammarVersion()
+  const expectedVersion = mode === "release"
+    ? await msgrammarVersion()
+    : undefined
   using artifacts = await makeTempDir({ prefix: "msgrammar-publish-" })
   const names = [
     INSTALLER,
@@ -172,7 +177,7 @@ export async function runMsgrammarPublish() {
       PACKAGE,
     ])
   }
-  await verifyMsgrammarInstaller(artifacts.path, version)
+  const version = await verifyMsgrammarInstaller(artifacts.path, expectedVersion)
   const releaseStem = assetStem("msgrammar", MSGRAMMAR_TARGET, version)
   const files: string[] = []
   for (const name of names) {

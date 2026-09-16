@@ -193,8 +193,15 @@ Deno.test("msgrammar publication rejects PRs before accessing credentials and ch
     builder.env.commit = "b".repeat(40)
     await rejects(verifyMsgrammarInstaller(dir, "0.1.0"), /provenance/)
     builder.env.commit = record.commit
+    record.version = "0.1.0-dev.20260916T060000Z+build.3"
+    await Deno.writeTextFile(
+      installer.replace(".exe", ".build.json"),
+      JSON.stringify(record),
+    )
+    builder.env.buildTimestamp = "2026-09-16T06:31:51.000Z"
+    strictEqual(await verifyMsgrammarInstaller(dir), record.version)
     await Deno.writeTextFile(installer, "tampered installer")
-    await rejects(verifyMsgrammarInstaller(dir, "0.1.0"), /checksum/)
+    await rejects(verifyMsgrammarInstaller(dir), /checksum/)
   } finally {
     Deno.chdir(cwd)
     await Deno.remove(dir, { recursive: true })
