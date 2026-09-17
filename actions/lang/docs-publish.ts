@@ -161,7 +161,7 @@ async function generateDocsData(
       "spellcheckers",
       "test",
     )
-    let variantReportCount = 0
+    const variantCodes: string[] = []
     if (await fs.exists(variantsDir)) {
       if (
         await run("bash", ["-c", "make -j$(nproc) speller-variant-reports"], {
@@ -176,15 +176,15 @@ async function generateDocsData(
               path.join(srcTyposreport, entry.name),
               path.join(outDir, `speller-accuracy-${m[1]}.json`),
             )
-            variantReportCount++
+            variantCodes.push(m[1])
           }
         } catch {
           // No docs/typosreport dir — speller-variant-reports was a no-op
           // (repo has no dialects/areas/orthographies/writing systems).
         }
-        if (variantReportCount > 0) {
+        if (variantCodes.length > 0) {
           logger.info(
-            `Published ${variantReportCount} variant accuracy report(s)`,
+            `Published ${variantCodes.length} variant accuracy report(s)`,
           )
         }
       } else {
@@ -195,7 +195,7 @@ async function generateDocsData(
     }
 
     const variantDefaultReport = path.join(srcTyposreport, "report.json")
-    if (variantReportCount > 0 && await fs.exists(variantDefaultReport)) {
+    if (variantCodes.length > 0 && await fs.exists(variantDefaultReport)) {
       await Deno.copyFile(variantDefaultReport, reportOut)
     } else if (
       await run("bash", ["-c", "make -j$(nproc) report.json"], {
@@ -211,6 +211,16 @@ async function generateDocsData(
       await emit("speller-suggestions.json", "bash", [
         path.join(scripts, "make-spellerbadge-json.sh"),
         reportOut,
+      ])
+    }
+
+    // Per-variant suggestion-quality badges, mirroring the accuracy reports
+    // above — giella-core's own badgedata/speller-suggestions-%.json rule
+    // does the same thing from docs/typosreport/report-%.json.
+    for (const code of variantCodes) {
+      await emit(`speller-suggestions-${code}.json`, "bash", [
+        path.join(scripts, "make-spellerbadge-json.sh"),
+        path.join(outDir, `speller-accuracy-${code}.json`),
       ])
     }
 
