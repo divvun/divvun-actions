@@ -92,7 +92,7 @@ export async function runDocsDataPublish() {
       path.join(scripts, "make-lemmacount.json.sh"),
       root,
     ])
-    await emit("fst-maturity.json", [
+    await emit("pkg-maturity.json", [
       path.join(scripts, "make-maturity.json.sh"),
       await gutRepoName(),
     ])

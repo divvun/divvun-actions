@@ -76,7 +76,7 @@ const GTCORE = path.join("..", "giella-core")
  * when present. Soft-fail throughout: most repos have no variants, and the
  * target is a cheap no-op there.
  *
- * TODO(CI): `fst-variants.json` needs autoconf-substituted vars (DIALECTS,
+ * TODO(CI): `pkg-variants.json` needs autoconf-substituted vars (DIALECTS,
  * AREAS, ...) — generated via `make` below; verify the target name against a
  * real build.
  */
@@ -96,7 +96,7 @@ async function generateDocsData(
     path.join(scripts, "make-lemmacount.json.sh"),
     root,
   ])
-  await emit("fst-maturity.json", "bash", [
+  await emit("pkg-maturity.json", "bash", [
     path.join(scripts, "make-maturity.json.sh"),
     await gutRepoName(),
   ])
@@ -121,30 +121,30 @@ async function generateDocsData(
     root,
   ])
 
-  // fst-variants.json needs configure-substituted make vars, so go through make.
+  // pkg-variants.json needs configure-substituted make vars, so go through make.
   if (
-    await run("bash", ["-c", "make -j$(nproc) badgedata/fst-variants.json"], {
+    await run("bash", ["-c", "make -j$(nproc) badgedata/pkg-variants.json"], {
       cwd: path.join(root, "build", "docs"),
     })
   ) {
     // VPATH build: make may land it in builddir or (fallback) srcdir.
     const made = [
-      "build/docs/badgedata/fst-variants.json",
-      "docs/badgedata/fst-variants.json",
+      "build/docs/badgedata/pkg-variants.json",
+      "docs/badgedata/pkg-variants.json",
     ]
     let copied = false
     for (const cand of made) {
       if (await fs.exists(cand)) {
-        await Deno.copyFile(cand, path.join(outDir, "fst-variants.json"))
+        await Deno.copyFile(cand, path.join(outDir, "pkg-variants.json"))
         copied = true
         break
       }
     }
     if (!copied) {
-      logger.warning("make succeeded but produced no fst-variants.json")
+      logger.warning("make succeeded but produced no pkg-variants.json")
     }
   } else {
-    logger.warning("Failed to generate fst-variants.json")
+    logger.warning("Failed to generate pkg-variants.json")
   }
 
   if (buildConfig.spellers) {
