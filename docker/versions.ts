@@ -27,7 +27,6 @@ export const versions = {
     aarch64: "https://musl.cc/aarch64-linux-musl-cross.tgz",
   },
   pahkatDevtoolsChannel: "nightly",
-  divvunRuntime: "0.3.1",
   divvunspell: "1.0.0-beta.13",
   rcodesign: "0.29.0",
 }

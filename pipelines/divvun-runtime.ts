@@ -26,10 +26,17 @@ const MAIN_TARGETS = [
   "aarch64-apple-darwin",
 ]
 
-// CLI release targets
+// CLI release targets.
+//
+// The glibc Linux CLI is here, not just in MAIN_TARGETS, because publishing
+// reads this list on every build — including dev-latest. While only the musl
+// target named Linux and MUSL_ENABLED was false, main built a glibc CLI and
+// then published nothing for Linux at all, so the Docker image could not move
+// off v0.3.1 and kept a divvun-runtime from before pipelines ran in place.
 const CLI_RELEASE_TARGETS = [
   // "aarch64-unknown-linux-musl",
   "x86_64-unknown-linux-musl",
+  "x86_64-unknown-linux-gnu",
   "aarch64-apple-darwin",
 ]
 
