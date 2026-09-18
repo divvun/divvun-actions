@@ -98,17 +98,27 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
 # android SDK (platform=android-36, build-tools=36.0.0, ndk=28.2.13676358)
-RUN curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip -o commandlinetools.zip && \
+RUN set -eu && \
+    curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip -o commandlinetools.zip && \
     mkdir -p ~/Android/sdk/cmdline-tools && \
-    unzip commandlinetools.zip -d ~/Android/sdk/cmdline-tools && \
+    unzip -q commandlinetools.zip -d ~/Android/sdk/cmdline-tools && \
     rm commandlinetools.zip && \
     mv ~/Android/sdk/cmdline-tools/cmdline-tools ~/Android/sdk/cmdline-tools/latest && \
-    yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses && \
-    $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-    "platform-tools" \
-    "platforms;android-36" \
-    "build-tools;36.0.0" \
-    "ndk;28.2.13676358"
+    yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null
+
+RUN set -eu && \
+    SDKMANAGER=$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager && \
+    for pkg in "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"; do \
+      n=1 ; \
+      until "$SDKMANAGER" "$pkg" ; do \
+        if [ "$n" -ge 3 ]; then echo "sdkmanager: $pkg failed $n times" >&2; exit 1; fi ; \
+        echo "sdkmanager: $pkg failed, clearing partial downloads and retrying ($n)" >&2 ; \
+        rm -rf "$ANDROID_HOME/.temp" "$ANDROID_HOME/.downloadIntermediates" ~/.android/cache ; \
+        n=$((n + 1)) ; \
+        sleep 5 ; \
+      done ; \
+    done && \
+    test -d "$ANDROID_NDK_HOME"
 
 # clang-21 symlinks as default
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-21 100 && \
