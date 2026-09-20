@@ -279,20 +279,11 @@ RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "aw
     ./aws/install && \
     rm awscliv2.zip
 
-# divvun-runtime (dev-latest @ 2026-09-17)
-RUN set -eu && \
-    echo 'divvun-runtime dev-latest refresh: 2026-09-17' && \
-    URL=$(curl -fsSL https://api.github.com/repos/divvun/divvun-runtime/releases/tags/dev-latest \
-          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*divvun-runtime[-_]x86[-_]64[-_]unknown[-_]linux[-_]gnu[-_][^"]*\.tgz"' \
-          | head -1 \
-          | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
-    test -n "$URL" || { echo 'no divvun-runtime asset for x86_64-unknown-linux-gnu on dev-latest' >&2; exit 1; } && \
-    echo "installing $URL" && \
-    curl -fsSL "$URL" -o /tmp/divvun-runtime.tgz && \
-    tar -xf /tmp/divvun-runtime.tgz -C /tmp && \
-    install -m 755 /tmp/divvun-runtime[-_]x86[-_]64[-_]unknown[-_]linux[-_]gnu[-_]*/divvun-runtime /usr/local/bin/divvun-runtime && \
-    rm -rf /tmp/divvun-runtime.tgz /tmp/divvun-runtime[-_]x86[-_]64[-_]unknown[-_]linux[-_]gnu[-_]* && \
-    divvun-runtime --version
+# divvun-runtime@0.3.1
+RUN curl -fsSL "https://github.com/divvun/divvun-runtime/releases/download/v0.3.1/divvun-runtime-x86_64-unknown-linux-musl-v0.3.1.tgz" -o "divvun-runtime.tgz" && \
+    bsdtar -xf divvun-runtime.tgz && \
+    cp divvun-runtime-x86_64*/divvun-runtime /usr/local/bin/divvun-runtime && \
+    rm -rf divvun-runtime.tgz divvun-runtime-x86_64*
 
 # divvunspell@1.0.0-beta.13
 RUN curl -fsSL "https://github.com/divvun/divvunspell/releases/download/divvunspell/v1.0.0-beta.13/divvunspell-x86_64-unknown-linux-gnu-v1.0.0-beta.13.tgz" -o divvunspell.tgz && \
