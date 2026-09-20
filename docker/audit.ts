@@ -41,11 +41,6 @@ const checks: Check[] = [
     tagToVersion: (t) => t,
   },
   {
-    label: "divvun-runtime",
-    pinned: versions.divvunRuntime,
-    repo: "divvun/divvun-runtime",
-  },
-  {
     label: "divvunspell",
     pinned: versions.divvunspell,
     repo: "divvun/divvunspell",
