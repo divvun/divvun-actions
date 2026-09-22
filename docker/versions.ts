@@ -4,6 +4,8 @@ export const versions = {
   minisign: "0.12",
   just: "1.40.0",
   nodejs: "22.x",
+  uv: "0.11.29",
+  box: "da96a74656aef7f582a061c16fc0b70288ed514a",
   llvm: 21,
   ndk: "28.2.13676358",
   cmake: "3.31.10",

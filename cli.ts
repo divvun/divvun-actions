@@ -30,6 +30,10 @@ import {
   pipelineDivvunWorkerTts,
   runDivvunWorkerTtsPublish,
 } from "./pipelines/divvun-worker-tts.ts"
+import {
+  pipelineDivvunSpeechPy,
+  runDivvunSpeechPyExport,
+} from "./pipelines/divvun-speech-py.ts"
 import { pipelineBox, runBoxPublish } from "./pipelines/box.ts"
 import {
   pipelineDivvunWind,
@@ -465,6 +469,10 @@ async function runPipeline(args: any) {
       await runDivvunWorkerTtsPublish()
       break
     }
+    case "divvun-speech-py-export": {
+      await runDivvunSpeechPyExport()
+      break
+    }
     case "borealium-lint": {
       await runBorealiumLint()
       break
@@ -777,6 +785,10 @@ export async function createCiPipeline(): Promise<BuildkitePipeline> {
     }
     case "divvun-worker-tts": {
       pipeline = pipelineDivvunWorkerTts()
+      break
+    }
+    case "divvun-speech-py": {
+      pipeline = pipelineDivvunSpeechPy()
       break
     }
     case "box": {

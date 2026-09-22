@@ -5,6 +5,7 @@ import {
   arm64UbuntuCross,
   awsCli,
   b3sum,
+  box,
   cg3,
   clangSymlinks,
   deno,
@@ -28,6 +29,7 @@ import {
   thfstTools,
   ubuntuFinnishMirrorWithApertium,
   uv,
+  uvPython,
   vulkanSdk,
 } from "../tools/mod.ts"
 import { versions } from "../versions.ts"
@@ -88,6 +90,7 @@ export default defineImage({
     "docker-ce-cli",
     "docker-compose-plugin",
     "flex",
+    "flatbuffers-compiler",
     "git-lfs",
     "imagemagick",
     "jq",
@@ -96,6 +99,7 @@ export default defineImage({
     "libboost-all-dev",
     "libicu-dev",
     "libicu74",
+    "libgomp1",
     "libsqlite3-dev",
     "libssl-dev",
     "ninja-build",
@@ -143,6 +147,7 @@ export default defineImage({
     muslCross({ arch: "x86_64" }),
     muslCross({ arch: "aarch64" }),
     uv(),
+    uvPython("3.11"),
     gh(),
     rust({
       targets: [
@@ -155,6 +160,7 @@ export default defineImage({
       ],
       binstall: ["just", "cargo-ndk"],
     }),
+    box(),
     rsigncode(),
     b3sum(),
     nodejs(),

@@ -159,8 +159,8 @@ RUN Invoke-WebRequest -Uri "https://github.com/cli/cli/releases/download/v2.83.1
     Expand-Archive gh.zip -DestinationPath C:\ ; \
     Remove-Item -Force gh.zip
 
-# uv
-RUN irm https://astral.sh/uv/install.ps1 | iex ; \
+# uv 0.11.29
+RUN irm https://astral.sh/uv/0.11.29/install.ps1 | iex ; \
     setx /M PATH $($Env:PATH + ';C:\Users\ContainerAdministrator\.local\bin')
 
 # Win32-OpenSSH client 9.8.3.0
