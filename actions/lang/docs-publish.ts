@@ -56,25 +56,19 @@ async function buildTestlogs(
 const GTCORE = path.join("..", "giella-core")
 
 /**
- * Regenerate the badge JSON + `speller-accuracy.json` into `outDir` by
+ * Regenerate the badge JSON into `outDir` (plus `speller-accuracy*.json`) by
  * calling the giella-core scripts directly (same invocations as
  * am-shared/docs-dir-include.am). The Class 1 badges (FST + grammar-checker
- * version/rule-count) need no FST build; `speller-accuracy.json` and the
- * `speller-suggestions` badge derived from it need the built speller, which the
- * snapshot restores.
+ * version/rule-count) need no FST build; the `speller-suggestions` badges are
+ * derived from the accuracy reports described below.
  *
- * Variant accuracy reports (`speller-accuracy-<code>.json`, for
- * dialect/area/alt-orth/alt-writing-system languages) come from
- * giella-core's `speller-variant-reports` target
- * (am-shared/tools-spellcheckers-test-include.am, included from
- * tools/spellcheckers/test/Makefile.am) — it writes `report.json` /
- * `report-<code>.json` straight into docs/typosreport/ in the source tree
- * (not build/), one per configured dialect/area/orthography/writing-system.
- * When it ran, its report.json also folds in variant-specific typos data via
- * typos-default-generated.tsv, so it's a strictly better default report than
- * the plain build/docs/report.json below for multi-variant repos — prefer it
- * when present. Soft-fail throughout: most repos have no variants, and the
- * target is a cheap no-op there.
+ * The accuracy reports themselves (`speller-accuracy.json` and, for
+ * dialect/area/alt-orth/alt-writing-system languages,
+ * `speller-accuracy-<code>.json`) are not regenerated here: `make check` in
+ * the speller-test step writes them to docs/typosreport/ (suggestion-quality.sh
+ * and test-speller-variant-*.sh, using typos-*-generated.tsv and the speller's
+ * config.json) and uploads them as artifacts, so the published numbers match
+ * a local `make check` by construction.
  *
  * TODO(CI): `pkg-variants.json` needs autoconf-substituted vars (DIALECTS,
  * AREAS, ...) — generated via `make` below; verify the target name against a
@@ -148,92 +142,27 @@ async function generateDocsData(
   }
 
   if (buildConfig.spellers) {
-    const reportOut = path.join(outDir, "speller-accuracy.json")
     const srcTyposreport = path.join(root, "docs", "typosreport")
-
-    // Variant reports first: for a multi-variant repo this also produces the
-    // more complete default docs/typosreport/report.json (see doc comment
-    // above), which the fallback below should not then clobber.
-    const variantsDir = path.join(
-      root,
-      "build",
-      "tools",
-      "spellcheckers",
-      "test",
-    )
-    const variantCodes: string[] = []
-    if (await fs.exists(variantsDir)) {
-      if (
-        await run("bash", ["-c", "make -j$(nproc) speller-variant-reports"], {
-          cwd: variantsDir,
-        })
-      ) {
-        try {
-          for await (const entry of Deno.readDir(srcTyposreport)) {
-            const m = entry.isFile && entry.name.match(/^report-(.+)\.json$/)
-            if (!m) continue
-            await Deno.copyFile(
-              path.join(srcTyposreport, entry.name),
-              path.join(outDir, `speller-accuracy-${m[1]}.json`),
-            )
-            variantCodes.push(m[1])
-          }
-        } catch {
-          // No docs/typosreport dir — speller-variant-reports was a no-op
-          // (repo has no dialects/areas/orthographies/writing systems).
-        }
-        if (variantCodes.length > 0) {
-          logger.info(
-            `Published ${variantCodes.length} variant accuracy report(s)`,
-          )
-        }
-      } else {
-        logger.warning(
-          "speller-variant-reports failed (or this repo has no variants configured)",
-        )
-      }
-    }
-
-    const variantDefaultReport = path.join(srcTyposreport, "report.json")
-    if (variantCodes.length > 0 && await fs.exists(variantDefaultReport)) {
-      await Deno.copyFile(variantDefaultReport, reportOut)
-    } else if (
-      await run("bash", ["-c", "make -j$(nproc) report.json"], {
-        cwd: path.join(root, "build", "docs"),
-      }) && await fs.exists("build/docs/report.json")
-    ) {
-      await Deno.copyFile("build/docs/report.json", reportOut)
-    } else {
-      logger.warning("Failed to generate speller-accuracy.json")
-    }
-
-    if (await fs.exists(reportOut)) {
-      await emit("speller-suggestions.json", "bash", [
-        path.join(scripts, "make-spellerbadge-json.sh"),
-        reportOut,
-      ])
-    }
-
-    // Per-variant suggestion-quality badges, mirroring the accuracy reports
-    // above — giella-core's own badgedata/speller-suggestions-%.json rule
-    // does the same thing from docs/typosreport/report-%.json.
-    for (const code of variantCodes) {
-      await emit(`speller-suggestions-${code}.json`, "bash", [
-        path.join(scripts, "make-spellerbadge-json.sh"),
-        path.join(outDir, `speller-accuracy-${code}.json`),
-      ])
-    }
-
-    // Hygiene: docs/typosreport/*.json is already .gitignore'd in every lang
-    // repo, so this isn't needed for git cleanliness — just to avoid stale
-    // generated files lingering in a workspace reused across builds.
+    const reports: string[] = []
     try {
       for await (const entry of Deno.readDir(srcTyposreport)) {
-        if (entry.isFile && /^report(-.+)?\.json$/.test(entry.name)) {
-          await Deno.remove(path.join(srcTyposreport, entry.name))
-        }
+        const m = entry.isFile && entry.name.match(/^report(-.+)?\.json$/)
+        if (!m) continue
+        const suffix = m[1] ?? ""
+        const reportOut = path.join(outDir, `speller-accuracy${suffix}.json`)
+        await Deno.copyFile(path.join(srcTyposreport, entry.name), reportOut)
+        await emit(`speller-suggestions${suffix}.json`, "bash", [
+          path.join(scripts, "make-spellerbadge-json.sh"),
+          reportOut,
+        ])
+        reports.push(entry.name)
       }
-    } catch { /* dir doesn't exist — nothing to clean up */ }
+    } catch { /* dir doesn't exist — handled below */ }
+    if (reports.length > 0) {
+      logger.info(`Published speller accuracy report(s): ${reports.join(", ")}`)
+    } else {
+      logger.warning("No speller accuracy reports from the speller-test step")
+    }
   }
 }
 
@@ -275,6 +204,13 @@ export async function runLangDocsPublish() {
       await builder.downloadArtifacts("docs/testlogs/*-lemmas.json", ".")
     } catch (e) {
       logger.warning(`No testlogs artifacts: ${e}`)
+    }
+    // docs/typosreport/*.json likewise come from `make check` in the test
+    // step; see generateDocsData.
+    try {
+      await builder.downloadArtifacts("docs/typosreport/*.json", ".")
+    } catch (e) {
+      logger.warning(`No typosreport artifacts: ${e}`)
     }
 
     await generateDocsData(buildConfig, outDir)

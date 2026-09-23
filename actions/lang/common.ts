@@ -169,6 +169,15 @@ export async function runLangTests(opts: {
     } catch (e) {
       logger.warning(`Failed to upload testlogs: ${e}`)
     }
+    // Same for the speller accuracy reports: suggestion-quality.sh and the
+    // test-speller-variant-*.sh scripts write docs/typosreport/report.json /
+    // report-<code>.json with the full typos-*-generated.tsv data and the
+    // speller's config.json — exactly what a local `make check` reports.
+    try {
+      await builder.uploadArtifacts("docs/typosreport/*.json")
+    } catch (e) {
+      logger.warning(`Failed to upload typosreport: ${e}`)
+    }
   }
 
   // Exit with the actual test exit code - soft_fail in pipeline config handles continuation
