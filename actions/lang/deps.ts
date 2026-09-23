@@ -178,6 +178,21 @@ async function cloneSibling(
 }
 
 /**
+ * Log the commit a sibling checkout is actually sitting at, so a CI run can be
+ * compared against another run or a developer's local checkout without
+ * guessing from "Updating X..." alone (that line only says a pull was
+ * attempted, not what it landed on).
+ */
+async function logRepoRevision(repoPath: string, name: string): Promise<void> {
+  const log = await new Deno.Command("git", {
+    args: ["log", "-1", "--format=%h %cI %s"],
+    cwd: repoPath,
+  }).output()
+  const rev = new TextDecoder().decode(log.stdout).trim()
+  logger.info(`${name} is at ${rev || "(unknown revision)"}`)
+}
+
+/**
  * Make the language's sibling dependency repos present and current.
  *
  * giella-core is cloned + bootstrapped when missing, not just updated when
@@ -234,6 +249,7 @@ export async function ensureLangDependencyRepos(opts?: {
       throw new Error("Failed to bootstrap freshly cloned giella-core")
     }
   }
+  await logRepoRevision(giellaCorePath, "giella-core")
 
   logger.info("Building giella-core...")
   const make = new Deno.Command("make", { cwd: giellaCorePath }).spawn()
