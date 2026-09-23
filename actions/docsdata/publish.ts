@@ -83,7 +83,7 @@ export async function runDocsDataPublish() {
       logger.warning(`Failed to generate ${name}`)
     }
 
-    await emit("version.json", [
+    await emit("pkg-version.json", [
       path.join(scripts, "make-version-json.sh"),
       root,
       "FST",

@@ -94,7 +94,7 @@ async function generateDocsData(
     path.join(scripts, "make-maturity.json.sh"),
     await gutRepoName(),
   ])
-  await emit("version.json", "bash", [
+  await emit("pkg-version.json", "bash", [
     path.join(scripts, "make-version-json.sh"),
     root,
     "FST",
