@@ -1110,10 +1110,11 @@ export async function pipelineLang() {
   const extra: Record<string, string> =
     LARGE_BUILDS.includes(builder.env.repoName) ? { size: "large" } : {}
 
-  // Steps that shell out to hfst/cg3 get tagged so the toolchain in use is
-  // visible from the build page. setupGiellaCoreDependencies() does the actual
-  // PATH switch off the same predicate.
-  const toolchainTag = usesRustToolchain() ? " (Rust)" : ""
+  // Steps that shell out to hfst/cg3 are tagged when a repo is opted back to
+  // the C++ toolchain, so the exception is visible from the build page.
+  // setupGiellaCoreDependencies() does the actual PATH switch off the same
+  // predicate.
+  const toolchainTag = usesRustToolchain() ? "" : " (C++)"
 
   // Read build configuration to check if grammar-checkers are enabled
   let buildConfig: BuildProps | undefined

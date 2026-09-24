@@ -10,17 +10,17 @@ const GTLEXTOOLS_SPEC = "git+ssh://git@github.com/divvun/GiellaLTLexTools"
 const DIVVUN_RUST_BIN = "/opt/divvun/bin"
 
 /**
- * Repos switched over to the Rust hfst/cg3. That directory is deliberately
- * left off PATH in the images so the apt C++ tools stay the default; listing a
- * repo here opts its giella build and test steps into the Rust toolchain.
+ * Repos kept on the apt C++ hfst/cg3. Every other repo's giella build and test
+ * steps put the Rust toolchain first on PATH; the images stage it off PATH so
+ * the C++ tools are still there for the repos listed here.
  *
  * `pipelineLang()` reads the same predicate to tag the affected step labels
- * with "(Rust)", so a glance at the build tells you which toolchain ran.
+ * with "(C++)", so a glance at the build tells you which toolchain ran.
  */
-export const RUST_TOOLCHAIN_REPOS = ["lang-kal", "lang-sme"]
+export const CPP_TOOLCHAIN_REPOS: string[] = []
 
 export function usesRustToolchain(): boolean {
-  return RUST_TOOLCHAIN_REPOS.includes(builder.env.repoName)
+  return !CPP_TOOLCHAIN_REPOS.includes(builder.env.repoName)
 }
 
 async function ensureGtlextoolsVenv(): Promise<void> {
