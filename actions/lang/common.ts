@@ -112,7 +112,7 @@ export async function downloadAndExtractSpellerSnapshot(): Promise<void> {
  * snapshot keeps its build-machine mtimes, so make treats the compiled
  * artifacts as up to date and recompiles nothing.
  *
- * Shared by the test step and the docs-publish step, which both need a
+ * Shared by the test steps and the proofing-build step, which all need a
  * ready-to-`make` tree without a full rebuild.
  */
 export async function restoreBuiltWorkspace(

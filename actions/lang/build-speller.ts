@@ -6,6 +6,7 @@ import logger from "~/util/log.ts"
 import { Tar } from "~/util/shared.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
 import { setupGiellaCoreDependencies } from "./common.ts"
+import { uploadPkgVariants } from "./docs-publish.ts"
 
 class Autotools {
   private directory: string
@@ -172,6 +173,11 @@ export default async function langSpellerBuild(
   })
 
   await builder.uploadArtifacts("build/tools/spellcheckers/*.zhfst")
+
+  // For the docs-publish step, which has no configured tree of its own.
+  if (builder.env.branch === "main") {
+    await uploadPkgVariants()
+  }
 
   const hfstolFiles = await globFiles("build/src/fst/*.hfstol")
   if (hfstolFiles.length > 0) {

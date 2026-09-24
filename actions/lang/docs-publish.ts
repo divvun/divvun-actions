@@ -6,10 +6,10 @@ import { GitHub } from "~/util/github.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
 import { makeTempDir } from "~/util/temp.ts"
-import { restoreBuiltWorkspace } from "./common.ts"
 import { readTestlogs, type TestlogsManifest } from "./testlogs.ts"
 import {
   buildLogUrl,
+  giellaCoreScripts,
   gutRepoName,
   publishGeneratedDocsData,
   run,
@@ -51,16 +51,57 @@ async function buildTestlogs(
   }
 }
 
-// --- badge + report generation ------------------------------------------
+// --- pkg-variants.json ----------------------------------------------------
 
-const GTCORE = path.join("..", "giella-core")
+const PKG_VARIANTS = "pkg-variants.json"
+
+/**
+ * Generate `pkg-variants.json` and upload it as an artifact for the
+ * docs-publish step. Called from the speller-build step, the one place the
+ * tree is already configured: the file needs configure-substituted make vars
+ * (DIALECTS, AREAS, ALT_ORTHS, ...), so it can only come from `make`, and
+ * generating it here saves docs-publish from restoring the workspace
+ * snapshot, setting up every sibling repo and re-running configure just for
+ * this one file. Best-effort: a failure only means the docs site has no
+ * variant list for this build.
+ */
+export async function uploadPkgVariants(): Promise<void> {
+  const root = Deno.cwd()
+  if (
+    !(await run("bash", ["-c", `make -j$(nproc) badgedata/${PKG_VARIANTS}`], {
+      cwd: path.join(root, "build", "docs"),
+    }))
+  ) {
+    logger.warning(`Failed to generate ${PKG_VARIANTS}`)
+    return
+  }
+
+  // VPATH build: the recipe writes to $(srcdir), but fall back to builddir.
+  for (const dir of ["docs/badgedata", "build/docs/badgedata"]) {
+    if (await fs.exists(path.join(root, dir, PKG_VARIANTS))) {
+      try {
+        await builder.uploadArtifacts(PKG_VARIANTS, {
+          cwd: path.join(root, dir),
+        })
+      } catch (e) {
+        logger.warning(`Failed to upload ${PKG_VARIANTS}: ${e}`)
+      }
+      return
+    }
+  }
+  logger.warning(`make succeeded but produced no ${PKG_VARIANTS}`)
+}
+
+// --- badge + report generation ------------------------------------------
 
 /**
  * Regenerate the badge JSON into `outDir` (plus `speller-accuracy*.json`) by
  * calling the giella-core scripts directly (same invocations as
  * am-shared/docs-dir-include.am). The Class 1 badges (FST + grammar-checker
- * version/rule-count) need no FST build; the `speller-suggestions` badges are
- * derived from the accuracy reports described below.
+ * version/rule-count) read the repo's sources and need no build; the
+ * `speller-suggestions` badges are derived from the accuracy reports
+ * described below; `pkg-variants.json` comes from the speller-build step
+ * (`uploadPkgVariants`).
  *
  * The accuracy reports themselves (`speller-accuracy.json` and, for
  * dialect/area/alt-orth/alt-writing-system languages,
@@ -69,17 +110,13 @@ const GTCORE = path.join("..", "giella-core")
  * and test-speller-variant-*.sh, using typos-*-generated.tsv and the speller's
  * config.json) and uploads them as artifacts, so the published numbers match
  * a local `make check` by construction.
- *
- * TODO(CI): `pkg-variants.json` needs autoconf-substituted vars (DIALECTS,
- * AREAS, ...) — generated via `make` below; verify the target name against a
- * real build.
  */
 async function generateDocsData(
   buildConfig: BuildProps,
+  scripts: string,
   outDir: string,
 ): Promise<void> {
   const root = Deno.cwd()
-  const scripts = path.join(GTCORE, "scripts")
 
   const emit = async (name: string, cmd: string, args: string[]) => {
     if (await run(cmd, args, { outFile: path.join(outDir, name) })) return
@@ -115,30 +152,10 @@ async function generateDocsData(
     root,
   ])
 
-  // pkg-variants.json needs configure-substituted make vars, so go through make.
-  if (
-    await run("bash", ["-c", "make -j$(nproc) badgedata/pkg-variants.json"], {
-      cwd: path.join(root, "build", "docs"),
-    })
-  ) {
-    // VPATH build: make may land it in builddir or (fallback) srcdir.
-    const made = [
-      "build/docs/badgedata/pkg-variants.json",
-      "docs/badgedata/pkg-variants.json",
-    ]
-    let copied = false
-    for (const cand of made) {
-      if (await fs.exists(cand)) {
-        await Deno.copyFile(cand, path.join(outDir, "pkg-variants.json"))
-        copied = true
-        break
-      }
-    }
-    if (!copied) {
-      logger.warning("make succeeded but produced no pkg-variants.json")
-    }
-  } else {
-    logger.warning("Failed to generate pkg-variants.json")
+  try {
+    await builder.downloadArtifacts(PKG_VARIANTS, outDir)
+  } catch (e) {
+    logger.warning(`No ${PKG_VARIANTS} from the speller-build step: ${e}`)
   }
 
   if (buildConfig.spellers) {
@@ -179,8 +196,10 @@ export async function runLangDocsPublish() {
   ) as { build?: BuildProps }
   const buildConfig = config?.build ?? {} as BuildProps
 
-  // Restore the same built + configured tree the speller-test step uses.
-  await restoreBuiltWorkspace("speller-configure-flags")
+  // Nothing here needs a built or configured tree, or any sibling repo: the
+  // badge scripts read this checkout's sources, and everything that does come
+  // out of the build (pkg-variants.json, testlogs, accuracy reports) is
+  // downloaded as an artifact of the step that made it.
 
   if (!builder.env.repo) {
     throw new Error("No repository information available")
@@ -195,6 +214,7 @@ export async function runLangDocsPublish() {
   // Everything to publish is assembled in one throwaway directory, flat, under
   // its final name — nothing is written into the checkout's tracked paths.
   const outDir = (await makeTempDir({ prefix: "docs-data-" })).path
+  const workDir = (await makeTempDir({ prefix: "docs-data-work-" })).path
   try {
     // testlogs/*-lemmas.json are produced by `make check` in the test step
     // (gtlemmatest/gtspelltest -J), which uploads them as artifacts. A repo
@@ -213,11 +233,16 @@ export async function runLangDocsPublish() {
       logger.warning(`No typosreport artifacts: ${e}`)
     }
 
-    await generateDocsData(buildConfig, outDir)
+    await generateDocsData(
+      buildConfig,
+      await giellaCoreScripts(workDir),
+      outDir,
+    )
     await buildTestlogs("docs/testlogs", outDir)
 
     await publishGeneratedDocsData(gh, outDir, repoMeta)
   } finally {
     await Deno.remove(outDir, { recursive: true }).catch(() => {})
+    await Deno.remove(workDir, { recursive: true }).catch(() => {})
   }
 }

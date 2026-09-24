@@ -57,6 +57,57 @@ export async function run(
   return (await proc.spawn().status).code === 0
 }
 
+/**
+ * giella-core's `scripts/` directory, for the badge scripts
+ * (`make-version-json.sh`, `make-lemmacount.json.sh`, ...). These read the
+ * repo's own sources (configure.ac, the lexc files) or the GitHub API directly
+ * and need neither a configured tree nor giella-core's `make`, so a plain
+ * shallow clone is all they need.
+ *
+ * Cloned fresh into `workDir` rather than reusing a `../giella-core` sibling
+ * the agent may have from an earlier build: a sibling can sit at any old
+ * commit, and pulling it (or any other sibling) is not this step's business.
+ * giella-core itself uses its own checkout.
+ */
+export async function giellaCoreScripts(workDir: string): Promise<string> {
+  if (builder.env.repoName === "giella-core") {
+    return path.join(Deno.cwd(), "scripts")
+  }
+
+  // Same scheme/host/owner as this repo's own origin, so the clone rides on
+  // whatever credential (ssh key, token) already fetched it.
+  const origin = await new Deno.Command("git", {
+    args: ["remote", "get-url", "origin"],
+    cwd: Deno.cwd(),
+  }).output()
+  const originUrl = new TextDecoder().decode(origin.stdout).trim()
+  const url = originUrl.replace(/[^/:]+?(\.git)?$/, "giella-core.git")
+
+  const giellaCorePath = path.join(workDir, "giella-core")
+  logger.info(`Cloning giella-core (shallow) from ${url}`)
+  if (
+    !(await run("git", [
+      "clone",
+      "--quiet",
+      "--depth",
+      "1",
+      url,
+      giellaCorePath,
+    ]))
+  ) {
+    throw new Error("Failed to clone giella-core")
+  }
+  const rev = await new Deno.Command("git", {
+    args: ["log", "-1", "--format=%h %cI %s"],
+    cwd: giellaCorePath,
+  }).output()
+  logger.info(
+    `giella-core is at ${new TextDecoder().decode(rev.stdout).trim()}`,
+  )
+
+  return path.join(giellaCorePath, "scripts")
+}
+
 /** giella-core's docs-dir-include.am derives REPONAME from .gut/delta.toml. */
 export async function gutRepoName(): Promise<string> {
   try {

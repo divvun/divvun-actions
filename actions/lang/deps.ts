@@ -197,7 +197,7 @@ async function logRepoRevision(repoPath: string, name: string): Promise<void> {
  *
  * giella-core is cloned + bootstrapped when missing, not just updated when
  * present: a fresh language checkout's own `./autogen.sh` would normally do
- * that cloning, but `restoreBuiltWorkspace()` (docs-publish, tests) never
+ * that cloning, but `restoreBuiltWorkspace()` (tests, proofing-build) never
  * runs autogen.sh -- it configures an already-extracted `build/` snapshot
  * directly. Since `hooks/environment` nested every pipeline's checkout under
  * its own parent dir (so `lang-sma` updating `../lang-sme` can't mutate
@@ -205,7 +205,7 @@ async function logRepoRevision(repoPath: string, name: string): Promise<void> {
  * across every pipeline on an agent, so a repo whose earlier build steps
  * haven't happened to land on this exact agent before has no `../giella-core`
  * sibling at all -- and configure dies outright ("GIELLA_CORE could not be
- * set"), taking docs-publish and the test steps down with it. Whatever the
+ * set"), taking the test steps down with it. Whatever the
  * caller, giella-core is a hard build requirement with no fallback, so a
  * failure to clone or bootstrap it is fatal.
  *
