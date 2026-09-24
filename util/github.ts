@@ -1,5 +1,6 @@
-import { encodeBase64 } from "@std/encoding/base64"
+import * as path from "@std/path"
 import logger from "./log.ts"
+import { makeTempDir } from "./temp.ts"
 
 /** A non-zero `gh api` exit. `status` is the HTTP code when `gh` reported one. */
 export class GitHubApiError extends Error {
@@ -112,77 +113,104 @@ export class GitHub {
   }
 
   /**
-   * Publish a flat set of files to `branch` via the GitHub Git Data API — no
-   * working-tree checkout. Used for the rolling `docs-data` branch (see
-   * docs/badgedata-artifact-migration.md): with `orphan: true` each build
-   * force-pushes a fresh parentless commit, so the branch always holds exactly
-   * the latest build's generated data and never accumulates history.
+   * Replace `branch` with a single parentless commit holding exactly `files`
+   * (flat, at the root), force-pushed with git. Used for the rolling
+   * `generated/docs-data` branch (see docs/badgedata-artifact-migration.md):
+   * each build overwrites it, so it always holds the latest build's data and
+   * never accumulates history.
+   *
+   * A real `git push` rather than the Git Data API: the API's create-blob call
+   * refuses large files (HTTP 422, "your input was too large to process"),
+   * which the full speller accuracy reports can hit. git takes files up to
+   * GitHub's 100 MB limit; a file past that still fails the push, loudly, which
+   * is how we want to find out. It is also one push instead of one API call per
+   * file.
+   *
+   * Authenticates with gh's own credentials (`gh auth git-credential`), so it
+   * pushes as the same identity as every other call here and needs no token
+   * handling of its own. A push rejected for lack of access is raised as a
+   * `GitHubApiError` with status 403, like the API equivalent.
    */
   async publishBranch(
     branch: string,
     files: Array<{ path: string; source: string }>,
-    opts: { message: string; orphan?: boolean },
+    opts: { message: string },
   ): Promise<void> {
     const slug = await this.#canonicalSlug()
+    await using work = await makeTempDir({ prefix: "publish-branch-" })
 
-    const tree: Array<
-      { path: string; mode: "100644"; type: "blob"; sha: string }
-    > = []
     for (const f of files) {
-      const bytes = await Deno.readFile(f.source)
-      const blob = await this.#api(
-        ["-X", "POST", `repos/${slug}/git/blobs`, "--input", "-"],
-        { content: encodeBase64(bytes), encoding: "base64" },
-      ) as { sha: string }
-      tree.push({ path: f.path, mode: "100644", type: "blob", sha: blob.sha })
+      await Deno.copyFile(f.source, path.join(work.path, f.path))
     }
 
-    // No base_tree: the commit is a complete snapshot of `files`.
-    const treeObj = await this.#api(
-      ["-X", "POST", `repos/${slug}/git/trees`, "--input", "-"],
-      { tree },
-    ) as { sha: string }
-
-    let parents: string[] = []
-    if (!opts.orphan) {
-      try {
-        const ref = await this.#api(
-          [`repos/${slug}/git/ref/heads/${branch}`],
-        ) as { object: { sha: string } }
-        parents = [ref.object.sha]
-      } catch {
-        // branch doesn't exist yet — first publish
+    const git = async (args: string[]): Promise<string> => {
+      const { code, stdout, stderr } = await new Deno.Command("git", {
+        args: [
+          // Ignore the agent's global git config where it could interfere.
+          "-c",
+          "commit.gpgsign=false",
+          "-c",
+          "credential.helper=",
+          "-c",
+          "credential.helper=!gh auth git-credential",
+          ...args,
+        ],
+        cwd: work.path,
+        stdout: "piped",
+        stderr: "piped",
+      }).output()
+      const err = new TextDecoder().decode(stderr).trim()
+      if (code !== 0) {
+        const msg = `git ${args[0]} failed (${code}): ${err}`
+        // "Permission to <repo>.git denied to <user>" / "Repository not found"
+        // (GitHub hides a repo you can't write to as not found).
+        if (/denied|403|Repository not found|404/.test(err)) {
+          throw new GitHubApiError(msg, 403)
+        }
+        throw new Error(msg)
       }
+      return new TextDecoder().decode(stdout).trim()
     }
 
-    const commit = await this.#api(
-      ["-X", "POST", `repos/${slug}/git/commits`, "--input", "-"],
-      { message: opts.message, tree: treeObj.sha, parents },
-    ) as { sha: string }
+    // Commit as the token's user, as the API did implicitly. Only cosmetic, so
+    // a lookup failure (e.g. an app token, which has no user) doesn't block.
+    let name = "divvun-actions"
+    let email = "divvun-actions@users.noreply.github.com"
+    try {
+      const { login, id } = await this.#api(["user"]) as {
+        login: string
+        id: number
+      }
+      name = login
+      email = `${id}+${login}@users.noreply.github.com`
+    } catch { /* keep the fallback identity */ }
+
+    await git(["init", "--quiet"])
+    await git(["add", "--all"])
+    await git([
+      "-c",
+      `user.name=${name}`,
+      "-c",
+      `user.email=${email}`,
+      "commit",
+      "--quiet",
+      "--message",
+      opts.message,
+    ])
+    const sha = await git(["rev-parse", "HEAD"])
 
     logger.info(
       `Publishing ${files.length} files to ${slug}@${branch} (${
-        commit.sha.slice(0, 8)
+        sha.slice(0, 8)
       })`,
     )
-
-    try {
-      await this.#api(
-        [
-          "-X",
-          "PATCH",
-          `repos/${slug}/git/refs/heads/${branch}`,
-          "--input",
-          "-",
-        ],
-        { sha: commit.sha, force: true },
-      )
-    } catch {
-      await this.#api(
-        ["-X", "POST", `repos/${slug}/git/refs`, "--input", "-"],
-        { ref: `refs/heads/${branch}`, sha: commit.sha },
-      )
-    }
+    await git([
+      "push",
+      "--quiet",
+      "--force",
+      `https://github.com/${slug}.git`,
+      `HEAD:refs/heads/${branch}`,
+    ])
   }
 
   /**

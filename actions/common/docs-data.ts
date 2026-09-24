@@ -168,18 +168,17 @@ export async function publishGeneratedDocsData(
   // CI status badge would flip to that failure.
   try {
     await gh.publishBranch(DOCS_DATA_BRANCH, files, {
-      orphan: true,
       message: `docs data: ${builder.env.commit?.slice(0, 8) ?? "?"} (build ${
         builder.env.buildNumber ?? "?"
       }) [skip ci]`,
     })
   } catch (e) {
-    // A 404/403 on the Git Data API write means the CI identity (divvunbot)
+    // A rejected push (raised as a 403) means the CI identity (divvunbot)
     // can't push to this repo. divvunbot gets write access through the
     // `GiellaLTstaff` / `GiellaLTusers` teams; a repo created without one of
     // those teams (or with only a project/regional team) hits this. GitHub
-    // masks "authenticated but no write access" as 404 on write endpoints, so
-    // the raw error is misleading — spell the cause out. Still fatal: this is
+    // can mask "authenticated but no write access" as "Repository not found",
+    // so the raw error is misleading — spell the cause out. Still fatal: this is
     // `soft_fail` in the pipeline, so it stays visible without blocking the
     // build, and a silent skip would hide a whole repo's badges going stale.
     // See docs/badgedata-artifact-migration.md.
