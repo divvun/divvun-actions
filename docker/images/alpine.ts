@@ -4,6 +4,7 @@ import {
   b3sum,
   cg3,
   clangSymlinks,
+  foma,
   gh,
   gitLfsInit,
   hfst,
@@ -94,6 +95,7 @@ export default defineImage({
     minisign(),
     pahkatUploader(),
     hfst(),
+    foma(),
     cg3(),
     gitLfsInit(),
     mkdir({

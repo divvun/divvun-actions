@@ -245,9 +245,9 @@ RUN curl -fsSL 'https://pahkat.uit.no/artifacts/thfst-tools_1.0.0-alpha.2_linux_
     bsdtar -xf thfst-tools.txz -C /usr/local && \
     rm thfst-tools.txz
 
-# hfst + foma-rs (dev-latest/main @ 2026-09-15, /opt/divvun/bin, off PATH)
+# hfst (dev-latest @ 2026-09-24, /opt/divvun/bin, off PATH)
 RUN set -eu && \
-    echo 'hfst dev-latest refresh: 2026-09-15' && \
+    echo 'hfst dev-latest refresh: 2026-09-24' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/hfst-rs/releases/tags/dev-latest \
           | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*hfst[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_][^"]*\.tgz"' \
           | head -1 \
@@ -262,11 +262,20 @@ RUN set -eu && \
     test -L /opt/divvun/bin/hfst-lexc || { echo 'hfst install-symlinks produced no symlinks' >&2; exit 1; } && \
     rm -rf /tmp/hfst.tgz /tmp/hfst[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*
 
+# foma-rs (dev-latest @ 2026-09-24, /opt/divvun/bin, off PATH)
 RUN set -eu && \
-    echo 'foma-rs main refresh: 2026-09-15' && \
-    cargo install --locked --git https://github.com/divvun/foma-rs --branch main --bins --root /tmp/foma-install foma && \
-    install -m 755 /tmp/foma-install/bin/foma /tmp/foma-install/bin/flookup /tmp/foma-install/bin/cgflookup /opt/divvun/bin/ && \
-    rm -rf /tmp/foma-install
+    echo 'foma-rs dev-latest refresh: 2026-09-24' && \
+    URL=$(curl -fsSL https://api.github.com/repos/divvun/foma-rs/releases/tags/dev-latest \
+          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_][^"]*\.tgz"' \
+          | head -1 \
+          | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
+    test -n "$URL" || { echo 'no foma asset for x86_64-unknown-linux-musl on dev-latest' >&2; exit 1; } && \
+    echo "installing $URL" && \
+    curl -fsSL "$URL" -o /tmp/foma.tgz && \
+    tar -xf /tmp/foma.tgz -C /tmp && \
+    install -d /opt/divvun/bin && \
+    install -m 755 /tmp/foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*/foma /tmp/foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*/flookup /tmp/foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*/cgflookup /opt/divvun/bin/ && \
+    rm -rf /tmp/foma.tgz /tmp/foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*
 
 # cg3 (dev-latest @ 2026-09-15, /opt/divvun/bin, off PATH)
 RUN set -eu && \
