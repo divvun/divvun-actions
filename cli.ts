@@ -46,6 +46,7 @@ import {
   runRsigncodePublish,
 } from "./pipelines/rsigncode.ts"
 import { pipelineHfstRs, runHfstRsPublish } from "./pipelines/hfst-rs.ts"
+import { pipelineFomaRs, runFomaRsPublish } from "./pipelines/foma-rs.ts"
 import { pipelineCg3Rs, runCg3RsPublish } from "./pipelines/cg3-rs.ts"
 import {
   pipelineDivvunActions,
@@ -442,6 +443,10 @@ async function runPipeline(args: any) {
       await runHfstRsPublish()
       break
     }
+    case "foma-rs-publish": {
+      await runFomaRsPublish()
+      break
+    }
     case "cg3-rs-publish": {
       await runCg3RsPublish()
       break
@@ -809,6 +814,10 @@ export async function createCiPipeline(): Promise<BuildkitePipeline> {
     }
     case "hfst-rs": {
       pipeline = pipelineHfstRs()
+      break
+    }
+    case "foma-rs": {
+      pipeline = pipelineFomaRs()
       break
     }
     case "cg3-rs": {
