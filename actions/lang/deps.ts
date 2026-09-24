@@ -327,13 +327,19 @@ async function tar(args: string[], cwd: string): Promise<void> {
  * giella-core and the configure.ac-declared repos, as they sit in `../`,
  * built -- into `archive`, for `restoreLangDependencyRepos` in later steps.
  *
- * `.git` is left out: configure and make don't need it, and the restore
- * deletes whatever it replaces, so no stale history is left behind to make
- * the extracted tree look like a clone with local edits. Nothing configure or
- * make generates in these repos records their absolute path, so the tree
- * works from whatever directory a later step extracts it into. Corpus repos
- * are not packed: only the speller weighting reads them, and no step that
- * restores rebuilds a speller.
+ * giella-core keeps its `.git`: every FST directory's `.generated/build-inputs`
+ * stamp (giella-core's am-shared/dot-generated-dir.am) records
+ * `git -C $(GTCORE) rev-parse HEAD`, and every FST depends on that stamp. A
+ * giella-core without history makes that `no-git`, which no longer matches the
+ * stamp in speller-build's workspace snapshot, so make would rebuild the whole
+ * tree. The other repos leave `.git` out: nothing in the build reads their
+ * history, and a lang-* dependency's history is large. The restore deletes
+ * whatever it replaces, so an extracted `.git` always matches its tree.
+ *
+ * Nothing configure or make generates in these repos records their absolute
+ * path, so the tree works from whatever directory a later step extracts it
+ * into. Corpus repos are not packed: only the speller weighting reads them,
+ * and no step that restores rebuilds a speller.
  */
 export async function packLangDependencyRepos(archive: string): Promise<void> {
   const parent = path.resolve(Deno.cwd(), "..")
@@ -358,7 +364,8 @@ export async function packLangDependencyRepos(archive: string): Promise<void> {
     "gzip -1",
     "-cpf",
     path.resolve(archive),
-    "--exclude=.git",
+    ...repos.filter((repo) => repo !== "giella-core")
+      .map((repo) => `--exclude=${repo}/.git`),
     ...repos,
   ], parent)
   const { size } = await Deno.stat(archive)
