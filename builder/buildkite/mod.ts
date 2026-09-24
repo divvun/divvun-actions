@@ -2,6 +2,7 @@
 // Buildkite implementation of the builder interface
 
 import * as path from "@std/path"
+import { TextLineStream } from "@std/streams"
 import { buildkite as getEnv, Env } from "~/util/env.ts"
 import logger from "~/util/log.ts"
 import { OpenBao, SecretsStore } from "~/util/openbao.ts"
@@ -252,16 +253,42 @@ export async function uploadArtifacts(
   // lands at the artifact root. Pass preserveAbsolutePath to keep the old
   // full-path behaviour.
   if (path.isAbsolute(filePath) && !preserveAbsolutePath) {
-    await exec(
-      "buildkite-agent",
-      ["artifact", "upload", path.basename(filePath)],
-      { cwd: path.dirname(filePath) },
-    )
+    await agentArtifactUpload(path.basename(filePath), path.dirname(filePath))
     return
   }
-  await exec("buildkite-agent", ["artifact", "upload", filePath], {
+  await agentArtifactUpload(filePath, cwd)
+}
+
+/**
+ * `buildkite-agent artifact upload`, with its log (stderr) streamed through
+ * line by line so its timings read `upload=3.43s` rather than Go's
+ * full-precision `upload=3.428451129s`.
+ */
+async function agentArtifactUpload(filePath: string, cwd?: string) {
+  const args = ["artifact", "upload", filePath]
+  const proc = new Deno.Command("buildkite-agent", {
+    args,
     cwd,
-  })
+    stderr: "piped",
+  }).spawn()
+  const lines = proc.stderr
+    .pipeThrough(new TextDecoderStream())
+    .pipeThrough(new TextLineStream())
+  for await (const line of lines) {
+    const tidy = line.replace(
+      /(\d+\.\d+)(ms|s)\b/g,
+      (_, n: string, unit: string) => Number(n).toFixed(2) + unit,
+    )
+    await Deno.stderr.write(encoder.encode(tidy + "\n"))
+  }
+  const status = await proc.status
+  if (status.code !== 0) {
+    throw new Error(
+      `Process 'buildkite-agent ${
+        JSON.stringify(args)
+      }' exited with code ${status.code}`,
+    )
+  }
 }
 
 export async function downloadArtifacts(path: string, outputDir: string) {
