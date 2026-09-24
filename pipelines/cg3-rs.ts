@@ -4,6 +4,7 @@ import * as toml from "@std/toml"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
+import { downloadBinary, downloadBinaryCmd } from "~/util/artifact_download.ts"
 import { assetFileName, assetStem } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
@@ -65,9 +66,6 @@ function createSignStep(target: string, buildKey: string): CommandStep {
   const steps: string[] = []
   for (const name of BINARIES) {
     const src = `target/${target}/release/${name}${ext}`
-    const downloadPath = isWindows
-      ? `target\\${target}\\release\\${name}${ext}`
-      : src
     const signed = `signed/${src}`
     const signCmd = isWindows
       ? `divvun-actions sign ${src}`
@@ -75,7 +73,7 @@ function createSignStep(target: string, buildKey: string): CommandStep {
 
     steps.push(
       `echo '--- Downloading ${name} (unsigned)'`,
-      `buildkite-agent artifact download '${downloadPath}' .`,
+      downloadBinaryCmd(src),
       `echo '--- Signing ${name}'`,
       signCmd,
       `mkdir -p signed/target/${target}/release`,
@@ -258,10 +256,8 @@ export async function runCg3RsPublish() {
           )
         }
 
-        // The Windows agent stores the artifact key with backslashes.
-        const sep = isWindows ? "\\" : "/"
-        return builder.downloadArtifacts(
-          `target${sep}${target}${sep}release${sep}${name}${ext}`,
+        return downloadBinary(
+          `target/${target}/release/${name}${ext}`,
           tempDir.path,
         )
       })

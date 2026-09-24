@@ -7,7 +7,7 @@ import * as targetModule from "~/target.ts"
 import { assetFileName, assetStem } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
-import logger from "~/util/log.ts"
+import { downloadBinary, downloadBinaryCmd } from "~/util/artifact_download.ts"
 import { Tar, versionAsDev, Zip } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
@@ -52,34 +52,6 @@ function binariesFor(target: string): readonly string[] {
 function binaryPath(target: string, name: string): string {
   const ext = target.includes("windows") ? ".exe" : ""
   return `target/${target}/release/${name}${ext}`
-}
-
-/**
- * Buildkite records an artifact's path as the uploading agent wrote it, so the
- * same binary can be stored as `target/.../outto.exe` or `target\...\outto.exe`
- * depending on which agent produced it. Pinning either shape breaks the other:
- * 0ff76e6 pinned backslashes and publish then found nothing for targets whose
- * artifacts were stored forward-slashed.
- *
- * Try the canonical forward-slash path, fall back to backslashes.
- */
-async function downloadBinary(artifactPath: string, outputDir: string) {
-  try {
-    await builder.downloadArtifacts(artifactPath, outputDir)
-  } catch (err) {
-    const alt = artifactPath.replaceAll("/", "\\")
-    if (alt === artifactPath) throw err
-    logger.warning(`No artifact at ${artifactPath}; retrying as ${alt}`)
-    await builder.downloadArtifacts(alt, outputDir)
-  }
-}
-
-/** Shell form of [downloadBinary], for steps that run buildkite-agent directly. */
-function downloadBinaryCmd(artifactPath: string): string {
-  const alt = artifactPath.replaceAll("/", "\\")
-  const primary = `buildkite-agent artifact download '${artifactPath}' .`
-  if (alt === artifactPath) return primary
-  return `${primary} || buildkite-agent artifact download '${alt}' .`
 }
 
 function createSignStep(

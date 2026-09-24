@@ -4,6 +4,7 @@ import * as toml from "@std/toml"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
+import { downloadBinary, downloadBinaryCmd } from "~/util/artifact_download.ts"
 import { assetFileName, assetStem } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
@@ -61,10 +62,6 @@ function createSignStep(
   const src = `target/${target}/release/${name}`
   const signedPath = `signed/${src}`
 
-  const downloadPath = platform === "windows"
-    ? `target\\${target}\\release\\${name}`
-    : src
-
   const signCommand = platform === "windows"
     ? `divvun-actions sign ${src}`
     : `divvun-actions run macos-sign ${src}`
@@ -75,7 +72,7 @@ function createSignStep(
     agents: { queue: "linux" },
     command: [
       "echo '--- Downloading unsigned binary'",
-      `buildkite-agent artifact download '${downloadPath}' .`,
+      downloadBinaryCmd(src),
       "echo '--- Signing'",
       signCommand,
       "echo '--- Uploading signed binary'",
@@ -251,12 +248,7 @@ export async function runHfstRsPublish() {
         )
       }
 
-      // The Windows agent stores the artifact key with backslashes.
-      const sep = isWindows ? "\\" : "/"
-      return builder.downloadArtifacts(
-        `target${sep}${target}${sep}release${sep}${name}`,
-        tempDir.path,
-      )
+      return downloadBinary(`target/${target}/release/${name}`, tempDir.path)
     }),
   )
 
