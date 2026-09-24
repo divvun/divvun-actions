@@ -4,7 +4,8 @@ import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
 import {
   downloadAndExtractSpellerSnapshot,
-  setupGiellaCoreDependencies,
+  downloadAndRestoreDependencySnapshot,
+  setupLangToolchain,
 } from "./common.ts"
 
 class Autotools {
@@ -134,7 +135,10 @@ export default async function langGrammarBuild(
   // build. This prevents make from trying to rebuild speller targets.
   await downloadAndExtractSpellerSnapshot()
 
-  await setupGiellaCoreDependencies()
+  // Build against the dependency repos speller-build used, not whatever is
+  // current now.
+  await setupLangToolchain()
+  await downloadAndRestoreDependencySnapshot()
 
   const flags = deriveAutogenFlags(buildConfig)
   await builder.setMetadata("grammar-configure-flags", flags.join(" "))

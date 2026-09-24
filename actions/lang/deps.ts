@@ -15,12 +15,12 @@ import logger from "~/util/log.ts"
  * reads those declarations and makes the siblings present and current, so no
  * action hard-codes its own repo list.
  *
- * Division of labour with the language's own autogen.sh: autogen already
- * clones AND bootstraps (autogen + configure) any missing build dependency, so
- * a missing build dep is left to it. What autogen never touches is (a) keeping
- * an existing checkout current -- the source of "speller rejects lemmas the
- * lexicon accepts" on long-lived agents -- and (b) the corpus repos. Those two
- * jobs are this module's.
+ * Only the steps that build from scratch (speller-build, tts-textproc-build,
+ * the combined build) resolve these repos. speller-build then packs the build
+ * dependencies it built against (`packLangDependencyRepos`) and every later
+ * step unpacks that exact tree over its own siblings
+ * (`restoreLangDependencyRepos`), so one build uses one set of dependency
+ * commits, however many agents its steps land on.
  */
 
 async function gitPull(repoPath: string): Promise<boolean> {
@@ -195,23 +195,19 @@ async function logRepoRevision(repoPath: string, name: string): Promise<void> {
 /**
  * Make the language's sibling dependency repos present and current.
  *
+ * For the steps that build from scratch. Steps that continue from
+ * speller-build's snapshot use `restoreLangDependencyRepos` instead.
+ *
  * giella-core is cloned + bootstrapped when missing, not just updated when
- * present: a fresh language checkout's own `./autogen.sh` would normally do
- * that cloning, but `restoreBuiltWorkspace()` (tests, proofing-build) never
- * runs autogen.sh -- it configures an already-extracted `build/` snapshot
- * directly. Since `hooks/environment` nested every pipeline's checkout under
- * its own parent dir (so `lang-sma` updating `../lang-sme` can't mutate
- * `lang-sme`'s own checkout mid-build), that parent is no longer shared
- * across every pipeline on an agent, so a repo whose earlier build steps
- * haven't happened to land on this exact agent before has no `../giella-core`
- * sibling at all -- and configure dies outright ("GIELLA_CORE could not be
- * set"), taking the test steps down with it. Whatever the
- * caller, giella-core is a hard build requirement with no fallback, so a
- * failure to clone or bootstrap it is fatal.
+ * present, rather than leaving the clone to the language's own autogen.sh:
+ * `hooks/environment` gives every pipeline its own checkout parent, so a
+ * pipeline's first build on an agent starts with no siblings at all, and
+ * giella-core is a hard build requirement with no fallback. A failure to
+ * clone or bootstrap it is fatal.
  *
  * Declared shared-* repos (configure.ac's gt_USE_SHARED / gt_NEED_SHARED) get
- * the same clone-when-missing treatment as giella-core, for the same reason
- * -- but best-effort, not fatal: a plain gt_USE_SHARED only downgrades to a
+ * the same clone-when-missing treatment as giella-core -- but best-effort,
+ * not fatal: a plain gt_USE_SHARED only downgrades to a
  * configure *warning* when the directory is absent, so a failed clone there
  * is harmless. gt_NEED_SHARED (a handful of repos, adding a pkg-config
  * version floor on top) is NOT harmless -- it hard-errors
@@ -307,5 +303,130 @@ export async function ensureLangDependencyRepos(opts?: {
           `the speller weighting will use the in-tree corpus`,
       )
     }
+  }
+}
+
+/** Build metadata key: `{repo: commit}` for the repos in the snapshot. */
+const DEPENDENCY_REVISIONS_METADATA = "lang-dependency-revisions"
+
+async function tar(args: string[], cwd: string): Promise<void> {
+  const proc = new Deno.Command("tar", {
+    args,
+    cwd,
+    stdout: "inherit",
+    stderr: "inherit",
+  }).spawn()
+  const code = (await proc.status).code
+  if (code !== 0) {
+    throw new Error(`tar ${args[0]} failed with exit code ${code}`)
+  }
+}
+
+/**
+ * Pack the build dependencies this checkout was just built against --
+ * giella-core and the configure.ac-declared repos, as they sit in `../`,
+ * built -- into `archive`, for `restoreLangDependencyRepos` in later steps.
+ *
+ * `.git` is left out: configure and make don't need it, and the restore
+ * deletes whatever it replaces, so no stale history is left behind to make
+ * the extracted tree look like a clone with local edits. Nothing configure or
+ * make generates in these repos records their absolute path, so the tree
+ * works from whatever directory a later step extracts it into. Corpus repos
+ * are not packed: only the speller weighting reads them, and no step that
+ * restores rebuilds a speller.
+ */
+export async function packLangDependencyRepos(archive: string): Promise<void> {
+  const parent = path.resolve(Deno.cwd(), "..")
+  const repos: string[] = []
+  const revisions: Record<string, string> = {}
+  for (const repo of ["giella-core", ...(await declaredDependencyRepos())]) {
+    const repoPath = path.join(parent, repo)
+    if (!(await fs.exists(repoPath))) {
+      continue
+    }
+    repos.push(repo)
+    const rev = await new Deno.Command("git", {
+      args: ["rev-parse", "HEAD"],
+      cwd: repoPath,
+    }).output()
+    revisions[repo] = new TextDecoder().decode(rev.stdout).trim() || "unknown"
+  }
+
+  logger.info(`Packing dependency repos: ${repos.join(", ")}`)
+  await tar([
+    "-I",
+    "gzip -1",
+    "-cpf",
+    path.resolve(archive),
+    "--exclude=.git",
+    ...repos,
+  ], parent)
+  const { size } = await Deno.stat(archive)
+  logger.info(
+    `${path.basename(archive)} is ${(size / 1024 / 1024).toFixed(1)} MiB`,
+  )
+
+  await builder.setMetadata(
+    DEPENDENCY_REVISIONS_METADATA,
+    JSON.stringify(revisions),
+  )
+}
+
+/**
+ * Unpack an archive made by `packLangDependencyRepos` into `destDir` (by
+ * default this checkout's parent, where configure looks for the siblings),
+ * deleting each repo it contains first so what's left is exactly what the
+ * packing step built against. `repos` limits the unpack to those repos.
+ *
+ * Deleting is only ever correct for disposable CI checkouts; outside CI an
+ * existing directory in the way is an error, never removed.
+ */
+export async function restoreLangDependencyRepos(
+  archive: string,
+  opts?: { destDir?: string; repos?: string[] },
+): Promise<void> {
+  const destDir = opts?.destDir ?? path.resolve(Deno.cwd(), "..")
+
+  const list = await new Deno.Command("tar", {
+    args: ["-tzf", archive],
+  }).output()
+  if (list.code !== 0) {
+    throw new Error(`Failed to list ${archive}`)
+  }
+  const packed = new Set(
+    new TextDecoder().decode(list.stdout).split("\n")
+      .map((entry) => entry.replace(/^\.\//, "").split("/")[0])
+      .filter((name) => name !== "" && name !== "."),
+  )
+  const repos = opts?.repos ?? [...packed]
+  for (const repo of repos) {
+    if (!packed.has(repo)) {
+      throw new Error(`${repo} is not in ${archive}`)
+    }
+    const repoPath = path.join(destDir, repo)
+    if (!(await fs.exists(repoPath))) {
+      continue
+    }
+    if (!checkoutsAreDisposable()) {
+      throw new Error(
+        `${repoPath} already exists; refusing to replace it outside CI`,
+      )
+    }
+    logger.info(`Removing ${repoPath} to replace it from the snapshot`)
+    await Deno.remove(repoPath, { recursive: true })
+  }
+
+  logger.info(`Unpacking dependency repos into ${destDir}: ${repos.join(", ")}`)
+  await tar(["-xpf", path.resolve(archive), ...repos], destDir)
+
+  try {
+    const revisions = JSON.parse(
+      await builder.metadata(DEPENDENCY_REVISIONS_METADATA),
+    ) as Record<string, string>
+    for (const repo of repos) {
+      logger.info(`${repo} is at ${revisions[repo] ?? "(unknown revision)"}`)
+    }
+  } catch (e) {
+    logger.warning(`Could not read the dependency revisions: ${e}`)
   }
 }

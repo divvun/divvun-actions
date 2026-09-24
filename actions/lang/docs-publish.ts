@@ -6,10 +6,10 @@ import { GitHub } from "~/util/github.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
 import { makeTempDir } from "~/util/temp.ts"
+import { downloadAndRestoreDependencySnapshot } from "./common.ts"
 import { readTestlogs, type TestlogsManifest } from "./testlogs.ts"
 import {
   buildLogUrl,
-  giellaCoreScripts,
   gutRepoName,
   publishGeneratedDocsData,
   run,
@@ -198,8 +198,9 @@ export async function runLangDocsPublish() {
 
   // Nothing here needs a built or configured tree, or any sibling repo: the
   // badge scripts read this checkout's sources, and everything that does come
-  // out of the build (pkg-variants.json, testlogs, accuracy reports) is
-  // downloaded as an artifact of the step that made it.
+  // out of the build (pkg-variants.json, testlogs, accuracy reports, and the
+  // giella-core the scripts come from) is downloaded as an artifact of the
+  // step that made it.
 
   if (!builder.env.repo) {
     throw new Error("No repository information available")
@@ -233,9 +234,15 @@ export async function runLangDocsPublish() {
       logger.warning(`No typosreport artifacts: ${e}`)
     }
 
+    // giella-core's scripts from speller-build's dependency snapshot, so the
+    // badges come from the giella-core this build used, with no git access.
+    await downloadAndRestoreDependencySnapshot({
+      destDir: workDir,
+      repos: ["giella-core"],
+    })
     await generateDocsData(
       buildConfig,
-      await giellaCoreScripts(workDir),
+      path.join(workDir, "giella-core", "scripts"),
       outDir,
     )
     await buildTestlogs("docs/testlogs", outDir)

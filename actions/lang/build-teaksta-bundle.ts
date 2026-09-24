@@ -4,7 +4,10 @@ import * as builder from "~/builder.ts"
 import { globFiles } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
-import { setupGiellaCoreDependencies } from "./common.ts"
+import {
+  downloadAndRestoreDependencySnapshot,
+  setupLangToolchain,
+} from "./common.ts"
 
 /**
  * Build the teaksta (Konteaksta) divvun-runtime bundle for a language.
@@ -27,9 +30,9 @@ import { setupGiellaCoreDependencies } from "./common.ts"
  * - `$LANG_SME/src/cg3` and `$SHARED_SMI/src/cg3` — the CG grammar sources the
  *   script flattens (CG-3 `INCLUDE` is textual inclusion, and the runtime
  *   resolves it against the loader's cwd, which inside a .drb is not the asset
- *   store). The language's own sources are in the checkout;
- *   `setupGiellaCoreDependencies()` makes the shared sibling present and
- *   current, since configure.ac declares it via `gt_USE_SHARED`.
+ *   store). The language's own sources are in the checkout; the shared
+ *   sibling comes from speller-build's dependency snapshot, since
+ *   configure.ac declares it via `gt_USE_SHARED`.
  *
  * With `assets/` assembled, `divvun-runtime bundle` packages it against
  * `pipeline.ts` into `bundle.drb`.
@@ -120,22 +123,23 @@ export default async function langTeakstaBundleBuild(
     )
   }
 
-  // Brings the shared-* siblings declared in configure.ac up to date, which is
-  // where the shared CG grammars the assemble script flattens live.
-  await setupGiellaCoreDependencies()
+  // The shared-* siblings declared in configure.ac, as speller-build used
+  // them: where the shared CG grammars the assemble script flattens live.
+  await setupLangToolchain()
+  await downloadAndRestoreDependencySnapshot()
 
   const zcheckDir = await unpackZcheck()
 
-  // ensureLangDependencyRepos() updates an existing sibling but leaves a
-  // missing one to autogen.sh, which this action never runs — so say so
-  // plainly rather than letting the assemble script fail later with
-  // "unresolved INCLUDEs remain".
+  // speller-build clones declared siblings best-effort, so one it couldn't
+  // clone is missing from the snapshot too — say so plainly rather than
+  // letting the assemble script fail later with "unresolved INCLUDEs remain".
   const sharedSmi = path.resolve(Deno.cwd(), "..", "shared-smi")
   if (!(await fs.exists(sharedSmi))) {
     throw new Error(
       `${sharedSmi} is not checked out; the teaksta bundle's CG grammars ` +
-        `INCLUDE files from it. It is normally cloned as a sibling by the ` +
-        `speller build's autogen.sh.`,
+        `INCLUDE files from it. It comes from the speller-build step's ` +
+        `dependency snapshot, so check that step's log for why it was not ` +
+        `cloned.`,
     )
   }
 

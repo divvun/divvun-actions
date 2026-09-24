@@ -2,7 +2,11 @@ import * as path from "@std/path"
 import * as fs from "@std/fs"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
-import { ensureLangDependencyRepos } from "./deps.ts"
+import { makeTempDir } from "~/util/temp.ts"
+import {
+  ensureLangDependencyRepos,
+  restoreLangDependencyRepos,
+} from "./deps.ts"
 
 const GTLEXTOOLS_SPEC = "git+ssh://git@github.com/divvun/GiellaLTLexTools"
 
@@ -70,8 +74,12 @@ async function ensureGtlextoolsVenv(): Promise<void> {
   builder.addPath(venvBin)
 }
 
-export async function setupGiellaCoreDependencies(): Promise<void> {
-  // Prepend before anything else runs: giella-core's make below, and every
+/**
+ * The tools a giella build or test step runs, without the sibling repos: the
+ * Rust hfst/cg3 on PATH for the repos using them, and GiellaLTLexTools.
+ */
+export async function setupLangToolchain(): Promise<void> {
+  // Prepend before anything else runs: giella-core's make, and every
   // autogen/configure/make in the callers, are spawned without an explicit
   // env and so inherit this process's PATH.
   if (usesRustToolchain()) {
@@ -80,8 +88,43 @@ export async function setupGiellaCoreDependencies(): Promise<void> {
   }
 
   await ensureGtlextoolsVenv()
+}
+
+/** Toolchain plus freshly resolved sibling repos, for the steps that build
+ * from scratch. */
+export async function setupGiellaCoreDependencies(): Promise<void> {
+  await setupLangToolchain()
 
   await ensureLangDependencyRepos()
+}
+
+/**
+ * The speller-build step's sibling dependency repos (giella-core, declared
+ * shared-*), built, as `packLangDependencyRepos` packed them. A separate
+ * artifact from the workspace snapshot so a step that needs only the
+ * dependencies doesn't download the whole built tree.
+ */
+export const DEPENDENCY_SNAPSHOT = "workspace-deps.tar.gz"
+
+/**
+ * Download the speller-build step's dependency snapshot and unpack it over
+ * this checkout's siblings (or into `opts.destDir`), so this step builds and
+ * tests against exactly the dependency commits speller-build used, with no
+ * git network access of its own.
+ */
+export async function downloadAndRestoreDependencySnapshot(
+  opts?: { destDir?: string; repos?: string[] },
+): Promise<void> {
+  const workDir = (await makeTempDir({ prefix: "workspace-deps-" })).path
+  try {
+    await builder.downloadArtifacts(DEPENDENCY_SNAPSHOT, workDir)
+    await restoreLangDependencyRepos(
+      path.join(workDir, DEPENDENCY_SNAPSHOT),
+      opts,
+    )
+  } finally {
+    await Deno.remove(workDir, { recursive: true }).catch(() => {})
+  }
 }
 
 export async function downloadAndExtractSpellerSnapshot(): Promise<void> {
@@ -107,9 +150,9 @@ export async function downloadAndExtractSpellerSnapshot(): Promise<void> {
 
 /**
  * Restore the built + configured workspace on a fresh agent: download the
- * speller-build snapshot, ensure the giella-core deps, and re-run `configure`
- * (not autogen) so the Makefiles carry this agent's absolute paths. The
- * snapshot keeps its build-machine mtimes, so make treats the compiled
+ * speller-build workspace and dependency snapshots, and re-run `configure`
+ * (not autogen) so the Makefiles carry this agent's absolute paths. Both
+ * snapshots keep their build-machine mtimes, so make treats the compiled
  * artifacts as up to date and recompiles nothing.
  *
  * Shared by the test steps and the proofing-build step, which all need a
@@ -120,7 +163,8 @@ export async function restoreBuiltWorkspace(
 ): Promise<void> {
   await downloadAndExtractSpellerSnapshot()
 
-  await setupGiellaCoreDependencies()
+  await setupLangToolchain()
+  await downloadAndRestoreDependencySnapshot()
 
   const configureFlags = await builder.metadata(configureFlagsMetadataKey)
   logger.info("Running configure")

@@ -5,7 +5,8 @@ import { globFiles } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { Tar } from "~/util/shared.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
-import { setupGiellaCoreDependencies } from "./common.ts"
+import { DEPENDENCY_SNAPSHOT, setupGiellaCoreDependencies } from "./common.ts"
+import { packLangDependencyRepos } from "./deps.ts"
 import { uploadPkgVariants } from "./docs-publish.ts"
 
 class Autotools {
@@ -169,6 +170,13 @@ export default async function langSpellerBuild(
     throw new Error(`tar failed with exit code ${tarStatus.code}`)
   }
   await builder.uploadArtifacts("workspace-speller.tar.gz", {
+    cwd: path.resolve(Deno.cwd(), ".."),
+  })
+
+  // And the sibling repos it was built against, so the later steps use the
+  // same dependency commits instead of each resolving their own.
+  await packLangDependencyRepos(path.join("..", DEPENDENCY_SNAPSHOT))
+  await builder.uploadArtifacts(DEPENDENCY_SNAPSHOT, {
     cwd: path.resolve(Deno.cwd(), ".."),
   })
 
