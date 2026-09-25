@@ -59,9 +59,10 @@ export type RepoBadgeMetadata = {
  * Render `<name>.svg` next to every `<name>.json` in `outDir` that carries a
  * `schemaVersion` (the shields `endpoint` marker): `pkg-maturity`,
  * `fst-lemmacount`, `pkg-version`, `speller-version`, `speller-suggestions` and
- * its `speller-suggestions-<variant>` siblings, `gramcheck-version` and
- * `gramcheck-rules`. `pkg-variants.json` and the `speller-accuracy*.json` /
- * `testlogs*.json` data files have no `schemaVersion` and are skipped.
+ * its `speller-suggestions-<variant>` siblings, `hyphenator-version`,
+ * `gramcheck-version`, `gramcheck-rules` and `tts-textproc-version`.
+ * `pkg-variants.json` and the `speller-accuracy*.json` / `testlogs*.json` data
+ * files have no `schemaVersion` and are skipped.
  */
 export async function renderEndpointBadgeSvgs(outDir: string): Promise<void> {
   let rendered = 0

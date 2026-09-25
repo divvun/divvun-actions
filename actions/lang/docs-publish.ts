@@ -141,11 +141,21 @@ async function generateDocsData(
     root,
     "SPELLER",
   ])
+  await emit("hyphenator-version.json", "bash", [
+    path.join(scripts, "make-version-json.sh"),
+    root,
+    "HYPH",
+  ])
 
   await emit("gramcheck-version.json", "bash", [
     path.join(scripts, "make-version-json.sh"),
     root,
     "GRAMCHECK",
+  ])
+  await emit("tts-textproc-version.json", "bash", [
+    path.join(scripts, "make-version-json.sh"),
+    root,
+    "TTSTEXTPROC",
   ])
   await emit("gramcheck-rules.json", "bash", [
     path.join(scripts, "make-gramcheck-rules-json.sh"),
