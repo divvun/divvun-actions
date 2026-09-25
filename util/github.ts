@@ -122,9 +122,9 @@ export class GitHub {
    * A real `git push` rather than the Git Data API: the API's create-blob call
    * refuses large files (HTTP 422, "your input was too large to process"),
    * which the full speller accuracy reports can hit. git takes files up to
-   * GitHub's 100 MB limit; a file past that still fails the push, loudly, which
-   * is how we want to find out. It is also one push instead of one API call per
-   * file.
+   * GitHub's 100 MB limit; a file past that fails the whole push, so
+   * `publishGeneratedDocsData` holds such files back, pushes the rest, and
+   * then fails. It is also one push instead of one API call per file.
    *
    * Authenticates with gh's own credentials (`gh auth git-credential`), so it
    * pushes as the same identity as every other call here and needs no token

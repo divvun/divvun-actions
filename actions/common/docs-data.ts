@@ -2,6 +2,11 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { GitHub, GitHubApiError } from "~/util/github.ts"
 import { ExpectedError } from "~/util/error.ts"
+import {
+  formatMiB,
+  MAX_PUBLISH_BYTES,
+  partitionBySize,
+} from "~/actions/common/docs-data-files.ts"
 import logger from "~/util/log.ts"
 import {
   renderEndpointBadgeSvgs,
@@ -149,16 +154,35 @@ export async function publishGeneratedDocsData(
     }),
   )
 
-  const files: Array<{ path: string; source: string }> = []
+  const all: Array<{ path: string; source: string; size: number }> = []
   for await (const entry of Deno.readDir(outDir)) {
     if (entry.isFile) {
-      files.push({ path: entry.name, source: path.join(outDir, entry.name) })
+      const source = path.join(outDir, entry.name)
+      all.push({
+        path: entry.name,
+        source,
+        size: (await Deno.stat(source)).size,
+      })
     }
   }
-  files.sort((a, b) => a.path.localeCompare(b.path))
+  all.sort((a, b) => a.path.localeCompare(b.path))
+
+  // A file over GitHub's limit would fail the whole push, so push everything
+  // else (keeping the badges fresh) and fail the step afterwards, loudly —
+  // a file silently missing from the branch would go unnoticed.
+  const { publishable: files, oversized } = partitionBySize(
+    all,
+    MAX_PUBLISH_BYTES,
+  )
 
   logger.info(`Publishing ${files.length} files to ${DOCS_DATA_BRANCH}:`)
   for (const f of files) logger.info(`  ${f.path}`)
+  for (const f of oversized) {
+    logger.error(
+      `  ${f.path} NOT published: ${formatMiB(f.size)}, over the ` +
+        `${formatMiB(MAX_PUBLISH_BYTES)} limit`,
+    )
+  }
 
   // Force-push a fresh orphan commit: the branch is a transport buffer for
   // the latest build's data, not an archive. Files land at the branch root,
@@ -209,5 +233,14 @@ export async function publishGeneratedDocsData(
     } catch (e) {
       logger.warning(`Could not trigger docs rebuild: ${e}`)
     }
+  }
+
+  if (oversized.length > 0) {
+    throw ExpectedError.create(
+      `Not published to ${DOCS_DATA_BRANCH} (GitHub rejects files over ` +
+        `100 MiB; limit here ${formatMiB(MAX_PUBLISH_BYTES)}): ` +
+        oversized.map((f) => `${f.path} (${formatMiB(f.size)})`).join(", ") +
+        `. Everything else was published.`,
+    )
   }
 }

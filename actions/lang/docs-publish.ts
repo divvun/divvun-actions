@@ -14,6 +14,10 @@ import {
   publishGeneratedDocsData,
   run,
 } from "~/actions/common/docs-data.ts"
+import {
+  formatMiB,
+  writeMinifiedGzip,
+} from "~/actions/common/docs-data-files.ts"
 
 // --- testlogs.json --------------------------------------------------------
 
@@ -95,7 +99,7 @@ export async function uploadPkgVariants(): Promise<void> {
 // --- badge + report generation ------------------------------------------
 
 /**
- * Regenerate the badge JSON into `outDir` (plus `speller-accuracy*.json`) by
+ * Regenerate the badge JSON into `outDir` (plus `speller-accuracy*.json.gz`) by
  * calling the giella-core scripts directly (same invocations as
  * am-shared/docs-dir-include.am). The Class 1 badges (FST + grammar-checker
  * version/rule-count) read the repo's sources and need no build; the
@@ -109,7 +113,10 @@ export async function uploadPkgVariants(): Promise<void> {
  * the speller-test step writes them to docs/typosreport/ (suggestion-quality.sh
  * and test-speller-variant-*.sh, using typos-*-generated.tsv and the speller's
  * config.json) and uploads them as artifacts, so the published numbers match
- * a local `make check` by construction.
+ * a local `make check` by construction. They are published minified and
+ * gzipped (`speller-accuracy*.json.gz`): the full reports can pass GitHub's
+ * 100 MB file limit, and gzip shrinks them ~40x. The accuracy viewer inflates
+ * them in the browser.
  */
 async function generateDocsData(
   buildConfig: BuildProps,
@@ -176,11 +183,20 @@ async function generateDocsData(
         const m = entry.isFile && entry.name.match(/^report(-.+)?\.json$/)
         if (!m) continue
         const suffix = m[1] ?? ""
-        const reportOut = path.join(outDir, `speller-accuracy${suffix}.json`)
-        await Deno.copyFile(path.join(srcTyposreport, entry.name), reportOut)
+        const report = path.join(srcTyposreport, entry.name)
+        const outName = `speller-accuracy${suffix}.json.gz`
+        const sizes = await writeMinifiedGzip(
+          report,
+          path.join(outDir, outName),
+        )
+        logger.info(
+          `${outName}: ${formatMiB(sizes.full)} full → ` +
+            `${formatMiB(sizes.minified)} minified → ` +
+            `${formatMiB(sizes.gzipped)} gzipped`,
+        )
         await emit(`speller-suggestions${suffix}.json`, "bash", [
           path.join(scripts, "make-spellerbadge-json.sh"),
-          reportOut,
+          report,
         ])
         reports.push(entry.name)
       }
