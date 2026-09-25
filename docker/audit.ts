@@ -41,13 +41,6 @@ const checks: Check[] = [
     tagToVersion: (t) => t,
   },
   {
-    label: "divvunspell",
-    pinned: versions.divvunspell,
-    repo: "divvun/divvunspell",
-    // release tags look like `divvunspell/v1.0.0-beta.13`
-    tagToVersion: (t) => t.replace(/^divvunspell\/v/, ""),
-  },
-  {
     label: "cmake",
     pinned: versions.cmake,
     repo: "Kitware/CMake",

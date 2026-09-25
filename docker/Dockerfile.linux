@@ -314,11 +314,19 @@ RUN set -eu && \
     rm -rf /tmp/divvun-runtime.tgz /tmp/divvun-runtime[-_]x86[-_]64[-_]unknown[-_]linux[-_]gnu[-_]* && \
     divvun-runtime --version
 
-# divvunspell@1.0.0-beta.13
-RUN curl -fsSL "https://github.com/divvun/divvunspell/releases/download/divvunspell/v1.0.0-beta.13/divvunspell-x86_64-unknown-linux-gnu-v1.0.0-beta.13.tgz" -o divvunspell.tgz && \
-    tar -xf divvunspell.tgz && \
-    install -m 755 divvunspell-x86_64-unknown-linux-gnu-v1.0.0-beta.13/divvunspell /usr/local/bin/divvunspell && \
-    rm -rf divvunspell.tgz divvunspell-x86_64-unknown-linux-gnu-v1.0.0-beta.13 && \
+# divvunspell (dev-latest @ 2026-09-25)
+RUN set -eu && \
+    echo 'divvunspell dev-latest refresh: 2026-09-25' && \
+    URL=$(curl -fsSL https://api.github.com/repos/divvun/divvunspell/releases/tags/dev-latest \
+          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*divvunspell[-_]x86[-_]64[-_]unknown[-_]linux[-_]gnu[-_][^"]*\.tgz"' \
+          | head -1 \
+          | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
+    test -n "$URL" || { echo 'no divvunspell asset for x86_64-unknown-linux-gnu on dev-latest' >&2; exit 1; } && \
+    echo "installing $URL" && \
+    curl -fsSL "$URL" -o /tmp/divvunspell.tgz && \
+    tar -xf /tmp/divvunspell.tgz -C /tmp && \
+    install -m 755 /tmp/divvunspell[-_]x86[-_]64[-_]unknown[-_]linux[-_]gnu[-_]*/divvunspell /usr/local/bin/divvunspell && \
+    rm -rf /tmp/divvunspell.tgz /tmp/divvunspell[-_]x86[-_]64[-_]unknown[-_]linux[-_]gnu[-_]* && \
     divvunspell --version
 
 # minisign@0.12
