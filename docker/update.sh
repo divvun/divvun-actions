@@ -78,37 +78,64 @@ describe_image() {
     echo "$1 (built $(docker image inspect "$1" --format '{{.Created}}' 2>/dev/null || echo unknown))"
 }
 
-# Note the local image before pulling: `docker pull` moves the tag to whatever
-# the registry has, even when that is older than an image built on this host.
+# `docker pull` moves the tag to whatever the registry has, even when that is
+# older than an image built on this host, so look at both before pulling.
 echo "Checking current image..."
 LOCAL_IMAGE_ID=""
 if docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     LOCAL_IMAGE_ID=$(docker image inspect "$IMAGE_NAME" --format '{{.Id}}')
-    echo "  Local image before pull:  $(describe_image "$LOCAL_IMAGE_ID")"
+    echo "  Local image:    $(describe_image "$LOCAL_IMAGE_ID")"
 else
-    echo "  Local image before pull:  none"
+    echo "  Local image:    none"
 fi
 
-echo "Pulling latest image..."
-docker pull "$IMAGE_NAME"
-PULLED_IMAGE_ID=$(docker image inspect "$IMAGE_NAME" --format '{{.Id}}')
-echo "  Registry image:           $(describe_image "$PULLED_IMAGE_ID")"
-
-# The pull leaves the previous image untagged but present, so if it is the
-# newer of the two its ID can take the tag back.
-if [[ -z "$LOCAL_IMAGE_ID" ]]; then
-    echo "  Decision: no local image, using the registry's."
-elif [[ "$LOCAL_IMAGE_ID" == "$PULLED_IMAGE_ID" ]]; then
-    echo "  Decision: local image IS the registry's image, nothing to choose."
+# Read the registry's image without pulling it. A local image ID is the config
+# digest (classic store) or the manifest digest (containerd store).
+echo "Checking registry image..."
+REMOTE_CREATED=""
+if REMOTE_MANIFEST_DIGEST=$(docker buildx imagetools inspect "$IMAGE_NAME" --format '{{.Manifest.Digest}}') \
+    && REMOTE_CONFIG_DIGEST=$(docker buildx imagetools inspect "$IMAGE_NAME" --raw | tr -d ' \n' | grep -o '"config":{[^}]*}' | grep -o 'sha256:[0-9a-f]*') \
+    && REMOTE_CREATED=$(docker buildx imagetools inspect "$IMAGE_NAME" --format '{{json .Image.Created}}' | tr -d '"'); then
+    echo "  Registry image: $REMOTE_CONFIG_DIGEST (built $REMOTE_CREATED, manifest $REMOTE_MANIFEST_DIGEST)"
 else
+    REMOTE_CREATED=""
+    echo "  Registry image: could not be inspected without pulling; will pull and compare"
+fi
+
+PULL=true
+if [[ -z "$LOCAL_IMAGE_ID" ]]; then
+    echo "  Decision: no local image, pulling the registry's."
+elif [[ -n "$REMOTE_CREATED" ]]; then
     LOCAL_CREATED=$(image_created_epoch "$LOCAL_IMAGE_ID")
-    PULLED_CREATED=$(image_created_epoch "$PULLED_IMAGE_ID")
-    echo "  Build times (epoch): local $LOCAL_CREATED, registry $PULLED_CREATED"
-    if [[ "$LOCAL_CREATED" -gt "$PULLED_CREATED" ]]; then
-        echo "  Decision: local image is newer, keeping it (re-tagging $LOCAL_IMAGE_ID)."
-        docker tag "$LOCAL_IMAGE_ID" "$IMAGE_NAME"
+    REMOTE_CREATED_EPOCH=$(date -d "$REMOTE_CREATED" +%s)
+    echo "  Build times (epoch): local $LOCAL_CREATED, registry $REMOTE_CREATED_EPOCH"
+    if [[ "$LOCAL_IMAGE_ID" == "$REMOTE_CONFIG_DIGEST" || "$LOCAL_IMAGE_ID" == "$REMOTE_MANIFEST_DIGEST" ]]; then
+        echo "  Decision: local image IS the registry's image, not pulling."
+        PULL=false
+    elif [[ "$LOCAL_CREATED" -ge "$REMOTE_CREATED_EPOCH" ]]; then
+        echo "  Decision: local image is newer than the registry's, not pulling."
+        PULL=false
     else
-        echo "  Decision: registry image is newer (or same age), using it."
+        echo "  Decision: registry image is newer, pulling it."
+    fi
+fi
+
+if [[ "$PULL" == "true" ]]; then
+    echo "Pulling image..."
+    docker pull "$IMAGE_NAME"
+    PULLED_IMAGE_ID=$(docker image inspect "$IMAGE_NAME" --format '{{.Id}}')
+    echo "  Pulled image:   $(describe_image "$PULLED_IMAGE_ID")"
+
+    # When the registry could not be inspected up front, compare now. The pull
+    # leaves the previous image untagged but present, so if it is the newer of
+    # the two its ID can take the tag back.
+    if [[ -n "$LOCAL_IMAGE_ID" && "$LOCAL_IMAGE_ID" != "$PULLED_IMAGE_ID" ]]; then
+        LOCAL_CREATED=$(image_created_epoch "$LOCAL_IMAGE_ID")
+        PULLED_CREATED=$(image_created_epoch "$PULLED_IMAGE_ID")
+        if [[ "$LOCAL_CREATED" -gt "$PULLED_CREATED" ]]; then
+            echo "  Decision: pulled image is older than the local one, re-tagging $LOCAL_IMAGE_ID."
+            docker tag "$LOCAL_IMAGE_ID" "$IMAGE_NAME"
+        fi
     fi
 fi
 
