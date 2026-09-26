@@ -51,6 +51,11 @@ if [[ -z "${BUILDKITE_AGENT_TOKEN:-}" ]]; then
     exit 1
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "Script: $SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}") at divvun-actions $(git -C "$SCRIPT_DIR" log -1 --format='%h %cd' --date=iso 2>/dev/null || echo '(commit unknown)')"
+echo "Docker storage driver: $(docker info --format '{{.Driver}}' 2>/dev/null || echo unknown)"
+echo ""
+
 echo "Configuration:"
 echo "  Instance Count: $INSTANCE_COUNT"
 echo "  Container Prefix: $CONTAINER_PREFIX"
@@ -68,42 +73,71 @@ image_created_epoch() {
     date -d "$created" +%s
 }
 
+# "<id> (built <time>)", for the log.
+describe_image() {
+    echo "$1 (built $(docker image inspect "$1" --format '{{.Created}}' 2>/dev/null || echo unknown))"
+}
+
 # Note the local image before pulling: `docker pull` moves the tag to whatever
 # the registry has, even when that is older than an image built on this host.
 echo "Checking current image..."
 LOCAL_IMAGE_ID=""
 if docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     LOCAL_IMAGE_ID=$(docker image inspect "$IMAGE_NAME" --format '{{.Id}}')
+    echo "  Local image before pull:  $(describe_image "$LOCAL_IMAGE_ID")"
+else
+    echo "  Local image before pull:  none"
 fi
 
 echo "Pulling latest image..."
 docker pull "$IMAGE_NAME"
 PULLED_IMAGE_ID=$(docker image inspect "$IMAGE_NAME" --format '{{.Id}}')
+echo "  Registry image:           $(describe_image "$PULLED_IMAGE_ID")"
 
 # The pull leaves the previous image untagged but present, so if it is the
 # newer of the two its ID can take the tag back.
-if [[ -n "$LOCAL_IMAGE_ID" && "$LOCAL_IMAGE_ID" != "$PULLED_IMAGE_ID" ]]; then
+if [[ -z "$LOCAL_IMAGE_ID" ]]; then
+    echo "  Decision: no local image, using the registry's."
+elif [[ "$LOCAL_IMAGE_ID" == "$PULLED_IMAGE_ID" ]]; then
+    echo "  Decision: local image IS the registry's image, nothing to choose."
+else
     LOCAL_CREATED=$(image_created_epoch "$LOCAL_IMAGE_ID")
     PULLED_CREATED=$(image_created_epoch "$PULLED_IMAGE_ID")
+    echo "  Build times (epoch): local $LOCAL_CREATED, registry $PULLED_CREATED"
     if [[ "$LOCAL_CREATED" -gt "$PULLED_CREATED" ]]; then
-        echo "Local image is newer than the registry's; keeping it."
+        echo "  Decision: local image is newer, keeping it (re-tagging $LOCAL_IMAGE_ID)."
         docker tag "$LOCAL_IMAGE_ID" "$IMAGE_NAME"
+    else
+        echo "  Decision: registry image is newer (or same age), using it."
     fi
 fi
 
 TARGET_IMAGE_ID=$(docker image inspect "$IMAGE_NAME" --format '{{.Id}}')
-echo "Target image: $TARGET_IMAGE_ID"
+echo "Target image: $(describe_image "$TARGET_IMAGE_ID")"
+echo ""
 
 # Compare against what each container actually runs, not against the tag's
 # previous value: a run that moved the tag but failed to recreate a container
 # must leave that container to be retried, not report it as up to date.
+echo "Containers:"
 STALE=()
 for N in $(seq 1 "$INSTANCE_COUNT"); do
-    RUNNING_IMAGE_ID=$(docker container inspect "${CONTAINER_PREFIX}$N" --format '{{.Image}}' 2>/dev/null || true)
-    if [[ "$FORCE_UPDATE" == "true" || "$RUNNING_IMAGE_ID" != "$TARGET_IMAGE_ID" ]]; then
+    CONTAINER_NAME="${CONTAINER_PREFIX}$N"
+    RUNNING_IMAGE_ID=$(docker container inspect "$CONTAINER_NAME" --format '{{.Image}}' 2>/dev/null || true)
+    if [[ -z "$RUNNING_IMAGE_ID" ]]; then
+        echo "  $CONTAINER_NAME: missing -> recreate"
         STALE+=("$N")
+    elif [[ "$RUNNING_IMAGE_ID" != "$TARGET_IMAGE_ID" ]]; then
+        echo "  $CONTAINER_NAME: runs $(describe_image "$RUNNING_IMAGE_ID"), not the target -> recreate"
+        STALE+=("$N")
+    elif [[ "$FORCE_UPDATE" == "true" ]]; then
+        echo "  $CONTAINER_NAME: runs the target, --force -> recreate"
+        STALE+=("$N")
+    else
+        echo "  $CONTAINER_NAME: runs the target -> keep"
     fi
 done
+echo ""
 
 if [[ ${#STALE[@]} -eq 0 ]]; then
     echo "All containers already run the target image. No update needed."
