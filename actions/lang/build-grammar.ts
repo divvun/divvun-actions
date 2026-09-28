@@ -7,6 +7,7 @@ import {
   downloadAndRestoreDependencySnapshot,
   setupLangToolchain,
 } from "./common.ts"
+import { restoreCorpusRepos } from "./deps.ts"
 
 class Autotools {
   private directory: string
@@ -139,6 +140,9 @@ export default async function langGrammarBuild(
   // current now.
   await setupLangToolchain()
   await downloadAndRestoreDependencySnapshot()
+  // And the corpus repos it weighted the speller with, so this make leaves
+  // the speller the grammar checker embeds as it was built.
+  await restoreCorpusRepos()
 
   const flags = deriveAutogenFlags(buildConfig)
   await builder.setMetadata("grammar-configure-flags", flags.join(" "))

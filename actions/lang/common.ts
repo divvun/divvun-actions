@@ -5,8 +5,10 @@ import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import {
   ensureLangDependencyRepos,
+  restoreCorpusRepos,
   restoreLangDependencyRepos,
 } from "./deps.ts"
+import { globFiles } from "~/util/glob.ts"
 
 const GTLEXTOOLS_SPEC = "git+ssh://git@github.com/divvun/GiellaLTLexTools"
 
@@ -91,11 +93,11 @@ export async function setupLangToolchain(): Promise<void> {
 }
 
 /** Toolchain plus freshly resolved sibling repos, for the steps that build
- * from scratch. */
-export async function setupGiellaCoreDependencies(): Promise<void> {
+ * from scratch. Returns the speller corpus repos the build uses. */
+export async function setupGiellaCoreDependencies(): Promise<string[]> {
   await setupLangToolchain()
 
-  await ensureLangDependencyRepos()
+  return await ensureLangDependencyRepos()
 }
 
 /**
@@ -150,10 +152,11 @@ export async function downloadAndExtractSpellerSnapshot(): Promise<void> {
 
 /**
  * Restore the built + configured workspace on a fresh agent: download the
- * speller-build workspace and dependency snapshots, and re-run `configure`
- * (not autogen) so the Makefiles carry this agent's absolute paths. Both
- * snapshots keep their build-machine mtimes, so make treats the compiled
- * artifacts as up to date and recompiles nothing.
+ * speller-build workspace and dependency snapshots, give this agent the corpus
+ * repos speller-build used, and re-run `configure` (not autogen) so the
+ * Makefiles carry this agent's absolute paths. Both snapshots keep their
+ * build-machine mtimes, so make treats the compiled artifacts as up to date
+ * and recompiles nothing.
  *
  * Shared by the test steps and the proofing-build step, which all need a
  * ready-to-`make` tree without a full rebuild.
@@ -165,6 +168,7 @@ export async function restoreBuiltWorkspace(
 
   await setupLangToolchain()
   await downloadAndRestoreDependencySnapshot()
+  await restoreCorpusRepos()
 
   const configureFlags = await builder.metadata(configureFlagsMetadataKey)
   logger.info("Running configure")
@@ -180,6 +184,27 @@ export async function restoreBuiltWorkspace(
   }
 }
 
+/** Size and mtime of each speller archive in the build tree, by path. */
+async function spellerArchives(): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  for (const file of await globFiles("build/tools/spellcheckers/*.zhfst")) {
+    const stat = await Deno.stat(file)
+    out.set(file, `${stat.size} ${stat.mtime?.getTime()}`)
+  }
+  return out
+}
+
+/** Archives added, removed or rewritten between two `spellerArchives` calls. */
+function changedArchives(
+  before: Map<string, string>,
+  after: Map<string, string>,
+): string[] {
+  const paths = new Set([...before.keys(), ...after.keys()])
+  return [...paths]
+    .filter((p) => before.get(p) !== after.get(p))
+    .map((p) => path.basename(p))
+}
+
 export async function runLangTests(opts: {
   metadataKey: string
   label: string
@@ -191,6 +216,11 @@ export async function runLangTests(opts: {
 
   logger.info(`Running ${label} tests`)
 
+  // `make check` builds `all` first, so anything it finds out of date is
+  // rebuilt before it is tested. The spellers must come through untouched:
+  // results for a rebuilt one describe a speller that was never shipped.
+  const shipped = await spellerArchives()
+
   // Run make check in the build directory
   const proc = new Deno.Command("bash", {
     args: ["-c", "make -j$(nproc) check"],
@@ -200,6 +230,14 @@ export async function runLangTests(opts: {
   }).spawn()
 
   const status = await proc.status
+
+  const rebuilt = changedArchives(shipped, await spellerArchives())
+  if (rebuilt.length > 0) {
+    logger.error(
+      `make check rebuilt ${rebuilt.join(", ")}; its results are for a ` +
+        `speller the speller-build step did not ship, so none are published`,
+    )
+  }
 
   // `make check` writes the per-suite lemma-test JSON into docs/testlogs/
   // (gtlemmatest/gtspelltest -J). Hand it to the docs-publish step, which
@@ -217,10 +255,12 @@ export async function runLangTests(opts: {
     // test-speller-variant-*.sh scripts write docs/typosreport/report.json /
     // report-<code>.json with the full typos-*-generated.tsv data and the
     // speller's config.json — exactly what a local `make check` reports.
-    try {
-      await builder.uploadArtifacts("docs/typosreport/*.json")
-    } catch (e) {
-      logger.warning(`Failed to upload typosreport: ${e}`)
+    if (rebuilt.length === 0) {
+      try {
+        await builder.uploadArtifacts("docs/typosreport/*.json")
+      } catch (e) {
+        logger.warning(`Failed to upload typosreport: ${e}`)
+      }
     }
   }
 
@@ -228,6 +268,9 @@ export async function runLangTests(opts: {
   if (status.code !== 0) {
     logger.error(`${label} tests failed with exit code ${status.code}`)
     Deno.exit(status.code)
+  }
+  if (rebuilt.length > 0) {
+    Deno.exit(1)
   }
 
   logger.info(`${label} tests passed`)
