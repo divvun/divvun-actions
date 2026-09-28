@@ -6,7 +6,7 @@ import logger from "~/util/log.ts"
 import { Tar } from "~/util/shared.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
 import { DEPENDENCY_SNAPSHOT, setupGiellaCoreDependencies } from "./common.ts"
-import { packLangDependencyRepos } from "./deps.ts"
+import { CORPUS_REPOS_METADATA, packLangDependencyRepos } from "./deps.ts"
 import { uploadPkgVariants } from "./docs-publish.ts"
 
 class Autotools {
@@ -139,7 +139,10 @@ export default async function langSpellerBuild(
   logger.info("Building spellers only")
   logger.info(JSON.stringify(buildConfig, null, 2))
 
-  await setupGiellaCoreDependencies()
+  const corpusRepos = await setupGiellaCoreDependencies()
+  // The steps that reuse this tree need the same corpus repos, or their make
+  // rebuilds the speller from a different corpus.
+  await builder.setMetadata(CORPUS_REPOS_METADATA, JSON.stringify(corpusRepos))
 
   const flags = deriveAutogenFlags(buildConfig)
   await builder.setMetadata("speller-configure-flags", flags.join(" "))

@@ -218,15 +218,17 @@ async function logRepoRevision(repoPath: string, name: string): Promise<void> {
  * so a failed clone/bootstrap only warns; configure right afterward is the
  * one place that actually knows whether this repo was required.
  *
- * Corpus repos are updated or shallow-cloned, and every failure is a warning:
- * the weighting falls back to the in-tree corpus by design, the closed repo
- * is private and an agent without access must still build. The build log
- * makes the outcome visible either way -- giella-core prints a CORPUS line
- * naming the repos it assembled from.
+ * Corpus repos are updated or shallow-cloned, and a failure is a warning: most
+ * languages have no corpus repo, and the closed one is private, so an agent
+ * without access must still build. What was obtained is then stated rather
+ * than left for make to discover: the repos present are exported as
+ * GIELLA_CORPUS_REPOS (empty means the in-tree weights/*.raw.txt) and
+ * returned, so the speller-build step can record them for the test steps.
+ * giella-core refuses to guess the corpus when CI is set.
  */
 export async function ensureLangDependencyRepos(opts?: {
   spellers?: boolean
-}): Promise<void> {
+}): Promise<string[]> {
   const spellers = opts?.spellers ?? true
 
   const giellaCorePath = path.join(Deno.cwd(), "..", "giella-core")
@@ -284,8 +286,9 @@ export async function ensureLangDependencyRepos(opts?: {
   }
 
   if (!spellers) {
-    return
+    return []
   }
+  const present: string[] = []
   for (const repo of corpusRepos(builder.env.repoName)) {
     const repoPath = path.join(Deno.cwd(), "..", repo)
     if (await fs.exists(repoPath)) {
@@ -300,10 +303,68 @@ export async function ensureLangDependencyRepos(opts?: {
     } else if (!(await cloneSibling(repo, repoPath))) {
       logger.warning(
         `${repo} is not available (private without access, or absent); ` +
-          `the speller weighting will use the in-tree corpus`,
+          `the speller weighting will not use it`,
+      )
+      continue
+    }
+    // The weighting reads <repo>/converted; a repo without it has no text.
+    if (await fs.exists(path.join(repoPath, "converted"))) {
+      await logRepoRevision(repoPath, repo)
+      present.push(repo)
+    } else {
+      logger.warning(`${repo} has no converted/ directory; not using it`)
+    }
+  }
+  useCorpusRepos(present)
+  return present
+}
+
+/** Build metadata key: JSON array of the corpus repos the speller was built with. */
+export const CORPUS_REPOS_METADATA = "speller-corpus-repos"
+
+/**
+ * Tell giella-core which corpus repos the speller weighting uses, for every
+ * make this process runs from here on.
+ */
+function useCorpusRepos(repos: string[]): void {
+  Deno.env.set("GIELLA_CORPUS_REPOS", repos.join(" "))
+  logger.info(
+    `Speller corpus: ${
+      repos.length > 0 ? repos.join(", ") : "in-tree weights/*.raw.txt"
+    }`,
+  )
+}
+
+/**
+ * Give a test step the corpus repos the speller-build step used, and name the
+ * same ones in GIELLA_CORPUS_REPOS, so `make check` resolves the corpus
+ * exactly as the build did. Any other answer -- a repo missing here, or one
+ * the build did not have -- rebuilds the weighting, and the step would then
+ * test a speller that was never shipped. Only the directories have to exist:
+ * make does not read the corpus unless it rebuilds.
+ */
+export async function restoreCorpusRepos(): Promise<void> {
+  const repos = JSON.parse(await builder.metadata(CORPUS_REPOS_METADATA)) as
+    string[]
+  for (const repo of repos) {
+    const repoPath = path.join(Deno.cwd(), "..", repo)
+    if (await fs.exists(path.join(repoPath, "converted"))) {
+      continue
+    }
+    if (await fs.exists(repoPath)) {
+      throw new Error(
+        `${repo} is here but has no converted/ directory, while the ` +
+          `speller-build step used it`,
+      )
+    }
+    if (!(await cloneSibling(repo, repoPath))) {
+      throw new Error(
+        `Could not clone ${repo}, which the speller-build step used; ` +
+          `testing without it would rebuild the speller`,
       )
     }
   }
+  useCorpusRepos(repos)
 }
 
 /** Build metadata key: `{repo: commit}` for the repos in the snapshot. */
@@ -338,8 +399,9 @@ async function tar(args: string[], cwd: string): Promise<void> {
  *
  * Nothing configure or make generates in these repos records their absolute
  * path, so the tree works from whatever directory a later step extracts it
- * into. Corpus repos are not packed: only the speller weighting reads them,
- * and no step that restores rebuilds a speller.
+ * into. Corpus repos are not packed (they are large, and the closed one must
+ * not become an artifact); `restoreCorpusRepos` gives a later step the same
+ * ones instead, because without them `make check` rebuilds the speller.
  */
 export async function packLangDependencyRepos(archive: string): Promise<void> {
   const parent = path.resolve(Deno.cwd(), "..")
