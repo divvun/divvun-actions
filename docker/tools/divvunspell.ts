@@ -1,5 +1,6 @@
 import type { Tool } from "../lib/image.ts"
 import { assetGlob, assetGrepPattern } from "../../util/asset_name.ts"
+import { recordInstalledTool } from "../../util/image_manifest.ts"
 
 const REPO = "divvun/divvunspell"
 const RELEASE_TAG = "dev-latest"
@@ -46,6 +47,7 @@ export function divvunspell(): Tool {
         `          | sed -E 's/.*"(https:[^"]+)"$/\\1/') && \\`,
         `    test -n "$URL" || { echo 'no divvunspell asset for ${TARGET} on ${RELEASE_TAG}' >&2; exit 1; } && \\`,
         `    echo "installing $URL" && \\`,
+        recordInstalledTool("divvunspell"),
         `    curl -fsSL "$URL" -o /tmp/divvunspell.tgz && \\`,
         `    tar -xf /tmp/divvunspell.tgz -C /tmp && \\`,
         `    install -m 755 /tmp/${

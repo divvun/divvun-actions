@@ -1,5 +1,6 @@
 import type { Tool } from "../lib/image.ts"
 import { assetGlob, assetGrepPattern } from "../../util/asset_name.ts"
+import { recordInstalledTool } from "../../util/image_manifest.ts"
 
 const REPO = "divvun/divvun-runtime"
 const RELEASE_TAG = "dev-latest"
@@ -47,6 +48,7 @@ export function divvunRuntime(): Tool {
         `          | sed -E 's/.*"(https:[^"]+)"$/\\1/') && \\`,
         `    test -n "$URL" || { echo 'no divvun-runtime asset for ${TARGET} on ${RELEASE_TAG}' >&2; exit 1; } && \\`,
         `    echo "installing $URL" && \\`,
+        recordInstalledTool("divvun-runtime"),
         `    curl -fsSL "$URL" -o /tmp/divvun-runtime.tgz && \\`,
         `    tar -xf /tmp/divvun-runtime.tgz -C /tmp && \\`,
         `    install -m 755 /tmp/${

@@ -1,5 +1,6 @@
 import type { Tool } from "../lib/image.ts"
 import { assetGlob, assetGrepPattern } from "../../util/asset_name.ts"
+import { recordInstalledTool } from "../../util/image_manifest.ts"
 
 const REPO = "divvun/hfst-rs"
 const RELEASE_TAG = "dev-latest"
@@ -53,6 +54,7 @@ export function hfst(opts: { prefix?: string } = {}): Tool {
         `          | sed -E 's/.*"(https:[^"]+)"$/\\1/') && \\`,
         `    test -n "$URL" || { echo 'no hfst asset for ${TARGET} on ${RELEASE_TAG}' >&2; exit 1; } && \\`,
         `    echo "installing $URL" && \\`,
+        recordInstalledTool("hfst"),
         `    curl -fsSL "$URL" -o /tmp/hfst.tgz && \\`,
         `    tar -xf /tmp/hfst.tgz -C /tmp && \\`,
         `    install -d ${prefix} && \\`,

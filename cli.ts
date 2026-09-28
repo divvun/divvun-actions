@@ -19,6 +19,7 @@ import {
   runDivvunKeyboardAndroid,
   runDivvunKeyboardIOS,
 } from "~/pipelines/keyboard/divvun-keyboard.ts"
+import { logJobEnvironment } from "~/util/job_environment.ts"
 import logger from "~/util/log.ts"
 import { runKbdgenDeploy } from "./actions/kbdgen/deploy.ts"
 import {
@@ -908,6 +909,7 @@ export async function createCiPipeline(): Promise<BuildkitePipeline> {
 
 async function runCi(_args: any) {
   logger.info("Running CI")
+  await logJobEnvironment()
   const pipeline = await createCiPipeline()
 
   // Strip undefined values from pipeline object before YAML serialization

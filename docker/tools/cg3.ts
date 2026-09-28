@@ -1,5 +1,6 @@
 import type { Tool } from "../lib/image.ts"
 import { assetGlob, assetGrepPattern } from "../../util/asset_name.ts"
+import { recordInstalledTool } from "../../util/image_manifest.ts"
 
 const REPO = "divvun/cg3-rs"
 const RELEASE_TAG = "dev-latest"
@@ -52,6 +53,7 @@ export function cg3(opts: { prefix?: string } = {}): Tool {
         `          | sed -E 's/.*"(https:[^"]+)"$/\\1/') && \\`,
         `    test -n "$URL" || { echo 'no cg3 asset for ${TARGET} on ${RELEASE_TAG}' >&2; exit 1; } && \\`,
         `    echo "installing $URL" && \\`,
+        recordInstalledTool("cg3"),
         `    curl -fsSL "$URL" -o /tmp/cg3.tgz && \\`,
         `    tar -xf /tmp/cg3.tgz -C /tmp && \\`,
         `    install -d ${prefix} && \\`,

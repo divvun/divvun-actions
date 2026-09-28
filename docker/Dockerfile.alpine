@@ -163,6 +163,7 @@ RUN set -eu && \
           | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
     test -n "$URL" || { echo 'no hfst asset for x86_64-unknown-linux-musl on dev-latest' >&2; exit 1; } && \
     echo "installing $URL" && \
+    mkdir -p /etc/divvun-actions && echo "hfst $URL" >> /etc/divvun-actions/installed-tools && \
     curl -fsSL "$URL" -o /tmp/hfst.tgz && \
     tar -xf /tmp/hfst.tgz -C /tmp && \
     install -d /opt/divvun/bin && \
@@ -180,6 +181,7 @@ RUN set -eu && \
           | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
     test -n "$URL" || { echo 'no foma asset for x86_64-unknown-linux-musl on dev-latest' >&2; exit 1; } && \
     echo "installing $URL" && \
+    mkdir -p /etc/divvun-actions && echo "foma $URL" >> /etc/divvun-actions/installed-tools && \
     curl -fsSL "$URL" -o /tmp/foma.tgz && \
     tar -xf /tmp/foma.tgz -C /tmp && \
     install -d /opt/divvun/bin && \
@@ -195,6 +197,7 @@ RUN set -eu && \
           | sed -E 's/.*"(https:[^"]+)"$/\1/') && \
     test -n "$URL" || { echo 'no cg3 asset for x86_64-unknown-linux-musl on dev-latest' >&2; exit 1; } && \
     echo "installing $URL" && \
+    mkdir -p /etc/divvun-actions && echo "cg3 $URL" >> /etc/divvun-actions/installed-tools && \
     curl -fsSL "$URL" -o /tmp/cg3.tgz && \
     tar -xf /tmp/cg3.tgz -C /tmp && \
     install -d /opt/divvun/bin && \
@@ -207,6 +210,9 @@ RUN git lfs install
 
 # Buildkite fs-cache folder
 RUN mkdir -p $BUILDKITE_PLUGIN_FS_CACHE_FOLDER
+
+# image build stamp
+RUN mkdir -p /etc/divvun-actions && date -u +%Y-%m-%dT%H:%M:%SZ > /etc/divvun-actions/image-built
 
 COPY entrypoint-alpine.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
