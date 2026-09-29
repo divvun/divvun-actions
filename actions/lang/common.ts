@@ -2,6 +2,7 @@ import * as path from "@std/path"
 import * as fs from "@std/fs"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
+import { createTarZst, extractTarball } from "~/util/tarball.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import {
   checkoutCorpusRepos,
@@ -96,7 +97,7 @@ export async function setupLangToolchain(): Promise<void> {
  * The lang-deps step's sibling dependency repos (giella-core, declared
  * shared-* and lang-*), built, as `prepareLangDependencies` packed them.
  */
-export const DEPENDENCY_SNAPSHOT = "workspace-deps.tar.gz"
+export const DEPENDENCY_SNAPSHOT = "workspace-deps.tar.zst"
 
 /**
  * The lang-deps step: decide and build this build's dependency repos, and
@@ -154,7 +155,7 @@ export async function setupLangDependencies(): Promise<void> {
 export type WorkspaceSnapshot = "speller" | "grammar"
 
 function snapshotArchive(snapshot: WorkspaceSnapshot): string {
-  return `workspace-${snapshot}.tar.gz`
+  return `workspace-${snapshot}.tar.zst`
 }
 
 /** Build metadata key: the absolute checkout path the snapshot was built in. */
@@ -163,54 +164,73 @@ function snapshotCheckoutMetadata(snapshot: WorkspaceSnapshot): string {
 }
 
 /**
+ * Built files a snapshot leaves out and uploads as artifacts of their own
+ * instead: the products other steps download anyway, and too large to carry
+ * twice (grammar-build's bundle.drb and .zcheck are ~600 MiB each). Restoring
+ * downloads them back into place. Nothing is built from them, and a download
+ * is newer than everything they are built from, so make leaves them be.
+ */
+const SNAPSHOT_ARTIFACTS: Record<WorkspaceSnapshot, string[]> = {
+  speller: [],
+  grammar: [
+    "build/tools/grammarcheckers/*.drb",
+    "build/tools/grammarcheckers/*.zcheck",
+  ],
+}
+
+/** The largest directories under build/, so the snapshot's size is explained. */
+async function logBuildDirSizes(): Promise<void> {
+  const du = await new Deno.Command("bash", {
+    args: ["-c", "du -m -d 3 build 2>/dev/null | sort -rn | head -n 12"],
+    stdout: "piped",
+  }).output()
+  logger.info(
+    `Largest build directories (MiB):\n${new TextDecoder().decode(du.stdout)}`,
+  )
+}
+
+/**
  * Pack this checkout (source + build dir, mtimes preserved, without .git) as
- * `snapshot`, and record where it was built: configure wrote that absolute
- * path into the Makefiles and scripts, and `restoreBuiltWorkspace` makes it
- * lead to wherever the snapshot is unpacked. Excluding .git keeps the archive
- * smaller and avoids conflicts with the downstream step's own checkout.
+ * `snapshot`, upload it with the artifacts it leaves out
+ * (`SNAPSHOT_ARTIFACTS`), and record where it was built: configure wrote that
+ * absolute path into the Makefiles and scripts, and `restoreBuiltWorkspace`
+ * makes it lead to wherever the snapshot is unpacked. Excluding .git keeps the
+ * archive smaller and avoids conflicts with the downstream step's own
+ * checkout.
  */
 export async function uploadWorkspaceSnapshot(
   snapshot: WorkspaceSnapshot,
 ): Promise<void> {
   const archive = snapshotArchive(snapshot)
+  const artifacts = SNAPSHOT_ARTIFACTS[snapshot]
   logger.info(`Creating ${snapshot} workspace snapshot`)
-  const tarProc = new Deno.Command("tar", {
-    args: ["-I", "gzip -1", "-cpf", `../${archive}`, "--exclude=./.git", "."],
+  await logBuildDirSizes()
+  await createTarZst(`../${archive}`, ["."], {
     cwd: Deno.cwd(),
-    stdout: "inherit",
-    stderr: "inherit",
-  }).spawn()
-  const tarStatus = await tarProc.status
-  if (tarStatus.code !== 0) {
-    throw new Error(`tar failed with exit code ${tarStatus.code}`)
-  }
+    exclude: ["./.git", ...artifacts.map((glob) => `./${glob}`)],
+  })
   await builder.setMetadata(snapshotCheckoutMetadata(snapshot), Deno.cwd())
   await builder.uploadArtifacts(archive, {
     cwd: path.resolve(Deno.cwd(), ".."),
   })
+  for (const glob of artifacts) {
+    await builder.uploadArtifacts(glob)
+  }
 }
 
 export async function downloadAndExtractWorkspaceSnapshot(
   snapshot: WorkspaceSnapshot,
 ): Promise<void> {
-  // tar -p restores mtimes, so make sees build artifacts as newer than
-  // sources and will not attempt to recompile anything.
+  // Modification times are restored, so make sees build artifacts as newer
+  // than sources and will not attempt to recompile anything.
   const archive = snapshotArchive(snapshot)
   await builder.downloadArtifacts(archive, ".")
   logger.info(`Extracting ${snapshot} workspace snapshot`)
-  const extractProc = new Deno.Command("tar", {
-    args: ["-xpf", archive],
-    cwd: Deno.cwd(),
-    stdout: "inherit",
-    stderr: "inherit",
-  }).spawn()
-  const extractStatus = await extractProc.status
-  if (extractStatus.code !== 0) {
-    throw new Error(
-      `tar extraction failed with exit code ${extractStatus.code}`,
-    )
-  }
+  await extractTarball(archive, { cwd: Deno.cwd() })
   await Deno.remove(archive)
+  for (const glob of SNAPSHOT_ARTIFACTS[snapshot]) {
+    await builder.downloadArtifacts(glob, ".")
+  }
 }
 
 /**

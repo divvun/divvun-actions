@@ -146,12 +146,9 @@ export default async function langGrammarBuild(
   logger.debug(`Flags: ${flags}`)
   await autotoolsBuilder.build(flags)
 
-  // For the grammar-test step, which tests this tree as built.
+  // For the grammar-test step, which tests this tree as built. This also
+  // uploads the .drb and .zcheck, for the bundle, teaksta and proofing steps.
   await uploadWorkspaceSnapshot("grammar")
-
-  // Upload grammar files
-  await builder.uploadArtifacts("build/tools/grammarcheckers/*.drb")
-  await builder.uploadArtifacts("build/tools/grammarcheckers/*.zcheck")
 
   logger.info("Grammar checker build complete")
 

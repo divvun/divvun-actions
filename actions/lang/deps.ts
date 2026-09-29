@@ -2,6 +2,7 @@ import * as path from "@std/path"
 import * as fs from "@std/fs"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
+import { createTarZst, extractTarball, listTarball } from "~/util/tarball.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
 /**
@@ -324,19 +325,11 @@ export async function prepareLangDependencies(archive: string): Promise<void> {
 
     const repos = Object.keys(revisions)
     logger.info(`Packing dependency repos: ${repos.join(", ")}`)
-    await run("tar", [
-      "-I",
-      "gzip -1",
-      "-cpf",
-      path.resolve(archive),
-      ...repos.filter((repo) => repo !== "giella-core")
-        .map((repo) => `--exclude=${repo}/.git`),
-      ...repos,
-    ], workDir)
-    const { size } = await Deno.stat(archive)
-    logger.info(
-      `${path.basename(archive)} is ${(size / 1024 / 1024).toFixed(1)} MiB`,
-    )
+    await createTarZst(path.resolve(archive), repos, {
+      cwd: workDir,
+      exclude: repos.filter((repo) => repo !== "giella-core")
+        .map((repo) => `${repo}/.git`),
+    })
   } finally {
     await Deno.remove(workDir, { recursive: true }).catch(() => {})
   }
@@ -362,7 +355,7 @@ export async function restoreLangDependencyRepos(
   const destDir = opts?.destDir ?? path.resolve(Deno.cwd(), "..")
 
   const packed = new Set(
-    (await capture("tar", ["-tzf", archive], Deno.cwd())).split("\n")
+    (await listTarball(archive))
       .map((entry) => entry.replace(/^\.\//, "").split("/")[0])
       .filter((name) => name !== "" && name !== "."),
   )
@@ -385,7 +378,7 @@ export async function restoreLangDependencyRepos(
   }
 
   logger.info(`Unpacking dependency repos into ${destDir}: ${repos.join(", ")}`)
-  await run("tar", ["-xpf", path.resolve(archive), ...repos], destDir)
+  await extractTarball(archive, { cwd: destDir, paths: repos })
 
   try {
     const revisions = JSON.parse(
