@@ -119,14 +119,10 @@ export async function langDeps(): Promise<void> {
  * checkout's siblings (or into `opts.destDir`), so this step builds and tests
  * against exactly the dependency commits the rest of the build uses, with no
  * git network access of its own.
- *
- * Sets up the toolchain first: unpacking reconfigures giella-core, and its
- * configure requires GiellaLTLexTools.
  */
 export async function downloadAndRestoreDependencySnapshot(
   opts?: { destDir?: string; repos?: string[] },
 ): Promise<void> {
-  await setupLangToolchain()
   const workDir = (await makeTempDir({ prefix: "workspace-deps-" })).path
   try {
     await builder.downloadArtifacts(DEPENDENCY_SNAPSHOT, workDir)
@@ -145,6 +141,7 @@ export async function downloadAndRestoreDependencySnapshot(
  * the commits it recorded.
  */
 export async function setupLangDependencies(): Promise<void> {
+  await setupLangToolchain()
   await downloadAndRestoreDependencySnapshot()
   await checkoutCorpusRepos()
 }

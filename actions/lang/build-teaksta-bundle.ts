@@ -4,7 +4,10 @@ import * as builder from "~/builder.ts"
 import { globFiles } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
-import { downloadAndRestoreDependencySnapshot } from "./common.ts"
+import {
+  downloadAndRestoreDependencySnapshot,
+  setupLangToolchain,
+} from "./common.ts"
 
 /**
  * Build the teaksta (Konteaksta) divvun-runtime bundle for a language.
@@ -122,6 +125,7 @@ export default async function langTeakstaBundleBuild(
 
   // The shared-* siblings declared in configure.ac, as the rest of the build
   // uses them: where the shared CG grammars the assemble script flattens live.
+  await setupLangToolchain()
   await downloadAndRestoreDependencySnapshot()
 
   const zcheckDir = await unpackZcheck()

@@ -181,6 +181,40 @@ async function fetchRepo(
   return await capture("git", ["rev-parse", "HEAD"], dir)
 }
 
+/**
+ * Every other step unpacks giella-core at its own path and runs its scripts
+ * there without configuring it again: configure rewrites every file it
+ * generates, and scripts/generate-nfc-nfd-regex.bash is a prerequisite of
+ * every language's orthography FSTs, so a configure there would make that
+ * step's make rebuild everything downstream of them, spellers included. That
+ * only works while no script giella-core generates records the directory it
+ * was configured in (giella-core's scripts find their own directory instead).
+ * A giella-core whose scripts do would run them from this step's temp
+ * directory, long deleted, so say so here rather than later in a test.
+ */
+async function checkGiellaCoreIsRelocatable(giellaCore: string): Promise<void> {
+  const scripts = path.join(giellaCore, "scripts")
+  const stale: string[] = []
+  for await (const entry of Deno.readDir(scripts)) {
+    if (!entry.isFile || entry.name.startsWith("Makefile")) {
+      continue
+    }
+    const text = await Deno.readTextFile(path.join(scripts, entry.name))
+      .catch(() => "")
+    if (text.includes(giellaCore)) {
+      stale.push(entry.name)
+    }
+  }
+  if (stale.length > 0) {
+    throw new Error(
+      `giella-core's configure wrote the directory it ran in into ` +
+        `scripts/${stale.join(", scripts/")}, so they would not work where ` +
+        `the other steps unpack it. They must find giella-core from their ` +
+        `own location instead.`,
+    )
+  }
+}
+
 /** Build metadata key: `{repo: commit}` for the repos in the snapshot. */
 const DEPENDENCY_REVISIONS_METADATA = "lang-dependency-revisions"
 
@@ -235,6 +269,7 @@ export async function prepareLangDependencies(archive: string): Promise<void> {
       ["-c", "autoreconf -i && ./configure && make"],
       giellaCore,
     )
+    await checkGiellaCoreIsRelocatable(giellaCore)
 
     for (const { repo, needsConfigure } of await declaredDependencies()) {
       const dir = path.join(workDir, repo)
@@ -311,10 +346,9 @@ export async function prepareLangDependencies(archive: string): Promise<void> {
  * deleting each repo it contains first so what's left is exactly what the
  * lang-deps step built. `repos` limits the unpack to those repos.
  *
- * giella-core is then configured again: configure writes the absolute path it
- * ran in into giella-core's Makefile and scripts (generate-lemmas.sh calls
- * `<abs_builddir>/extract-lemmas.sh`), and those must be this agent's. It
- * rewrites no file a language's make depends on, so nothing rebuilds.
+ * Nothing is configured or built here: the repos are used exactly as packed,
+ * mtimes included, so make sees them as unchanged (see
+ * `checkGiellaCoreIsRelocatable` for why that works from any directory).
  *
  * Deleting is only ever correct for disposable CI checkouts; outside CI an
  * existing directory in the way is an error, never removed.
@@ -350,11 +384,6 @@ export async function restoreLangDependencyRepos(
 
   logger.info(`Unpacking dependency repos into ${destDir}: ${repos.join(", ")}`)
   await run("tar", ["-xpf", path.resolve(archive), ...repos], destDir)
-
-  if (repos.includes("giella-core")) {
-    logger.info("Configuring giella-core for this agent's paths...")
-    await run("bash", ["-c", "./configure"], path.join(destDir, "giella-core"))
-  }
 
   try {
     const revisions = JSON.parse(
