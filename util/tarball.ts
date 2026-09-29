@@ -36,6 +36,12 @@ async function bsdtar(args: string[], cwd?: string): Promise<string> {
  * `archive`, keeping modification times and permissions. `exclude` takes
  * bsdtar patterns, matched against each archived path (`./build/x.drb` when
  * `paths` is `["."]`) at any directory boundary.
+ *
+ * File names are stored as the bytes they are on disk (hdrcharset=BINARY)
+ * and so come back exactly as they were. By default bsdtar converts them to
+ * UTF-8 from the locale's charset, which on the agents (C locale) fails for
+ * any non-ASCII name (lang-smj's insert-æae-area-flags.regex) with a warning
+ * per file, and which in a UTF-8 locale on macOS can change their bytes.
  */
 export async function createTarZst(
   archive: string,
@@ -47,7 +53,7 @@ export async function createTarZst(
   await bsdtar([
     "--zstd",
     "--options",
-    `zstd:compression-level=${level},zstd:threads=0`,
+    `zstd:compression-level=${level},zstd:threads=0,hdrcharset=BINARY`,
     ...(opts.exclude ?? []).flatMap((pattern) => ["--exclude", pattern]),
     "-cf",
     path.resolve(opts.cwd, archive),
