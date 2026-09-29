@@ -261,10 +261,8 @@ export async function prepareLangDependencies(archive: string): Promise<void> {
     const revisions: Record<string, string> = {}
 
     const giellaCore = path.join(workDir, "giella-core")
-    // TEMPORARY: giellalt/giella-core#457 (scripts find giella-core from
-    // their own location), until it is merged. Back to "HEAD" then.
     revisions["giella-core"] = await fetchRepo("giella-core", giellaCore, {
-      ref: "self-locating-scripts",
+      ref: "HEAD",
     })
     logger.info("Building giella-core...")
     await run(
