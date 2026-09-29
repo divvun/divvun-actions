@@ -132,8 +132,9 @@ async function siblingCloneUrl(repoName: string): Promise<string> {
  *
  * The same steps work on a missing directory, an earlier clone at any commit,
  * or a directory that isn't a repo at all: fetch just that one commit, force
- * the tree to it, and remove anything else. `paths` limits the checkout to
- * those top-level directories and fetches only their files.
+ * the tree to it, and remove anything else. `sparse` limits the checkout to
+ * those sparse-checkout patterns (`/src/`, `/*.pc.in`) and fetches only the
+ * files they match.
  *
  * Outside CI an existing directory is left as it is (see
  * `checkoutsAreDisposable`).
@@ -141,7 +142,7 @@ async function siblingCloneUrl(repoName: string): Promise<string> {
 async function fetchRepo(
   repo: string,
   dir: string,
-  opts: { ref: string; paths?: string[] },
+  opts: { ref: string; sparse?: string[] },
 ): Promise<string> {
   if ((await fs.exists(dir)) && !checkoutsAreDisposable()) {
     logger.warning(
@@ -155,12 +156,12 @@ async function fetchRepo(
   await fs.ensureDir(dir)
   await run("git", ["init", "-q"], dir)
   await run("git", ["config", "remote.origin.url", url], dir)
-  if (opts.paths) {
+  if (opts.sparse) {
     await run("git", [
       "sparse-checkout",
       "set",
       "--no-cone",
-      ...opts.paths.map((p) => `/${p}/`),
+      ...opts.sparse,
     ], dir)
   }
   await run("git", [
@@ -168,7 +169,7 @@ async function fetchRepo(
     "-q",
     "--depth",
     "1",
-    ...(opts.paths ? ["--filter=blob:none"] : []),
+    ...(opts.sparse ? ["--filter=blob:none"] : []),
     "origin",
     opts.ref,
   ], dir)
@@ -199,11 +200,12 @@ const CORPUS_REVISIONS_METADATA = "lang-corpus-revisions"
  * is where that is reported. A declared repo that failed is left out of the
  * snapshot rather than packed half-made.
  *
- * Only a gt_NEED_SHARED repo is configured (autoreconf, not the repo's own
- * autogen.sh, which in a lang-* repo clones missing siblings of its own). Of
- * the others only `src/` is fetched: everything a language build or the
- * teaksta script reads from a dependency lives there, and a lang-* repo's
- * other directories are most of its size.
+ * Every repo is fetched whole, even where a language build reads only its
+ * `src/`: the language's make, its autogen.sh and scripts like teaksta's each
+ * look at siblings in their own way, and a partial checkout only fails the
+ * one nobody listed. Only a gt_NEED_SHARED repo is configured (autoreconf,
+ * not the repo's own autogen.sh, which in a lang-* repo clones missing
+ * siblings of its own).
  *
  * giella-core keeps its `.git`: every FST directory's `.generated/build-inputs`
  * stamp (giella-core's am-shared/dot-generated-dir.am) records
@@ -237,10 +239,7 @@ export async function prepareLangDependencies(archive: string): Promise<void> {
     for (const { repo, needsConfigure } of await declaredDependencies()) {
       const dir = path.join(workDir, repo)
       try {
-        revisions[repo] = await fetchRepo(repo, dir, {
-          ref: "HEAD",
-          paths: needsConfigure ? undefined : ["src"],
-        })
+        revisions[repo] = await fetchRepo(repo, dir, { ref: "HEAD" })
         if (needsConfigure) {
           logger.info(`Configuring ${repo}...`)
           await run("bash", ["-c", "autoreconf -i && ./configure"], dir)
@@ -402,7 +401,7 @@ export async function checkoutCorpusRepos(): Promise<void> {
   const present: string[] = []
   for (const [repo, commit] of Object.entries(revisions)) {
     const dir = path.join(Deno.cwd(), "..", repo)
-    await fetchRepo(repo, dir, { ref: commit, paths: ["converted"] })
+    await fetchRepo(repo, dir, { ref: commit, sparse: ["/converted/"] })
     if (await fs.exists(path.join(dir, "converted"))) {
       present.push(repo)
     } else {
