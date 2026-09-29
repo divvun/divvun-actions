@@ -9,27 +9,19 @@ import { makeTempDir } from "~/util/temp.ts"
  * Sibling dependency repos for a language build.
  *
  * A language checkout builds against repos that live BESIDE it: giella-core,
- * the shared-* lexicon repos, sometimes other lang-* repos, and the speller
- * corpus repos. Which ones a language needs is not for the pipeline to know:
- * configure.ac declares the build dependencies (gt_USE_SHARED / gt_NEED_SHARED
- * lines), and the speller weighting reads ../corpus-<lang> and
- * ../corpus-<lang>-x-closed when they exist (giella-core 1.15.2+).
+ * the shared-* and lang-* repos configure.ac declares (gt_USE_SHARED /
+ * gt_NEED_SHARED), and the speller corpus repos ../corpus-<lang> and
+ * ../corpus-<lang>-x-closed.
  *
- * One step decides all of them. The lang-deps step fetches each repo's
- * current commit into a fresh directory, builds what needs building, records
- * the commits as build metadata and packs the result
- * (`prepareLangDependencies`). Every other step unpacks that snapshot over its
- * own siblings (`restoreLangDependencyRepos`) and fetches the recorded corpus
- * commits (`checkoutCorpusRepos`). No step pulls, and nothing an earlier build
- * left on an agent is ever built against, so one build uses one set of
- * dependency commits however many agents its steps land on.
+ * The lang-deps step fetches and builds them once (`prepareLangDependencies`).
+ * Every other step unpacks that snapshot (`restoreLangDependencyRepos`) and
+ * fetches the recorded corpus commits (`checkoutCorpusRepos`), so a build uses
+ * one set of commits whichever agents its steps land on.
  */
 
 /**
- * Discarding or deleting a sibling checkout is only correct where it is a
- * disposable build input. On CI agents it is; outside CI `..` may be a
- * developer's working tree with uncommitted work, and a build step must never
- * eat that.
+ * On CI sibling checkouts are disposable; elsewhere `..` may be a developer's
+ * working tree, which must never be replaced.
  */
 function checkoutsAreDisposable(): boolean {
   return Deno.env.get("BUILDKITE") != null
@@ -128,17 +120,9 @@ async function siblingCloneUrl(repoName: string): Promise<string> {
 }
 
 /**
- * Make `dir` exactly `repo` at `ref` (a commit, or "HEAD" for the default
- * branch's current commit), and return the commit it is at.
- *
- * The same steps work on a missing directory, an earlier clone at any commit,
- * or a directory that isn't a repo at all: fetch just that one commit, force
- * the tree to it, and remove anything else. `sparse` limits the checkout to
- * those sparse-checkout patterns (`/src/`, `/*.pc.in`) and fetches only the
- * files they match.
- *
- * Outside CI an existing directory is left as it is (see
- * `checkoutsAreDisposable`).
+ * Make `dir` exactly `repo` at `ref` (a commit, or "HEAD"), whatever was there
+ * before, and return the commit. `sparse` limits the checkout and the fetched
+ * blobs to those patterns. Outside CI an existing directory is left alone.
  */
 async function fetchRepo(
   repo: string,
@@ -183,15 +167,10 @@ async function fetchRepo(
 }
 
 /**
- * Every other step unpacks giella-core at its own path and runs its scripts
- * there without configuring it again: configure rewrites every file it
- * generates, and scripts/generate-nfc-nfd-regex.bash is a prerequisite of
- * every language's orthography FSTs, so a configure there would make that
- * step's make rebuild everything downstream of them, spellers included. That
- * only works while no script giella-core generates records the directory it
- * was configured in (giella-core's scripts find their own directory instead).
- * A giella-core whose scripts do would run them from this step's temp
- * directory, long deleted, so say so here rather than later in a test.
+ * Other steps use giella-core unpacked at their own path without configuring
+ * it again, since a fresh configure would make make rebuild the spellers. Fail
+ * here, not later in a test, if a generated script hardcodes the (temporary)
+ * directory it was configured in.
  */
 async function checkGiellaCoreIsRelocatable(giellaCore: string): Promise<void> {
   const scripts = path.join(giellaCore, "scripts")
@@ -223,37 +202,21 @@ const DEPENDENCY_REVISIONS_METADATA = "lang-dependency-revisions"
 const CORPUS_REVISIONS_METADATA = "lang-corpus-revisions"
 
 /**
- * The lang-deps step: fetch giella-core and the configure.ac-declared repos at
- * their current commits into a fresh directory, build them, record the
- * commits of those and of the corpus repos, and pack the repos into
- * `archive` for `restoreLangDependencyRepos` in every other step.
+ * The lang-deps step: fetch giella-core and the declared repos at their
+ * current commits, build them, record their commits and the corpus repos',
+ * and pack the repos into `archive`.
  *
- * giella-core is built in full, and a failure there is fatal: it is a hard
- * build requirement. A declared repo is best-effort, as configure treats it: a
- * gt_USE_SHARED repo that is missing only downgrades to a configure warning,
- * while a gt_NEED_SHARED one fails configure in the step that needs it, which
- * is where that is reported. A declared repo that failed is left out of the
- * snapshot rather than packed half-made.
+ * Only giella-core failing is fatal. A declared repo that fails is left out,
+ * and configure decides later whether it was required (gt_NEED_SHARED).
+ * Those are configured with autoreconf, not their autogen.sh, which in a
+ * lang-* repo clones siblings of its own.
  *
- * Every repo is fetched whole, even where a language build reads only its
- * `src/`: the language's make, its autogen.sh and scripts like teaksta's each
- * look at siblings in their own way, and a partial checkout only fails the
- * one nobody listed. Only a gt_NEED_SHARED repo is configured (autoreconf,
- * not the repo's own autogen.sh, which in a lang-* repo clones missing
- * siblings of its own).
+ * giella-core keeps its `.git`: every FST's `.generated/build-inputs` stamp
+ * records its `git rev-parse HEAD`, and without history that becomes `no-git`
+ * and make rebuilds the whole tree.
  *
- * giella-core keeps its `.git`: every FST directory's `.generated/build-inputs`
- * stamp (giella-core's am-shared/dot-generated-dir.am) records
- * `git -C $(GTCORE) rev-parse HEAD`, and every FST depends on that stamp. A
- * giella-core without history makes that `no-git`, which no longer matches the
- * stamp in speller-build's workspace snapshot, so make would rebuild the whole
- * tree. The other repos leave `.git` out: nothing in the build reads their
- * history.
- *
- * Corpus repos are only resolved to a commit here, not packed: they are
- * large, and the closed one must not become an artifact. One that can't be
- * resolved (absent, or private without access) is left out, and the speller
- * is weighted without it.
+ * Corpus repos are only resolved to a commit, not packed: they are large, and
+ * the closed one must not become an artifact.
  */
 export async function prepareLangDependencies(archive: string): Promise<void> {
   const workDir = (await makeTempDir({ prefix: "lang-deps-" })).path
@@ -334,17 +297,9 @@ export async function prepareLangDependencies(archive: string): Promise<void> {
 }
 
 /**
- * Unpack an archive made by `prepareLangDependencies` into `destDir` (by
- * default this checkout's parent, where configure looks for the siblings),
- * deleting each repo it contains first so what's left is exactly what the
- * lang-deps step built. `repos` limits the unpack to those repos.
- *
- * Nothing is configured or built here: the repos are used exactly as packed,
- * mtimes included, so make sees them as unchanged (see
- * `checkGiellaCoreIsRelocatable` for why that works from any directory).
- *
- * Deleting is only ever correct for disposable CI checkouts; outside CI an
- * existing directory in the way is an error, never removed.
+ * Unpack an archive made by `prepareLangDependencies` into `destDir` (default:
+ * this checkout's parent), replacing each repo it contains. `repos` limits it
+ * to those. Outside CI an existing repo in the way is an error.
  */
 export async function restoreLangDependencyRepos(
   archive: string,
@@ -405,16 +360,10 @@ function useCorpusRepos(repos: string[]): void {
 }
 
 /**
- * Put the corpus repos at the commits the lang-deps step recorded beside this
- * checkout, and name the ones with text in GIELLA_CORPUS_REPOS, so every
- * step's make resolves the speller corpus exactly alike. Any other answer --
- * a repo missing here, or at another commit -- rebuilds the weighting, and a
- * test step would then test a speller that was never shipped. So a repo that
- * can't be fetched is fatal.
- *
- * Only `converted/` is fetched: it is what the weighting reads, and a repo
- * without it has no text to weight with. Every step fetches the same commit,
- * so every step makes the same call.
+ * Fetch the corpus repos' `converted/` (what the weighting reads) at the
+ * commits lang-deps recorded, and name them in GIELLA_CORPUS_REPOS. Every step
+ * must resolve the same corpus or make rebuilds the weighting, so a failed
+ * fetch is fatal.
  */
 export async function checkoutCorpusRepos(): Promise<void> {
   const revisions = JSON.parse(

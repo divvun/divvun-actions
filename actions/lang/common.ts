@@ -93,16 +93,12 @@ export async function setupLangToolchain(): Promise<void> {
   await ensureGtlextoolsVenv()
 }
 
-/**
- * The lang-deps step's sibling dependency repos (giella-core, declared
- * shared-* and lang-*), built, as `prepareLangDependencies` packed them.
- */
+/** The lang-deps step's built dependency repos (`prepareLangDependencies`). */
 export const DEPENDENCY_SNAPSHOT = "workspace-deps.tar.zst"
 
 /**
- * The lang-deps step: decide and build this build's dependency repos, and
- * upload them for every other step. See `prepareLangDependencies`.
- * giella-core's configure requires GiellaLTLexTools, hence the toolchain.
+ * The lang-deps step. The toolchain is for giella-core's configure, which
+ * requires GiellaLTLexTools.
  */
 export async function langDeps(): Promise<void> {
   await setupLangToolchain()
@@ -116,10 +112,8 @@ export async function langDeps(): Promise<void> {
 }
 
 /**
- * Download the lang-deps step's dependency snapshot and unpack it over this
- * checkout's siblings (or into `opts.destDir`), so this step builds and tests
- * against exactly the dependency commits the rest of the build uses, with no
- * git network access of its own.
+ * Unpack the lang-deps step's dependency snapshot over this checkout's
+ * siblings (or into `opts.destDir`).
  */
 export async function downloadAndRestoreDependencySnapshot(
   opts?: { destDir?: string; repos?: string[] },
@@ -136,11 +130,6 @@ export async function downloadAndRestoreDependencySnapshot(
   }
 }
 
-/**
- * Everything a giella build or test step needs beside the checkout: the
- * toolchain, the lang-deps step's dependency repos and the corpus repos at
- * the commits it recorded.
- */
 export async function setupLangDependencies(): Promise<void> {
   await setupLangToolchain()
   await downloadAndRestoreDependencySnapshot()
@@ -148,9 +137,8 @@ export async function setupLangDependencies(): Promise<void> {
 }
 
 /**
- * A build step's whole checkout, built and configured, for the steps that
- * continue from it: speller-build's for grammar-build, speller-test and
- * proofing-build; grammar-build's for grammar-test.
+ * A built checkout: speller-build's, for grammar-build, speller-test and
+ * proofing-build; grammar-build's, for grammar-test.
  */
 export type WorkspaceSnapshot = "speller" | "grammar"
 
@@ -164,11 +152,9 @@ function snapshotCheckoutMetadata(snapshot: WorkspaceSnapshot): string {
 }
 
 /**
- * Built files a snapshot leaves out and uploads as artifacts of their own
- * instead: the products other steps download anyway, and too large to carry
- * twice (grammar-build's bundle.drb and .zcheck are ~600 MiB each). Restoring
- * downloads them back into place. Nothing is built from them, and a download
- * is newer than everything they are built from, so make leaves them be.
+ * Built files left out of a snapshot and uploaded separately: other steps
+ * download them anyway, and they are large (~600 MiB each). Once downloaded
+ * they are newer than their inputs, so make leaves them be.
  */
 const SNAPSHOT_ARTIFACTS: Record<WorkspaceSnapshot, string[]> = {
   speller: [],
@@ -178,7 +164,6 @@ const SNAPSHOT_ARTIFACTS: Record<WorkspaceSnapshot, string[]> = {
   ],
 }
 
-/** The largest directories under build/, so the snapshot's size is explained. */
 async function logBuildDirSizes(): Promise<void> {
   const du = await new Deno.Command("bash", {
     args: ["-c", "du -m -d 3 build 2>/dev/null | sort -rn | head -n 12"],
@@ -190,13 +175,9 @@ async function logBuildDirSizes(): Promise<void> {
 }
 
 /**
- * Pack this checkout (source + build dir, mtimes preserved, without .git) as
- * `snapshot`, upload it with the artifacts it leaves out
- * (`SNAPSHOT_ARTIFACTS`), and record where it was built: configure wrote that
- * absolute path into the Makefiles and scripts, and `restoreBuiltWorkspace`
- * makes it lead to wherever the snapshot is unpacked. Excluding .git keeps the
- * archive smaller and avoids conflicts with the downstream step's own
- * checkout.
+ * Pack and upload this checkout (without .git), and record where it was
+ * built: configure wrote that absolute path into the Makefiles, and
+ * `restoreBuiltWorkspace` has to reach it.
  */
 export async function uploadWorkspaceSnapshot(
   snapshot: WorkspaceSnapshot,
@@ -221,8 +202,7 @@ export async function uploadWorkspaceSnapshot(
 export async function downloadAndExtractWorkspaceSnapshot(
   snapshot: WorkspaceSnapshot,
 ): Promise<void> {
-  // Modification times are restored, so make sees build artifacts as newer
-  // than sources and will not attempt to recompile anything.
+  // Restored mtimes keep make from rebuilding anything.
   const archive = snapshotArchive(snapshot)
   await builder.downloadArtifacts(archive, ".")
   logger.info(`Extracting ${snapshot} workspace snapshot`)
@@ -234,17 +214,11 @@ export async function downloadAndExtractWorkspaceSnapshot(
 }
 
 /**
- * Make the checkout path a snapshot was built at lead to this one.
- *
- * The path differs between agents only in the agent's name
- * (/buildkite/builds/<agent>/<org>/<pipeline>/<repo>). Its parent, which also
- * holds giella-core and the other sibling repos, becomes a symlink to this
- * checkout's parent, so every absolute path configure recorded reaches the
- * same files here. Re-running configure instead would rewrite every file it
- * generates, and make would rebuild whatever depends on them (the spellers'
- * index.xml, and so every .zhfst). Each agent runs in its own container, so
- * the link is seen by nothing but this job and later jobs on this agent,
- * which replace it.
+ * Make the checkout path a snapshot was built at lead here, by symlinking its
+ * parent (which also holds the sibling repos) to this checkout's parent. The
+ * paths differ between agents only in the agent's name. Re-running configure
+ * instead would regenerate files that every .zhfst depends on. Each agent is
+ * its own container, so only this agent's jobs see the link.
  */
 async function reachBuiltCheckout(builtAt: string): Promise<void> {
   const here = Deno.cwd()
@@ -274,18 +248,9 @@ async function reachBuiltCheckout(builtAt: string): Promise<void> {
 }
 
 /**
- * Restore a built + configured workspace on a fresh agent, ready to `make`
- * without rebuilding anything: download `snapshot`, set up the build's
- * dependency and corpus repos, and make the checkout path it was built at
- * lead here (see `reachBuiltCheckout`). All snapshots keep their build-machine
- * mtimes and nothing is regenerated, so make treats the built artifacts as up
- * to date.
- *
- * A snapshot that recorded no checkout path (made before that was recorded)
- * is configured again with the flags in `configureFlagsMetadataKey` instead,
- * as it used to be; make then repacks the spellers.
- *
- * Shared by the test steps and the proofing-build step.
+ * Restore `snapshot` and the build's dependency and corpus repos, ready to
+ * `make` without rebuilding anything. A snapshot that recorded no checkout
+ * path is configured again instead, which repacks the spellers.
  */
 export async function restoreBuiltWorkspace(
   snapshot: WorkspaceSnapshot,

@@ -2,18 +2,12 @@ import * as path from "@std/path"
 import logger from "~/util/log.ts"
 
 /**
- * Tarballs made and read with bsdtar (libarchive), which the Linux agents
- * already use for zstd (`Tar.createFlatPkt`): it compresses with zstd on as
- * many threads as there are cores, and detects the compression of an archive
- * it reads, so `listTarball` and `extractTarball` read .tar.zst and .tar.gz
- * alike. Check that an agent's bsdtar has zstd before using this elsewhere.
- *
- * zstd rather than gzip: on a lang build's dependency repos (762 MiB of
- * tar), gzip -1 took 3.0 s to make 180 MiB, zstd -9 on 14 threads 0.7 s to
- * make 104 MiB, and zstd decompresses faster too.
+ * Tarballs via bsdtar, which on the Linux agents supports multithreaded zstd
+ * and detects compression when reading. Check that an agent's bsdtar has zstd
+ * before using this elsewhere. On a lang build's dependency repos zstd -9 was
+ * 4x faster than gzip -1 and 40% smaller.
  */
 
-/** zstd level `createTarZst` uses by default: most of the size, little time. */
 export const DEFAULT_ZSTD_LEVEL = 9
 
 async function bsdtar(args: string[], cwd?: string): Promise<string> {
@@ -32,16 +26,12 @@ async function bsdtar(args: string[], cwd?: string): Promise<string> {
 }
 
 /**
- * Pack `paths` (relative to `cwd`) into the zstd-compressed tarball
- * `archive`, keeping modification times and permissions. `exclude` takes
- * bsdtar patterns, matched against each archived path (`./build/x.drb` when
- * `paths` is `["."]`) at any directory boundary.
+ * Pack `paths` (relative to `cwd`) into `archive`. `exclude` patterns match
+ * archived paths as stored (`./build/x.drb` when `paths` is `["."]`).
  *
- * File names are stored as the bytes they are on disk (hdrcharset=BINARY)
- * and so come back exactly as they were. By default bsdtar converts them to
- * UTF-8 from the locale's charset, which on the agents (C locale) fails for
- * any non-ASCII name (lang-smj's insert-æae-area-flags.regex) with a warning
- * per file, and which in a UTF-8 locale on macOS can change their bytes.
+ * File names are stored as raw bytes (hdrcharset=BINARY): by default bsdtar
+ * converts them from the locale's charset, which fails for non-ASCII names in
+ * the agents' C locale.
  */
 export async function createTarZst(
   archive: string,
@@ -74,9 +64,8 @@ export async function listTarball(archive: string): Promise<string[]> {
 }
 
 /**
- * Unpack a tarball into `cwd`, restoring modification times and
- * permissions, so make sees built files exactly as they were built. `paths`
- * limits it to those members.
+ * Unpack into `cwd`, restoring mtimes and permissions. `paths` limits it to
+ * those members.
  */
 export async function extractTarball(
   archive: string,
