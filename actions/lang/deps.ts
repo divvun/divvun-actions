@@ -205,6 +205,15 @@ async function logRepoRevision(repoPath: string, name: string): Promise<void> {
  * giella-core is a hard build requirement with no fallback. A failure to
  * clone or bootstrap it is fatal.
  *
+ * giella-core is re-bootstrapped (autogen + configure, a few seconds) even
+ * when it is already present. configure writes the absolute path it ran in
+ * into the Makefile, and make uses that path whenever it regenerates the
+ * autotools output (e.g. after a pull that touched configure.ac). A
+ * giella-core that another step unpacked from speller-build's dependency
+ * snapshot was configured on the agent that packed it, so that
+ * regeneration fails there with "build-aux/missing: No such file or
+ * directory".
+ *
  * Declared shared-* repos (configure.ac's gt_USE_SHARED / gt_NEED_SHARED) get
  * the same clone-when-missing treatment as giella-core -- but best-effort,
  * not fatal: a plain gt_USE_SHARED only downgrades to a
@@ -234,18 +243,16 @@ export async function ensureLangDependencyRepos(opts?: {
   const giellaCorePath = path.join(Deno.cwd(), "..", "giella-core")
   if (await fs.exists(giellaCorePath)) {
     await updateDependencyRepo(giellaCorePath, "giella-core")
-  } else {
-    if (!(await cloneSibling("giella-core", giellaCorePath))) {
-      throw new Error("Failed to clone giella-core")
-    }
-    logger.info("Bootstrapping giella-core...")
-    const bootstrap = new Deno.Command("bash", {
-      args: ["-c", "./autogen.sh && ./configure"],
-      cwd: giellaCorePath,
-    }).spawn()
-    if ((await bootstrap.status).code !== 0) {
-      throw new Error("Failed to bootstrap freshly cloned giella-core")
-    }
+  } else if (!(await cloneSibling("giella-core", giellaCorePath))) {
+    throw new Error("Failed to clone giella-core")
+  }
+  logger.info("Bootstrapping giella-core...")
+  const bootstrap = new Deno.Command("bash", {
+    args: ["-c", "./autogen.sh && ./configure"],
+    cwd: giellaCorePath,
+  }).spawn()
+  if ((await bootstrap.status).code !== 0) {
+    throw new Error("Failed to bootstrap giella-core")
   }
   await logRepoRevision(giellaCorePath, "giella-core")
 
@@ -397,9 +404,12 @@ async function tar(args: string[], cwd: string): Promise<void> {
  * history, and a lang-* dependency's history is large. The restore deletes
  * whatever it replaces, so an extracted `.git` always matches its tree.
  *
- * Nothing configure or make generates in these repos records their absolute
- * path, so the tree works from whatever directory a later step extracts it
- * into. Corpus repos are not packed (they are large, and the closed one must
+ * configure records the absolute path it ran in, so the unpacked tree works
+ * elsewhere only as long as make doesn't regenerate its autotools output. The
+ * steps that unpack it never run make in these repos, and
+ * `ensureLangDependencyRepos` reconfigures giella-core before building in it.
+ *
+ * Corpus repos are not packed (they are large, and the closed one must
  * not become an artifact); `restoreCorpusRepos` gives a later step the same
  * ones instead, because without them `make check` rebuilds the speller.
  */
