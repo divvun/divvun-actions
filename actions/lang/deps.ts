@@ -2,136 +2,92 @@ import * as path from "@std/path"
 import * as fs from "@std/fs"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
+import { createTarZst, extractTarball, listTarball } from "~/util/tarball.ts"
+import { makeTempDir } from "~/util/temp.ts"
 
 /**
  * Sibling dependency repos for a language build.
  *
  * A language checkout builds against repos that live BESIDE it: giella-core,
- * the shared-* lexicon repos, sometimes other lang-* repos, and the speller
- * corpus repos. Which ones a language needs is not for the pipeline to know:
- * configure.ac declares the build dependencies (gt_USE_SHARED / gt_NEED_SHARED
- * lines), and the speller weighting reads ../corpus-<lang> and
- * ../corpus-<lang>-x-closed when they exist (giella-core 1.15.2+). This module
- * reads those declarations and makes the siblings present and current, so no
- * action hard-codes its own repo list.
+ * the shared-* and lang-* repos configure.ac declares (gt_USE_SHARED /
+ * gt_NEED_SHARED), and the speller corpus repos ../corpus-<lang> and
+ * ../corpus-<lang>-x-closed.
  *
- * Only the steps that build from scratch (speller-build, tts-textproc-build,
- * the combined build) resolve these repos. speller-build then packs the build
- * dependencies it built against (`packLangDependencyRepos`) and every later
- * step unpacks that exact tree over its own siblings
- * (`restoreLangDependencyRepos`), so one build uses one set of dependency
- * commits, however many agents its steps land on.
+ * The lang-deps step fetches and builds them once (`prepareLangDependencies`).
+ * Every other step unpacks that snapshot (`restoreLangDependencyRepos`) and
+ * fetches the recorded corpus commits (`checkoutCorpusRepos`), so a build uses
+ * one set of commits whichever agents its steps land on.
  */
 
-async function gitPull(repoPath: string): Promise<boolean> {
-  const proc = new Deno.Command("git", {
-    args: ["pull"],
-    cwd: repoPath,
-  }).spawn()
-  return (await proc.status).code === 0
-}
-
 /**
- * Discarding local changes is only correct where a checkout is a disposable
- * build input. On CI agents it is; in local mode `..` may be a developer's
- * working tree with uncommitted work, and a build step must never eat that.
+ * On CI sibling checkouts are disposable; elsewhere `..` may be a developer's
+ * working tree, which must never be replaced.
  */
 function checkoutsAreDisposable(): boolean {
   return Deno.env.get("BUILDKITE") != null
 }
 
-/**
- * Update a dependency checkout in place.
- *
- * giella-core's `make` rewrites tracked files (docs/badgedata/version.json), so
- * on an agent that has built before, a plain `git pull` aborts with "Your local
- * changes would be overwritten by merge" and every subsequent build fails.
- * On CI the checkouts are disposable build inputs rather than somewhere work
- * is authored, so discard the modifications and pull again. A pull that fails
- * for any other reason (diverged branch, network) still throws untouched.
- */
-export async function updateDependencyRepo(
-  repoPath: string,
-  name: string,
-): Promise<void> {
-  // A checkout with no current branch is not ours to update. Buildkite checks
-  // pipelines out at a fixed commit, detached, so a sibling that is another
-  // pipeline's own checkout (lang-smj beside lang-sma, on an agent that
-  // builds both) looks exactly like this -- and `git pull` in it can only
-  // fail with "You are not currently on a branch". Dependency clones made by
-  // autogen or by this module are on a branch, so they still update.
-  const head = await new Deno.Command("git", {
-    args: ["symbolic-ref", "-q", "--short", "HEAD"],
-    cwd: repoPath,
-  }).output()
-  if (head.code !== 0) {
-    logger.warning(
-      `${name} is checked out at a fixed commit (likely another pipeline's ` +
-        `Buildkite checkout); leaving it as it is`,
-    )
-    return
-  }
-
-  logger.info(`Updating ${name}...`)
-  if (await gitPull(repoPath)) {
-    return
-  }
-
-  const status = await new Deno.Command("git", {
-    args: ["status", "--porcelain", "--untracked-files=no"],
-    cwd: repoPath,
-  }).output()
-  const dirty = new TextDecoder().decode(status.stdout).trim()
-  if (dirty === "") {
-    throw new Error(`Failed to update ${name}`)
-  }
-
-  if (!checkoutsAreDisposable()) {
-    logger.warning(
-      `${name} has local changes and cannot be pulled; leaving it as it ` +
-        `is (not on CI, so it may be a working tree):\n${dirty}`,
-    )
-    return
-  }
-
-  logger.warning(
-    `Discarding local changes in ${name} and retrying:\n${dirty}`,
-  )
-  const restore = new Deno.Command("git", {
-    args: ["checkout", "--", "."],
-    cwd: repoPath,
+async function run(cmd: string, args: string[], cwd: string): Promise<void> {
+  const proc = new Deno.Command(cmd, {
+    args,
+    cwd,
+    stdout: "inherit",
+    stderr: "inherit",
   }).spawn()
-  if ((await restore.status).code !== 0) {
-    throw new Error(`Failed to discard local changes in ${name}`)
+  const code = (await proc.status).code
+  if (code !== 0) {
+    throw new Error(`${cmd} ${args.join(" ")} failed with exit code ${code}`)
   }
+}
 
-  if (!(await gitPull(repoPath))) {
-    throw new Error(`Failed to update ${name}`)
+async function capture(
+  cmd: string,
+  args: string[],
+  cwd: string,
+): Promise<string> {
+  const out = await new Deno.Command(cmd, { args, cwd, stderr: "inherit" })
+    .output()
+  if (out.code !== 0) {
+    throw new Error(
+      `${cmd} ${args.join(" ")} failed with exit code ${out.code}`,
+    )
   }
+  return new TextDecoder().decode(out.stdout).trim()
+}
+
+/** A sibling repo configure.ac declares as a build dependency. */
+export type Dependency = {
+  repo: string
+  /**
+   * Declared with gt_NEED_SHARED, whose version floor is checked against the
+   * repo's own `.pc` file -- which only its configure writes. A plain
+   * gt_USE_SHARED only needs the directory to exist.
+   */
+  needsConfigure: boolean
 }
 
 /**
  * The sibling repos configure.ac declares as build dependencies, in
  * declaration order. `gt_USE_SHARED([smi], [shared-smi], [giella-shared-smi])`
  * names the repo in its second argument; gt_NEED_SHARED repeats a USE line to
- * add a version floor, so the two are read alike and deduplicated.
+ * add a version floor, so a repo declared both ways needs configuring.
  */
-export async function declaredDependencyRepos(
+export async function declaredDependencies(
   langDir: string = Deno.cwd(),
-): Promise<string[]> {
+): Promise<Dependency[]> {
   const configureAc = path.join(langDir, "configure.ac")
   if (!(await fs.exists(configureAc))) {
     return []
   }
   const text = await Deno.readTextFile(configureAc)
-  const repos = new Set<string>()
+  const deps = new Map<string, boolean>()
   const uses = text.matchAll(
-    /^\s*gt_(?:USE|NEED)_SHARED\(\s*\[[^\]]*\]\s*,\s*\[([^\]]+)\]/gm,
+    /^\s*gt_(USE|NEED)_SHARED\(\s*\[[^\]]*\]\s*,\s*\[([^\]]+)\]/gm,
   )
-  for (const use of uses) {
-    repos.add(use[1])
+  for (const [, macro, repo] of uses) {
+    deps.set(repo, (deps.get(repo) ?? false) || macro === "NEED")
   }
-  return [...repos]
+  return [...deps].map(([repo, needsConfigure]) => ({ repo, needsConfigure }))
 }
 
 /**
@@ -155,300 +111,195 @@ export function corpusRepos(repoName: string): string[] {
  * the language repo itself. Same host, owner and scheme, different name.
  */
 async function siblingCloneUrl(repoName: string): Promise<string> {
-  const origin = await new Deno.Command("git", {
-    args: ["remote", "get-url", "origin"],
-    cwd: Deno.cwd(),
-  }).output()
-  const originUrl = new TextDecoder().decode(origin.stdout).trim()
+  const originUrl = await capture(
+    "git",
+    ["remote", "get-url", "origin"],
+    Deno.cwd(),
+  )
   return originUrl.replace(/[^/:]+?(\.git)?$/, `${repoName}.git`)
 }
 
-async function cloneSibling(
-  repoName: string,
-  repoPath: string,
-): Promise<boolean> {
-  const url = await siblingCloneUrl(repoName)
-  logger.info(`Cloning ${repoName} (shallow) from ${url}`)
-  const proc = new Deno.Command("git", {
-    args: ["clone", "--depth", "1", url, repoPath],
-    stdout: "inherit",
-    stderr: "inherit",
-  }).spawn()
-  return (await proc.status).code === 0
+/**
+ * Make `dir` exactly `repo` at `ref` (a commit, or "HEAD"), whatever was there
+ * before, and return the commit. `sparse` limits the checkout and the fetched
+ * blobs to those patterns. Outside CI an existing directory is left alone.
+ */
+async function fetchRepo(
+  repo: string,
+  dir: string,
+  opts: { ref: string; sparse?: string[] },
+): Promise<string> {
+  if ((await fs.exists(dir)) && !checkoutsAreDisposable()) {
+    logger.warning(
+      `Leaving ${repo} as it is (not on CI, so it may be a working tree)`,
+    )
+    return await capture("git", ["rev-parse", "HEAD"], dir)
+  }
+
+  const url = await siblingCloneUrl(repo)
+  logger.info(`Fetching ${repo} at ${opts.ref} from ${url}`)
+  await fs.ensureDir(dir)
+  await run("git", ["init", "-q"], dir)
+  await run("git", ["config", "remote.origin.url", url], dir)
+  if (opts.sparse) {
+    await run("git", [
+      "sparse-checkout",
+      "set",
+      "--no-cone",
+      ...opts.sparse,
+    ], dir)
+  }
+  await run("git", [
+    "fetch",
+    "-q",
+    "--depth",
+    "1",
+    ...(opts.sparse ? ["--filter=blob:none"] : []),
+    "origin",
+    opts.ref,
+  ], dir)
+  await run("git", ["checkout", "-q", "-f", "--detach", "FETCH_HEAD"], dir)
+  await run("git", ["clean", "-ffdxq"], dir)
+
+  const log = await capture("git", ["log", "-1", "--format=%h %cI %s"], dir)
+  logger.info(`${repo} is at ${log}`)
+  return await capture("git", ["rev-parse", "HEAD"], dir)
 }
 
 /**
- * Log the commit a sibling checkout is actually sitting at, so a CI run can be
- * compared against another run or a developer's local checkout without
- * guessing from "Updating X..." alone (that line only says a pull was
- * attempted, not what it landed on).
+ * Other steps use giella-core unpacked at their own path without configuring
+ * it again, since a fresh configure would make make rebuild the spellers. Fail
+ * here, not later in a test, if a generated script hardcodes the (temporary)
+ * directory it was configured in.
  */
-async function logRepoRevision(repoPath: string, name: string): Promise<void> {
-  const log = await new Deno.Command("git", {
-    args: ["log", "-1", "--format=%h %cI %s"],
-    cwd: repoPath,
-  }).output()
-  const rev = new TextDecoder().decode(log.stdout).trim()
-  logger.info(`${name} is at ${rev || "(unknown revision)"}`)
-}
-
-/**
- * Make the language's sibling dependency repos present and current.
- *
- * For the steps that build from scratch. Steps that continue from
- * speller-build's snapshot use `restoreLangDependencyRepos` instead.
- *
- * giella-core is cloned + bootstrapped when missing, not just updated when
- * present, rather than leaving the clone to the language's own autogen.sh:
- * `hooks/environment` gives every pipeline its own checkout parent, so a
- * pipeline's first build on an agent starts with no siblings at all, and
- * giella-core is a hard build requirement with no fallback. A failure to
- * clone or bootstrap it is fatal.
- *
- * Declared shared-* repos (configure.ac's gt_USE_SHARED / gt_NEED_SHARED) get
- * the same clone-when-missing treatment as giella-core -- but best-effort,
- * not fatal: a plain gt_USE_SHARED only downgrades to a
- * configure *warning* when the directory is absent, so a failed clone there
- * is harmless. gt_NEED_SHARED (a handful of repos, adding a pkg-config
- * version floor on top) is NOT harmless -- it hard-errors
- * ("giella-shared-mul needs to be updated and installed") if the clone
- * didn't happen and the version requirement can't be checked. Both
- * declarations look identical from here (same regex, no way to tell which
- * macro a given repo uses without parsing configure.ac's actual macro call),
- * so a failed clone/bootstrap only warns; configure right afterward is the
- * one place that actually knows whether this repo was required.
- *
- * Corpus repos are updated or shallow-cloned, and a failure is a warning: most
- * languages have no corpus repo, and the closed one is private, so an agent
- * without access must still build. What was obtained is then stated rather
- * than left for make to discover: the repos present are exported as
- * GIELLA_CORPUS_REPOS (empty means the in-tree weights/*.raw.txt) and
- * returned, so the speller-build step can record them for the test steps.
- * giella-core refuses to guess the corpus when CI is set.
- */
-export async function ensureLangDependencyRepos(opts?: {
-  spellers?: boolean
-}): Promise<string[]> {
-  const spellers = opts?.spellers ?? true
-
-  const giellaCorePath = path.join(Deno.cwd(), "..", "giella-core")
-  if (await fs.exists(giellaCorePath)) {
-    await updateDependencyRepo(giellaCorePath, "giella-core")
-  } else {
-    if (!(await cloneSibling("giella-core", giellaCorePath))) {
-      throw new Error("Failed to clone giella-core")
-    }
-    logger.info("Bootstrapping giella-core...")
-    const bootstrap = new Deno.Command("bash", {
-      args: ["-c", "./autogen.sh && ./configure"],
-      cwd: giellaCorePath,
-    }).spawn()
-    if ((await bootstrap.status).code !== 0) {
-      throw new Error("Failed to bootstrap freshly cloned giella-core")
-    }
-  }
-  await logRepoRevision(giellaCorePath, "giella-core")
-
-  logger.info("Building giella-core...")
-  const make = new Deno.Command("make", { cwd: giellaCorePath }).spawn()
-  if ((await make.status).code !== 0) {
-    throw new Error("Failed to build giella-core")
-  }
-
-  for (const repo of await declaredDependencyRepos()) {
-    const repoPath = path.join(Deno.cwd(), "..", repo)
-    if (await fs.exists(repoPath)) {
-      await updateDependencyRepo(repoPath, repo)
+async function checkGiellaCoreIsRelocatable(giellaCore: string): Promise<void> {
+  const scripts = path.join(giellaCore, "scripts")
+  const stale: string[] = []
+  for await (const entry of Deno.readDir(scripts)) {
+    if (!entry.isFile || entry.name.startsWith("Makefile")) {
       continue
     }
-
-    if (!(await cloneSibling(repo, repoPath))) {
-      logger.warning(
-        `${repo} could not be cloned; configure will fail below if it's ` +
-          "actually required (gt_NEED_SHARED), or degrade gracefully if " +
-          "not (gt_USE_SHARED)",
-      )
-      continue
-    }
-
-    logger.info(`Bootstrapping ${repo}...`)
-    const bootstrap = new Deno.Command("bash", {
-      args: ["-c", "./autogen.sh && ./configure"],
-      cwd: repoPath,
-    }).spawn()
-    if ((await bootstrap.status).code !== 0) {
-      logger.warning(
-        `Failed to bootstrap ${repo}; configure will fail below if it's ` +
-          "actually required (gt_NEED_SHARED), or degrade gracefully if " +
-          "not (gt_USE_SHARED)",
-      )
+    const text = await Deno.readTextFile(path.join(scripts, entry.name))
+      .catch(() => "")
+    if (text.includes(giellaCore)) {
+      stale.push(entry.name)
     }
   }
-
-  if (!spellers) {
-    return []
+  if (stale.length > 0) {
+    throw new Error(
+      `giella-core's configure wrote the directory it ran in into ` +
+        `scripts/${stale.join(", scripts/")}, so they would not work where ` +
+        `the other steps unpack it. They must find giella-core from their ` +
+        `own location instead.`,
+    )
   }
-  const present: string[] = []
-  for (const repo of corpusRepos(builder.env.repoName)) {
-    const repoPath = path.join(Deno.cwd(), "..", repo)
-    if (await fs.exists(repoPath)) {
-      try {
-        await updateDependencyRepo(repoPath, repo)
-      } catch (e) {
-        logger.warning(
-          `Could not update ${repo}; the speller weighting uses it as it ` +
-            `is: ${e}`,
-        )
-      }
-    } else if (!(await cloneSibling(repo, repoPath))) {
-      logger.warning(
-        `${repo} is not available (private without access, or absent); ` +
-          `the speller weighting will not use it`,
-      )
-      continue
-    }
-    // The weighting reads <repo>/converted; a repo without it has no text.
-    if (await fs.exists(path.join(repoPath, "converted"))) {
-      await logRepoRevision(repoPath, repo)
-      present.push(repo)
-    } else {
-      logger.warning(`${repo} has no converted/ directory; not using it`)
-    }
-  }
-  useCorpusRepos(present)
-  return present
-}
-
-/** Build metadata key: JSON array of the corpus repos the speller was built with. */
-export const CORPUS_REPOS_METADATA = "speller-corpus-repos"
-
-/**
- * Tell giella-core which corpus repos the speller weighting uses, for every
- * make this process runs from here on.
- */
-function useCorpusRepos(repos: string[]): void {
-  Deno.env.set("GIELLA_CORPUS_REPOS", repos.join(" "))
-  logger.info(
-    `Speller corpus: ${
-      repos.length > 0 ? repos.join(", ") : "in-tree weights/*.raw.txt"
-    }`,
-  )
-}
-
-/**
- * Give a test step the corpus repos the speller-build step used, and name the
- * same ones in GIELLA_CORPUS_REPOS, so `make check` resolves the corpus
- * exactly as the build did. Any other answer -- a repo missing here, or one
- * the build did not have -- rebuilds the weighting, and the step would then
- * test a speller that was never shipped. Only the directories have to exist:
- * make does not read the corpus unless it rebuilds.
- */
-export async function restoreCorpusRepos(): Promise<void> {
-  const repos = JSON.parse(await builder.metadata(CORPUS_REPOS_METADATA)) as
-    string[]
-  for (const repo of repos) {
-    const repoPath = path.join(Deno.cwd(), "..", repo)
-    if (await fs.exists(path.join(repoPath, "converted"))) {
-      continue
-    }
-    if (await fs.exists(repoPath)) {
-      throw new Error(
-        `${repo} is here but has no converted/ directory, while the ` +
-          `speller-build step used it`,
-      )
-    }
-    if (!(await cloneSibling(repo, repoPath))) {
-      throw new Error(
-        `Could not clone ${repo}, which the speller-build step used; ` +
-          `testing without it would rebuild the speller`,
-      )
-    }
-  }
-  useCorpusRepos(repos)
 }
 
 /** Build metadata key: `{repo: commit}` for the repos in the snapshot. */
 const DEPENDENCY_REVISIONS_METADATA = "lang-dependency-revisions"
 
-async function tar(args: string[], cwd: string): Promise<void> {
-  const proc = new Deno.Command("tar", {
-    args,
-    cwd,
-    stdout: "inherit",
-    stderr: "inherit",
-  }).spawn()
-  const code = (await proc.status).code
-  if (code !== 0) {
-    throw new Error(`tar ${args[0]} failed with exit code ${code}`)
-  }
-}
+/** Build metadata key: `{repo: commit}` for the corpus repos this build uses. */
+const CORPUS_REVISIONS_METADATA = "lang-corpus-revisions"
 
 /**
- * Pack the build dependencies this checkout was just built against --
- * giella-core and the configure.ac-declared repos, as they sit in `../`,
- * built -- into `archive`, for `restoreLangDependencyRepos` in later steps.
+ * The lang-deps step: fetch giella-core and the declared repos at their
+ * current commits, build them, record their commits and the corpus repos',
+ * and pack the repos into `archive`.
  *
- * giella-core keeps its `.git`: every FST directory's `.generated/build-inputs`
- * stamp (giella-core's am-shared/dot-generated-dir.am) records
- * `git -C $(GTCORE) rev-parse HEAD`, and every FST depends on that stamp. A
- * giella-core without history makes that `no-git`, which no longer matches the
- * stamp in speller-build's workspace snapshot, so make would rebuild the whole
- * tree. The other repos leave `.git` out: nothing in the build reads their
- * history, and a lang-* dependency's history is large. The restore deletes
- * whatever it replaces, so an extracted `.git` always matches its tree.
+ * Only giella-core failing is fatal. A declared repo that fails is left out,
+ * and configure decides later whether it was required (gt_NEED_SHARED).
+ * Those are configured with autoreconf, not their autogen.sh, which in a
+ * lang-* repo clones siblings of its own.
  *
- * Nothing configure or make generates in these repos records their absolute
- * path, so the tree works from whatever directory a later step extracts it
- * into. Corpus repos are not packed (they are large, and the closed one must
- * not become an artifact); `restoreCorpusRepos` gives a later step the same
- * ones instead, because without them `make check` rebuilds the speller.
+ * giella-core keeps its `.git`: every FST's `.generated/build-inputs` stamp
+ * records its `git rev-parse HEAD`, and without history that becomes `no-git`
+ * and make rebuilds the whole tree.
+ *
+ * Corpus repos are only resolved to a commit, not packed: they are large, and
+ * the closed one must not become an artifact.
  */
-export async function packLangDependencyRepos(archive: string): Promise<void> {
-  const parent = path.resolve(Deno.cwd(), "..")
-  const repos: string[] = []
-  const revisions: Record<string, string> = {}
-  for (const repo of ["giella-core", ...(await declaredDependencyRepos())]) {
-    const repoPath = path.join(parent, repo)
-    if (!(await fs.exists(repoPath))) {
-      continue
+export async function prepareLangDependencies(archive: string): Promise<void> {
+  const workDir = (await makeTempDir({ prefix: "lang-deps-" })).path
+  try {
+    const revisions: Record<string, string> = {}
+
+    const giellaCore = path.join(workDir, "giella-core")
+    revisions["giella-core"] = await fetchRepo("giella-core", giellaCore, {
+      ref: "HEAD",
+    })
+    logger.info("Building giella-core...")
+    await run(
+      "bash",
+      ["-c", "autoreconf -i && ./configure && make"],
+      giellaCore,
+    )
+    await checkGiellaCoreIsRelocatable(giellaCore)
+
+    for (const { repo, needsConfigure } of await declaredDependencies()) {
+      const dir = path.join(workDir, repo)
+      try {
+        revisions[repo] = await fetchRepo(repo, dir, { ref: "HEAD" })
+        if (needsConfigure) {
+          logger.info(`Configuring ${repo}...`)
+          await run("bash", ["-c", "autoreconf -i && ./configure"], dir)
+        }
+      } catch (e) {
+        logger.warning(
+          `Leaving ${repo} out of the dependency snapshot: ${e}. configure ` +
+            "will fail where it is required (gt_NEED_SHARED), or degrade " +
+            "gracefully where not (gt_USE_SHARED)",
+        )
+        delete revisions[repo]
+        await Deno.remove(dir, { recursive: true }).catch(() => {})
+      }
     }
-    repos.push(repo)
-    const rev = await new Deno.Command("git", {
-      args: ["rev-parse", "HEAD"],
-      cwd: repoPath,
-    }).output()
-    revisions[repo] = new TextDecoder().decode(rev.stdout).trim() || "unknown"
+
+    const corpusRevisions: Record<string, string> = {}
+    for (const repo of corpusRepos(builder.env.repoName)) {
+      try {
+        const head = await capture("git", [
+          "ls-remote",
+          await siblingCloneUrl(repo),
+          "HEAD",
+        ], Deno.cwd())
+        const commit = head.split(/\s/)[0]
+        if (commit) {
+          corpusRevisions[repo] = commit
+          logger.info(`${repo} is at ${commit}`)
+        }
+      } catch (e) {
+        logger.warning(
+          `${repo} is not available (private without access, or absent); ` +
+            `the speller weighting will not use it: ${e}`,
+        )
+      }
+    }
+
+    await builder.setMetadata(
+      DEPENDENCY_REVISIONS_METADATA,
+      JSON.stringify(revisions),
+    )
+    await builder.setMetadata(
+      CORPUS_REVISIONS_METADATA,
+      JSON.stringify(corpusRevisions),
+    )
+
+    const repos = Object.keys(revisions)
+    logger.info(`Packing dependency repos: ${repos.join(", ")}`)
+    await createTarZst(path.resolve(archive), repos, {
+      cwd: workDir,
+      exclude: repos.filter((repo) => repo !== "giella-core")
+        .map((repo) => `${repo}/.git`),
+    })
+  } finally {
+    await Deno.remove(workDir, { recursive: true }).catch(() => {})
   }
-
-  logger.info(`Packing dependency repos: ${repos.join(", ")}`)
-  await tar([
-    "-I",
-    "gzip -1",
-    "-cpf",
-    path.resolve(archive),
-    ...repos.filter((repo) => repo !== "giella-core")
-      .map((repo) => `--exclude=${repo}/.git`),
-    ...repos,
-  ], parent)
-  const { size } = await Deno.stat(archive)
-  logger.info(
-    `${path.basename(archive)} is ${(size / 1024 / 1024).toFixed(1)} MiB`,
-  )
-
-  await builder.setMetadata(
-    DEPENDENCY_REVISIONS_METADATA,
-    JSON.stringify(revisions),
-  )
 }
 
 /**
- * Unpack an archive made by `packLangDependencyRepos` into `destDir` (by
- * default this checkout's parent, where configure looks for the siblings),
- * deleting each repo it contains first so what's left is exactly what the
- * packing step built against. `repos` limits the unpack to those repos.
- *
- * Deleting is only ever correct for disposable CI checkouts; outside CI an
- * existing directory in the way is an error, never removed.
+ * Unpack an archive made by `prepareLangDependencies` into `destDir` (default:
+ * this checkout's parent), replacing each repo it contains. `repos` limits it
+ * to those. Outside CI an existing repo in the way is an error.
  */
 export async function restoreLangDependencyRepos(
   archive: string,
@@ -456,14 +307,8 @@ export async function restoreLangDependencyRepos(
 ): Promise<void> {
   const destDir = opts?.destDir ?? path.resolve(Deno.cwd(), "..")
 
-  const list = await new Deno.Command("tar", {
-    args: ["-tzf", archive],
-  }).output()
-  if (list.code !== 0) {
-    throw new Error(`Failed to list ${archive}`)
-  }
   const packed = new Set(
-    new TextDecoder().decode(list.stdout).split("\n")
+    (await listTarball(archive))
       .map((entry) => entry.replace(/^\.\//, "").split("/")[0])
       .filter((name) => name !== "" && name !== "."),
   )
@@ -486,7 +331,7 @@ export async function restoreLangDependencyRepos(
   }
 
   logger.info(`Unpacking dependency repos into ${destDir}: ${repos.join(", ")}`)
-  await tar(["-xpf", path.resolve(archive), ...repos], destDir)
+  await extractTarball(archive, { cwd: destDir, paths: repos })
 
   try {
     const revisions = JSON.parse(
@@ -498,4 +343,41 @@ export async function restoreLangDependencyRepos(
   } catch (e) {
     logger.warning(`Could not read the dependency revisions: ${e}`)
   }
+}
+
+/**
+ * Tell giella-core which corpus repos the speller weighting uses, for every
+ * make this process runs from here on. giella-core refuses to guess the
+ * corpus when CI is set.
+ */
+function useCorpusRepos(repos: string[]): void {
+  Deno.env.set("GIELLA_CORPUS_REPOS", repos.join(" "))
+  logger.info(
+    `Speller corpus: ${
+      repos.length > 0 ? repos.join(", ") : "in-tree weights/*.raw.txt"
+    }`,
+  )
+}
+
+/**
+ * Fetch the corpus repos' `converted/` (what the weighting reads) at the
+ * commits lang-deps recorded, and name them in GIELLA_CORPUS_REPOS. Every step
+ * must resolve the same corpus or make rebuilds the weighting, so a failed
+ * fetch is fatal.
+ */
+export async function checkoutCorpusRepos(): Promise<void> {
+  const revisions = JSON.parse(
+    await builder.metadata(CORPUS_REVISIONS_METADATA),
+  ) as Record<string, string>
+  const present: string[] = []
+  for (const [repo, commit] of Object.entries(revisions)) {
+    const dir = path.join(Deno.cwd(), "..", repo)
+    await fetchRepo(repo, dir, { ref: commit, sparse: ["/converted/"] })
+    if (await fs.exists(path.join(dir, "converted"))) {
+      present.push(repo)
+    } else {
+      logger.warning(`${repo} has no converted/ directory; not using it`)
+    }
+  }
+  useCorpusRepos(present)
 }

@@ -3,11 +3,10 @@ import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
 import {
-  downloadAndExtractSpellerSnapshot,
-  downloadAndRestoreDependencySnapshot,
-  setupLangToolchain,
+  downloadAndExtractWorkspaceSnapshot,
+  setupLangDependencies,
+  uploadWorkspaceSnapshot,
 } from "./common.ts"
-import { restoreCorpusRepos } from "./deps.ts"
 
 class Autotools {
   private directory: string
@@ -134,15 +133,11 @@ export default async function langGrammarBuild(
   // Download and extract the speller workspace snapshot so that speller
   // artifacts are present with their original mtimes before we configure and
   // build. This prevents make from trying to rebuild speller targets.
-  await downloadAndExtractSpellerSnapshot()
+  await downloadAndExtractWorkspaceSnapshot("speller")
 
-  // Build against the dependency repos speller-build used, not whatever is
-  // current now.
-  await setupLangToolchain()
-  await downloadAndRestoreDependencySnapshot()
-  // And the corpus repos it weighted the speller with, so this make leaves
-  // the speller the grammar checker embeds as it was built.
-  await restoreCorpusRepos()
+  // The same dependency and corpus repos speller-build used, so this make
+  // leaves the speller the grammar checker embeds as it was built.
+  await setupLangDependencies()
 
   const flags = deriveAutogenFlags(buildConfig)
   await builder.setMetadata("grammar-configure-flags", flags.join(" "))
@@ -151,9 +146,9 @@ export default async function langGrammarBuild(
   logger.debug(`Flags: ${flags}`)
   await autotoolsBuilder.build(flags)
 
-  // Upload grammar files
-  await builder.uploadArtifacts("build/tools/grammarcheckers/*.drb")
-  await builder.uploadArtifacts("build/tools/grammarcheckers/*.zcheck")
+  // For the grammar-test step, which tests this tree as built. This also
+  // uploads the .drb and .zcheck, for the bundle, teaksta and proofing steps.
+  await uploadWorkspaceSnapshot("grammar")
 
   logger.info("Grammar checker build complete")
 

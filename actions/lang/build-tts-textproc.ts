@@ -3,7 +3,7 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
-import { setupGiellaCoreDependencies } from "./common.ts"
+import { setupLangDependencies } from "./common.ts"
 
 class Autotools {
   private directory: string
@@ -92,7 +92,7 @@ export default async function langTtsTextprocBuild(
   logger.info("Building TTS text processor")
   logger.info(JSON.stringify(buildConfig, null, 2))
 
-  await setupGiellaCoreDependencies()
+  await setupLangDependencies()
 
   const flags = deriveAutogenFlags(buildConfig)
   const autotoolsBuilder = new Autotools(Deno.cwd())

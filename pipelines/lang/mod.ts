@@ -18,9 +18,8 @@ import { runLangDocsPublish } from "~/actions/lang/docs-publish.ts"
 import langSpellerBuild from "~/actions/lang/build-speller.ts"
 import langTeakstaBundleBuild from "~/actions/lang/build-teaksta-bundle.ts"
 import langTtsTextprocBuild from "~/actions/lang/build-tts-textproc.ts"
-import langBuild from "~/actions/lang/build.ts"
 import langCheck from "~/actions/lang/check.ts"
-import { usesRustToolchain } from "~/actions/lang/common.ts"
+import { langDeps, usesRustToolchain } from "~/actions/lang/common.ts"
 import langGrammarTest from "~/actions/lang/test-grammar.ts"
 import langSpellerTest from "~/actions/lang/test-speller.ts"
 import * as builder from "~/builder.ts"
@@ -94,21 +93,8 @@ function isConfigActive(config: BuildProps | undefined | null): boolean {
   })
 }
 
-export async function runLangBuild() {
-  const yml = await Deno.readTextFile(".build-config.yml")
-  const config = await yaml.parse(yml) as any
-
-  const buildConfig = config?.build as BuildProps | undefined
-
-  const shouldBuild = isConfigActive(buildConfig)
-
-  if (!shouldBuild) {
-    throw new Error(
-      "No build configuration found in .build-config.yml",
-    )
-  }
-
-  await langBuild(buildConfig!)
+export async function runLangDeps() {
+  await langDeps()
 }
 
 export async function runLangTest() {
@@ -1112,7 +1098,7 @@ export async function pipelineLang() {
 
   // Steps that shell out to hfst/cg3 are tagged when a repo is opted back to
   // the C++ toolchain, so the exception is visible from the build page.
-  // setupGiellaCoreDependencies() does the actual PATH switch off the same
+  // setupLangToolchain() does the actual PATH switch off the same
   // predicate.
   const toolchainTag = usesRustToolchain() ? "" : " (C++)"
 
@@ -1126,11 +1112,23 @@ export async function pipelineLang() {
     // Config file not found or invalid, buildConfig remains undefined
   }
 
+  // Decides every dependency repo commit for the whole build, and builds
+  // them once; every step that builds or tests unpacks its result.
+  const depsStep = command({
+    key: "lang-deps",
+    label: "Fetch Dependencies",
+    command: "divvun-actions run lang-deps",
+    agents: {
+      queue: "linux",
+    },
+  })
+
   // Separate build steps for spellers and grammar checkers
   const spellerBuildStep = command({
     key: "speller-build",
     label: `Build Spellers${toolchainTag}`,
     command: "divvun-actions run lang-speller-build",
+    depends_on: "lang-deps",
     agents: {
       queue: "linux",
       ...extra,
@@ -1160,6 +1158,7 @@ export async function pipelineLang() {
     key: "tts-textproc-build",
     label: `Build TTS Text Processor${toolchainTag}`,
     command: "divvun-actions run lang-tts-textproc-build",
+    depends_on: "lang-deps",
     agents: {
       queue: "linux",
       ...extra,
@@ -1245,6 +1244,10 @@ export async function pipelineLang() {
       soft_fail: true,
       agents: { queue: "linux", ...extra },
     }))
+  }
+
+  if (buildSteps.length > 0) {
+    buildSteps.unshift(depsStep)
   }
 
   // Test phase steps array (only on non-release builds)

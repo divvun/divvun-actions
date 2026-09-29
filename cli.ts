@@ -103,6 +103,7 @@ import {
   pipelineLang,
   runLangBundle,
   runLangDeploy,
+  runLangDeps,
   runLangDocsPublish,
   runLangGrammarBuild,
   runLangGrammarBundle,
@@ -313,6 +314,10 @@ async function runPipeline(args: any) {
     case "divvun-keyboard-macos": {
       const kbdgenBundlePath = builder.env.repoName.split("-")[1] + ".kbdgen"
       await runDesktopKeyboardMacOS(kbdgenBundlePath, installerArg(args._[1]))
+      break
+    }
+    case "lang-deps": {
+      await runLangDeps()
       break
     }
     case "lang-speller-build": {

@@ -72,6 +72,22 @@ Deno.test("proofing DAG: grammar, spelling, disabled, main, PR and release tags"
           step.command === "divvun-actions run lang-proofing-deploy"
         )
         strictEqual(deploy.length, enabled ? 1 : 0)
+
+        // One lang-deps step decides the dependency repos for every step
+        // that builds from scratch.
+        const context = `${source} ${branch} ${tag}`
+        const fromScratch = steps.filter((step) =>
+          step.key === "speller-build" || step.key === "tts-textproc-build"
+        )
+        ok(fromScratch.length > 0, context)
+        strictEqual(
+          steps.filter((step) => step.key === "lang-deps").length,
+          1,
+          context,
+        )
+        for (const step of fromScratch) {
+          strictEqual(step.depends_on, "lang-deps", `${step.key} ${context}`)
+        }
       }
     }
   } finally {
