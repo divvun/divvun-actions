@@ -1,5 +1,6 @@
 import * as path from "@std/path"
 import logger from "~/util/log.ts"
+import { makeTempDir } from "~/util/temp.ts"
 
 /**
  * Tarballs made and read with bsdtar (libarchive), which the Linux agents
@@ -83,4 +84,61 @@ export async function extractTarball(
   opts: { cwd: string; paths?: string[] },
 ): Promise<void> {
   await bsdtar(["-xpf", path.resolve(archive), ...(opts.paths ?? [])], opts.cwd)
+}
+
+/** First line of `<command> --version`, or why there is none. */
+async function versionOf(command: string): Promise<string> {
+  try {
+    const out = await new Deno.Command(command, {
+      args: ["--version"],
+      stdout: "piped",
+      stderr: "piped",
+    }).output()
+    const text = new TextDecoder().decode(out.success ? out.stdout : out.stderr)
+    return text.trim().split("\n")[0] || `exit code ${out.code}`
+  } catch (e) {
+    return e instanceof Deno.errors.NotFound ? "not found" : String(e)
+  }
+}
+
+/**
+ * Log whether this agent can make and read the tarballs this module makes,
+ * by making and reading one with the same commands. For finding out which
+ * agents (macOS, Windows) are ready before any artifact they download is
+ * compressed, so it never throws: the answer is only logged, as one line
+ * starting "zstd tarballs: ready" or "zstd tarballs: NOT ready".
+ */
+export async function logZstdSupport(): Promise<void> {
+  const facts = [
+    `os: ${Deno.build.os}/${Deno.build.arch}`,
+    `bsdtar: ${await versionOf("bsdtar")}`,
+    `zstd: ${await versionOf("zstd")}`,
+  ]
+  let ready = false
+  let dir: string | undefined
+  try {
+    dir = (await makeTempDir({ prefix: "zstd-probe-" })).path
+    const content = "zstd probe\n"
+    await Deno.mkdir(path.join(dir, "in"))
+    await Deno.mkdir(path.join(dir, "out"))
+    await Deno.writeTextFile(path.join(dir, "in", "probe.txt"), content)
+    await createTarZst(path.join(dir, "probe.tar.zst"), ["probe.txt"], {
+      cwd: path.join(dir, "in"),
+    })
+    await extractTarball(path.join(dir, "probe.tar.zst"), {
+      cwd: path.join(dir, "out"),
+    })
+    const back = await Deno.readTextFile(path.join(dir, "out", "probe.txt"))
+    ready = back === content
+    facts.push(ready ? "round trip: ok" : "round trip: content differs")
+  } catch (e) {
+    facts.push(`round trip: ${e instanceof Error ? e.message : e}`)
+  } finally {
+    if (dir) {
+      await Deno.remove(dir, { recursive: true }).catch(() => {})
+    }
+  }
+  logger.info(
+    `zstd tarballs: ${ready ? "ready" : "NOT ready"} (${facts.join("; ")})`,
+  )
 }

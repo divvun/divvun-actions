@@ -29,6 +29,7 @@ import { globFiles, globOneFile } from "~/util/glob.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
 import { versionAsDev } from "~/util/shared.ts"
+import { logZstdSupport } from "~/util/tarball.ts"
 import spellerBundle, {
   type InstallerKind,
 } from "../../actions/speller/bundle.ts"
@@ -225,6 +226,8 @@ export async function runLangBundle(
     installer?: InstallerKind
   },
 ) {
+  // Runs on macOS and Windows: whether they can read zstd artifacts yet.
+  await logZstdSupport()
   await builder.downloadArtifacts("build/tools/spellcheckers/*.zhfst", ".")
 
   const spellerPaths = JSON.parse(await builder.metadata("speller-paths"))
@@ -713,6 +716,8 @@ export async function runLangProofingBuild() {
 export async function runLangProofingBundle(
   { target }: { target: ProofingTarget },
 ) {
+  // Runs on macOS and Windows: whether they can read zstd artifacts yet.
+  await logZstdSupport()
   const source = await readProofingSource()
   const artifact = proofingArtifact(source)
   await builder.downloadArtifacts(artifact, ".")
