@@ -5,8 +5,7 @@ import { globFiles } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { Tar } from "~/util/shared.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
-import { DEPENDENCY_SNAPSHOT, setupGiellaCoreDependencies } from "./common.ts"
-import { CORPUS_REPOS_METADATA, packLangDependencyRepos } from "./deps.ts"
+import { setupLangDependencies } from "./common.ts"
 import { uploadPkgVariants } from "./docs-publish.ts"
 
 class Autotools {
@@ -139,10 +138,7 @@ export default async function langSpellerBuild(
   logger.info("Building spellers only")
   logger.info(JSON.stringify(buildConfig, null, 2))
 
-  const corpusRepos = await setupGiellaCoreDependencies()
-  // The steps that reuse this tree need the same corpus repos, or their make
-  // rebuilds the speller from a different corpus.
-  await builder.setMetadata(CORPUS_REPOS_METADATA, JSON.stringify(corpusRepos))
+  await setupLangDependencies()
 
   const flags = deriveAutogenFlags(buildConfig)
   await builder.setMetadata("speller-configure-flags", flags.join(" "))
@@ -173,13 +169,6 @@ export default async function langSpellerBuild(
     throw new Error(`tar failed with exit code ${tarStatus.code}`)
   }
   await builder.uploadArtifacts("workspace-speller.tar.gz", {
-    cwd: path.resolve(Deno.cwd(), ".."),
-  })
-
-  // And the sibling repos it was built against, so the later steps use the
-  // same dependency commits instead of each resolving their own.
-  await packLangDependencyRepos(path.join("..", DEPENDENCY_SNAPSHOT))
-  await builder.uploadArtifacts(DEPENDENCY_SNAPSHOT, {
     cwd: path.resolve(Deno.cwd(), ".."),
   })
 

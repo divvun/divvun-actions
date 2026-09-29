@@ -4,8 +4,8 @@ import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import {
-  ensureLangDependencyRepos,
-  restoreCorpusRepos,
+  checkoutCorpusRepos,
+  prepareLangDependencies,
   restoreLangDependencyRepos,
 } from "./deps.ts"
 import { globFiles } from "~/util/glob.ts"
@@ -92,26 +92,30 @@ export async function setupLangToolchain(): Promise<void> {
   await ensureGtlextoolsVenv()
 }
 
-/** Toolchain plus freshly resolved sibling repos, for the steps that build
- * from scratch. Returns the speller corpus repos the build uses. */
-export async function setupGiellaCoreDependencies(): Promise<string[]> {
-  await setupLangToolchain()
-
-  return await ensureLangDependencyRepos()
-}
-
 /**
- * The speller-build step's sibling dependency repos (giella-core, declared
- * shared-*), built, as `packLangDependencyRepos` packed them. A separate
- * artifact from the workspace snapshot so a step that needs only the
- * dependencies doesn't download the whole built tree.
+ * The lang-deps step's sibling dependency repos (giella-core, declared
+ * shared-* and lang-*), built, as `prepareLangDependencies` packed them.
  */
 export const DEPENDENCY_SNAPSHOT = "workspace-deps.tar.gz"
 
 /**
- * Download the speller-build step's dependency snapshot and unpack it over
- * this checkout's siblings (or into `opts.destDir`), so this step builds and
- * tests against exactly the dependency commits speller-build used, with no
+ * The lang-deps step: decide and build this build's dependency repos, and
+ * upload them for every other step. See `prepareLangDependencies`.
+ */
+export async function langDeps(): Promise<void> {
+  const workDir = (await makeTempDir({ prefix: "workspace-deps-" })).path
+  try {
+    await prepareLangDependencies(path.join(workDir, DEPENDENCY_SNAPSHOT))
+    await builder.uploadArtifacts(DEPENDENCY_SNAPSHOT, { cwd: workDir })
+  } finally {
+    await Deno.remove(workDir, { recursive: true }).catch(() => {})
+  }
+}
+
+/**
+ * Download the lang-deps step's dependency snapshot and unpack it over this
+ * checkout's siblings (or into `opts.destDir`), so this step builds and tests
+ * against exactly the dependency commits the rest of the build uses, with no
  * git network access of its own.
  */
 export async function downloadAndRestoreDependencySnapshot(
@@ -127,6 +131,17 @@ export async function downloadAndRestoreDependencySnapshot(
   } finally {
     await Deno.remove(workDir, { recursive: true }).catch(() => {})
   }
+}
+
+/**
+ * Everything a giella build or test step needs beside the checkout: the
+ * toolchain, the lang-deps step's dependency repos and the corpus repos at
+ * the commits it recorded.
+ */
+export async function setupLangDependencies(): Promise<void> {
+  await setupLangToolchain()
+  await downloadAndRestoreDependencySnapshot()
+  await checkoutCorpusRepos()
 }
 
 export async function downloadAndExtractSpellerSnapshot(): Promise<void> {
@@ -152,11 +167,10 @@ export async function downloadAndExtractSpellerSnapshot(): Promise<void> {
 
 /**
  * Restore the built + configured workspace on a fresh agent: download the
- * speller-build workspace and dependency snapshots, give this agent the corpus
- * repos speller-build used, and re-run `configure` (not autogen) so the
- * Makefiles carry this agent's absolute paths. Both snapshots keep their
- * build-machine mtimes, so make treats the compiled artifacts as up to date
- * and recompiles nothing.
+ * speller-build workspace snapshot, set up the build's dependency and corpus
+ * repos, and re-run `configure` (not autogen) so the Makefiles carry this
+ * agent's absolute paths. Both snapshots keep their build-machine mtimes, so
+ * make treats the compiled artifacts as up to date and recompiles nothing.
  *
  * Shared by the test steps and the proofing-build step, which all need a
  * ready-to-`make` tree without a full rebuild.
@@ -166,9 +180,7 @@ export async function restoreBuiltWorkspace(
 ): Promise<void> {
   await downloadAndExtractSpellerSnapshot()
 
-  await setupLangToolchain()
-  await downloadAndRestoreDependencySnapshot()
-  await restoreCorpusRepos()
+  await setupLangDependencies()
 
   const configureFlags = await builder.metadata(configureFlagsMetadataKey)
   logger.info("Running configure")

@@ -260,8 +260,9 @@ export async function runLangDocsPublish() {
       logger.warning(`No typosreport artifacts: ${e}`)
     }
 
-    // giella-core's scripts from speller-build's dependency snapshot, so the
-    // badges come from the giella-core this build used, with no git access.
+    // giella-core's scripts from the lang-deps step's dependency snapshot, so
+    // the badges come from the giella-core this build used, with no git
+    // access.
     await downloadAndRestoreDependencySnapshot({
       destDir: workDir,
       repos: ["giella-core"],

@@ -31,7 +31,7 @@ import {
  *   script flattens (CG-3 `INCLUDE` is textual inclusion, and the runtime
  *   resolves it against the loader's cwd, which inside a .drb is not the asset
  *   store). The language's own sources are in the checkout; the shared
- *   sibling comes from speller-build's dependency snapshot, since
+ *   sibling comes from the lang-deps step's dependency snapshot, since
  *   configure.ac declares it via `gt_USE_SHARED`.
  *
  * With `assets/` assembled, `divvun-runtime bundle` packages it against
@@ -130,16 +130,16 @@ export default async function langTeakstaBundleBuild(
 
   const zcheckDir = await unpackZcheck()
 
-  // speller-build clones declared siblings best-effort, so one it couldn't
+  // lang-deps fetches declared siblings best-effort, so one it couldn't
   // clone is missing from the snapshot too — say so plainly rather than
   // letting the assemble script fail later with "unresolved INCLUDEs remain".
   const sharedSmi = path.resolve(Deno.cwd(), "..", "shared-smi")
   if (!(await fs.exists(sharedSmi))) {
     throw new Error(
       `${sharedSmi} is not checked out; the teaksta bundle's CG grammars ` +
-        `INCLUDE files from it. It comes from the speller-build step's ` +
+        `INCLUDE files from it. It comes from the lang-deps step's ` +
         `dependency snapshot, so check that step's log for why it was not ` +
-        `cloned.`,
+        `fetched.`,
     )
   }
 
