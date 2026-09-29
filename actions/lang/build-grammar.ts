@@ -3,8 +3,9 @@ import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
 import {
-  downloadAndExtractSpellerSnapshot,
+  downloadAndExtractWorkspaceSnapshot,
   setupLangDependencies,
+  uploadWorkspaceSnapshot,
 } from "./common.ts"
 
 class Autotools {
@@ -132,7 +133,7 @@ export default async function langGrammarBuild(
   // Download and extract the speller workspace snapshot so that speller
   // artifacts are present with their original mtimes before we configure and
   // build. This prevents make from trying to rebuild speller targets.
-  await downloadAndExtractSpellerSnapshot()
+  await downloadAndExtractWorkspaceSnapshot("speller")
 
   // The same dependency and corpus repos speller-build used, so this make
   // leaves the speller the grammar checker embeds as it was built.
@@ -144,6 +145,9 @@ export default async function langGrammarBuild(
 
   logger.debug(`Flags: ${flags}`)
   await autotoolsBuilder.build(flags)
+
+  // For the grammar-test step, which tests this tree as built.
+  await uploadWorkspaceSnapshot("grammar")
 
   // Upload grammar files
   await builder.uploadArtifacts("build/tools/grammarcheckers/*.drb")

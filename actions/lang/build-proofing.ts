@@ -27,7 +27,7 @@ async function run(command: string, args: string[], cwd: string) {
 export default async function langProofingBuild(
   info: { name: string; version: string; locales?: string[] },
 ) {
-  await restoreBuiltWorkspace("speller-configure-flags")
+  await restoreBuiltWorkspace("speller", "speller-configure-flags")
   const buildDir = path.resolve("build")
   for (const [directory, ...targets] of spellerProofingMakeSteps) {
     await run("make", ["-j2", ...targets], path.join(buildDir, directory))

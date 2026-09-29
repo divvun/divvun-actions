@@ -146,14 +146,60 @@ export async function setupLangDependencies(): Promise<void> {
   await checkoutCorpusRepos()
 }
 
-export async function downloadAndExtractSpellerSnapshot(): Promise<void> {
-  // Download the workspace snapshot produced by the speller-build step and
-  // extract it. tar -p restores mtimes, so make sees build artifacts as newer
-  // than sources and will not attempt to recompile anything.
-  await builder.downloadArtifacts("workspace-speller.tar.gz", ".")
-  logger.info("Extracting speller workspace snapshot")
+/**
+ * A build step's whole checkout, built and configured, for the steps that
+ * continue from it: speller-build's for grammar-build, speller-test and
+ * proofing-build; grammar-build's for grammar-test.
+ */
+export type WorkspaceSnapshot = "speller" | "grammar"
+
+function snapshotArchive(snapshot: WorkspaceSnapshot): string {
+  return `workspace-${snapshot}.tar.gz`
+}
+
+/** Build metadata key: the absolute checkout path the snapshot was built in. */
+function snapshotCheckoutMetadata(snapshot: WorkspaceSnapshot): string {
+  return `workspace-${snapshot}-checkout`
+}
+
+/**
+ * Pack this checkout (source + build dir, mtimes preserved, without .git) as
+ * `snapshot`, and record where it was built: configure wrote that absolute
+ * path into the Makefiles and scripts, and `restoreBuiltWorkspace` makes it
+ * lead to wherever the snapshot is unpacked. Excluding .git keeps the archive
+ * smaller and avoids conflicts with the downstream step's own checkout.
+ */
+export async function uploadWorkspaceSnapshot(
+  snapshot: WorkspaceSnapshot,
+): Promise<void> {
+  const archive = snapshotArchive(snapshot)
+  logger.info(`Creating ${snapshot} workspace snapshot`)
+  const tarProc = new Deno.Command("tar", {
+    args: ["-I", "gzip -1", "-cpf", `../${archive}`, "--exclude=./.git", "."],
+    cwd: Deno.cwd(),
+    stdout: "inherit",
+    stderr: "inherit",
+  }).spawn()
+  const tarStatus = await tarProc.status
+  if (tarStatus.code !== 0) {
+    throw new Error(`tar failed with exit code ${tarStatus.code}`)
+  }
+  await builder.setMetadata(snapshotCheckoutMetadata(snapshot), Deno.cwd())
+  await builder.uploadArtifacts(archive, {
+    cwd: path.resolve(Deno.cwd(), ".."),
+  })
+}
+
+export async function downloadAndExtractWorkspaceSnapshot(
+  snapshot: WorkspaceSnapshot,
+): Promise<void> {
+  // tar -p restores mtimes, so make sees build artifacts as newer than
+  // sources and will not attempt to recompile anything.
+  const archive = snapshotArchive(snapshot)
+  await builder.downloadArtifacts(archive, ".")
+  logger.info(`Extracting ${snapshot} workspace snapshot`)
   const extractProc = new Deno.Command("tar", {
-    args: ["-xpf", "workspace-speller.tar.gz"],
+    args: ["-xpf", archive],
     cwd: Deno.cwd(),
     stdout: "inherit",
     stderr: "inherit",
@@ -164,28 +210,84 @@ export async function downloadAndExtractSpellerSnapshot(): Promise<void> {
       `tar extraction failed with exit code ${extractStatus.code}`,
     )
   }
-  await Deno.remove("workspace-speller.tar.gz")
+  await Deno.remove(archive)
 }
 
 /**
- * Restore the built + configured workspace on a fresh agent: download the
- * speller-build workspace snapshot, set up the build's dependency and corpus
- * repos, and re-run `configure` (not autogen) so the Makefiles carry this
- * agent's absolute paths. Both snapshots keep their build-machine mtimes, so
- * make treats the compiled artifacts as up to date and recompiles nothing.
+ * Make the checkout path a snapshot was built at lead to this one.
  *
- * Shared by the test steps and the proofing-build step, which all need a
- * ready-to-`make` tree without a full rebuild.
+ * The path differs between agents only in the agent's name
+ * (/buildkite/builds/<agent>/<org>/<pipeline>/<repo>). Its parent, which also
+ * holds giella-core and the other sibling repos, becomes a symlink to this
+ * checkout's parent, so every absolute path configure recorded reaches the
+ * same files here. Re-running configure instead would rewrite every file it
+ * generates, and make would rebuild whatever depends on them (the spellers'
+ * index.xml, and so every .zhfst). Each agent runs in its own container, so
+ * the link is seen by nothing but this job and later jobs on this agent,
+ * which replace it.
+ */
+async function reachBuiltCheckout(builtAt: string): Promise<void> {
+  const here = Deno.cwd()
+  if (builtAt === here) {
+    logger.info(`Built at this same path (${here})`)
+    return
+  }
+  if (path.basename(builtAt) !== path.basename(here)) {
+    throw new Error(
+      `The snapshot was built in ${builtAt}, whose checkout is not named ` +
+        `like this one (${here}), so its sibling paths would not match`,
+    )
+  }
+  const builtParent = path.dirname(builtAt)
+  const existing = await Deno.lstat(builtParent).catch(() => null)
+  if (existing?.isSymlink) {
+    await Deno.remove(builtParent)
+  } else if (existing) {
+    throw new Error(
+      `${builtParent} exists and is not a symlink; refusing to replace it ` +
+        `to reach this checkout from where the snapshot was built`,
+    )
+  }
+  await fs.ensureDir(path.dirname(builtParent))
+  await Deno.symlink(path.dirname(here), builtParent)
+  logger.info(`Linked ${builtParent} -> ${path.dirname(here)}`)
+}
+
+/**
+ * Restore a built + configured workspace on a fresh agent, ready to `make`
+ * without rebuilding anything: download `snapshot`, set up the build's
+ * dependency and corpus repos, and make the checkout path it was built at
+ * lead here (see `reachBuiltCheckout`). All snapshots keep their build-machine
+ * mtimes and nothing is regenerated, so make treats the built artifacts as up
+ * to date.
+ *
+ * A snapshot that recorded no checkout path (made before that was recorded)
+ * is configured again with the flags in `configureFlagsMetadataKey` instead,
+ * as it used to be; make then repacks the spellers.
+ *
+ * Shared by the test steps and the proofing-build step.
  */
 export async function restoreBuiltWorkspace(
+  snapshot: WorkspaceSnapshot,
   configureFlagsMetadataKey: string,
 ): Promise<void> {
-  await downloadAndExtractSpellerSnapshot()
+  await downloadAndExtractWorkspaceSnapshot(snapshot)
 
   await setupLangDependencies()
 
+  const builtAt = await builder.metadata(snapshotCheckoutMetadata(snapshot))
+    .then((value) => value.trim())
+    .catch(() => undefined)
+  if (builtAt) {
+    await reachBuiltCheckout(builtAt)
+    return
+  }
+
   const configureFlags = await builder.metadata(configureFlagsMetadataKey)
-  logger.info("Running configure")
+  logger.warning(
+    `The ${snapshot} snapshot did not record where it was built; running ` +
+      `configure, which will make make repack the spellers`,
+  )
   const configureProc = new Deno.Command("bash", {
     args: ["-c", `../configure ${configureFlags}`],
     cwd: path.join(Deno.cwd(), "build"),
@@ -220,13 +322,14 @@ function changedArchives(
 }
 
 export async function runLangTests(opts: {
+  snapshot: WorkspaceSnapshot
   metadataKey: string
   label: string
 }) {
-  const { metadataKey, label } = opts
+  const { snapshot, metadataKey, label } = opts
 
   logger.info(`Downloading ${label} workspace snapshot`)
-  await restoreBuiltWorkspace(metadataKey)
+  await restoreBuiltWorkspace(snapshot, metadataKey)
 
   logger.info(`Running ${label} tests`)
 

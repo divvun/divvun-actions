@@ -5,7 +5,7 @@ import { globFiles } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { Tar } from "~/util/shared.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
-import { setupLangDependencies } from "./common.ts"
+import { setupLangDependencies, uploadWorkspaceSnapshot } from "./common.ts"
 import { uploadPkgVariants } from "./docs-publish.ts"
 
 class Autotools {
@@ -147,30 +147,8 @@ export default async function langSpellerBuild(
   logger.debug(`Flags: ${flags}`)
   await autotoolsBuilder.build(flags)
 
-  // Upload a workspace snapshot (source + build dir, mtimes preserved) for the
-  // test and grammar-build steps. Excluding .git keeps the archive smaller and
-  // avoids conflicts when the downstream step has already done a git checkout.
-  logger.info("Creating workspace snapshot tarball")
-  const tarProc = new Deno.Command("tar", {
-    args: [
-      "-I",
-      "gzip -1",
-      "-cpf",
-      "../workspace-speller.tar.gz",
-      "--exclude=./.git",
-      ".",
-    ],
-    cwd: Deno.cwd(),
-    stdout: "inherit",
-    stderr: "inherit",
-  }).spawn()
-  const tarStatus = await tarProc.status
-  if (tarStatus.code !== 0) {
-    throw new Error(`tar failed with exit code ${tarStatus.code}`)
-  }
-  await builder.uploadArtifacts("workspace-speller.tar.gz", {
-    cwd: path.resolve(Deno.cwd(), ".."),
-  })
+  // For the grammar-build, speller-test and proofing-build steps.
+  await uploadWorkspaceSnapshot("speller")
 
   await builder.uploadArtifacts("build/tools/spellcheckers/*.zhfst")
 
