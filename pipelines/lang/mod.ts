@@ -2,7 +2,6 @@ import * as fs from "@std/fs"
 import * as semver from "@std/semver"
 import * as toml from "@std/toml"
 import * as yaml from "@std/yaml"
-import grammarBundle from "~/actions/grammar/bundle.ts"
 import proofingBundle, {
   type ProofingTarget,
 } from "~/actions/proofing/bundle.ts"
@@ -536,35 +535,6 @@ export async function runLangDeploy() {
  */
 const GRAMMAR_DRB = "build/tools/grammarcheckers/*.drb"
 const GRAMMAR_ZCHECK = "build/tools/grammarcheckers/*.zcheck"
-
-export async function runLangGrammarBundle() {
-  await downloadCompressedArtifacts(GRAMMAR_DRB)
-  await downloadCompressedArtifacts(GRAMMAR_ZCHECK)
-
-  const drbFiles = await globFiles(GRAMMAR_DRB)
-  const zcheckFiles = await globFiles(GRAMMAR_ZCHECK)
-
-  let manifest
-  try {
-    manifest = toml.parse(
-      await Deno.readTextFile("./manifest.toml"),
-    ) as any
-  } catch (e) {
-    logger.error("Failed to read manifest.toml:", e)
-    throw e
-  }
-
-  const grammarManifest = {
-    name: manifest.package.grammar.name,
-    version: manifest.package.grammar.version,
-  }
-
-  await grammarBundle({
-    manifest: grammarManifest,
-    drbPaths: drbFiles,
-    zcheckPaths: zcheckFiles,
-  })
-}
 
 export async function runLangGrammarDeploy() {
   const isGrammarReleaseTag = GRAMMAR_RELEASE_TAG.test(builder.env.tag ?? "")
@@ -1371,18 +1341,6 @@ export async function pipelineLang() {
     }))
   }
 
-  if (buildConfig?.["grammar-checkers"] === true && isGrammarDeploy) {
-    bundleSteps.push(command({
-      label: "Bundle Grammar Checker",
-      key: "grammar-bundle",
-      command: "divvun-actions run lang-grammar-bundle",
-      depends_on: "grammar-build",
-      agents: {
-        queue: "linux",
-      },
-    }))
-  }
-
   // Experimental proofing packages (x-proofing-<lang>): wrap the selected DRB
   // per-OS. soft_fail keeps them from blocking the legacy speller/grammar chain.
   if (proofing && isProofingDeploy) {
@@ -1430,7 +1388,7 @@ export async function pipelineLang() {
         isGrammarReleaseTag ? "Release" : "Dev"
       })`,
       command: "divvun-actions run lang-grammar-deploy",
-      depends_on: "grammar-bundle",
+      depends_on: "grammar-build",
       agents: {
         queue: "linux",
       },

@@ -77,8 +77,7 @@ async function run(cmd: string, args: string[], options?: {
 
 /**
  * Download the grammar-build step's `.zcheck` and unpack it. It lands back at
- * `build/tools/grammarcheckers/`, same as the grammar bundle and deploy
- * actions expect.
+ * `build/tools/grammarcheckers/`, where the grammar deploy also expects it.
  */
 async function unpackZcheck(): Promise<string> {
   await downloadCompressedArtifacts(ZCHECK_GLOB)

@@ -106,7 +106,6 @@ import {
   runLangDeps,
   runLangDocsPublish,
   runLangGrammarBuild,
-  runLangGrammarBundle,
   runLangGrammarDeploy,
   runLangGrammarTest,
   runLangProofingBuild,
@@ -353,10 +352,6 @@ async function runPipeline(args: any) {
     }
     case "lang-deploy": {
       await runLangDeploy()
-      break
-    }
-    case "lang-grammar-bundle": {
-      await runLangGrammarBundle()
       break
     }
     case "lang-grammar-deploy": {
