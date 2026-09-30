@@ -13,6 +13,25 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+// Client errors other than timeouts won't succeed on retry.
+function isRetryable(status: number): boolean {
+  return status >= 500 || status === 408
+}
+
+async function httpError(
+  url: string,
+  options: RequestInit | undefined,
+  response: Response,
+): Promise<Error> {
+  const body = (await response.text().catch(() => "")).trim()
+  return new Error(
+    `${
+      options?.method ?? "GET"
+    } ${url} failed: HTTP ${response.status} ${response.statusText}` +
+      (body ? `\n${body}` : ""),
+  )
+}
+
 /**
  * Wrapper around fetch for GitHub API calls with automatic retry on failures.
  * Handles rate limiting using x-ratelimit headers and waits for reset.
@@ -57,12 +76,12 @@ export async function fetchGithub(
     }
 
     if (!response.ok && response.status !== 404) {
-      if (attempt < maxAttempts) {
+      if (isRetryable(response.status) && attempt < maxAttempts) {
         const waitMs = 1000 * Math.pow(2, attempt - 1)
         await sleep(waitMs)
         continue
       }
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      throw await httpError(url, options, response)
     }
 
     return response
@@ -110,12 +129,12 @@ export async function fetchBuildkite(
     }
 
     if (!response.ok) {
-      if (attempt < maxAttempts) {
+      if (isRetryable(response.status) && attempt < maxAttempts) {
         const waitMs = 1000 * Math.pow(2, attempt - 1)
         await sleep(waitMs)
         continue
       }
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      throw await httpError(url, options, response)
     }
 
     return response
