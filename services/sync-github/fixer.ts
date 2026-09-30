@@ -5,6 +5,7 @@ import {
   createBuildkitePipeline,
   updateBuildkitePipeline,
 } from "./buildkite-client.ts"
+import { assessStatus } from "./assessor.ts"
 import { extractMaturityTag } from "./formatters.ts"
 import { PIPELINE_STEPS } from "./types.ts"
 import type { SyncGithubProps, SyncOptions, SyncStatus } from "./types.ts"
@@ -22,6 +23,7 @@ export async function applyFixes(
     r.discrepancies.some((d) => d.code === "no-pipeline")
   )
 
+  const created = new Map<string, SyncStatus>()
   for (const result of noPipelines) {
     if (dryRun) {
       logger.info(`🚀 Would create pipeline for ${result.repoName}`)
@@ -34,10 +36,16 @@ export async function applyFixes(
       result.repo,
     )
     logger.info(`✅ Created pipeline: ${newPipeline.name} (${newPipeline.url})`)
+
+    // Re-assess against the new pipeline so the fixes below configure it in
+    // this run. It can't have a webhook yet.
+    created.set(result.repoName, assessStatus(result.repo, [newPipeline], []))
   }
 
+  const statuses = results.map((r) => created.get(r.repoName) ?? r)
+
   // Fix 2: Update undeclared or stale managed pipeline configuration
-  const pipelineConfigOutOfDate = results.filter((r) =>
+  const pipelineConfigOutOfDate = statuses.filter((r) =>
     r.pipeline &&
     r.discrepancies.some((d) =>
       d.code === "undeclared-configuration" || d.code === "version-mismatch"
@@ -82,7 +90,7 @@ export async function applyFixes(
   }
 
   // Fix 3: Create missing webhooks
-  const noWebhooks = results.filter((r) =>
+  const noWebhooks = statuses.filter((r) =>
     r.discrepancies.some((d) => d.code === "no-webhook") && r.pipeline
   )
 
@@ -120,7 +128,7 @@ export async function applyFixes(
   }
 
   // Fix 4: Update branch configuration
-  const noBranchConfig = results.filter((r) =>
+  const noBranchConfig = statuses.filter((r) =>
     r.discrepancies.some((d) => d.code === "branch-configuration-missing") &&
     r.pipeline
   )
@@ -169,7 +177,7 @@ export async function applyFixes(
   }
 
   // Fix 5: Enable build_tags
-  const tagsNotEnabled = results.filter((r) =>
+  const tagsNotEnabled = statuses.filter((r) =>
     r.discrepancies.some((d) => d.code === "tags-not-enabled") && r.pipeline
   )
 
@@ -205,7 +213,7 @@ export async function applyFixes(
   }
 
   // Fix 6: Set build filter
-  const filterNotSet = results.filter((r) =>
+  const filterNotSet = statuses.filter((r) =>
     r.discrepancies.some((d) => d.code === "filter-not-set") && r.pipeline
   )
 
@@ -249,7 +257,7 @@ export async function applyFixes(
   }
 
   // Fix 7: Enable skip_queued_branch_builds
-  const skipQueuedNotEnabled = results.filter((r) =>
+  const skipQueuedNotEnabled = statuses.filter((r) =>
     r.discrepancies.some((d) => d.code === "skip-queued-not-enabled") &&
     r.pipeline
   )
@@ -295,7 +303,7 @@ export async function applyFixes(
   }
 
   // Fix 8: Sync maturity tags
-  const maturityTagsMismatch = results.filter((r) =>
+  const maturityTagsMismatch = statuses.filter((r) =>
     r.discrepancies.some((d) => d.code === "maturity-tags-mismatch") &&
     r.pipeline &&
     r.repo

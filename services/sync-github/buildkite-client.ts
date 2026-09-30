@@ -13,24 +13,8 @@ function requireApiKey(props: SyncGithubProps["buildkite"]): string {
   return props.apiKey
 }
 
-export async function listBuildkitePipelines(
-  props: SyncGithubProps["buildkite"],
-): Promise<BuildkitePipeline[]> {
-  const apiKey = requireApiKey(props)
-  let nextUrl: string | null =
-    `https://api.buildkite.com/v2/organizations/${props.orgName}/pipelines?per_page=100`
-  let responses: any[] = []
-
-  while (nextUrl != null) {
-    logger.info(`Fetching pipelines from ${nextUrl}`)
-    const response = await fetchBuildkite(nextUrl, apiKey)
-
-    nextUrl = parseNextLinkHeader(response.headers.get("link"))
-    const data = await response.json()
-    responses = [...responses, ...data]
-  }
-
-  return responses.map((pipeline) => ({
+function toBuildkitePipeline(pipeline: any): BuildkitePipeline {
+  return {
     id: pipeline.id,
     name: pipeline.name,
     slug: pipeline.slug,
@@ -50,13 +34,33 @@ export async function listBuildkitePipelines(
     filter_enabled: pipeline.filter_enabled,
     filter_condition: pipeline.filter_condition,
     provider: pipeline.provider,
-  }))
+  }
+}
+
+export async function listBuildkitePipelines(
+  props: SyncGithubProps["buildkite"],
+): Promise<BuildkitePipeline[]> {
+  const apiKey = requireApiKey(props)
+  let nextUrl: string | null =
+    `https://api.buildkite.com/v2/organizations/${props.orgName}/pipelines?per_page=100`
+  let responses: any[] = []
+
+  while (nextUrl != null) {
+    logger.info(`Fetching pipelines from ${nextUrl}`)
+    const response = await fetchBuildkite(nextUrl, apiKey)
+
+    nextUrl = parseNextLinkHeader(response.headers.get("link"))
+    const data = await response.json()
+    responses = [...responses, ...data]
+  }
+
+  return responses.map(toBuildkitePipeline)
 }
 
 export async function createBuildkitePipeline(
   props: SyncGithubProps["buildkite"],
   repo: any,
-) {
+): Promise<BuildkitePipeline> {
   const apiKey = requireApiKey(props)
   const response = await fetchBuildkite(
     `https://api.buildkite.com/v2/organizations/${props.orgName}/pipelines`,
@@ -77,7 +81,7 @@ export async function createBuildkitePipeline(
     },
   )
 
-  return await response.json()
+  return toBuildkitePipeline(await response.json())
 }
 
 export async function updateBuildkitePipeline(
