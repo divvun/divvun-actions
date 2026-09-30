@@ -10,8 +10,8 @@ import { makeTempDir } from "~/util/temp.ts"
  *
  * A language checkout builds against repos that live BESIDE it: giella-core,
  * the shared-* and lang-* repos configure.ac declares (gt_USE_SHARED /
- * gt_NEED_SHARED), and the speller corpus repos ../corpus-<lang> and
- * ../corpus-<lang>-x-closed.
+ * gt_NEED_SHARED), and the speller corpus repos ../corpus-<lang>,
+ * ../corpus-<lang>-x-closed and ../corpus-<lang>-x-sensitive.
  *
  * The lang-deps step fetches and builds them once (`prepareLangDependencies`).
  * Every other step unpacks that snapshot (`restoreLangDependencyRepos`) and
@@ -91,7 +91,8 @@ export async function declaredDependencies(
 }
 
 /**
- * The speller corpus repos for a language: public and closed.
+ * The speller corpus repos for a language: public, closed, and sensitive.
+ * Those that don't exist are skipped.
  *
  * An `-x-` qualifier in the repo name (lang-sjd-x-private, lang-est-x-utee)
  * is not part of the language code, so it is stripped: the corpora follow the
@@ -102,7 +103,11 @@ export function corpusRepos(repoName: string): string[] {
     return []
   }
   const lang = repoName.slice("lang-".length).replace(/-x-.*$/, "")
-  return [`corpus-${lang}`, `corpus-${lang}-x-closed`]
+  return [
+    `corpus-${lang}`,
+    `corpus-${lang}-x-closed`,
+    `corpus-${lang}-x-sensitive`,
+  ]
 }
 
 /**
