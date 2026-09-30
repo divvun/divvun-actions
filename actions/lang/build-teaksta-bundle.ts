@@ -1,6 +1,10 @@
 import * as fs from "@std/fs"
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
+import {
+  downloadCompressedArtifacts,
+  uploadCompressedArtifacts,
+} from "~/util/compressed_artifact.ts"
 import { globFiles } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
@@ -50,6 +54,7 @@ import {
 const TEAKSTA_DIR = "tools/teaksta"
 const ASSEMBLE_SCRIPT = "assemble-assets.sh"
 const BUNDLE_FILE = "bundle.drb"
+const ZCHECK_GLOB = "build/tools/grammarcheckers/*.zcheck"
 
 /** The three model files the assemble script copies out of `ZCHECK_DIR`. */
 const REQUIRED_ZCHECK_FILES = [
@@ -71,15 +76,14 @@ async function run(cmd: string, args: string[], options?: {
 }
 
 /**
- * Download the grammar-build step's `.zcheck` and unpack it. Buildkite stores
- * an artifact under its path relative to the upload cwd, so the download lands
- * back at `build/tools/grammarcheckers/`, same as the grammar bundle and
- * deploy actions expect.
+ * Download the grammar-build step's `.zcheck` and unpack it. It lands back at
+ * `build/tools/grammarcheckers/`, same as the grammar bundle and deploy
+ * actions expect.
  */
 async function unpackZcheck(): Promise<string> {
-  await builder.downloadArtifacts("*.zcheck", ".")
+  await downloadCompressedArtifacts(ZCHECK_GLOB)
 
-  const zchecks = await globFiles("build/tools/grammarcheckers/*.zcheck")
+  const zchecks = await globFiles(ZCHECK_GLOB)
   if (zchecks.length === 0) {
     throw new Error(
       "No .zcheck found; the teaksta bundle build needs the grammar-build " +
@@ -168,7 +172,7 @@ export default async function langTeakstaBundleBuild(
     throw new Error(`teaksta ${BUNDLE_FILE} not found at ${bundlePath}!`)
   }
 
-  await builder.uploadArtifacts(bundlePath)
+  await uploadCompressedArtifacts(bundlePath)
 
   logger.info(`teaksta bundle: ${bundlePath}`)
 

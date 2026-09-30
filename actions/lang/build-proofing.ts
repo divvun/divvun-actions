@@ -1,6 +1,6 @@
 import * as path from "@std/path"
 import { stripAnsiCode } from "@std/fmt/colors"
-import * as builder from "~/builder.ts"
+import { uploadCompressedArtifacts } from "~/util/compressed_artifact.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import { restoreBuiltWorkspace } from "./common.ts"
 import {
@@ -79,5 +79,5 @@ export default async function langProofingBuild(
   const output = path.join(buildDir, "tools", "proofing", "bundle.drb")
   await Deno.mkdir(path.dirname(output), { recursive: true })
   await Deno.copyFile(path.join(stage.path, "bundle.drb"), output)
-  await builder.uploadArtifacts("build/tools/proofing/bundle.drb")
+  await uploadCompressedArtifacts("build/tools/proofing/bundle.drb")
 }

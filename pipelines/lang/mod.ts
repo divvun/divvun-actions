@@ -25,6 +25,7 @@ import langSpellerTest from "~/actions/lang/test-speller.ts"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
+import { downloadCompressedArtifacts } from "~/util/compressed_artifact.ts"
 import { globFiles, globOneFile } from "~/util/glob.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
@@ -529,12 +530,19 @@ export async function runLangDeploy() {
   }
 }
 
-export async function runLangGrammarBundle() {
-  await builder.downloadArtifacts("*.drb", ".")
-  await builder.downloadArtifacts("*.zcheck", ".")
+/**
+ * The grammar-build step's outputs. Only this directory: a bare `*.drb` would
+ * also fetch the TTS, teaksta and proofing bundles.
+ */
+const GRAMMAR_DRB = "build/tools/grammarcheckers/*.drb"
+const GRAMMAR_ZCHECK = "build/tools/grammarcheckers/*.zcheck"
 
-  const drbFiles = await globFiles("build/tools/grammarcheckers/*.drb")
-  const zcheckFiles = await globFiles("build/tools/grammarcheckers/*.zcheck")
+export async function runLangGrammarBundle() {
+  await downloadCompressedArtifacts(GRAMMAR_DRB)
+  await downloadCompressedArtifacts(GRAMMAR_ZCHECK)
+
+  const drbFiles = await globFiles(GRAMMAR_DRB)
+  const zcheckFiles = await globFiles(GRAMMAR_ZCHECK)
 
   let manifest
   try {
@@ -562,11 +570,11 @@ export async function runLangGrammarDeploy() {
   const isGrammarReleaseTag = GRAMMAR_RELEASE_TAG.test(builder.env.tag ?? "")
   const isMainBranch = builder.env.branch === "main"
 
-  await builder.downloadArtifacts("*.drb", ".")
-  await builder.downloadArtifacts("*.zcheck", ".")
+  await downloadCompressedArtifacts(GRAMMAR_DRB)
+  await downloadCompressedArtifacts(GRAMMAR_ZCHECK)
 
-  const drbFiles = await globFiles("build/tools/grammarcheckers/*.drb")
-  const zcheckFiles = await globFiles("build/tools/grammarcheckers/*.zcheck")
+  const drbFiles = await globFiles(GRAMMAR_DRB)
+  const zcheckFiles = await globFiles(GRAMMAR_ZCHECK)
 
   if (drbFiles.length === 0) {
     throw new Error("Missing .drb file for deployment")
@@ -715,7 +723,7 @@ export async function runLangProofingBundle(
 ) {
   const source = await readProofingSource()
   const artifact = proofingArtifact(source)
-  await builder.downloadArtifacts(artifact, ".")
+  await downloadCompressedArtifacts(artifact)
 
   const drbFiles = await globFiles(artifact)
   if (drbFiles.length !== 1) {
@@ -861,9 +869,8 @@ export async function runLangTtsTextprocDeploy() {
   const isTtsReleaseTag = TTS_TEXTPROC_RELEASE_TAG.test(builder.env.tag ?? "")
   const isMainBranch = builder.env.branch === "main"
 
-  await builder.downloadArtifacts("build/tools/tts/bundle.drb", ".")
-
   const bundlePath = "build/tools/tts/bundle.drb"
+  await downloadCompressedArtifacts(bundlePath)
   if (!await fs.exists(bundlePath)) {
     throw new Error("TTS bundle.drb not found for deployment")
   }
@@ -972,7 +979,7 @@ export async function runLangTeakstaBundleDeploy() {
   const isMainBranch = builder.env.branch === "main"
 
   const bundlePath = "tools/teaksta/bundle.drb"
-  await builder.downloadArtifacts(bundlePath, ".")
+  await downloadCompressedArtifacts(bundlePath)
 
   if (!await fs.exists(bundlePath)) {
     throw new Error("teaksta bundle.drb not found for deployment")

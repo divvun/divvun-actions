@@ -3,6 +3,10 @@ import * as fs from "@std/fs"
 import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 import { createTarZst, extractTarball } from "~/util/tarball.ts"
+import {
+  downloadCompressedArtifacts,
+  uploadCompressedArtifacts,
+} from "~/util/compressed_artifact.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import {
   checkoutCorpusRepos,
@@ -152,9 +156,9 @@ function snapshotCheckoutMetadata(snapshot: WorkspaceSnapshot): string {
 }
 
 /**
- * Built files left out of a snapshot and uploaded separately: other steps
- * download them anyway, and they are large (~600 MiB each). Once downloaded
- * they are newer than their inputs, so make leaves them be.
+ * Built files left out of a snapshot and uploaded separately, compressed:
+ * other steps download them anyway, and they are large (~600 MiB each).
+ * They unpack with their build mtimes, so make leaves them be.
  */
 const SNAPSHOT_ARTIFACTS: Record<WorkspaceSnapshot, string[]> = {
   speller: [],
@@ -195,7 +199,7 @@ export async function uploadWorkspaceSnapshot(
     cwd: path.resolve(Deno.cwd(), ".."),
   })
   for (const glob of artifacts) {
-    await builder.uploadArtifacts(glob)
+    await uploadCompressedArtifacts(glob)
   }
 }
 
@@ -209,7 +213,7 @@ export async function downloadAndExtractWorkspaceSnapshot(
   await extractTarball(archive, { cwd: Deno.cwd() })
   await Deno.remove(archive)
   for (const glob of SNAPSHOT_ARTIFACTS[snapshot]) {
-    await builder.downloadArtifacts(glob, ".")
+    await downloadCompressedArtifacts(glob)
   }
 }
 
