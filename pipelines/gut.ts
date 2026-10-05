@@ -5,6 +5,7 @@ import * as targetModule from "~/target.ts"
 import { GitHub } from "~/util/github.ts"
 import { Tar, Zip } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
+import { downloadBinaryCmd } from "~/util/artifact_download.ts"
 
 const platforms = {
   macos: ["x86_64-apple-darwin", "aarch64-apple-darwin"],
@@ -110,11 +111,6 @@ function createSignStep(
   const binaryPath = `target/${arch}/release/gut${ext}`
   const signedPath = `signed/${binaryPath}`
 
-  // Windows artifacts are uploaded with backslash paths
-  const downloadPath = platform === "windows"
-    ? `target\\${arch}\\release\\gut${ext}`
-    : binaryPath
-
   const signCommand = platform === "windows"
     ? `divvun-actions sign ${binaryPath}`
     : `divvun-actions run macos-sign ${binaryPath}`
@@ -125,7 +121,7 @@ function createSignStep(
     agents: { queue: "linux" },
     command: [
       "echo '--- Downloading unsigned binary'",
-      `buildkite-agent artifact download '${downloadPath}' .`,
+      downloadBinaryCmd(binaryPath),
       "echo '--- Signing'",
       signCommand,
       "echo '--- Uploading signed binary'",

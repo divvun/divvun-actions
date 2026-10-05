@@ -3,6 +3,7 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
+import { downloadBinary } from "~/util/artifact_download.ts"
 import { assetFileName, assetStem } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
@@ -127,14 +128,12 @@ export async function runRsigncodePublish() {
 
   using tempDir = await makeTempDir()
   await Promise.all(
-    TARGETS.map((target) => {
-      // Windows upload stores the artifact key with backslashes.
-      const sep = target.includes("windows") ? "\\" : "/"
-      return builder.downloadArtifacts(
-        `target${sep}${target}${sep}release${sep}${binaryName(target)}`,
+    TARGETS.map((target) =>
+      downloadBinary(
+        `target/${target}/release/${binaryName(target)}`,
         tempDir.path,
       )
-    }),
+    ),
   )
 
   using archivePath = await makeTempDir({ prefix: "rsigncode-" })

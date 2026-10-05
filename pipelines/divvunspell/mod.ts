@@ -6,6 +6,7 @@ import { GitHub } from "../../util/github.ts"
 import logger from "../../util/log.ts"
 import { Tar, versionAsDev, Zip } from "../../util/shared.ts"
 import { makeTempDir } from "../../util/temp.ts"
+import { downloadBinaryCmd } from "~/util/artifact_download.ts"
 
 const binPlatforms = {
   macos: ["x86_64-apple-darwin", "aarch64-apple-darwin"],
@@ -113,10 +114,6 @@ function createBinSignStep(
   const binaryPath = `target/${arch}/release/divvunspell${ext}`
   const signedPath = `signed/${binaryPath}`
 
-  const downloadPath = platform === "windows"
-    ? `target\\${arch}\\release\\divvunspell${ext}`
-    : binaryPath
-
   const signCommand = platform === "windows"
     ? `divvun-actions sign ${binaryPath}`
     : `divvun-actions run macos-sign ${binaryPath}`
@@ -127,7 +124,7 @@ function createBinSignStep(
     agents: { queue: "linux" },
     command: [
       "echo '--- Downloading unsigned binary'",
-      `buildkite-agent artifact download '${downloadPath}' .`,
+      downloadBinaryCmd(binaryPath),
       "echo '--- Signing'",
       signCommand,
       "echo '--- Uploading signed binary'",
