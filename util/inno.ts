@@ -74,6 +74,20 @@ export class InnoSetupBuilder {
     return this
   }
 
+  /**
+   * The `ArchitecturesAllowed` and `ArchitecturesInstallIn64BitMode`
+   * directives: identifier lists or boolean expressions such as
+   * `x86os or x64compatible` (Inno Setup 6.3+). Defaults to `x86 x64` and
+   * `x64`, the pre-6.3 names of `x86os` and `x64os`, which refuse Arm64.
+   */
+  architectures(input: {
+    allowed: string
+    installIn64BitMode: string
+  }): InnoSetupBuilder {
+    this.data.architectures = input
+    return this
+  }
+
   files(
     callback: (builder: InnoSetupFilesBuilder) => InnoSetupFilesBuilder,
   ): InnoSetupBuilder {
@@ -145,8 +159,9 @@ export class InnoSetupBuilder {
       SolidCompression: "yes",
       WizardStyle: "modern",
       MinVersion: this.data.minVersion || "6.3.9200",
-      ArchitecturesAllowed: "x86 x64",
-      ArchitecturesInstallIn64BitMode: "x64",
+      ArchitecturesAllowed: this.data.architectures?.allowed ?? "x86 x64",
+      ArchitecturesInstallIn64BitMode:
+        this.data.architectures?.installIn64BitMode ?? "x64",
       DefaultGroupName: name,
       ...(options.codesign != false
         ? {
