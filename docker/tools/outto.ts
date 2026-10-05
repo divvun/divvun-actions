@@ -5,6 +5,14 @@ const RELEASE_TAG = "dev-latest"
 const REPO = "divvun/outto"
 
 /**
+ * Bump to pull a newer `dev-latest` build into the image. The RUN below never
+ * changes on its own, so Docker reuses the cached layer and keeps whichever
+ * outto it fetched first. This token is echoed inside the RUN, so changing it
+ * is a cache miss.
+ */
+const REFRESH = "2026-10-05"
+
+/**
  * Install outto from the rolling `dev-latest` GitHub Release on `divvun/outto`.
  * That release is updated by `pipelineOutto` on every main-branch build —
  * filenames are `outto_<target>_<dev-version>.zip` (Windows) or `.tgz` (macOS),
@@ -21,7 +29,7 @@ const REPO = "divvun/outto"
  */
 export function outto(): Tool {
   return {
-    name: `outto (${RELEASE_TAG})`,
+    name: `outto (${RELEASE_TAG} @ ${REFRESH})`,
     render: (ctx) => {
       if (ctx.platform !== "windows") {
         throw new Error(
@@ -32,10 +40,15 @@ export function outto(): Tool {
 
       const apiUrl =
         `https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG}`
-      const assetPattern = assetPsPattern("outto", "x86_64-pc-windows-msvc", "zip")
+      const assetPattern = assetPsPattern(
+        "outto",
+        "x86_64-pc-windows-msvc",
+        "zip",
+      )
 
       return [
-        `RUN $rel = Invoke-RestMethod -Uri '${apiUrl}' ; \\`,
+        `RUN Write-Output 'outto ${RELEASE_TAG} refresh: ${REFRESH}' ; \\`,
+        `    $rel = Invoke-RestMethod -Uri '${apiUrl}' ; \\`,
         `    $asset = $rel.assets | Where-Object { $_.name -match '${assetPattern}' } | Select-Object -First 1 ; \\`,
         `    if (-not $asset) { throw "No outto windows asset on ${RELEASE_TAG}" } ; \\`,
         `    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile outto.zip ; \\`,
