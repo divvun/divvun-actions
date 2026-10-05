@@ -66,7 +66,7 @@ export default defineImage({
     sshAgentService(),
     setUser("ContainerAdministrator"),
     nodejsWindows(),
-    rust({ targets: ["aarch64-pc-windows-msvc"] }),
+    rust({ targets: ["aarch64-pc-windows-msvc", "i686-pc-windows-msvc"] }),
     rustToolchain({ channel: "nightly", components: ["rust-src"] }),
     rsigncode(),
     outto(),

@@ -95,9 +95,9 @@ RUN choco install nodejs --version="24.21.0" -y ; \
     setx /M PATH $($Env:PATH + ';C:\Program Files\nodejs')
 RUN corepack enable pnpm
 
-# rust@1.99.0 (targets: aarch64-pc-windows-msvc)
+# rust@1.99.0 (targets: aarch64-pc-windows-msvc, i686-pc-windows-msvc)
 RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe; \
-    Start-Process -FilePath .\\rustup-init.exe -ArgumentList @('-y', '--default-toolchain', '1.99.0', '--target', 'aarch64-pc-windows-msvc') -NoNewWindow -Wait; \
+    Start-Process -FilePath .\\rustup-init.exe -ArgumentList @('-y', '--default-toolchain', '1.99.0', '--target', 'aarch64-pc-windows-msvc', '--target', 'i686-pc-windows-msvc') -NoNewWindow -Wait; \
     Remove-Item -Force .\\rustup-init.exe
 
 # rust-nightly (rust-src)
