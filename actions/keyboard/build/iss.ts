@@ -1,32 +1,29 @@
-// deno-lint-ignore-file no-explicit-any
 import * as path from "@std/path"
-import * as uuid from "@std/uuid"
 import { InnoSetupBuilder } from "~/util/inno.ts"
 import logger from "~/util/log.ts"
 import { Kbdgen } from "~/util/shared.ts"
+import type { WindowsLayout } from "./layouts.ts"
 import { stageWindInstaller, WIND_DIRECTORY, WIND_FILES } from "./wind.ts"
 
-function layoutTarget(layout: { [key: string]: any }) {
-  const targets = layout["windows"] || {}
-  return targets["config"] || {}
-}
+const SYSTEM_FILE_FLAGS = [
+  "restartreplace",
+  "uninsrestartdelete",
+  "ignoreversion",
+]
 
-function getKbdId(locale: string, layout: { [key: string]: any }) {
-  if ("id" in layout) {
-    return "kbd" + layout["id"]
-  }
-  return "kbd" + locale.replace(/[^A-Za-z0-9-]/g, "").substr(0, 5)
-}
-
+/**
+ * Write `install.all.iss` into `payloadDir`, the directory staged by
+ * `stageInstallerPayload`; Inno resolves the relative sources against it.
+ */
 export async function generateKbdInnoFromBundle(
   bundlePath: string,
-  buildDir: string,
+  payloadDir: string,
+  layouts: WindowsLayout[],
 ): Promise<string> {
   const bundle = await Kbdgen.loadTarget(bundlePath, "windows")
   const project = await Kbdgen.loadProjectBundle(bundlePath)
-  const layouts = await Kbdgen.loadLayouts(bundlePath)
 
-  await stageWindInstaller(buildDir)
+  await stageWindInstaller(payloadDir)
 
   const builder = new InnoSetupBuilder(Deno.cwd())
 
@@ -37,36 +34,51 @@ export async function generateKbdInnoFromBundle(
     .url(bundle.url)
     .productCode(`{${bundle.uuid}`)
     .defaultDirName("{pf}\\" + bundle.appName)
+    // 32-bit mode on x86 Windows; 64-bit mode (native {sys}, {syswow64}) on
+    // x64 and on Arm64 Windows 11, which x64compatible also matches and where
+    // kbdi-x64.exe runs under emulation. Arm64 Windows 10 cannot run x64
+    // binaries, so it is refused rather than left without a working kbdi.
+    .architectures({
+      allowed: "x86os or x64compatible",
+      installIn64BitMode: "x64compatible",
+    })
     .files((builder) => {
       builder.add(
         `kbdi.exe`,
         "{app}",
-        ["restartreplace", "uninsrestartdelete", "ignoreversion"],
+        SYSTEM_FILE_FLAGS,
         "not Is64BitInstallMode",
       )
       builder.add(
         `kbdi-x64.exe`,
         "{app}",
-        ["restartreplace", "uninsrestartdelete", "ignoreversion"],
+        SYSTEM_FILE_FLAGS,
         "Is64BitInstallMode",
         "kbdi.exe",
       )
+      // kbdgen spec tsf.installer.layout-dlls; see LAYOUT_DLL_VARIANTS.
       builder.add(
-        `i386\\*`,
+        `x86\\*.dll`,
         "{sys}",
-        ["restartreplace", "uninsrestartdelete", "ignoreversion"],
+        SYSTEM_FILE_FLAGS,
         "not Is64BitInstallMode",
       )
       builder.add(
-        `amd64\\*`,
+        `x64\\*.dll`,
         "{sys}",
-        ["restartreplace", "uninsrestartdelete", "ignoreversion"],
-        "Is64BitInstallMode",
+        SYSTEM_FILE_FLAGS,
+        "Is64BitInstallMode and IsX64OS",
       )
       builder.add(
-        `wow64\\*`,
+        `arm64\\*.dll`,
+        "{sys}",
+        SYSTEM_FILE_FLAGS,
+        "Is64BitInstallMode and IsArm64",
+      )
+      builder.add(
+        `wow64\\*.dll`,
         "{syswow64}",
-        ["restartreplace", "uninsrestartdelete", "ignoreversion"],
+        SYSTEM_FILE_FLAGS,
         "Is64BitInstallMode",
       )
 
@@ -81,10 +93,8 @@ export async function generateKbdInnoFromBundle(
       return builder
     })
 
-  for (const [locale, layout] of Object.entries(layouts)) {
-    if ("windows" in layout) {
-      await addLayoutToInstaller(builder, locale, layout)
-    }
+  for (const layout of layouts) {
+    addLayoutToInstaller(builder, layout)
   }
   builder.run((command) =>
     command
@@ -94,50 +104,44 @@ export async function generateKbdInnoFromBundle(
       )
       .withFlags(["runhidden", "waituntilterminated"])
   )
-  const fileName = path.join(buildDir, `install.all.iss`)
+  const fileName = path.join(payloadDir, `install.all.iss`)
   logger.debug(builder.build())
   await builder.write(fileName)
   return fileName
 }
 
-const textEncoder = new TextEncoder()
-const KBDGEN_NAMESPACE = await uuid.v5.generate(
-  uuid.NAMESPACE_DNS,
-  textEncoder.encode("divvun.no"),
-)
+/**
+ * A product code as one quoted argument inside an Inno `Parameters: "..."`
+ * string, where `""` is a literal quote and `{{` a literal brace.
+ */
+function innoProductCode(productCode: string): string {
+  return `""${productCode.replaceAll("{", "{{")}""`
+}
 
-async function addLayoutToInstaller(
+function addLayoutToInstaller(
   builder: InnoSetupBuilder,
-  locale: string,
-  layout: { [key: string]: any },
+  layout: WindowsLayout,
 ) {
-  const target = layoutTarget(layout)
-  const kbdId = getKbdId(locale, target)
-  const dllName = kbdId + ".dll"
-  const languageCode = target["locale"] || locale
-  const languageName = target["languageName"]
-  const layoutDisplayName = layout["displayNames"][locale]
-  const guidStr = await uuid.v5.generate(
-    KBDGEN_NAMESPACE,
-    textEncoder.encode(kbdId),
-  )
-  if (!layoutDisplayName) {
-    throw new Error(`Display name for ${locale} not found`)
-  }
-
   builder
+    .run((builder) =>
+      builder
+        .withFilename("{app}\\kbdi.exe")
+        .withParameter("keyboard_uninstall")
+        .withParameter(innoProductCode(layout.legacyProductCode))
+        .withFlags(["runhidden", "waituntilterminated"])
+    )
     .run((builder) => {
       builder
         .withFilename("{app}\\kbdi.exe")
         .withParameter("keyboard_install")
-        .withParameter(`-t ""${languageCode}""`)
-      if (languageName) {
-        builder.withParameter(`-l ""${languageName}""`)
+        .withParameter(`-t ""${layout.languageCode}""`)
+      if (layout.languageName) {
+        builder.withParameter(`-l ""${layout.languageName}""`)
       }
       builder
-        .withParameter(`-g ""{{${guidStr}""`)
-        .withParameter(`-d ${dllName}`)
-        .withParameter(`-n ""${layoutDisplayName}""`)
+        .withParameter(`-g ${innoProductCode(layout.productCode)}`)
+        .withParameter(`-d ${layout.dllName}`)
+        .withParameter(`-n ""${layout.displayName}""`)
         .withParameter("-e")
         .withFlags(["runhidden", "waituntilterminated"])
       return builder
@@ -146,18 +150,18 @@ async function addLayoutToInstaller(
       builder
         .withFilename("{app}\\kbdi.exe")
         .withParameter("keyboard_uninstall")
-        .withParameter(`""${guidStr}""`)
+        .withParameter(innoProductCode(layout.productCode))
         .withFlags(["runhidden", "waituntilterminated"])
 
       return builder
     })
     .icons((builder) => {
       builder
-        .withName(`{group}\\Enable ${layoutDisplayName}`)
+        .withName(`{group}\\Enable ${layout.displayName}`)
         .withFilename("{app}\\kbdi.exe")
         .withParameter("keyboard_enable")
-        .withParameter(`-g ""{{${guidStr}""`)
-        .withParameter(`-t ${languageCode}`)
+        .withParameter(`-g ${innoProductCode(layout.productCode)}`)
+        .withParameter(`-t ${layout.languageCode}`)
         .withFlags([
           "runminimized",
           "preventpinning",

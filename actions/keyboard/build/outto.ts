@@ -5,9 +5,7 @@
 // keyboardBuild() (see ./mod.ts). Until the matching Pahkat upload type
 // lands, this path stops at "signed artifact written to disk".
 
-// deno-lint-ignore-file no-explicit-any
 import * as path from "@std/path"
-import * as uuid from "@std/uuid"
 import * as builder from "~/builder.ts"
 import { makeOuttoInstaller, windowsOuttoSigning } from "~/actions/outto/lib.ts"
 import macosSign from "~/services/macos-codesign.ts"
@@ -15,6 +13,7 @@ import * as target from "~/target.ts"
 import { OuttoBuilder } from "~/util/outto.ts"
 import { Kbdgen } from "~/util/shared.ts"
 import logger from "~/util/log.ts"
+import type { WindowsLayout } from "./layouts.ts"
 import { addWindToOutto, stageWindInstaller } from "./wind.ts"
 
 export type OuttoKeyboardResult = {
@@ -22,97 +21,66 @@ export type OuttoKeyboardResult = {
   unsigned: boolean
 }
 
-const textEncoder = new TextEncoder()
-const KBDGEN_NAMESPACE = await uuid.v5.generate(
-  uuid.NAMESPACE_DNS,
-  textEncoder.encode("divvun.no"),
-)
-
-function layoutTarget(layout: { [key: string]: any }) {
-  const targets = layout["windows"] || {}
-  return targets["config"] || {}
-}
-
-function getKbdId(locale: string, layout: { [key: string]: any }) {
-  if ("id" in layout) {
-    return "kbd" + layout["id"]
-  }
-  return "kbd" + locale.replace(/[^A-Za-z0-9-]/g, "").substr(0, 5)
-}
-
 /**
  * Generate an outto manifest + run `outto build` for a kbdgen Windows
- * keyboard bundle. Mirrors the inputs of generateKbdInnoFromBundle().
+ * keyboard bundle. Mirrors generateKbdInnoFromBundle().
  *
- * `bundlePath` is the kbdgen bundle dir; `buildDir` is the dir where kbdgen
- * has already staged the architecture sub-dirs (i386/, amd64/, wow64/) and
- * the kbdi.exe / kbdi-x64.exe binaries.
+ * `payloadDir` is the directory staged by `stageInstallerPayload`; outto
+ * packs all of it, so the manifest and the installer go to `outputDir`.
+ *
+ * The package is x64-only. outto's installer stub is an x86_64 binary, and
+ * its Windows architecture selectors are `x86` (which also matches x64),
+ * `x64` and `any`: it has none for Arm64, where it would skip every
+ * x86/x64 file but still run kbdi. Refusing Arm64 up front beats a
+ * half-installed keyboard; kbdgen spec tsf.installer.layout-dlls requires
+ * Arm64 (`arm64/*.dll` to `#{sys}`, `wow64/*.dll` to SysWOW64, as the Inno
+ * installer does), which needs an `arm64` selector in outto first.
  */
 export async function buildKeyboardWindowsOutto(
   bundlePath: string,
-  buildDir: string,
+  payloadDir: string,
+  outputDir: string,
+  layouts: WindowsLayout[],
   options: { sign?: boolean } = {},
 ): Promise<OuttoKeyboardResult> {
   const bundle = await Kbdgen.loadTarget(bundlePath, "windows")
   const project = await Kbdgen.loadProjectBundle(bundlePath)
-  const layouts = await Kbdgen.loadLayouts(bundlePath)
 
-  const oBuilder = new OuttoBuilder(buildDir, "windows")
+  const oBuilder = new OuttoBuilder(payloadDir, "windows")
     .id(`{${bundle.uuid}}`)
     .name(bundle.appName)
     .version(bundle.version)
     .publisher(project.organisation)
     .url(bundle.url)
     .privileges("admin")
-    .architecture("any")
+    .architecture("x64")
     .defaultDir(`#{pf}/${bundle.appName}`)
 
-  // kbdi binaries: 32-bit hosts get kbdi.exe, 64-bit hosts get kbdi-x64.exe
-  // renamed to kbdi.exe so the run hooks can reference a single name.
-  oBuilder.file({
-    source: "kbdi.exe",
-    dest: "#{app}",
-    arch: "x86",
-    overwrite: "always",
-  })
+  // Renamed so the run hooks can reference a single name.
   oBuilder.file({
     source: "kbdi-x64.exe",
     dest: "#{app}",
-    arch: "x64",
     dest_name: "kbdi.exe",
     overwrite: "always",
   })
 
-  // System DLLs:
-  //   i386/   → System32 on 32-bit Windows
-  //   amd64/  → System32 on 64-bit Windows
-  //   wow64/  → SysWOW64 (32-bit emulation dir) on 64-bit Windows
+  // kbdgen spec tsf.installer.layout-dlls; see LAYOUT_DLL_VARIANTS. The x86
+  // DLL has no place here: outto cannot run on x86 Windows.
   oBuilder.file({
-    source: "i386/*",
-    dest: "#{sys}",
-    arch: "x86",
-    overwrite: "always",
-  })
-  oBuilder.file({
-    source: "amd64/*",
+    source: "x64/*.dll",
     dest: "#{sys}",
     arch: "x64",
     overwrite: "always",
   })
   oBuilder.file({
-    source: "wow64/*",
-    dest: "C:/Windows/SysWOW64",
-    arch: "x64",
+    source: "wow64/*.dll",
+    dest: "#{win}/SysWOW64",
     overwrite: "always",
   })
 
   const enableCommands: string[] = []
-  for (const [locale, layout] of Object.entries(layouts)) {
-    if ("windows" in layout) {
-      enableCommands.push(
-        await addLayoutToOuttoManifest(oBuilder, locale, layout),
-      )
-    }
+  for (const layout of layouts) {
+    enableCommands.push(addLayoutToOuttoManifest(oBuilder, layout))
   }
   // Register the whole bundle before enabling any layout. If kbdi detects a
   // stale ctfmon cache on the first enable, one refresh sees every new Layout
@@ -128,7 +96,7 @@ export async function buildKeyboardWindowsOutto(
     })
   }
 
-  await stageWindInstaller(buildDir)
+  await stageWindInstaller(payloadDir)
   addWindToOutto(oBuilder)
 
   // Last of all, restart ctfmon so running apps pick up the new layouts.
@@ -152,20 +120,17 @@ export async function buildKeyboardWindowsOutto(
     show: "hidden",
   })
 
-  const configPath = path.join(buildDir, "outto.toml")
+  const configPath = path.join(outputDir, "outto.toml")
   await oBuilder.write(configPath)
   logger.debug(`outto manifest written: ${configPath}`)
 
-  // Output beside the build dir so the surrounding rename-to-payload-path
-  // logic can pick it up.
-  const outputName = `install.exe`
-  const outputPath = path.join(buildDir, outputName)
+  const outputPath = path.join(outputDir, "install.exe")
   // Local validation can request an unsigned artifact without invoking any
   // signing/credential provider. CI retains its existing signed default.
   if (options.sign === false) {
     return await makeOuttoInstaller({
       configPath,
-      sourceDir: buildDir,
+      sourceDir: payloadDir,
       outputPath,
       target: "windows",
     })
@@ -174,7 +139,7 @@ export async function buildKeyboardWindowsOutto(
   // so an unsigned fallback would only hide the error behind a green step.
   return await makeOuttoInstaller({
     configPath,
-    sourceDir: buildDir,
+    sourceDir: payloadDir,
     outputPath,
     target: "windows",
     ...windowsOuttoSigning(
@@ -183,36 +148,31 @@ export async function buildKeyboardWindowsOutto(
   })
 }
 
-async function addLayoutToOuttoManifest(
+function addLayoutToOuttoManifest(
   oBuilder: OuttoBuilder,
-  locale: string,
-  layout: { [key: string]: any },
-): Promise<string> {
-  const target = layoutTarget(layout)
-  const kbdId = getKbdId(locale, target)
-  const dllName = kbdId + ".dll"
-  const languageCode = target["locale"] || locale
-  const languageName = target["languageName"]
-  const layoutDisplayName = layout["displayNames"][locale]
-  const guidStr = await uuid.v5.generate(
-    KBDGEN_NAMESPACE,
-    textEncoder.encode(kbdId),
-  )
-  if (!layoutDisplayName) {
-    throw new Error(`Display name for ${locale} not found`)
-  }
+  layout: WindowsLayout,
+): string {
+  // Runs before keyboard_install, which would otherwise register the layout
+  // a second time beside an older Inno installer's entry.
+  oBuilder.run({
+    phase: "after_install",
+    command: "#{app}/kbdi.exe",
+    arguments: `keyboard_uninstall "${layout.legacyProductCode}"`,
+    wait: true,
+    show: "hidden",
+  })
 
   const installArgs: string[] = [
     "keyboard_install",
     "-t",
-    `"${languageCode}"`,
+    `"${layout.languageCode}"`,
   ]
-  if (languageName) {
-    installArgs.push("-l", `"${languageName}"`)
+  if (layout.languageName) {
+    installArgs.push("-l", `"${layout.languageName}"`)
   }
-  installArgs.push("-g", `"{${guidStr}}"`)
-  installArgs.push("-d", dllName)
-  installArgs.push("-n", `"${layoutDisplayName}"`)
+  installArgs.push("-g", `"${layout.productCode}"`)
+  installArgs.push("-d", layout.dllName)
+  installArgs.push("-n", `"${layout.displayName}"`)
 
   oBuilder.run({
     phase: "after_install",
@@ -225,18 +185,19 @@ async function addLayoutToOuttoManifest(
   oBuilder.run({
     phase: "before_uninstall",
     command: "#{app}/kbdi.exe",
-    arguments: `keyboard_uninstall "{${guidStr}}"`,
+    arguments: `keyboard_uninstall "${layout.productCode}"`,
     wait: true,
     show: "hidden",
   })
 
-  const enableArgs = `keyboard_enable -g "{${guidStr}}" -t "${languageCode}"`
+  const enableArgs =
+    `keyboard_enable -g "${layout.productCode}" -t "${layout.languageCode}"`
   oBuilder.shortcut({
-    name: `Enable ${layoutDisplayName}`,
+    name: `Enable ${layout.displayName}`,
     target: "#{app}/kbdi.exe",
     location: "start_menu",
     arguments: enableArgs,
-    description: `Enable ${layoutDisplayName} keyboard layout`,
+    description: `Enable ${layout.displayName} keyboard layout`,
   })
   return enableArgs
 }

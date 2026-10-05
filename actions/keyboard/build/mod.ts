@@ -5,6 +5,11 @@ import { type InstallerResult, makeInstaller } from "../../inno-setup/lib.ts"
 import { buildKeyboardMacOSOutto, buildKeyboardWindowsOutto } from "./outto.ts"
 import { KeyboardType } from "../types.ts"
 import { generateKbdInnoFromBundle } from "./iss.ts"
+import {
+  loadWindowsLayouts,
+  stageInstallerPayload,
+  type WindowsLayout,
+} from "./layouts.ts"
 import { NIGHTLY_CHANNEL } from "../../version.ts"
 
 // Taken straight from semver.org, with added 'v'
@@ -110,15 +115,29 @@ async function buildWindowsKeyboard(
   const outputPath = await Kbdgen.buildWindows(bundlePath)
   logger.debug("Windows keyboard built")
 
-  await copyKbdiExecutables(outputPath)
-  await createArchitectureDirectories(outputPath)
+  const layouts = await loadWindowsLayouts(bundlePath)
+  const payloadDir = path.join(outputPath, "installer-payload")
+  await Deno.remove(payloadDir, { recursive: true }).catch((e) => {
+    if (!(e instanceof Deno.errors.NotFound)) throw e
+  })
+  await stageInstallerPayload({
+    kbdgenOutput: outputPath,
+    kbdiBinDir: path.join(PahkatPrefix.path, "pkg", "kbdi", "bin"),
+    payloadDir,
+    layouts,
+  })
 
   if (installerKind === "outto") {
     logger.debug("Creating Windows installer via outto")
-    return await buildKeyboardWindowsOutto(bundlePath, outputPath)
+    return await buildKeyboardWindowsOutto(
+      bundlePath,
+      payloadDir,
+      outputPath,
+      layouts,
+    )
   }
 
-  return await createWindowsInstaller(bundlePath, outputPath)
+  return await createWindowsInstaller(bundlePath, payloadDir, layouts)
 }
 
 async function setupWindowsDependencies(): Promise<void> {
@@ -128,80 +147,17 @@ async function setupWindowsDependencies(): Promise<void> {
   logger.debug("Installed kbdi")
 }
 
-async function copyKbdiExecutables(outputPath: string): Promise<void> {
-  const kbdi_path = path.join(
-    PahkatPrefix.path,
-    "pkg",
-    "kbdi",
-    "bin",
-    "kbdi.exe",
-  )
-  const kbdi_x64_path = path.join(
-    PahkatPrefix.path,
-    "pkg",
-    "kbdi",
-    "bin",
-    "kbdi-x64.exe",
-  )
-
-  await Deno.copyFile(kbdi_path, path.resolve(outputPath, "kbdi.exe"))
-  await Deno.copyFile(kbdi_x64_path, path.resolve(outputPath, "kbdi-x64.exe"))
-}
-
-async function createArchitectureDirectories(
-  outputPath: string,
-): Promise<void> {
-  logger.debug("Creating old-style directory structure for Inno Setup")
-
-  const architectureMappings = [
-    { from: "x86", to: "i386" },
-    { from: "x64", to: "amd64" },
-    { from: "x86", to: "wow64" }, // x86 files also used for wow64
-  ]
-
-  for (const mapping of architectureMappings) {
-    await copyArchitectureDirectory(outputPath, mapping.from, mapping.to)
-  }
-}
-
-async function copyArchitectureDirectory(
-  outputPath: string,
-  from: string,
-  to: string,
-): Promise<void> {
-  const fromDir = path.join(outputPath, from)
-  const toDir = path.join(outputPath, to)
-
-  try {
-    const stat = await Deno.stat(fromDir)
-    if (stat.isDirectory) {
-      logger.debug(`Copying ${fromDir} to ${toDir}`)
-      await Deno.mkdir(toDir, { recursive: true })
-
-      for await (const entry of Deno.readDir(fromDir)) {
-        if (entry.isFile) {
-          await Deno.copyFile(
-            path.join(fromDir, entry.name),
-            path.join(toDir, entry.name),
-          )
-        }
-      }
-    }
-  } catch (e) {
-    logger.debug(
-      `Warning: Could not process ${from} -> ${to}: ${
-        e instanceof Error ? e.message : String(e)
-      }`,
-    )
-  }
-}
-
 async function createWindowsInstaller(
   bundlePath: string,
-  outputPath: string,
+  payloadDir: string,
+  layouts: WindowsLayout[],
 ): Promise<InstallerResult> {
   logger.debug("Generating Inno Setup script")
-  const issPath = await generateKbdInnoFromBundle(bundlePath, outputPath)
+  const issPath = await generateKbdInnoFromBundle(
+    bundlePath,
+    payloadDir,
+    layouts,
+  )
 
   logger.debug("Creating Windows installer")
   let result: InstallerResult
