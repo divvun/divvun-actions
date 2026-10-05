@@ -7,7 +7,7 @@ const RELEASE_TAG = "dev-latest"
 const TARGET = "x86_64-unknown-linux-gnu"
 
 /** Bump to pull a newer `dev-latest` build into the image. */
-const REFRESH = "2026-09-25"
+const REFRESH = "2026-10-05"
 
 /**
  * Install the `divvunspell` CLI from divvun/divvunspell `dev-latest`.

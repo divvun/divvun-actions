@@ -8,8 +8,8 @@ FROM buildkite/agent:alpine
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="/var/cache/buildkite"
 
 # Configure apk repositories
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositories && \
-    echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.24/main" > /etc/apk/repositories && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/v3.24/community" >> /etc/apk/repositories
 
 # System packages (apk)
 RUN echo "Get cache-busted, loser" && apk update && apk upgrade && apk add --no-cache \
@@ -67,9 +67,9 @@ RUN ln -sf /usr/bin/clang-21 /usr/local/bin/clang && \
     ln -sf /usr/bin/lld21 /usr/local/bin/lld && \
     ln -sf /usr/bin/ld.lld21 /usr/local/bin/ld.lld
 
-# rust@1.98.1 (targets: x86_64-unknown-linux-musl, aarch64-unknown-linux-musl)
+# rust@1.99.0 (targets: x86_64-unknown-linux-musl, aarch64-unknown-linux-musl)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-    --default-toolchain 1.98.1 \
+    --default-toolchain 1.99.0 \
     -t x86_64-unknown-linux-musl \
     -t aarch64-unknown-linux-musl
 ENV PATH="/root/.cargo/bin:${PATH}"
@@ -131,17 +131,17 @@ RUN mkdir -p /opt/sysroot-aarch64 && \
     zlib-dev \
     zlib-static
 
-# openbao@2.4.4
-RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.4.4/bao_2.4.4_Linux_x86_64.tar.gz -o bao.tar.gz && \
+# openbao@2.7.1
+RUN curl -fsSL https://github.com/openbao/openbao/releases/download/v2.7.1/openbao_2.7.1_linux_amd64.tar.gz -o bao.tar.gz && \
     tar -xzf bao.tar.gz && \
     mv bao /usr/local/bin/bao && \
     rm bao.tar.gz
 
-# gh@2.83.1
-RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.83.1/gh_2.83.1_linux_amd64.tar.gz -o gh.tar.gz && \
+# gh@2.102.0
+RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_linux_amd64.tar.gz -o gh.tar.gz && \
     bsdtar -xzf gh.tar.gz && \
-    mv gh_2.83.1_linux_amd64/bin/gh /usr/local/bin/gh && \
-    rm -rf gh.tar.gz gh_2.83.1_linux_amd64
+    mv gh_2.102.0_linux_amd64/bin/gh /usr/local/bin/gh && \
+    rm -rf gh.tar.gz gh_2.102.0_linux_amd64
 
 # minisign@0.12
 RUN curl -fsSL "https://github.com/jedisct1/minisign/releases/download/0.12/minisign-0.12-linux.tar.gz" -o "minisign.tar.gz" && \
@@ -154,9 +154,9 @@ RUN curl -fsSL 'https://pahkat.uit.no/devtools/download/pahkat-uploader?platform
     bsdtar -xf pahkat-uploader.txz -C /usr/local && \
     rm pahkat-uploader.txz
 
-# hfst (dev-latest @ 2026-09-24, /opt/divvun/bin, off PATH)
+# hfst (dev-latest @ 2026-10-05, /opt/divvun/bin, off PATH)
 RUN set -eu && \
-    echo 'hfst dev-latest refresh: 2026-09-24' && \
+    echo 'hfst dev-latest refresh: 2026-10-05' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/hfst-rs/releases/tags/dev-latest \
           | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*hfst[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_][^"]*\.tgz"' \
           | head -1 \
@@ -172,9 +172,9 @@ RUN set -eu && \
     test -L /opt/divvun/bin/hfst-lexc || { echo 'hfst install-symlinks produced no symlinks' >&2; exit 1; } && \
     rm -rf /tmp/hfst.tgz /tmp/hfst[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*
 
-# foma-rs (dev-latest @ 2026-09-24, /opt/divvun/bin, off PATH)
+# foma-rs (dev-latest @ 2026-10-05, /opt/divvun/bin, off PATH)
 RUN set -eu && \
-    echo 'foma-rs dev-latest refresh: 2026-09-24' && \
+    echo 'foma-rs dev-latest refresh: 2026-10-05' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/foma-rs/releases/tags/dev-latest \
           | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_][^"]*\.tgz"' \
           | head -1 \
@@ -188,9 +188,9 @@ RUN set -eu && \
     install -m 755 /tmp/foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*/foma /tmp/foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*/flookup /tmp/foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*/cgflookup /opt/divvun/bin/ && \
     rm -rf /tmp/foma.tgz /tmp/foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*
 
-# cg3 (dev-latest @ 2026-09-15, /opt/divvun/bin, off PATH)
+# cg3 (dev-latest @ 2026-10-05, /opt/divvun/bin, off PATH)
 RUN set -eu && \
-    echo 'cg3 dev-latest refresh: 2026-09-15' && \
+    echo 'cg3 dev-latest refresh: 2026-10-05' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/cg3-rs/releases/tags/dev-latest \
           | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*cg3[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_][^"]*\.tgz"' \
           | head -1 \

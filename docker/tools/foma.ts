@@ -15,7 +15,7 @@ const BINARIES = ["foma", "flookup", "cgflookup"]
  * so Docker reuses the cached layer even when the upstream build changes.
  * This token is echoed inside the RUN so changing it is a cache miss.
  */
-const REFRESH = "2026-09-24"
+const REFRESH = "2026-10-05"
 
 /**
  * Install foma, flookup and cgflookup from divvun/foma-rs `dev-latest`.

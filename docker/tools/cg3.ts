@@ -15,7 +15,7 @@ const PREFIX = "/opt/divvun/bin"
  * binaries it happened to fetch first, no matter how far `dev-latest` has
  * moved. This token is echoed inside the RUN so changing it is a cache miss.
  */
-const REFRESH = "2026-09-15"
+const REFRESH = "2026-10-05"
 
 /**
  * Install the Rust cg3 tools from the rolling `dev-latest` release on

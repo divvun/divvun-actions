@@ -7,8 +7,8 @@ FROM ghcr.io/divvun/lts-windowsservercore-ltsc2022-vs2022:latest AS buildkite-ag
 
 SHELL ["pwsh", "-command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
-# Git for Windows 2.47.1
-RUN Invoke-WebRequest -Uri https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.1/Git-2.47.1-64-bit.exe -OutFile git-installer.exe ; \
+# Git for Windows 2.56.0
+RUN Invoke-WebRequest -Uri https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.1/Git-2.56.0-64-bit.exe -OutFile git-installer.exe ; \
     Start-Process -FilePath git-installer.exe -ArgumentList '/VERYSILENT /NORESTART /NOCANCEL /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /COMPONENTS="bash,bash_path"' -Wait ; \
     Remove-Item git-installer.exe
 
@@ -45,8 +45,8 @@ RUN Invoke-WebRequest -Uri https://download.microsoft.com/download/6/f/5/6f5ce43
     Start-Process -FilePath msiexec.exe -ArgumentList '/i .\MSKLC\msklc.msi /qn /norestart' -Wait ; \
     Remove-Item MSKLC.exe
 
-# CMake 3.31.10
-RUN Invoke-WebRequest -UseBasicParsing 'https://github.com/Kitware/CMake/releases/download/v3.31.10/cmake-3.31.10-windows-x86_64.msi' -OutFile cmake.msi ; \
+# CMake 3.31.12
+RUN Invoke-WebRequest -UseBasicParsing 'https://github.com/Kitware/CMake/releases/download/v3.31.12/cmake-3.31.12-windows-x86_64.msi' -OutFile cmake.msi ; \
     Start-Process -Wait msiexec -ArgumentList '/i', 'cmake.msi', '/quiet', '/norestart' ; \
     Remove-Item -Force cmake.msi ; \
     $env:PATH = 'C:\Program Files\CMake\bin;' + $env:PATH ; \
@@ -56,13 +56,13 @@ RUN Invoke-WebRequest -UseBasicParsing 'https://github.com/Kitware/CMake/release
 RUN New-Item -ItemType Directory -Path C:\bin ; \
     setx /M PATH $('C:\bin;' + $Env:PATH)
 
-# Ninja 1.12.1
-RUN Invoke-WebRequest -Uri 'https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-win.zip' -OutFile ninja.zip ; \
+# Ninja 1.13.2
+RUN Invoke-WebRequest -Uri 'https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-win.zip' -OutFile ninja.zip ; \
     Expand-Archive ninja.zip -DestinationPath C:\bin ; \
     Remove-Item -Force ninja.zip
 
-# openbao@2.4.4
-RUN Invoke-WebRequest -Uri https://github.com/openbao/openbao/releases/download/v2.4.4/bao_2.4.4_Windows_x86_64.zip -OutFile bao.zip ; \
+# openbao@2.7.1
+RUN Invoke-WebRequest -Uri https://github.com/openbao/openbao/releases/download/v2.7.1/openbao_2.7.1_windows_amd64.zip -OutFile bao.zip ; \
     Expand-Archive bao.zip -DestinationPath C:\bin ; \
     Remove-Item -Force bao.zip
 
@@ -71,8 +71,8 @@ RUN Invoke-WebRequest -Uri https://x.giellalt.org/bsdtar.zip -OutFile bsdtar.zip
     Expand-Archive bsdtar.zip -DestinationPath C:\bin ; \
     Remove-Item -Force bsdtar.zip
 
-# MSYS2 (2025-08-30)
-RUN Invoke-WebRequest -Uri "https://github.com/msys2/msys2-installer/releases/download/2025-08-30/msys2-x86_64-20250830.exe" -OutFile msys2-installer.exe ; \
+# MSYS2 (2026-09-27)
+RUN Invoke-WebRequest -Uri "https://github.com/msys2/msys2-installer/releases/download/2026-09-27/msys2-x86_64-20260927.exe" -OutFile msys2-installer.exe ; \
     Start-Process -Wait -FilePath .\msys2-installer.exe -ArgumentList @('install', '--root', 'C:\MSYS2', '--confirm-command') ; \
     Remove-Item -Force msys2-installer.exe ; \
     C:\MSYS2\usr\bin\bash.exe -lc '/usr/bin/pacman -Syu --noconfirm' ; \
@@ -90,14 +90,14 @@ RUN sc config ssh-agent start= auto ; \
 # USER ContainerAdministrator
 USER ContainerAdministrator
 
-# Node.js 24.11.1 + pnpm via corepack
-RUN choco install nodejs --version="24.11.1" -y ; \
+# Node.js 24.21.0 + pnpm via corepack
+RUN choco install nodejs --version="24.21.0" -y ; \
     setx /M PATH $($Env:PATH + ';C:\Program Files\nodejs')
 RUN corepack enable pnpm
 
-# rust@1.98.1 (targets: aarch64-pc-windows-msvc)
+# rust@1.99.0 (targets: aarch64-pc-windows-msvc)
 RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe; \
-    Start-Process -FilePath .\\rustup-init.exe -ArgumentList @('-y', '--default-toolchain', '1.98.1', '--target', 'aarch64-pc-windows-msvc') -NoNewWindow -Wait; \
+    Start-Process -FilePath .\\rustup-init.exe -ArgumentList @('-y', '--default-toolchain', '1.99.0', '--target', 'aarch64-pc-windows-msvc') -NoNewWindow -Wait; \
     Remove-Item -Force .\\rustup-init.exe
 
 # rust-nightly (rust-src)
@@ -137,8 +137,8 @@ RUN Invoke-WebRequest -Uri 'https://pahkat.uit.no/devtools/download/pahkat-uploa
 # aws-cli v2
 RUN msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi /qn
 
-# just 1.40.0
-RUN Invoke-WebRequest -Uri https://github.com/casey/just/releases/download/1.40.0/just-1.40.0-x86_64-pc-windows-msvc.zip -OutFile just.zip ; \
+# just 1.58.0
+RUN Invoke-WebRequest -Uri https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-pc-windows-msvc.zip -OutFile just.zip ; \
     Expand-Archive just.zip -DestinationPath .\just ; \
     Move-Item -Path .\just\just.exe -Destination C:\bin\just.exe ; \
     Remove-Item -Force just.zip ; \
@@ -155,13 +155,13 @@ RUN Invoke-WebRequest -Uri "https://download.docker.com/win/static/stable/x86_64
     Remove-Item -Force docker.zip ; \
     setx /M PATH $($Env:PATH + ';' + $Env:ProgramFiles + '\Docker')
 
-# gh@2.83.1
-RUN Invoke-WebRequest -Uri "https://github.com/cli/cli/releases/download/v2.83.1/gh_2.83.1_windows_amd64.zip" -OutFile gh.zip ; \
+# gh@2.102.0
+RUN Invoke-WebRequest -Uri "https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_windows_amd64.zip" -OutFile gh.zip ; \
     Expand-Archive gh.zip -DestinationPath C:\ ; \
     Remove-Item -Force gh.zip
 
-# uv 0.11.29
-RUN irm https://astral.sh/uv/0.11.29/install.ps1 | iex ; \
+# uv 0.11.33
+RUN irm https://astral.sh/uv/0.11.33/install.ps1 | iex ; \
     setx /M PATH $($Env:PATH + ';C:\Users\ContainerAdministrator\.local\bin')
 
 # Win32-OpenSSH client 9.8.3.0
