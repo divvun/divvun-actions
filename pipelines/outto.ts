@@ -153,12 +153,9 @@ export function pipelineOutto(): BuildkitePipeline {
       }))
     }
 
-    if (isRelease) {
-      const signKey = `sign-${target}`
-      publishDependKeys.push(signKey)
+    if (isRelease || isMainBranch) {
+      publishDependKeys.push(`sign-${target}`)
       groupSteps.push(createSignStep(target, buildKey))
-    } else {
-      publishDependKeys.push(buildKey)
     }
 
     steps.push({
@@ -215,22 +212,11 @@ export async function runOuttoPublish() {
 
   using tempDir = await makeTempDir()
 
-  // Fetch every binary for every target. Signed releases land under
-  // signed/target/...; dev builds keep the raw target/... layout.
-  if (isRelease) {
-    for (const target of TARGETS) {
-      for (const name of binariesFor(target)) {
-        await downloadBinary(`signed/${binaryPath(target, name)}`, tempDir.path)
-      }
+  // Fetch every signed binary for every target, from signed/target/...
+  for (const target of TARGETS) {
+    for (const name of binariesFor(target)) {
+      await downloadBinary(`signed/${binaryPath(target, name)}`, tempDir.path)
     }
-  } else {
-    await Promise.all(
-      TARGETS.flatMap((target) =>
-        binariesFor(target).map((name) =>
-          downloadBinary(binaryPath(target, name), tempDir.path)
-        )
-      ),
-    )
   }
 
   // Version comes from crates/cli/Cargo.toml — that's the publishable CLI.
@@ -250,7 +236,6 @@ export async function runOuttoPublish() {
 
   for (const target of TARGETS) {
     const isWindows = target.includes("windows")
-    const isSigned = !!isRelease
     const ext = isWindows ? ".exe" : ""
     const names = binariesFor(target)
 
@@ -263,7 +248,8 @@ export async function runOuttoPublish() {
     for (const name of names) {
       const src = path.join(
         tempDir.path,
-        ...(isSigned ? ["signed", "target"] : ["target"]),
+        "signed",
+        "target",
         target,
         "release",
         `${name}${ext}`,
