@@ -192,8 +192,9 @@ RUN cargo install box-cli \
     --rev da96a74656aef7f582a061c16fc0b70288ed514a \
     --locked
 
-# rsigncode (from dev-latest)
+# rsigncode (dev-latest @ 2026-10-05)
 RUN set -eu && \
+    echo 'rsigncode dev-latest refresh: 2026-10-05' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/rsigncode/releases/tags/dev-latest \
           | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*rsigncode[-_]x86[-_]64[-_]unknown[-_]linux[-_]gnu[-_][^"]*\.tgz"' \
           | head -1 \
