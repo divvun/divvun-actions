@@ -1,4 +1,5 @@
 import * as path from "@std/path"
+import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 import { isMatchingTag, Kbdgen, PahkatPrefix } from "~/util/shared.ts"
 import { type InstallerResult, makeInstaller } from "../../inno-setup/lib.ts"
@@ -110,6 +111,7 @@ async function buildWindowsKeyboard(
   installerKind: InstallerKind,
 ): Promise<InstallerResult> {
   await setupWindowsDependencies()
+  await checkLayoutDllToolchain()
 
   logger.debug("Building Windows keyboard")
   const outputPath = await Kbdgen.buildWindows(bundlePath)
@@ -145,6 +147,67 @@ async function setupWindowsDependencies(): Promise<void> {
   logger.debug("Installing kbdi")
   await PahkatPrefix.install(["kbdi", "kbdgen"])
   logger.debug("Installed kbdi")
+}
+
+/** The Rust targets kbdgen builds layout DLLs for (`kbdl.build`). */
+const LAYOUT_DLL_TARGETS = [
+  "i686-pc-windows-msvc",
+  "x86_64-pc-windows-msvc",
+  "aarch64-pc-windows-msvc",
+]
+
+/**
+ * kbdgen builds the layout DLLs itself with cargo and rust-lld, and fails
+ * without a Rust toolchain that has all of LAYOUT_DLL_TARGETS
+ * (`kbdl.build.toolchain`). Check up front so a build agent that lacks one
+ * fails with the fix for the agent image, not deep inside kbdgen.
+ */
+async function checkLayoutDllToolchain(): Promise<void> {
+  const run = async (args: string[]) => {
+    try {
+      const { stdout, stderr, status } = await builder.output("rustc", args)
+      return status.success
+        ? { ok: true, text: stdout.trim() }
+        : { ok: false, text: stderr.trim() }
+    } catch (e) {
+      return { ok: false, text: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
+  const version = await run(["--version"])
+  if (!version.ok) {
+    throw new Error(
+      `kbdgen needs a Rust toolchain to build Windows layout DLLs, but ` +
+        `rustc does not run: ${version.text}. Install Rust with rustup ` +
+        `on the Windows build agent (docker/images/windows.ts).`,
+    )
+  }
+  logger.info(`Layout DLL toolchain: ${version.text}`)
+
+  const missing: string[] = []
+  for (const triple of LAYOUT_DLL_TARGETS) {
+    const libdir = await run(["--print", "target-libdir", "--target", triple])
+    if (!libdir.ok || !await isDirectory(libdir.text)) {
+      missing.push(triple)
+    }
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `kbdgen builds Windows layout DLLs for ${
+        LAYOUT_DLL_TARGETS.join(", ")
+      }, but this Rust toolchain lacks ${missing.join(", ")}. ` +
+        `Run \`rustup target add ${missing.join(" ")}\`, or add them to ` +
+        `the rust() tool's targets in docker/images/windows.ts.`,
+    )
+  }
+}
+
+async function isDirectory(dirPath: string): Promise<boolean> {
+  try {
+    return (await Deno.stat(dirPath)).isDirectory
+  } catch {
+    return false
+  }
 }
 
 async function createWindowsInstaller(
