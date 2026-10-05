@@ -61,6 +61,8 @@ type RunEntry = {
   show?: "normal" | "hidden" | "minimized" | "maximized"
   working_dir?: string
   component?: string
+  /** Windows: run as the signed-in desktop user, not the elevated installer. */
+  run_as_original_user?: boolean
 }
 
 type ShortcutEntry = {
