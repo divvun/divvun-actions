@@ -12,7 +12,7 @@ export function opensshWindows(opts: { version?: string } = {}): Tool {
     name: `Win32-OpenSSH client ${version}`,
     render: () =>
       [
-        `RUN Invoke-WebRequest -Uri "https://github.com/PowerShell/Win32-OpenSSH/releases/download/v${version}p2-Preview/OpenSSH-Win64-v${version}.msi" -OutFile openssh.msi ; \\`,
+        `RUN Invoke-WebRequest -Uri "https://github.com/PowerShell/Win32-OpenSSH/releases/download/${version}p2-Preview/OpenSSH-Win64-v${version}.msi" -OutFile openssh.msi ; \\`,
         `    Start-Process -Wait msiexec -ArgumentList '/i', 'openssh.msi', 'ADDLOCAL=Client', '/quiet', '/norestart' ; \\`,
         `    Remove-Item -Force openssh.msi ; \\`,
         `    setx /M PATH $($Env:ProgramFiles + '\\OpenSSH' + ';' + $Env:PATH)`,

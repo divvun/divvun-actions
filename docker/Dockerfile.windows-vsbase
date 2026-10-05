@@ -46,7 +46,7 @@ RUN powershell -Command "$ProgressPreference = 'SilentlyContinue'; Invoke-WebReq
     && del /q vs_buildtools.exe `
     && (rmdir /s /q "C:\ProgramData\Package Cache" 2>nul || exit /b 0)
 
-# PowerShell Core 7.5.11
-RUN powershell -Command "$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.5.11/PowerShell-7.5.11-win-x64.msi' -OutFile 'pwsh.msi'" `
+# PowerShell Core 7.6.6
+RUN powershell -Command "$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.6.6/PowerShell-7.6.6-win-x64.msi' -OutFile 'pwsh.msi'" `
     && msiexec /i pwsh.msi /quiet /norestart `
     && del /q pwsh.msi

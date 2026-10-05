@@ -160,12 +160,12 @@ RUN Invoke-WebRequest -Uri "https://github.com/cli/cli/releases/download/v2.102.
     Expand-Archive gh.zip -DestinationPath C:\ ; \
     Remove-Item -Force gh.zip
 
-# uv 0.11.33
-RUN irm https://astral.sh/uv/0.11.33/install.ps1 | iex ; \
+# uv 0.12.23
+RUN irm https://astral.sh/uv/0.12.23/install.ps1 | iex ; \
     setx /M PATH $($Env:PATH + ';C:\Users\ContainerAdministrator\.local\bin')
 
-# Win32-OpenSSH client 9.8.3.0
-RUN Invoke-WebRequest -Uri "https://github.com/PowerShell/Win32-OpenSSH/releases/download/v9.8.3.0p2-Preview/OpenSSH-Win64-v9.8.3.0.msi" -OutFile openssh.msi ; \
+# Win32-OpenSSH client 10.0.0.0
+RUN Invoke-WebRequest -Uri "https://github.com/PowerShell/Win32-OpenSSH/releases/download/10.0.0.0p2-Preview/OpenSSH-Win64-v10.0.0.0.msi" -OutFile openssh.msi ; \
     Start-Process -Wait msiexec -ArgumentList '/i', 'openssh.msi', 'ADDLOCAL=Client', '/quiet', '/norestart' ; \
     Remove-Item -Force openssh.msi ; \
     setx /M PATH $($Env:ProgramFiles + '\OpenSSH' + ';' + $Env:PATH)
@@ -182,8 +182,8 @@ RUN $sshDir = Join-Path $env:ProgramData 'ssh' ; \
     New-Item -ItemType Directory -Force -Path $sshDir | Out-Null ; \
     Set-Content -Path (Join-Path $sshDir 'ssh_config') -Value @('Host github.com', '    IdentityFile C:\buildkite-secrets\id_ed25519_buildkite_git', '    StrictHostKeyChecking accept-new') -Encoding ascii
 
-# vcpkg 2025.10.17
-RUN git clone --depth 1 --branch 2025.10.17 https://github.com/microsoft/vcpkg.git C:\vcpkg ; \
+# vcpkg 2026.07.29
+RUN git clone --depth 1 --branch 2026.07.29 https://github.com/microsoft/vcpkg.git C:\vcpkg ; \
     C:\vcpkg\bootstrap-vcpkg.bat -disableMetrics; \
     setx /M PATH $($Env:PATH + ';C:\vcpkg')
 

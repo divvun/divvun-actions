@@ -82,7 +82,7 @@ export default defineImage({
   ],
   apkPackages: ALPINE_PACKAGES,
   tools: [
-    clangSymlinks({ version: versions.llvm }),
+    clangSymlinks({ version: versions.alpineLlvm }),
     rust({
       targets: [
         "x86_64-unknown-linux-musl",

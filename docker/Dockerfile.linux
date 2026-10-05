@@ -9,7 +9,7 @@ SHELL ["bash", "-lic"]
 
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="/var/cache/buildkite"
 ENV ANDROID_HOME="/root/Android/sdk"
-ENV ANDROID_NDK_HOME="/root/Android/sdk/ndk/28.2.13676358"
+ENV ANDROID_NDK_HOME="/root/Android/sdk/ndk/30.0.16248370"
 
 # ubuntu: Finnish mirror + amd64 only + apertium nightly
 RUN sed -i 's/archive\.ubuntu/fi\.archive\.ubuntu/g' /etc/apt/sources.list.d/ubuntu.sources && \
@@ -19,7 +19,7 @@ RUN sed -i 's/archive\.ubuntu/fi\.archive\.ubuntu/g' /etc/apt/sources.list.d/ubu
 
 # apt repo: LLVM
 RUN curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg && \
-    echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" > /etc/apt/sources.list.d/llvm.list
+    echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/noble/ llvm-toolchain-noble-23 main" > /etc/apt/sources.list.d/llvm.list
 
 # apt repo: Kitware (cmake)
 RUN curl -fsSL https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor -o /usr/share/keyrings/kitware-archive-keyring.gpg && \
@@ -76,30 +76,30 @@ RUN apt-get update && \
     socat \
     tree \
     unzip \
-    clang-21 \
-    clang-format-21 \
-    clang-tidy-21 \
-    clang-tools-21 \
-    clangd-21 \
-    libc++-21-dev \
+    clang-23 \
+    clang-format-23 \
+    clang-tidy-23 \
+    clang-tools-23 \
+    clangd-23 \
+    libc++-23-dev \
     libc++1 \
-    libc++abi-21-dev \
+    libc++abi-23-dev \
     libc++abi1 \
-    libclang-21-dev \
-    libunwind-21-dev \
-    lld-21 \
-    lldb-21 \
-    llvm-21 \
-    llvm-21-dev \
-    llvm-21-runtime \
-    python3-clang-21 \
+    libclang-23-dev \
+    libunwind-23-dev \
+    lld-23 \
+    lldb-23 \
+    llvm-23 \
+    llvm-23-dev \
+    llvm-23-runtime \
+    python3-clang-23 \
     libwebkit2gtk-4.1-dev \
     libgtk-3-dev \
     libayatana-appindicator3-dev \
     librsvg2-dev && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
-# android SDK (platform=android-36, build-tools=36.0.0, ndk=28.2.13676358)
+# android SDK (platform=android-36, build-tools=36.0.0, ndk=30.0.16248370)
 RUN set -eu && \
     curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip -o commandlinetools.zip && \
     mkdir -p ~/Android/sdk/cmdline-tools && \
@@ -110,7 +110,7 @@ RUN set -eu && \
 
 RUN set -eu && \
     SDKMANAGER=$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager && \
-    for pkg in "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"; do \
+    for pkg in "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;30.0.16248370"; do \
       n=1 ; \
       until "$SDKMANAGER" "$pkg" ; do \
         if [ "$n" -ge 3 ]; then echo "sdkmanager: $pkg failed $n times" >&2; exit 1; fi ; \
@@ -122,11 +122,11 @@ RUN set -eu && \
     done && \
     test -d "$ANDROID_NDK_HOME"
 
-# clang-21 symlinks as default
-RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-21 100 && \
-    update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-21 100 && \
-    update-alternatives --install /usr/bin/lld lld /usr/bin/lld-21 100 && \
-    update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-21 100
+# clang-23 symlinks as default
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-23 100 && \
+    update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-23 100 && \
+    update-alternatives --install /usr/bin/lld lld /usr/bin/lld-23 100 && \
+    update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-23 100
 
 # arm64 ubuntu cross-compilation toolchain
 RUN echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse" >> /etc/apt/sources.list.d/arm64.list && \
@@ -160,8 +160,8 @@ RUN curl -fsSL https://musl.cc/aarch64-linux-musl-cross.tgz -o aarch64-musl-cros
     ln -s /opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-ar /usr/local/bin/aarch64-linux-musl-ar && \
     ln -s /opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-ranlib /usr/local/bin/aarch64-linux-musl-ranlib
 
-# uv 0.11.33
-RUN curl -LsSf https://astral.sh/uv/0.11.33/install.sh | sh
+# uv 0.12.23
+RUN curl -LsSf https://astral.sh/uv/0.12.23/install.sh | sh
 
 # Python 3.11 (uv)
 RUN uv python install 3.11
@@ -208,8 +208,8 @@ RUN set -eu && \
 RUN curl -fsSL "https://github.com/BLAKE3-team/BLAKE3/releases/latest/download/b3sum_linux_x64_bin" -o /usr/local/bin/b3sum && \
     chmod +x /usr/local/bin/b3sum
 
-# nodejs 22.x + pnpm via corepack
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+# nodejs 24.x + pnpm via corepack
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
     apt-get install -y nodejs && \
     corepack enable pnpm && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
@@ -217,8 +217,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
 # deno
 RUN curl -fsSL https://deno.land/install.sh | bash -s -- -y
 
-# libtorch@2.8.0 (cpu)
-RUN curl -fsSL https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-2.8.0%2Bcpu.zip -o libtorch.zip && \
+# libtorch@2.14.1 (cpu)
+RUN curl -fsSL https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-2.14.1%2Bcpu.zip -o libtorch.zip && \
     unzip libtorch.zip && \
     cp -ar libtorch/{share,include,lib} /usr && \
     rm -rf libtorch && \
