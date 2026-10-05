@@ -286,7 +286,7 @@ export async function runDesktopKeyboardDeployOutto() {
   using tempDir = await makeTempDir()
 
   // Artifact names come from createWindowsPackage/createMacosOuttoArtifact:
-  //   <repoName>_<version>_windows.exe     (.UNSIGNED.exe if signing failed)
+  //   <repoName>_<version>_windows.exe
   //   <repoName>_<version>_macos.app.zip
   // The legacy macOS build uploads a .pkg into this same build, so these
   // patterns must stay narrow enough to exclude it.
@@ -296,9 +296,8 @@ export async function runDesktopKeyboardDeployOutto() {
   const files: string[] = []
   for await (const entry of Deno.readDir(tempDir.path)) {
     if (!entry.isFile) continue
-    // buildKeyboardWindowsOutto falls back to an unsigned installer rather than
-    // failing the build. An unsigned installer on a public release is worse
-    // than no installer, so drop it and say so loudly.
+    // An unsigned installer on a public release is worse than no installer,
+    // so drop any that reach here and say so loudly.
     if (entry.name.includes(".UNSIGNED.")) {
       logger.warning(`Refusing to publish unsigned installer: ${entry.name}`)
       continue

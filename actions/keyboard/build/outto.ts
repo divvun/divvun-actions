@@ -131,6 +131,27 @@ export async function buildKeyboardWindowsOutto(
   await stageWindInstaller(buildDir)
   addWindToOutto(oBuilder)
 
+  // Last of all, restart ctfmon so running apps pick up the new layouts.
+  // taskkill exits non-zero when ctfmon isn't running; outto only logs that.
+  // The installer is elevated, so starting ctfmon.exe directly would leave an
+  // elevated ctfmon behind. The MsCtfMonitor task, which Windows itself uses
+  // at sign-in, starts it as the signed-in user instead.
+  oBuilder.run({
+    phase: "after_install",
+    command: "#{sys}/taskkill.exe",
+    arguments: "/F /IM ctfmon.exe",
+    wait: true,
+    show: "hidden",
+  })
+  oBuilder.run({
+    phase: "after_install",
+    command: "#{sys}/schtasks.exe",
+    arguments:
+      "/Run /TN \\Microsoft\\Windows\\TextServicesFramework\\MsCtfMonitor",
+    wait: true,
+    show: "hidden",
+  })
+
   const configPath = path.join(buildDir, "outto.toml")
   await oBuilder.write(configPath)
   logger.debug(`outto manifest written: ${configPath}`)
@@ -149,34 +170,17 @@ export async function buildKeyboardWindowsOutto(
       target: "windows",
     })
   }
-  const signing = windowsOuttoSigning(
-    path.join(target.projectPath, "bin/divvun-actions.bat"),
-  )
-
-  let result: { path: string; unsigned: boolean }
-  try {
-    result = await makeOuttoInstaller({
-      configPath,
-      sourceDir: buildDir,
-      outputPath,
-      target: "windows",
-      ...signing,
-    })
-  } catch (err) {
-    logger.warning(
-      `outto build with signing failed: ${
-        err instanceof Error ? err.message : String(err)
-      }; retrying without signing`,
-    )
-    result = await makeOuttoInstaller({
-      configPath,
-      sourceDir: buildDir,
-      outputPath,
-      target: "windows",
-    })
-  }
-
-  return result
+  // A signing failure fails the build: the deploy refuses unsigned installers,
+  // so an unsigned fallback would only hide the error behind a green step.
+  return await makeOuttoInstaller({
+    configPath,
+    sourceDir: buildDir,
+    outputPath,
+    target: "windows",
+    ...windowsOuttoSigning(
+      path.join(target.projectPath, "bin/divvun-actions.bat"),
+    ),
+  })
 }
 
 async function addLayoutToOuttoManifest(
