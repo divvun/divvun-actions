@@ -2,10 +2,10 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { assetFileName, assetPsPattern } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
-import { blake3Hash } from "~/util/hash.ts"
 import logger from "~/util/log.ts"
 import { OuttoBuilder } from "~/util/outto.ts"
 import { makeTempDir } from "~/util/temp.ts"
+import { verifyReleaseDownload } from "./release_asset.ts"
 
 const REPO = "divvun/divvun-wind"
 const TAG = "dev-latest"
@@ -17,37 +17,12 @@ export const WIND_FILES = [
 ] as const
 
 /** Select exactly one supported installer and check it against the release's BLAKE3 list. */
-export async function verifyWindDownload(directory: string): Promise<string> {
-  const pattern = new RegExp(assetPsPattern("divvun-wind", TARGET, "exe"))
-  const installers: string[] = []
-  for await (const file of Deno.readDir(directory)) {
-    if (
-      file.isFile && pattern.test(file.name) &&
-      !file.name.endsWith(".UNSIGNED.exe")
-    ) {
-      installers.push(file.name)
-    }
-  }
-  if (installers.length !== 1) {
-    throw new Error(
-      `Expected one Wind x64 installer, found ${installers.length}`,
-    )
-  }
-  const name = installers[0]
-  const checksums = await Deno.readTextFile(path.join(directory, "BLAKE3SUMS"))
-  const matching = checksums.split(/\r?\n/)
-    .map((line) => /^([a-fA-F0-9]{64}) {2}(.+)$/.exec(line))
-    .filter((entry) => entry?.[2] === name)
-  if (
-    matching.length !== 1 ||
-    matching[0]![1].toLowerCase() !==
-      await blake3Hash(path.join(directory, name))
-  ) {
-    throw new Error(
-      `Wind release BLAKE3 checksum mismatch or missing entry: ${name}`,
-    )
-  }
-  return path.join(directory, name)
+export function verifyWindDownload(directory: string): Promise<string> {
+  return verifyReleaseDownload(
+    directory,
+    new RegExp(assetPsPattern("divvun-wind", TARGET, "exe")),
+    "Wind x64",
+  )
 }
 
 /** Resolve dev-latest once per keyboard build; the resulting installer works offline. */
