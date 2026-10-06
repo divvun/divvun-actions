@@ -16,8 +16,9 @@
 ; %ProgramFiles% ACL, which grants read and execute to both package SIDs; a
 ; successful registration is the check that they do. Registering the new
 ; version points InprocServer32 at it, after which older version
-; directories are deleted, or deleted at restart while a process still has
-; one of their DLLs loaded.
+; directories are deleted. A DLL that a process still has loaded is moved
+; to the Windows temporary directory and deleted from there at restart, so
+; its path is free for a reinstall before then.
 ;
 ; Exit codes beyond Inno's own: 10 when a DLL failed to register. Setup
 ; refuses to start (Inno's exit code for a failed InitializeSetup) when a
@@ -279,8 +280,33 @@ begin
     Result := '';
 end;
 
-{ Deletes Dir and everything in it; files a process has loaded, and the
-  directories holding them, go at the next restart instead. }
+{ Deletes the file at Path. A file that a process has loaded cannot be
+  deleted but can be renamed: it moves to the Windows temporary directory
+  and is deleted from there at the next restart, which leaves its own path
+  free at once. Deleting the original path at restart would delete the
+  same version's DLL had it been installed again before then. Only when the
+  move fails is the original path deleted at restart. }
+procedure DiscardFile(Path: String);
+var
+  Trash: String;
+begin
+  if DeleteFile(Path) then
+    Exit;
+  Trash := GenerateUniqueName(ExpandConstant('{win}\Temp'), '.tmp');
+  if RenameFile(Path, Trash) then
+  begin
+    Log('In use, moved to ' + Trash + ', deleting that at restart: ' + Path);
+    RestartReplace(Trash, '');
+  end
+  else
+  begin
+    Log('In use, deleting at restart: ' + Path);
+    RestartReplace(Path, '');
+  end;
+end;
+
+{ Deletes Dir and everything in it, files a process has loaded as
+  DiscardFile does. }
 procedure DeleteTree(Dir: String);
 var
   Find: TFindRec;
@@ -294,11 +320,8 @@ begin
         Path := Dir + '\' + Find.Name;
         if Find.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0 then
           DeleteTree(Path)
-        else if not DeleteFile(Path) then
-        begin
-          Log('In use, deleting at restart: ' + Path);
-          RestartReplace(Path, '');
-        end;
+        else
+          DiscardFile(Path);
       end;
     until not FindNext(Find);
   finally
@@ -386,7 +409,9 @@ begin
     MsgBox('Divvun keyboards still use the Divvun Text Service. Uninstall them first.', mbError, MB_OK);
 end;
 
-{ Unregisters every version's DLLs. Only the registered version's remove
+{ Unregisters every version's DLLs, then deletes them before Inno's own
+  file removal, which would schedule a loaded DLL's path for deletion at
+  restart (DiscardFile). Only the registered version's DLLs remove
   anything: another version's DllUnregisterServer leaves a registration
   naming a different path alone. }
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
@@ -407,9 +432,8 @@ begin
           if IsWin64 then
             RegSvr32(ExpandConstant('{sys}\regsvr32.exe'), '/u', NativeDll(Dir));
           RegSvr32(RegSvr32X86, '/u', Dir + '\divvun_tip_x86.dll');
-        end
-        else if CurUninstallStep = usPostUninstall then
           DeleteTree(Dir);
+        end;
       end;
     until not FindNext(Find);
   finally
