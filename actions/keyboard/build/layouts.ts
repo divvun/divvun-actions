@@ -60,7 +60,29 @@ const KBDGEN_NAMESPACE = await uuid.v5.generate(
   textEncoder.encode("divvun.no"),
 )
 
+/**
+ * Whether kbdgen builds a Windows layout DLL from the layout. A format 4
+ * layout has a Windows document when its `hardware` has a `windows` or a
+ * `default` variant (kbdgen spec `ldml.yaml.hosts`); an older one when it
+ * has a `windows` section.
+ */
+function hasWindowsInput(layout: { [key: string]: any }): boolean {
+  if (layout["format"] === 4) {
+    const hardware = layout["hardware"] || {}
+    return "windows" in hardware || "default" in hardware
+  }
+  return "windows" in layout
+}
+
+/**
+ * The layout's Windows configuration: `targets.windows` in format 4, which
+ * has `id` and `locale` (kbdgen spec `ldml.yaml.targets`); `windows.config`
+ * before, which may also have `languageName`.
+ */
 function layoutTarget(layout: { [key: string]: any }) {
+  if (layout["format"] === 4) {
+    return layout["targets"]?.["windows"] || {}
+  }
   const targets = layout["windows"] || {}
   return targets["config"] || {}
 }
@@ -79,7 +101,7 @@ export async function loadWindowsLayouts(
   const layouts = await Kbdgen.loadLayouts(bundlePath)
   const result: WindowsLayout[] = []
   for (const [locale, layout] of Object.entries(layouts)) {
-    if (!("windows" in layout)) {
+    if (!hasWindowsInput(layout)) {
       continue
     }
     const target = layoutTarget(layout)
