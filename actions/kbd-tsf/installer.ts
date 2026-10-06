@@ -14,6 +14,11 @@ import logger from "~/util/log.ts"
 export const TIP_NAME = "divvun-tip"
 /** One installer serves x86, x64 and Arm64 Windows. */
 export const TIP_TARGET = "windows"
+/**
+ * The rolling prerelease of the kbdgen repository that main's builds
+ * replace, and that keyboard builds embed.
+ */
+export const TIP_DEV_TAG = "kbd-tsf-dev-latest"
 
 /**
  * Where divvun-tip.iss installs the text service: `{commonpf}\Divvun\Text

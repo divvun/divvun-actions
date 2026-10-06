@@ -11,6 +11,7 @@ import {
   readTipVersion,
   setTipVersion,
   signTipDlls,
+  TIP_DEV_TAG,
   TIP_NAME,
   TIP_TARGET,
 } from "~/actions/kbd-tsf/installer.ts"
@@ -22,8 +23,6 @@ import { blake3Hash, createSignedChecksums } from "~/util/hash.ts"
 import { versionAsDev } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
-/** The rolling prerelease that main's builds replace. */
-export const TIP_DEV_TAG = "kbd-tsf-dev-latest"
 /** A release tag, `kbd-tsf-v<kbd-tsf version>`. */
 const TIP_RELEASE_TAG =
   /^kbd-tsf-v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)$/

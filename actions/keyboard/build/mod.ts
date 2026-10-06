@@ -12,6 +12,8 @@ import {
   type WindowsLayout,
 } from "./layouts.ts"
 import { NIGHTLY_CHANNEL } from "../../version.ts"
+import { stageTipInstaller } from "./tip.ts"
+import { stageWindInstaller } from "./wind.ts"
 
 // Taken straight from semver.org, with added 'v'
 const SEMVER_TAG_RE =
@@ -215,6 +217,9 @@ async function createWindowsInstaller(
   payloadDir: string,
   layouts: WindowsLayout[],
 ): Promise<InstallerResult> {
+  await stageWindInstaller(payloadDir)
+  await stageTipInstaller(payloadDir)
+
   logger.debug("Generating Inno Setup script")
   const issPath = await generateKbdInnoFromBundle(
     bundlePath,

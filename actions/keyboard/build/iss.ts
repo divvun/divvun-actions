@@ -3,7 +3,13 @@ import { InnoSetupBuilder } from "~/util/inno.ts"
 import logger from "~/util/log.ts"
 import { Kbdgen } from "~/util/shared.ts"
 import type { WindowsLayout } from "./layouts.ts"
-import { stageWindInstaller, WIND_DIRECTORY, WIND_FILES } from "./wind.ts"
+import { WIND_DIRECTORY, WIND_FILES } from "./wind.ts"
+import {
+  TIP_APP_DIR,
+  TIP_SILENT_ARGS,
+  TIP_UNINSTALLER,
+} from "~/actions/kbd-tsf/installer.ts"
+import { TIP_DIRECTORY, TIP_INSTALL_ARGS, TIP_INSTALLER } from "./tip.ts"
 
 const SYSTEM_FILE_FLAGS = [
   "restartreplace",
@@ -13,7 +19,8 @@ const SYSTEM_FILE_FLAGS = [
 
 /**
  * Write `install.all.iss` into `payloadDir`, the directory staged by
- * `stageInstallerPayload`; Inno resolves the relative sources against it.
+ * `stageInstallerPayload`, `stageWindInstaller` and `stageTipInstaller`;
+ * Inno resolves the relative sources against it.
  */
 export async function generateKbdInnoFromBundle(
   bundlePath: string,
@@ -22,8 +29,6 @@ export async function generateKbdInnoFromBundle(
 ): Promise<string> {
   const bundle = await Kbdgen.loadTarget(bundlePath, "windows")
   const project = await Kbdgen.loadProjectBundle(bundlePath)
-
-  await stageWindInstaller(payloadDir)
 
   const builder = new InnoSetupBuilder(Deno.cwd())
 
@@ -82,6 +87,12 @@ export async function generateKbdInnoFromBundle(
         "Is64BitInstallMode",
       )
 
+      builder.add(
+        `${TIP_DIRECTORY}/${TIP_INSTALLER}`,
+        `{app}\\${TIP_DIRECTORY.replaceAll("/", "\\")}`,
+        ["ignoreversion"],
+      )
+
       for (const name of WIND_FILES) {
         builder.add(
           `${WIND_DIRECTORY}/${name}`,
@@ -93,9 +104,29 @@ export async function generateKbdInnoFromBundle(
       return builder
     })
 
+  // kbdgen spec tsf.installer.bundle: the text service before any
+  // keyboard_install, so kbdi registers each layout's profile. Inno ignores
+  // [Run] exit codes, so a failed text service setup leaves the keyboards
+  // on their layouts (tsf.register.enable).
+  builder.run((command) =>
+    command
+      .withFilename(`{app}\\${TIP_DIRECTORY.replaceAll("/", "\\")}\\${TIP_INSTALLER}`)
+      .withParameter(TIP_INSTALL_ARGS)
+      .withFlags(["runhidden", "waituntilterminated"])
+  )
   for (const layout of layouts) {
     addLayoutToInstaller(builder, layout)
   }
+  // After every keyboard_uninstall: Windows ignores the removal of a TIP
+  // string once the text service is unregistered. The text service's
+  // uninstaller refuses while another keyboard's profile remains
+  // (tsf.register.uninstall), so this removes it with the last keyboard.
+  builder.uninstallRun((command) =>
+    command
+      .withFilename(`{commonpf}\\${TIP_APP_DIR}\\${TIP_UNINSTALLER}`)
+      .withParameter(TIP_SILENT_ARGS)
+      .withFlags(["runhidden", "waituntilterminated", "skipifdoesntexist"])
+  )
   builder.run((command) =>
     command
       .withFilename("{sys}\\WindowsPowerShell\\v1.0\\powershell.exe")

@@ -15,6 +15,27 @@ Wind remains an independently installed, shared product. Removing one keyboard
 removes that keyboard's bundled setup files but does not uninstall Wind or
 remove other keyboards' data.
 
+## Divvun Text Service
+
+Both builds also embed the Divvun keyboard text service, the TSF text input
+processor built from kbdgen's `crates/kbd-tsf` (kbdgen spec
+`tsf.installer.bundle`). The kbdgen pipeline builds its installer
+(`actions/kbd-tsf/divvun-tip.iss`) with a per-build version and publishes it
+to the `kbd-tsf-dev-latest` prerelease of `divvun/kbdgen`. A keyboard build
+downloads it with `BLAKE3SUMS`, checks it, and embeds it as
+`dependencies/divvun-tip/divvun-tip-installer.exe`.
+
+The keyboard installer runs it silently before any `kbdi keyboard_install`,
+so kbdi registers each layout's TSF profile. It installs into
+`%ProgramFiles%\Divvun\Text Service\<version>`, registers its DLLs with
+regsvr32, deletes older versions (at restart while loaded), and refuses to
+replace a newer version. A failure leaves the keyboards on their layouts.
+
+On uninstall the keyboard runs `kbdi keyboard_uninstall` for its layouts and
+then the text service's uninstaller, which refuses while any keyboard's
+profile remains under its CLSID in `CTF\TIP`. The last keyboard removed
+therefore removes the text service.
+
 Validation on Windows:
 
 ```powershell

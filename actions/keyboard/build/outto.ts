@@ -15,6 +15,11 @@ import { Kbdgen } from "~/util/shared.ts"
 import logger from "~/util/log.ts"
 import type { WindowsLayout } from "./layouts.ts"
 import { addWindToOutto, stageWindInstaller } from "./wind.ts"
+import {
+  addTipInstallToOutto,
+  addTipUninstallToOutto,
+  stageTipInstaller,
+} from "./tip.ts"
 
 export type OuttoKeyboardResult = {
   path: string
@@ -78,10 +83,16 @@ export async function buildKeyboardWindowsOutto(
     overwrite: "always",
   })
 
+  // kbdgen spec tsf.installer.bundle: the text service installs before the
+  // layouts' kbdi runs and its uninstaller runs after theirs.
+  await stageTipInstaller(payloadDir)
+  addTipInstallToOutto(oBuilder)
+
   const enableCommands: string[] = []
   for (const layout of layouts) {
     enableCommands.push(addLayoutToOuttoManifest(oBuilder, layout))
   }
+  addTipUninstallToOutto(oBuilder)
   // Register the whole bundle before enabling any layout. If kbdi detects a
   // stale ctfmon cache on the first enable, one refresh sees every new Layout
   // Id; subsequent enables can verify the live profiles without another restart.
