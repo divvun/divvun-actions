@@ -99,6 +99,7 @@ import {
   runLibdivvunFstPublish,
 } from "./pipelines/divvunspell/mod.ts"
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
+import { runTipInstaller, runTipPublish } from "./pipelines/kbdgen/tip.ts"
 import {
   pipelineLang,
   runLangBundle,
@@ -398,6 +399,14 @@ async function runPipeline(args: any) {
     }
     case "kbdgen-deploy": {
       await runKbdgenDeploy()
+      break
+    }
+    case "kbd-tsf-installer": {
+      await runTipInstaller()
+      break
+    }
+    case "kbd-tsf-publish": {
+      await runTipPublish()
       break
     }
     case "divvun-keyboard-deploy-windows": {
