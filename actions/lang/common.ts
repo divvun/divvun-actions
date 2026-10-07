@@ -310,6 +310,55 @@ function changedArchives(
     .map((p) => path.basename(p))
 }
 
+const GRAMMAR_TEST_DIR = "tools/grammarcheckers"
+
+/** `SUBDIRS` of the configured Makefile in `dir`. */
+async function makeSubdirs(dir: string): Promise<string[]> {
+  const out = await new Deno.Command("make", {
+    args: [
+      "-s",
+      "--no-print-directory",
+      "--eval",
+      "print-subdirs: ; @echo $(SUBDIRS)",
+      "print-subdirs",
+    ],
+    cwd: dir,
+    stdout: "piped",
+  }).output()
+  if (!out.success) {
+    throw new Error(`Could not read SUBDIRS in ${dir}`)
+  }
+  return new TextDecoder().decode(out.stdout).trim().split(/\s+/)
+    .filter(Boolean)
+}
+
+/**
+ * The `make` invocations that check `dir` (relative to `buildDir`) minus
+ * `exclude`. Recurses only along the path to `exclude`, mirroring automake's
+ * order: `.` in SUBDIRS is the dir itself (`check-am`), else it goes last.
+ */
+async function checkTargets(
+  buildDir: string,
+  dir: string,
+  exclude: string,
+): Promise<{ dir: string; target: string }[]> {
+  if (dir === exclude) return []
+  if (dir !== "." && !exclude.startsWith(`${dir}/`)) {
+    return [{ dir, target: "check" }]
+  }
+  const subdirs = await makeSubdirs(path.join(buildDir, dir))
+  if (!subdirs.includes(".")) subdirs.push(".")
+  const targets = []
+  for (const sub of subdirs) {
+    targets.push(
+      ...sub === "."
+        ? [{ dir, target: "check-am" }]
+        : await checkTargets(buildDir, path.join(dir, sub), exclude),
+    )
+  }
+  return targets
+}
+
 export async function runLangTests(opts: {
   snapshot: WorkspaceSnapshot
   metadataKey: string
@@ -327,15 +376,25 @@ export async function runLangTests(opts: {
   // results for a rebuilt one describe a speller that was never shipped.
   const shipped = await spellerArchives()
 
-  // -k: a failing suite mustn't skip later subdirs (e.g. typosreport)
-  const proc = new Deno.Command("bash", {
-    args: ["-c", "make -k -j$(nproc) check"],
-    cwd: path.join(Deno.cwd(), "build"),
-    stdout: "inherit",
-    stderr: "inherit",
-  }).spawn()
+  // Each job checks only its own part of the tree: the grammar job
+  // tools/grammarcheckers, the speller job everything else.
+  const buildDir = path.join(Deno.cwd(), "build")
+  const targets = snapshot === "grammar"
+    ? [{ dir: GRAMMAR_TEST_DIR, target: "check" }]
+    : await checkTargets(buildDir, ".", GRAMMAR_TEST_DIR)
 
-  const status = await proc.status
+  // -k: a failing suite mustn't skip later subdirs (e.g. typosreport)
+  let status = { code: 0 }
+  for (const { dir, target } of targets) {
+    const proc = new Deno.Command("bash", {
+      args: ["-c", `make -k -j$(nproc) ${target}`],
+      cwd: path.join(buildDir, dir),
+      stdout: "inherit",
+      stderr: "inherit",
+    }).spawn()
+    const result = await proc.status
+    if (status.code === 0) status = result
+  }
 
   const rebuilt = changedArchives(shipped, await spellerArchives())
   if (rebuilt.length > 0) {

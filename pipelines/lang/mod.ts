@@ -1237,6 +1237,7 @@ export async function pipelineLang() {
       command: "divvun-actions run lang-speller-test",
       depends_on: "speller-build",
       soft_fail: true,
+      timeout_in_minutes: 60,
       agents: {
         queue: "linux",
         ...extra,
@@ -1253,6 +1254,7 @@ export async function pipelineLang() {
         command: "divvun-actions run lang-grammar-test",
         depends_on: "grammar-build",
         soft_fail: true,
+        timeout_in_minutes: 40,
         agents: {
           queue: "linux",
           ...extra,
