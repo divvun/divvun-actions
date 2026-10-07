@@ -1150,11 +1150,14 @@ export class Kbdgen {
     return await Kbdgen.resolveOutput(path.join(cwd, "output", `*.pkg`))
   }
 
-  static async buildWindows(bundlePath: string): Promise<string> {
+  static async buildWindows(
+    bundlePath: string,
+    kbdgen = "kbdgen",
+  ): Promise<string> {
     const abs = path.resolve(bundlePath)
     const cwd = Deno.cwd()
 
-    const proc = new Deno.Command("kbdgen", {
+    const proc = new Deno.Command(kbdgen, {
       args: [
         "target",
         "--output-path",

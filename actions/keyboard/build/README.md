@@ -15,14 +15,24 @@ Wind remains an independently installed, shared product. Removing one keyboard
 removes that keyboard's bundled setup files but does not uninstall Wind or
 remove other keyboards' data.
 
-## Divvun Text Service
+## kbdgen v4 and the Divvun Text Service
 
-Both builds also embed the Divvun keyboard text service, the TSF text input
-processor built from kbdgen's `crates/kbd-tsf` (kbdgen spec
-`tsf.installer.bundle`). The kbdgen pipeline builds its installer
-(`actions/kbd-tsf/divvun-tip.iss`) with a per-build version and publishes it
-to the `kbd-tsf-dev-latest` prerelease of `divvun/kbdgen`. A keyboard build
-downloads it with `BLAKE3SUMS`, checks it, and embeds it as
+A keyboard bundle with a format 4 layout gets only the "kbdgen v4 (test)"
+group (`pipelineDesktopKeyboard`), which builds the Inno Setup and outto
+installers with the `v4` toolchain (`toolchain.ts`) and uploads them as
+build artifacts without deploying them. Other bundles keep the production
+steps, with kbdgen and kbdi from pahkat.
+
+The `v4` toolchain downloads kbdgen and the text service installer from the
+`v4-latest` prerelease of `divvun/kbdgen`, which kbdgen's `v4` branch
+replaces on every build, checks both against its `BLAKE3SUMS`, and builds
+kbdi from its `kbdgen-tsf-profiles` branch. kbdgen builds the layout DLLs
+for x86, x64, Arm64 and WOW64 itself, which needs the i686, x86_64 and
+aarch64 `pc-windows-msvc` Rust targets on the agent.
+
+Both v4 installers embed the Divvun keyboard text service, the TSF text
+input processor built from kbdgen's `crates/kbd-tsf` (kbdgen spec
+`tsf.installer.bundle`), as
 `dependencies/divvun-tip/divvun-tip-installer.exe`.
 
 The keyboard installer runs it silently before any `kbdi keyboard_install`,

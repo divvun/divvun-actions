@@ -1,5 +1,8 @@
 import * as path from "@std/path"
+import * as builder from "~/builder.ts"
+import { GitHub } from "~/util/github.ts"
 import { blake3Hash } from "~/util/hash.ts"
+import logger from "~/util/log.ts"
 
 /**
  * The one file in `directory` matching `pattern`, not an `.UNSIGNED.exe`,
@@ -22,7 +25,7 @@ export async function verifyReleaseDownload(
   }
   if (candidates.length !== 1) {
     throw new Error(
-      `Expected one ${label} installer, found ${candidates.length}`,
+      `Expected one ${label} release asset, found ${candidates.length}`,
     )
   }
   const name = candidates[0]
@@ -40,4 +43,35 @@ export async function verifyReleaseDownload(
     )
   }
   return path.join(directory, name)
+}
+
+/**
+ * Downloads the assets of `repo`'s `tag` release matching `ghPattern`, and
+ * its `BLAKE3SUMS`, into `directory`, which must be empty, and returns the one
+ * matching `pattern` that {@link verifyReleaseDownload} accepts.
+ */
+export async function downloadVerifiedReleaseAsset(opts: {
+  repo: string
+  tag: string
+  ghPattern: string
+  pattern: RegExp
+  label: string
+  directory: string
+}): Promise<string> {
+  if (!Deno.env.get("GH_TOKEN") && !Deno.env.get("GITHUB_TOKEN")) {
+    Deno.env.set("GH_TOKEN", (await builder.secrets()).get("github/token"))
+  }
+  const gh = new GitHub(opts.repo)
+  for (const pattern of [opts.ghPattern, "BLAKE3SUMS"]) {
+    await gh.downloadReleaseAssets(opts.tag, pattern, opts.directory)
+  }
+  const asset = await verifyReleaseDownload(
+    opts.directory,
+    opts.pattern,
+    opts.label,
+  )
+  logger.info(
+    `Using ${opts.repo}@${opts.tag}: ${path.basename(asset)} (BLAKE3 checked)`,
+  )
+  return asset
 }

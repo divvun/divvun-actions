@@ -14,6 +14,7 @@ import { OuttoBuilder } from "~/util/outto.ts"
 import { Kbdgen } from "~/util/shared.ts"
 import logger from "~/util/log.ts"
 import type { WindowsLayout } from "./layouts.ts"
+import type { KeyboardToolchain } from "./toolchain.ts"
 import { addWindToOutto, stageWindInstaller } from "./wind.ts"
 import {
   addTipInstallToOutto,
@@ -30,11 +31,12 @@ export type OuttoKeyboardResult = {
  * Generate an outto manifest + run `outto build` for a kbdgen Windows
  * keyboard bundle. Mirrors generateKbdInnoFromBundle().
  *
- * `payloadDir` is the directory staged by `stageInstallerPayload`; outto
- * packs all of it, so the manifest and the installer go to `outputDir`.
+ * outto packs all of `payloadDir`, the directory staged with the layout
+ * DLLs, kbdi and (v4) the text service; the manifest and the installer go to
+ * `outputDir`.
  *
- * The package is x64-only. outto's installer stub is an x86_64 binary, and
- * its Windows architecture selectors are `x86` (which also matches x64),
+ * The v4 package is x64-only. outto's installer stub is an x86_64 binary,
+ * and its Windows architecture selectors are `x86` (which also matches x64),
  * `x64` and `any`: it has none for Arm64, where it would skip every
  * x86/x64 file but still run kbdi. Refusing Arm64 up front beats a
  * half-installed keyboard; kbdgen spec tsf.installer.layout-dlls requires
@@ -46,6 +48,7 @@ export async function buildKeyboardWindowsOutto(
   payloadDir: string,
   outputDir: string,
   layouts: WindowsLayout[],
+  toolchain: KeyboardToolchain,
   options: { sign?: boolean } = {},
 ): Promise<OuttoKeyboardResult> {
   const bundle = await Kbdgen.loadTarget(bundlePath, "windows")
@@ -58,41 +61,28 @@ export async function buildKeyboardWindowsOutto(
     .publisher(project.organisation)
     .url(bundle.url)
     .privileges("admin")
-    .architecture("x64")
+    .architecture(toolchain.kind === "v4" ? "x64" : "any")
     .defaultDir(`#{pf}/${bundle.appName}`)
 
-  // Renamed so the run hooks can reference a single name.
-  oBuilder.file({
-    source: "kbdi-x64.exe",
-    dest: "#{app}",
-    dest_name: "kbdi.exe",
-    overwrite: "always",
-  })
-
-  // kbdgen spec tsf.installer.layout-dlls; see LAYOUT_DLL_VARIANTS. The x86
-  // DLL has no place here: outto cannot run on x86 Windows.
-  oBuilder.file({
-    source: "x64/*.dll",
-    dest: "#{sys}",
-    arch: "x64",
-    overwrite: "always",
-  })
-  oBuilder.file({
-    source: "wow64/*.dll",
-    dest: "#{win}/SysWOW64",
-    overwrite: "always",
-  })
-
-  // kbdgen spec tsf.installer.bundle: the text service installs before the
-  // layouts' kbdi runs and its uninstaller runs after theirs.
-  await stageTipInstaller(payloadDir)
-  addTipInstallToOutto(oBuilder)
+  if (toolchain.kind === "v4") {
+    addV4Files(oBuilder)
+    // kbdgen spec tsf.installer.bundle: the text service installs before the
+    // layouts' kbdi runs and its uninstaller runs after theirs.
+    await stageTipInstaller(payloadDir, toolchain.tipInstaller)
+    addTipInstallToOutto(oBuilder)
+  } else {
+    addLegacyFiles(oBuilder)
+  }
 
   const enableCommands: string[] = []
   for (const layout of layouts) {
-    enableCommands.push(addLayoutToOuttoManifest(oBuilder, layout))
+    enableCommands.push(
+      addLayoutToOuttoManifest(oBuilder, layout, toolchain.kind === "v4"),
+    )
   }
-  addTipUninstallToOutto(oBuilder)
+  if (toolchain.kind === "v4") {
+    addTipUninstallToOutto(oBuilder)
+  }
   // Register the whole bundle before enabling any layout. If kbdi detects a
   // stale ctfmon cache on the first enable, one refresh sees every new Layout
   // Id; subsequent enables can verify the live profiles without another restart.
@@ -159,19 +149,92 @@ export async function buildKeyboardWindowsOutto(
   })
 }
 
+/**
+ * Production kbdgen's payload: 32-bit hosts get kbdi.exe, 64-bit hosts get
+ * kbdi-x64.exe renamed to kbdi.exe so the run hooks can reference a single
+ * name. `i386/` goes to System32 on 32-bit Windows, `amd64/` to System32 on
+ * 64-bit Windows and `wow64/` to SysWOW64.
+ */
+function addLegacyFiles(oBuilder: OuttoBuilder) {
+  oBuilder.file({
+    source: "kbdi.exe",
+    dest: "#{app}",
+    arch: "x86",
+    overwrite: "always",
+  })
+  oBuilder.file({
+    source: "kbdi-x64.exe",
+    dest: "#{app}",
+    arch: "x64",
+    dest_name: "kbdi.exe",
+    overwrite: "always",
+  })
+  oBuilder.file({
+    source: "i386/*",
+    dest: "#{sys}",
+    arch: "x86",
+    overwrite: "always",
+  })
+  oBuilder.file({
+    source: "amd64/*",
+    dest: "#{sys}",
+    arch: "x64",
+    overwrite: "always",
+  })
+  oBuilder.file({
+    source: "wow64/*",
+    dest: "C:/Windows/SysWOW64",
+    arch: "x64",
+    overwrite: "always",
+  })
+}
+
+/**
+ * kbdgen v4's payload on x64: kbdi-x64.exe as kbdi.exe, and the layout DLLs
+ * per kbdgen spec tsf.installer.layout-dlls (see LAYOUT_DLL_VARIANTS). The
+ * x86 DLL has no place here: outto cannot run on x86 Windows.
+ */
+function addV4Files(oBuilder: OuttoBuilder) {
+  oBuilder.file({
+    source: "kbdi-x64.exe",
+    dest: "#{app}",
+    dest_name: "kbdi.exe",
+    overwrite: "always",
+  })
+  oBuilder.file({
+    source: "x64/*.dll",
+    dest: "#{sys}",
+    arch: "x64",
+    overwrite: "always",
+  })
+  oBuilder.file({
+    source: "wow64/*.dll",
+    dest: "#{win}/SysWOW64",
+    overwrite: "always",
+  })
+}
+
+/**
+ * Adds one layout's kbdi runs and shortcut, all passing the braced product
+ * code, and returns its `keyboard_enable` arguments. `replaceLegacy` first
+ * removes the layout that an older Inno installer registered under the
+ * unclosed `{guid`, which keyboard_install would otherwise register a
+ * second time beside it.
+ */
 function addLayoutToOuttoManifest(
   oBuilder: OuttoBuilder,
   layout: WindowsLayout,
+  replaceLegacy: boolean,
 ): string {
-  // Runs before keyboard_install, which would otherwise register the layout
-  // a second time beside an older Inno installer's entry.
-  oBuilder.run({
-    phase: "after_install",
-    command: "#{app}/kbdi.exe",
-    arguments: `keyboard_uninstall "${layout.legacyProductCode}"`,
-    wait: true,
-    show: "hidden",
-  })
+  if (replaceLegacy) {
+    oBuilder.run({
+      phase: "after_install",
+      command: "#{app}/kbdi.exe",
+      arguments: `keyboard_uninstall "${layout.legacyProductCode}"`,
+      wait: true,
+      show: "hidden",
+    })
+  }
 
   const installArgs: string[] = [
     "keyboard_install",

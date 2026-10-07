@@ -4,9 +4,14 @@ import keyboardBuildMeta from "~/actions/keyboard/build-meta.ts"
 import keyboardBuild, {
   type InstallerKind,
 } from "~/actions/keyboard/build/mod.ts"
+import type { KeyboardToolchainKind } from "~/actions/keyboard/build/toolchain.ts"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
 import * as builder from "~/builder.ts"
-import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
+import {
+  BuildkitePipeline,
+  CommandStep,
+  GroupStep,
+} from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import { globOneFile } from "~/util/glob.ts"
 import { GitHub } from "~/util/github.ts"
@@ -115,22 +120,30 @@ async function createWindowsPackage(
 export async function runDesktopKeyboardWindows(
   kbdgenBundlePath: string,
   installer?: InstallerKind,
+  toolchain: KeyboardToolchainKind = "production",
 ) {
   logger.info(
     `Building Divvun Keyboard for Windows (installer: ${
       installer ?? "default"
-    })`,
+    }, toolchain: ${toolchain})`,
   )
 
   const { payloadPath, channel, unsigned } = await keyboardBuild({
     keyboardType: KeyboardType.Windows,
     bundlePath: kbdgenBundlePath,
     installer,
+    toolchain,
   })
 
+  // The v4 group's Inno and outto builds upload side by side.
+  const packageId = toolchain === "v4"
+    ? `${builder.env.repoName}-kbdgen-v4-${
+      installer === "outto" ? "outto" : "inno"
+    }`
+    : builder.env.repoName
   const artifactPath = await createWindowsPackage(
     payloadPath,
-    builder.env.repoName,
+    packageId,
     kbdgenBundlePath,
     channel,
     unsigned,
@@ -432,7 +445,69 @@ export function pipelineDivvunKeyboard() {
   return pipeline
 }
 
+/** The kbdgen bundle of a `keyboard-<name>` repository, `<name>.kbdgen`. */
+export function desktopKeyboardBundlePath(): string {
+  return builder.env.repoName.split("-")[1] + ".kbdgen"
+}
+
+/** A top-level `format: 4`, matched rather than parsed so it cannot throw. */
+const FORMAT_4 = /^format:\s*4\s*(?:#.*)?$/m
+
+/**
+ * Whether any of the bundle's layouts is format 4, which only kbdgen v4
+ * reads. Pipelines are generated in the checkout; an unreadable bundle is
+ * left to the production steps, as before.
+ */
+function isFormat4Bundle(bundlePath: string): boolean {
+  const layoutsDir = path.join(bundlePath, "layouts")
+  try {
+    return [...Deno.readDirSync(layoutsDir)].some((entry) =>
+      entry.isFile && entry.name.endsWith(".yaml") &&
+      FORMAT_4.test(Deno.readTextFileSync(path.join(layoutsDir, entry.name)))
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Windows installers built with kbdgen v4, its text service and kbdi with
+ * text service profiles (actions/keyboard/build/toolchain.ts), uploaded as
+ * build artifacts only: nothing here deploys or publishes.
+ */
+function kbdgenV4Group(): GroupStep {
+  return {
+    group: "kbdgen v4 (test)",
+    key: "kbdgen-v4",
+    steps: [
+      command({
+        label: "Build Windows keyboard with kbdgen v4 (Inno Setup)",
+        key: "build-windows-kbdgen-v4",
+        command: "divvun-actions run divvun-keyboard-windows-v4 legacy",
+        agents: {
+          queue: "windows",
+        },
+      }),
+      command({
+        label: "Build Windows keyboard with kbdgen v4 (outto)",
+        key: "build-windows-kbdgen-v4-outto",
+        command: "divvun-actions run divvun-keyboard-windows-v4 outto",
+        agents: {
+          queue: "windows",
+        },
+      }),
+    ],
+  }
+}
+
 export function pipelineDesktopKeyboard() {
+  // Production kbdgen cannot read a format 4 bundle, so such a bundle gets
+  // only the kbdgen v4 builds.
+  if (isFormat4Bundle(desktopKeyboardBundlePath())) {
+    const pipeline: BuildkitePipeline = { steps: [kbdgenV4Group()] }
+    return pipeline
+  }
+
   // Only main publishes to the rolling dev-latest release; a branch build
   // would otherwise overwrite its assets with a one-off.
   const isMain = builder.env.branch === "main"

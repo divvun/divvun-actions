@@ -1,7 +1,7 @@
 import * as path from "@std/path"
-import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
-import { isMatchingTag, Kbdgen, PahkatPrefix } from "~/util/shared.ts"
+import { isMatchingTag, Kbdgen } from "~/util/shared.ts"
+import { makeTempDir } from "~/util/temp.ts"
 import { type InstallerResult, makeInstaller } from "../../inno-setup/lib.ts"
 import { buildKeyboardMacOSOutto, buildKeyboardWindowsOutto } from "./outto.ts"
 import { KeyboardType } from "../types.ts"
@@ -13,6 +13,11 @@ import {
 } from "./layouts.ts"
 import { NIGHTLY_CHANNEL } from "../../version.ts"
 import { stageTipInstaller } from "./tip.ts"
+import {
+  type KeyboardToolchain,
+  type KeyboardToolchainKind,
+  prepareWindowsToolchain,
+} from "./toolchain.ts"
 import { stageWindInstaller } from "./wind.ts"
 
 // Taken straight from semver.org, with added 'v'
@@ -34,6 +39,8 @@ export type Props = {
   bundlePath: string
   /** Installer toolchain. Defaults to env DIVVUN_INSTALLER, else "legacy". */
   installer?: InstallerKind
+  /** The kbdgen and kbdi a Windows build uses. Defaults to "production". */
+  toolchain?: KeyboardToolchainKind
 }
 
 export type Output = {
@@ -46,6 +53,7 @@ export default async function keyboardBuild({
   keyboardType,
   bundlePath,
   installer,
+  toolchain = "production",
 }: Props): Promise<Output> {
   if (
     keyboardType !== KeyboardType.Windows &&
@@ -54,6 +62,9 @@ export default async function keyboardBuild({
     throw new Error(
       `Unsupported keyboard type for non-meta build: ${keyboardType}`,
     )
+  }
+  if (toolchain !== "production" && keyboardType !== KeyboardType.Windows) {
+    throw new Error(`The ${toolchain} toolchain only builds Windows keyboards`)
   }
 
   const installerKind = resolveInstallerKind(installer)
@@ -82,7 +93,11 @@ export default async function keyboardBuild({
       payloadPath = await Kbdgen.buildMacOS(bundlePath)
     }
   } else {
-    const result = await buildWindowsKeyboard(bundlePath, installerKind)
+    const result = await buildWindowsKeyboard(
+      bundlePath,
+      installerKind,
+      toolchain,
+    )
     payloadPath = result.path
     unsigned = result.unsigned
   }
@@ -111,25 +126,33 @@ async function determineVersionAndChannel(
 async function buildWindowsKeyboard(
   bundlePath: string,
   installerKind: InstallerKind,
+  toolchainKind: KeyboardToolchainKind,
 ): Promise<InstallerResult> {
-  await setupWindowsDependencies()
-  await checkLayoutDllToolchain()
+  using work = await makeTempDir({ prefix: "keyboard-toolchain-" })
+  const toolchain = await prepareWindowsToolchain(toolchainKind, work.path)
 
   logger.debug("Building Windows keyboard")
-  const outputPath = await Kbdgen.buildWindows(bundlePath)
+  const outputPath = await Kbdgen.buildWindows(bundlePath, toolchain.kbdgen)
   logger.debug("Windows keyboard built")
 
   const layouts = await loadWindowsLayouts(bundlePath)
-  const payloadDir = path.join(outputPath, "installer-payload")
-  await Deno.remove(payloadDir, { recursive: true }).catch((e) => {
-    if (!(e instanceof Deno.errors.NotFound)) throw e
-  })
-  await stageInstallerPayload({
-    kbdgenOutput: outputPath,
-    kbdiBinDir: path.join(PahkatPrefix.path, "pkg", "kbdi", "bin"),
-    payloadDir,
-    layouts,
-  })
+  let payloadDir: string
+  if (toolchain.kind === "v4") {
+    payloadDir = path.join(outputPath, "installer-payload")
+    await Deno.remove(payloadDir, { recursive: true }).catch((e) => {
+      if (!(e instanceof Deno.errors.NotFound)) throw e
+    })
+    await stageInstallerPayload({
+      kbdgenOutput: outputPath,
+      kbdiBinDir: toolchain.kbdiBinDir,
+      payloadDir,
+      layouts,
+    })
+  } else {
+    payloadDir = outputPath
+    await copyKbdiExecutables(toolchain.kbdiBinDir, outputPath)
+    await createArchitectureDirectories(outputPath)
+  }
 
   if (installerKind === "outto") {
     logger.debug("Creating Windows installer via outto")
@@ -138,77 +161,75 @@ async function buildWindowsKeyboard(
       payloadDir,
       outputPath,
       layouts,
+      toolchain,
     )
   }
 
-  return await createWindowsInstaller(bundlePath, payloadDir, layouts)
+  return await createWindowsInstaller(
+    bundlePath,
+    payloadDir,
+    layouts,
+    toolchain,
+  )
 }
 
-async function setupWindowsDependencies(): Promise<void> {
-  await PahkatPrefix.bootstrap(["devtools"], "nightly")
-  logger.debug("Installing kbdi")
-  await PahkatPrefix.install(["kbdi", "kbdgen"])
-  logger.debug("Installed kbdi")
-}
-
-/** The Rust targets kbdgen builds layout DLLs for (`kbdl.build`). */
-const LAYOUT_DLL_TARGETS = [
-  "i686-pc-windows-msvc",
-  "x86_64-pc-windows-msvc",
-  "aarch64-pc-windows-msvc",
-]
-
-/**
- * kbdgen builds the layout DLLs itself with cargo and rust-lld, and fails
- * without a Rust toolchain that has all of LAYOUT_DLL_TARGETS
- * (`kbdl.build.toolchain`). Check up front so a build agent that lacks one
- * fails with the fix for the agent image, not deep inside kbdgen.
- */
-async function checkLayoutDllToolchain(): Promise<void> {
-  const run = async (args: string[]) => {
-    try {
-      const { stdout, stderr, status } = await builder.output("rustc", args)
-      return status.success
-        ? { ok: true, text: stdout.trim() }
-        : { ok: false, text: stderr.trim() }
-    } catch (e) {
-      return { ok: false, text: e instanceof Error ? e.message : String(e) }
-    }
-  }
-
-  const version = await run(["--version"])
-  if (!version.ok) {
-    throw new Error(
-      `kbdgen needs a Rust toolchain to build Windows layout DLLs, but ` +
-        `rustc does not run: ${version.text}. Install Rust with rustup ` +
-        `on the Windows build agent (docker/images/windows.ts).`,
-    )
-  }
-  logger.info(`Layout DLL toolchain: ${version.text}`)
-
-  const missing: string[] = []
-  for (const triple of LAYOUT_DLL_TARGETS) {
-    const libdir = await run(["--print", "target-libdir", "--target", triple])
-    if (!libdir.ok || !await isDirectory(libdir.text)) {
-      missing.push(triple)
-    }
-  }
-  if (missing.length > 0) {
-    throw new Error(
-      `kbdgen builds Windows layout DLLs for ${
-        LAYOUT_DLL_TARGETS.join(", ")
-      }, but this Rust toolchain lacks ${missing.join(", ")}. ` +
-        `Run \`rustup target add ${missing.join(" ")}\`, or add them to ` +
-        `the rust() tool's targets in docker/images/windows.ts.`,
+async function copyKbdiExecutables(
+  kbdiBinDir: string,
+  outputPath: string,
+): Promise<void> {
+  for (const name of ["kbdi.exe", "kbdi-x64.exe"]) {
+    await Deno.copyFile(
+      path.join(kbdiBinDir, name),
+      path.resolve(outputPath, name),
     )
   }
 }
 
-async function isDirectory(dirPath: string): Promise<boolean> {
+async function createArchitectureDirectories(
+  outputPath: string,
+): Promise<void> {
+  logger.debug("Creating old-style directory structure for Inno Setup")
+
+  const architectureMappings = [
+    { from: "x86", to: "i386" },
+    { from: "x64", to: "amd64" },
+    { from: "x86", to: "wow64" }, // x86 files also used for wow64
+  ]
+
+  for (const mapping of architectureMappings) {
+    await copyArchitectureDirectory(outputPath, mapping.from, mapping.to)
+  }
+}
+
+async function copyArchitectureDirectory(
+  outputPath: string,
+  from: string,
+  to: string,
+): Promise<void> {
+  const fromDir = path.join(outputPath, from)
+  const toDir = path.join(outputPath, to)
+
   try {
-    return (await Deno.stat(dirPath)).isDirectory
-  } catch {
-    return false
+    const stat = await Deno.stat(fromDir)
+    if (stat.isDirectory) {
+      logger.debug(`Copying ${fromDir} to ${toDir}`)
+      await Deno.mkdir(toDir, { recursive: true })
+
+      for await (const entry of Deno.readDir(fromDir)) {
+        if (entry.isFile) {
+          await Deno.copyFile(
+            path.join(fromDir, entry.name),
+            path.join(toDir, entry.name),
+          )
+        }
+      }
+    }
+  } catch (e) {
+    logger.debug(
+      `Warning: Could not process ${from} -> ${to}: ${
+        e instanceof Error ? e.message : String(e)
+      }`,
+    )
   }
 }
 
@@ -216,15 +237,19 @@ async function createWindowsInstaller(
   bundlePath: string,
   payloadDir: string,
   layouts: WindowsLayout[],
+  toolchain: KeyboardToolchain,
 ): Promise<InstallerResult> {
   await stageWindInstaller(payloadDir)
-  await stageTipInstaller(payloadDir)
+  if (toolchain.kind === "v4") {
+    await stageTipInstaller(payloadDir, toolchain.tipInstaller)
+  }
 
   logger.debug("Generating Inno Setup script")
   const issPath = await generateKbdInnoFromBundle(
     bundlePath,
     payloadDir,
     layouts,
+    toolchain,
   )
 
   logger.debug("Creating Windows installer")

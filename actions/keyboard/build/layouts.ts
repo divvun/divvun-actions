@@ -1,5 +1,6 @@
 // What both Windows keyboard installers (Inno Setup and outto) need to know
-// about a kbdgen bundle's layouts and the layout DLLs kbdgen built for them.
+// about a kbdgen bundle's layouts and, for kbdgen v4, the layout DLLs kbdgen
+// built for them.
 
 // deno-lint-ignore-file no-explicit-any
 import * as path from "@std/path"
@@ -39,6 +40,8 @@ export type WindowsLayout = {
   languageCode: string
   languageName: string | undefined
   displayName: string
+  /** The layout's GUID, unbraced, derived from `kbdId`. */
+  guid: string
   /**
    * The braced `{guid}` passed to every kbdi command. kbdi stores it as the
    * layout's `Layout Product Code` on `keyboard_install` and finds the layout
@@ -121,6 +124,7 @@ export async function loadWindowsLayouts(
       languageCode: target["locale"] || locale,
       languageName: target["languageName"],
       displayName,
+      guid,
       productCode: `{${guid}}`,
       legacyProductCode: `{${guid}`,
     })

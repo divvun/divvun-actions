@@ -10,6 +10,7 @@ import {
 } from "~/pipelines/msgrammar.ts"
 import { BuildkitePipeline } from "~/builder/pipeline.ts"
 import {
+  desktopKeyboardBundlePath,
   pipelineDesktopKeyboard,
   pipelineDivvunKeyboard,
   runDesktopKeyboardDeploy,
@@ -309,6 +310,14 @@ async function runPipeline(args: any) {
       await runDesktopKeyboardWindows(
         kbdgenBundlePath,
         installerArg(args._[1]),
+      )
+      break
+    }
+    case "divvun-keyboard-windows-v4": {
+      await runDesktopKeyboardWindows(
+        desktopKeyboardBundlePath(),
+        installerArg(args._[1]),
+        "v4",
       )
       break
     }
