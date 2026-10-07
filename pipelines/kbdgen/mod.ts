@@ -1,7 +1,11 @@
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import * as builder from "~/builder.ts"
-import { isKbdgenV4Build } from "~/actions/kbdgen/v4.ts"
+import { downloadBinaryCmd } from "~/util/artifact_download.ts"
+import {
+  isKbdgenV4Build,
+  KBDGEN_WINDOWS_TARGET,
+} from "~/actions/kbdgen/v4.ts"
 import { hasTextService } from "~/actions/kbd-tsf/installer.ts"
 import { TIP_BUILD_KEY, tipSteps } from "./tip.ts"
 import { v4PublishStep } from "./v4.ts"
@@ -22,6 +26,10 @@ function command(input: CommandStep): CommandStep {
   }
 }
 
+function kbdgenPath(os: string, arch: string): string {
+  return `target/${arch}/release/kbdgen${os === "windows" ? ".exe" : ""}`
+}
+
 const msvcEnvCmd = (arch: string) => {
   if (arch.startsWith("aarch64")) {
     return "arm64"
@@ -29,19 +37,54 @@ const msvcEnvCmd = (arch: string) => {
   return "x64"
 }
 
+/**
+ * Downloads the unsigned kbdgen that `buildKey` uploaded for a Windows or
+ * macOS `arch`, signs it and uploads it as `signed/<path>`. It runs on Linux,
+ * where a failed signing fails the step, rather than on the Windows agent,
+ * whose PowerShell carries on past a failed native command.
+ */
+function createSignStep(
+  os: "windows" | "macos",
+  arch: string,
+  buildKey: string,
+): CommandStep {
+  const src = kbdgenPath(os, arch)
+  const signed = `signed/${src}`
+  const signCommand = os === "windows"
+    ? `divvun-actions sign ${src}`
+    : `divvun-actions run macos-sign ${src}`
+  return command({
+    key: `sign-${os}-${arch}`,
+    label: "Sign",
+    agents: { queue: "linux" },
+    command: [
+      "echo '--- Downloading unsigned binary'",
+      downloadBinaryCmd(src),
+      "echo '--- Signing'",
+      signCommand,
+      "echo '--- Uploading signed binary'",
+      `mkdir -p signed/target/${arch}/release`,
+      `mv ${src} ${signed}`,
+      `buildkite-agent artifact upload ${signed}`,
+    ],
+    depends_on: buildKey,
+  })
+}
+
 export function pipelineKbdgen() {
   const pipeline: BuildkitePipeline = {
     steps: [],
   }
 
-  const buildStepKeys: string[] = []
+  // The keys of the steps that upload each target's shipped binary: the sign
+  // step for Windows and macOS, the build step for Linux.
+  const binaryStepKeys: string[] = []
 
   for (const [os, archs] of Object.entries(platforms)) {
     for (const arch of archs) {
-      const ext = os === "windows" ? ".exe" : ""
-      const steps = []
+      const steps: CommandStep[] = []
       const buildKey = `build-${os}-${arch}`
-      buildStepKeys.push(buildKey)
+      const upload = `buildkite-agent artifact upload ${kbdgenPath(os, arch)}`
 
       if (os === "windows") {
         steps.push(command({
@@ -49,13 +92,12 @@ export function pipelineKbdgen() {
           agents: {
             queue: os,
           },
-          label: "Build and sign",
+          label: "Build",
           command: [
             `msvc-env ${
               msvcEnvCmd(arch)
-            } | Invoke-Expression; cargo build --bin kbdgen --release --target ${arch}`,
-            `divvun-actions sign target/${arch}/release/kbdgen${ext}`,
-            `buildkite-agent artifact upload target/${arch}/release/kbdgen${ext}`,
+            } | Invoke-Expression; cargo build --bin kbdgen --release --target ${arch}; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }`,
+            upload,
           ],
           plugins: [
             {
@@ -82,7 +124,7 @@ export function pipelineKbdgen() {
           label: "Build",
           command: [
             `${cargoCmd} build --bin kbdgen --release --target ${arch}`,
-            `buildkite-agent artifact upload target/${arch}/release/kbdgen${ext}`,
+            upload,
           ],
           plugins: os === "linux"
             ? [
@@ -100,8 +142,16 @@ export function pipelineKbdgen() {
         }))
       }
 
+      if (os === "windows" || os === "macos") {
+        const signStep = createSignStep(os, arch, buildKey)
+        steps.push(signStep)
+        binaryStepKeys.push(signStep.key!)
+      } else {
+        binaryStepKeys.push(buildKey)
+      }
+
       pipeline.steps.push({
-        group: `${os} ${arch}`,
+        group: arch,
         steps,
       })
     }
@@ -113,13 +163,13 @@ export function pipelineKbdgen() {
   if (textService) {
     pipeline.steps.push({
       group: "Text service",
-      steps: tipSteps("build-windows-x86_64-pc-windows-msvc", command),
+      steps: tipSteps(`sign-windows-${KBDGEN_WINDOWS_TARGET}`, command),
     })
   }
 
   if (isKbdgenV4Build()) {
     pipeline.steps.push(v4PublishStep(
-      textService ? [...buildStepKeys, TIP_BUILD_KEY] : buildStepKeys,
+      textService ? [...binaryStepKeys, TIP_BUILD_KEY] : binaryStepKeys,
       command,
     ))
   }
@@ -128,7 +178,7 @@ export function pipelineKbdgen() {
     pipeline.steps.push(command({
       label: "Deploy",
       command: "divvun-actions run kbdgen-deploy",
-      depends_on: buildStepKeys,
+      depends_on: binaryStepKeys,
       agents: {
         queue: "linux",
       },

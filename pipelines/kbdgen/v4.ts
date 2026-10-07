@@ -18,7 +18,10 @@ import { versionAsDev } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import { downloadTipAsset } from "./tip.ts"
 
-/** Publishes every kbdgen build step's binary and the text service to KBDGEN_V4_TAG. */
+/**
+ * Publishes the kbdgen binary of every target, signed for Windows and macOS,
+ * and the text service to KBDGEN_V4_TAG.
+ */
 export function v4PublishStep(
   dependsOn: string[],
   command: (input: CommandStep) => CommandStep,
@@ -34,19 +37,20 @@ export function v4PublishStep(
 }
 
 /**
- * The kbdgen binaries the build steps uploaded, by Rust target. Windows
- * agents may store `target\<triple>\release\kbdgen.exe` with backslashes,
- * which a Linux download can keep in the file name, so the target is read
- * from the path split on either separator.
+ * The kbdgen binaries the pipeline ships, by Rust target: the ones the sign
+ * steps uploaded under `signed/` for Windows and macOS, and the ones the
+ * build steps uploaded for Linux. A path stored with backslashes can keep
+ * them in a Linux download's file name, so the target is read from the path
+ * split on either separator.
  */
 async function downloadKbdgenBinaries(
   directory: string,
 ): Promise<Map<string, string>> {
   for (
     const pattern of [
-      "target/*/release/kbdgen",
-      "target/*/release/kbdgen.exe",
-      "target\\*\\release\\kbdgen.exe",
+      "signed/target/*-pc-windows-msvc/release/kbdgen.exe",
+      "signed/target/*-apple-darwin/release/kbdgen",
+      "target/*-linux-*/release/kbdgen",
     ]
   ) {
     try {
@@ -58,10 +62,13 @@ async function downloadKbdgenBinaries(
   const binaries = new Map<string, string>()
   for await (const entry of fs.walk(directory, { includeDirs: false })) {
     const parts = path.relative(directory, entry.path).split(/[\\/]/)
-    const [root, triple, release, name] = parts
+    const signed = parts[0] === "signed"
+    const [root, triple, release, name] = signed ? parts.slice(1) : parts
     if (
-      parts.length === 4 && root === "target" && release === "release" &&
-      (name === "kbdgen" || name === "kbdgen.exe")
+      parts.length === (signed ? 5 : 4) && root === "target" &&
+      release === "release" &&
+      (name === "kbdgen" || name === "kbdgen.exe") &&
+      signed === !triple.includes("-linux-")
     ) {
       binaries.set(triple, entry.path)
     }

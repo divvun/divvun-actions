@@ -186,47 +186,55 @@ export async function runKbdgenDeploy() {
 
   using artifactsDir = await makeTempDir()
 
-  await builder.downloadArtifacts("target/*/release/kbdgen", artifactsDir.path)
+  // Windows and macOS ship what the sign steps uploaded under signed/, Linux
+  // what its build steps uploaded.
   await builder.downloadArtifacts(
-    "target\\*\\release\\kbdgen.exe",
+    "signed/target/*-pc-windows-msvc/release/kbdgen.exe",
     artifactsDir.path,
   )
-  try {
-    await builder.downloadArtifacts(
-      "target/*/release/kbdgen.exe",
-      artifactsDir.path,
-    )
-  } catch (_e) {
-    logger.info("Forward slash Windows pattern not needed (already downloaded)")
-  }
+  await builder.downloadArtifacts(
+    "signed/target/*-apple-darwin/release/kbdgen",
+    artifactsDir.path,
+  )
+  await builder.downloadArtifacts(
+    "target/*-linux-*/release/kbdgen",
+    artifactsDir.path,
+  )
 
   const kbdgenFiles: { path: string; platform: string }[] = []
 
   // Find Unix binaries (no extension)
-  for await (
-    const file of fs.expandGlob("target/*/release/kbdgen", {
-      root: artifactsDir.path,
-    })
+  for (
+    const pattern of [
+      "signed/target/*/release/kbdgen",
+      "target/*/release/kbdgen",
+    ]
   ) {
-    if (file.isFile) {
-      const rustTarget = path.basename(path.dirname(path.dirname(file.path)))
-      const platform = determinePlatform(rustTarget)
-
-      if (!platform) {
-        logger.warning(
-          `Unknown Unix platform for target ${rustTarget}, skipping`,
+    for await (
+      const file of fs.expandGlob(pattern, { root: artifactsDir.path })
+    ) {
+      if (file.isFile) {
+        const rustTarget = path.basename(
+          path.dirname(path.dirname(file.path)),
         )
-        continue
-      }
+        const platform = determinePlatform(rustTarget)
 
-      logger.info(`Found ${platform} binary: ${file.path}`)
-      kbdgenFiles.push({ path: file.path, platform })
+        if (!platform) {
+          logger.warning(
+            `Unknown Unix platform for target ${rustTarget}, skipping`,
+          )
+          continue
+        }
+
+        logger.info(`Found ${platform} binary: ${file.path}`)
+        kbdgenFiles.push({ path: file.path, platform })
+      }
     }
   }
 
   // Find Windows binaries (.exe extension)
   for await (
-    const file of fs.expandGlob("target/*/release/kbdgen.exe", {
+    const file of fs.expandGlob("signed/target/*/release/kbdgen.exe", {
       root: artifactsDir.path,
     })
   ) {

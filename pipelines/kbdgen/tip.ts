@@ -16,7 +16,10 @@ import {
   TIP_TARGET,
 } from "~/actions/kbd-tsf/installer.ts"
 import type { CommandStep } from "~/builder/pipeline.ts"
-import { isKbdgenV4Build } from "~/actions/kbdgen/v4.ts"
+import {
+  isKbdgenV4Build,
+  KBDGEN_WINDOWS_TARGET,
+} from "~/actions/kbdgen/v4.ts"
 import { assetFileName } from "~/util/asset_name.ts"
 import { downloadBinary } from "~/util/artifact_download.ts"
 import { GitHub } from "~/util/github.ts"
@@ -58,9 +61,9 @@ export function tipReleaseMode(): "release" | "dev" | "v4" | null {
 }
 
 /**
- * The steps that turn `kbdgenStep`'s x64 Windows kbdgen into a text service
- * installer, and publish it from main and from release tags. On the v4
- * branch, the kbdgen v4 publish step publishes it instead.
+ * The steps that turn the x64 Windows kbdgen that `kbdgenStep` signed into a
+ * text service installer, and publish it from main and from release tags. On
+ * the v4 branch, the kbdgen v4 publish step publishes it instead.
  */
 export function tipSteps(
   kbdgenStep: string,
@@ -111,9 +114,9 @@ async function tipVersion(): Promise<string> {
 }
 
 /**
- * On a Windows agent: builds the text service DLLs with the kbdgen of the
- * same commit, signs them and the installer when the build is published, and
- * uploads the installer with a record of what it is.
+ * On a Windows agent: builds the text service DLLs with the signed kbdgen of
+ * the same commit, signs them and the installer when the build is published,
+ * and uploads the installer with a record of what it is.
  */
 export async function runTipInstaller() {
   const signed = tipReleaseMode() !== null
@@ -121,7 +124,8 @@ export async function runTipInstaller() {
   await setTipVersion(".", version)
 
   using work = await makeTempDir({ prefix: "kbd-tsf-" })
-  const kbdgenPath = "target/x86_64-pc-windows-msvc/release/kbdgen.exe"
+  const kbdgenPath =
+    `signed/target/${KBDGEN_WINDOWS_TARGET}/release/kbdgen.exe`
   await downloadBinary(kbdgenPath, work.path)
   const kbdgen = path.join(work.path, kbdgenPath)
 
