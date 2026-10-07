@@ -5,6 +5,7 @@
 // deno-lint-ignore-file no-explicit-any
 import * as path from "@std/path"
 import * as uuid from "@std/uuid"
+import sign from "~/services/windows-codesign.ts"
 import logger from "~/util/log.ts"
 import { Kbdgen } from "~/util/shared.ts"
 
@@ -197,6 +198,26 @@ export async function stageInstallerPayload(opts: {
       path.join(kbdiBinDir, name),
       path.join(payloadDir, name),
     )
+  }
+}
+
+/**
+ * Signs every layout DLL staged in `payloadDir` by
+ * {@link stageInstallerPayload}, in place, as the text service's DLLs are
+ * signed (kbdgen spec `tsf.security.signing`): kbdgen v4 writes them
+ * unsigned. A failure fails the build rather than shipping unsigned layout
+ * DLLs in a signed installer.
+ */
+export async function signLayoutDlls(
+  payloadDir: string,
+  layouts: WindowsLayout[],
+): Promise<void> {
+  for (const variant of LAYOUT_DLL_VARIANTS) {
+    for (const layout of layouts) {
+      const dll = path.join(payloadDir, variant, layout.dllName)
+      logger.info(`Signing ${dll}`)
+      await sign(dll)
+    }
   }
 }
 

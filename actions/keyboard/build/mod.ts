@@ -8,6 +8,7 @@ import { KeyboardType } from "../types.ts"
 import { generateKbdInnoFromBundle } from "./iss.ts"
 import {
   loadWindowsLayouts,
+  signLayoutDlls,
   stageInstallerPayload,
   type WindowsLayout,
 } from "./layouts.ts"
@@ -148,7 +149,11 @@ async function buildWindowsKeyboard(
       payloadDir,
       layouts,
     })
+    await signLayoutDlls(payloadDir, layouts)
   } else {
+    // Production kbdgen's DLLs stay unsigned: its Inno installer falls back
+    // to an unsigned build when signing fails, which signing each DLL here
+    // would turn into a failed build.
     payloadDir = outputPath
     await copyKbdiExecutables(toolchain.kbdiBinDir, outputPath)
     await createArchitectureDirectories(outputPath)
