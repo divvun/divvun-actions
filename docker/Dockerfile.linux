@@ -246,9 +246,9 @@ RUN curl -fsSL 'https://pahkat.uit.no/artifacts/thfst-tools_1.0.0-alpha.2_linux_
     bsdtar -xf thfst-tools.txz -C /usr/local && \
     rm thfst-tools.txz
 
-# hfst (dev-latest @ 2026-10-05, /opt/divvun/bin, off PATH)
+# hfst (dev-latest @ 2026-10-07, /opt/divvun/bin, off PATH)
 RUN set -eu && \
-    echo 'hfst dev-latest refresh: 2026-10-05' && \
+    echo 'hfst dev-latest refresh: 2026-10-07' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/hfst-rs/releases/tags/dev-latest \
           | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*hfst[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_][^"]*\.tgz"' \
           | head -1 \
@@ -264,9 +264,9 @@ RUN set -eu && \
     test -L /opt/divvun/bin/hfst-lexc || { echo 'hfst install-symlinks produced no symlinks' >&2; exit 1; } && \
     rm -rf /tmp/hfst.tgz /tmp/hfst[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*
 
-# foma-rs (dev-latest @ 2026-10-05, /opt/divvun/bin, off PATH)
+# foma-rs (dev-latest @ 2026-10-07, /opt/divvun/bin, off PATH)
 RUN set -eu && \
-    echo 'foma-rs dev-latest refresh: 2026-10-05' && \
+    echo 'foma-rs dev-latest refresh: 2026-10-07' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/foma-rs/releases/tags/dev-latest \
           | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_][^"]*\.tgz"' \
           | head -1 \
@@ -280,9 +280,9 @@ RUN set -eu && \
     install -m 755 /tmp/foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*/foma /tmp/foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*/flookup /tmp/foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*/cgflookup /opt/divvun/bin/ && \
     rm -rf /tmp/foma.tgz /tmp/foma[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_]*
 
-# cg3 (dev-latest @ 2026-10-05, /opt/divvun/bin, off PATH)
+# cg3 (dev-latest @ 2026-10-07, /opt/divvun/bin, off PATH)
 RUN set -eu && \
-    echo 'cg3 dev-latest refresh: 2026-10-05' && \
+    echo 'cg3 dev-latest refresh: 2026-10-07' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/cg3-rs/releases/tags/dev-latest \
           | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*cg3[-_]x86[-_]64[-_]unknown[-_]linux[-_]musl[-_][^"]*\.tgz"' \
           | head -1 \
@@ -303,9 +303,9 @@ RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "aw
     ./aws/install && \
     rm awscliv2.zip
 
-# divvun-runtime (dev-latest @ 2026-10-05)
+# divvun-runtime (dev-latest @ 2026-10-07)
 RUN set -eu && \
-    echo 'divvun-runtime dev-latest refresh: 2026-10-05' && \
+    echo 'divvun-runtime dev-latest refresh: 2026-10-07' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/divvun-runtime/releases/tags/dev-latest \
           | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*divvun-runtime[-_]x86[-_]64[-_]unknown[-_]linux[-_]gnu[-_][^"]*\.tgz"' \
           | head -1 \
@@ -319,9 +319,9 @@ RUN set -eu && \
     rm -rf /tmp/divvun-runtime.tgz /tmp/divvun-runtime[-_]x86[-_]64[-_]unknown[-_]linux[-_]gnu[-_]* && \
     divvun-runtime --version
 
-# divvunspell (dev-latest @ 2026-10-05)
+# divvunspell (dev-latest @ 2026-10-07)
 RUN set -eu && \
-    echo 'divvunspell dev-latest refresh: 2026-10-05' && \
+    echo 'divvunspell dev-latest refresh: 2026-10-07' && \
     URL=$(curl -fsSL https://api.github.com/repos/divvun/divvunspell/releases/tags/dev-latest \
           | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*divvunspell[-_]x86[-_]64[-_]unknown[-_]linux[-_]gnu[-_][^"]*\.tgz"' \
           | head -1 \

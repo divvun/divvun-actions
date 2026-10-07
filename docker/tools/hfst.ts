@@ -14,7 +14,7 @@ const PREFIX = "/opt/divvun/bin"
  * so Docker reuses the cached layer even when the upstream build changes.
  * This token is echoed inside the RUN so changing it is a cache miss.
  */
-const REFRESH = "2026-10-05"
+const REFRESH = "2026-10-07"
 
 /**
  * Install Rust hfst from divvun/hfst-rs `dev-latest`.
