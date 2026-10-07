@@ -102,6 +102,7 @@ import {
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
 import { runTipInstaller, runTipPublish } from "./pipelines/kbdgen/tip.ts"
 import { runKbdgenPublishV4 } from "./pipelines/kbdgen/v4.ts"
+import { pipelineKbdi, runKbdiPublishV4 } from "./pipelines/kbdi/mod.ts"
 import {
   pipelineLang,
   runLangBundle,
@@ -413,6 +414,10 @@ async function runPipeline(args: any) {
     }
     case "kbdgen-publish-v4": {
       await runKbdgenPublishV4()
+      break
+    }
+    case "kbdi-publish-v4": {
+      await runKbdiPublishV4()
       break
     }
     case "kbd-tsf-installer": {
@@ -802,6 +807,10 @@ export async function createCiPipeline(): Promise<BuildkitePipeline> {
     }
     case "kbdgen": {
       pipeline = pipelineKbdgen()
+      break
+    }
+    case "kbdi": {
+      pipeline = pipelineKbdi()
       break
     }
     case "divvun-runtime": {
