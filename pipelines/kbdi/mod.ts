@@ -31,21 +31,9 @@ function binaryPath(triple: string): string {
   return `target/${triple}/release/kbdi.exe`
 }
 
-const msvcEnvCmd = (arch: string) => {
-  if (arch.startsWith("aarch64")) {
-    return "arm64"
-  }
-  if (arch.startsWith("i686")) {
-    return "x86"
-  }
-  return "x64"
-}
-
 /**
  * Downloads the unsigned kbdi that `buildKey` uploaded, signs it and uploads
- * it as `signed/<path>`. It runs on Linux, where a failed signing fails the
- * step, rather than on the Windows agent, whose PowerShell carries on past a
- * failed native command.
+ * it as `signed/<path>`.
  */
 function createSignStep(triple: string, buildKey: string): CommandStep {
   const src = binaryPath(triple)
@@ -87,16 +75,14 @@ export function pipelineKbdi(): BuildkitePipeline {
         command({
           key: buildKey,
           agents: {
-            queue: "windows",
+            queue: "linux",
           },
           label: "Build",
           command: [
             // rustup 1.28+ installs the toolchain and targets that
             // rust-toolchain.toml pins only when asked to.
-            "rustup toolchain install; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }",
-            `msvc-env ${
-              msvcEnvCmd(arch)
-            } | Invoke-Expression; cargo build --locked --bin kbdi --release --target ${arch}; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }`,
+            "rustup toolchain install",
+            `cargo xwin build --locked --bin kbdi --release --target ${arch}`,
             `buildkite-agent artifact upload ${binaryPath(arch)}`,
           ],
           plugins: [

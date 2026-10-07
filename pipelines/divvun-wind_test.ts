@@ -8,7 +8,7 @@ Deno.env.set("BUILDKITE_REPO", "git@github.com:divvun/divvun-wind.git")
 Deno.env.delete("BUILDKITE_PLUGINS")
 const builder = await import("~/builder.ts")
 const { createCiPipeline } = await import("~/cli.ts")
-const { windReleaseMode, runWindPublish } = await import(
+const { BUILD_COMMANDS, windReleaseMode, runWindPublish } = await import(
   "~/pipelines/divvun-wind.ts"
 )
 const { windManifest } = await import("~/actions/divvun-wind/bundle.ts")
@@ -33,8 +33,8 @@ Deno.test("Wind installer depends on checks; publication only follows trusted ma
     validatePipeline(pipeline)
     strictEqual(pipeline.steps.length, mode ? 3 : 2)
     const [build, installer, publish] = pipeline.steps as CommandStep[]
-    strictEqual(build.command, "pwsh -NoProfile -File scripts/buildkite.ps1")
-    deepStrictEqual(build.agents, { queue: "windows" })
+    deepStrictEqual(build.command, BUILD_COMMANDS)
+    deepStrictEqual(build.agents, { queue: "linux" })
     strictEqual(installer.depends_on, build.key)
     strictEqual(installer.command, "divvun-actions run divvun-wind-installer")
     if (mode) {

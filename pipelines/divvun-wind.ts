@@ -19,6 +19,28 @@ const TARGET = "x86_64-pc-windows-msvc"
 const INSTALLER = `divvun-wind_${assetTarget(TARGET)}.exe`
 const BUILD = `check-build-${TARGET}`
 const PACKAGE = `installer-${TARGET}`
+const RELEASE_DIR = `target/${TARGET}/release`
+
+/**
+ * Checks and cross-compiles Wind on Linux with cargo-xwin, then uploads what
+ * the installer packages plus the PDBs. The tests are compiled but not run:
+ * a Linux agent cannot execute them.
+ */
+export const BUILD_COMMANDS = [
+  // rustup 1.28+ installs the toolchain and targets that rust-toolchain.toml
+  // pins only when asked to.
+  "rustup toolchain install",
+  "cargo fmt --all -- --check",
+  `cargo xwin clippy --workspace --all-targets --locked --target ${TARGET} -- -D warnings`,
+  `cargo xwin test --workspace --locked --no-run --target ${TARGET}`,
+  `cargo xwin build --workspace --release --locked --target ${TARGET}`,
+  ...[
+    "divvun-wind.exe",
+    "divvun-wind-symbols.exe",
+    "divvunwind.dll",
+    "*.pdb",
+  ].map((name) => `buildkite-agent artifact upload "${RELEASE_DIR}/${name}"`),
+]
 
 export function windReleaseMode(): "release" | "dev" | null {
   if (builder.env.pullRequest && builder.env.pullRequest !== "false") {
@@ -48,9 +70,9 @@ export function pipelineDivvunWind(): BuildkitePipeline {
   const steps: BuildkitePipeline["steps"] = [
     command({
       key: BUILD,
-      label: "Windows x64: check, test, build",
-      agents: { queue: "windows" },
-      command: "pwsh -NoProfile -File scripts/buildkite.ps1",
+      label: "Windows x64: check, build (cargo-xwin)",
+      agents: { queue: "linux" },
+      command: BUILD_COMMANDS,
     }),
     command({
       key: PACKAGE,

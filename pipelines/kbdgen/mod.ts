@@ -30,18 +30,9 @@ function kbdgenPath(os: string, arch: string): string {
   return `target/${arch}/release/kbdgen${os === "windows" ? ".exe" : ""}`
 }
 
-const msvcEnvCmd = (arch: string) => {
-  if (arch.startsWith("aarch64")) {
-    return "arm64"
-  }
-  return "x64"
-}
-
 /**
  * Downloads the unsigned kbdgen that `buildKey` uploaded for a Windows or
- * macOS `arch`, signs it and uploads it as `signed/<path>`. It runs on Linux,
- * where a failed signing fails the step, rather than on the Windows agent,
- * whose PowerShell carries on past a failed native command.
+ * macOS `arch`, signs it and uploads it as `signed/<path>`.
  */
 function createSignStep(
   os: "windows" | "macos",
@@ -87,16 +78,15 @@ export function pipelineKbdgen() {
       const upload = `buildkite-agent artifact upload ${kbdgenPath(os, arch)}`
 
       if (os === "windows") {
+        // Cross-compiled on Linux with cargo-xwin.
         steps.push(command({
           key: buildKey,
           agents: {
-            queue: os,
+            queue: "linux",
           },
           label: "Build",
           command: [
-            `msvc-env ${
-              msvcEnvCmd(arch)
-            } | Invoke-Expression; cargo build --bin kbdgen --release --target ${arch}; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }`,
+            `cargo xwin build --bin kbdgen --release --target ${arch}`,
             upload,
           ],
           plugins: [
