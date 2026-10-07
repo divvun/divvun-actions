@@ -96,6 +96,21 @@ export async function buildKeyboardWindowsOutto(
       show: "hidden",
     })
   }
+  if (toolchain.kind === "v4") {
+    // kbdgen spec tsf.register.welcome: once enabled, offer each layout on
+    // the welcome screen. Only kbdi with text service profiles can; its
+    // keyboard_uninstall takes the layout off the welcome screen again.
+    for (const layout of layouts) {
+      oBuilder.run({
+        phase: "after_install",
+        command: "#{app}/kbdi.exe",
+        arguments:
+          `keyboard_enable -g "${layout.productCode}" -t "${layout.languageCode}" --default-user`,
+        wait: true,
+        show: "hidden",
+      })
+    }
+  }
 
   await stageWindInstaller(payloadDir)
   addWindToOutto(oBuilder)

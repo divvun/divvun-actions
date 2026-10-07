@@ -109,6 +109,7 @@ export async function generateKbdInnoFromBundle(
       builder,
       layout,
       v4 ? v4ProductCodes(layout) : legacyProductCodes(layout),
+      v4,
     )
   }
   if (v4) {
@@ -224,10 +225,17 @@ function innoProductCode(productCode: string): string {
   return `""${productCode.replaceAll("{", "{{")}""`
 }
 
+/**
+ * Adds one layout's kbdi runs and shortcut. `welcomeScreen` also offers the
+ * layout on the welcome screen once it is installed and enabled (kbdgen spec
+ * tsf.register.welcome), which only kbdi with text service profiles can do;
+ * its `keyboard_uninstall` takes the layout off the welcome screen again.
+ */
 function addLayoutToInstaller(
   builder: InnoSetupBuilder,
   layout: WindowsLayout,
   codes: ProductCodes,
+  welcomeScreen: boolean,
 ) {
   const { replaces } = codes
   if (replaces) {
@@ -256,6 +264,18 @@ function addLayoutToInstaller(
         .withFlags(["runhidden", "waituntilterminated"])
       return builder
     })
+  if (welcomeScreen) {
+    builder.run((builder) =>
+      builder
+        .withFilename("{app}\\kbdi.exe")
+        .withParameter("keyboard_enable")
+        .withParameter(`-g ${innoProductCode(codes.install)}`)
+        .withParameter(`-t ""${layout.languageCode}""`)
+        .withParameter("--default-user")
+        .withFlags(["runhidden", "waituntilterminated"])
+    )
+  }
+  builder
     .uninstallRun((builder) => {
       builder
         .withFilename("{app}\\kbdi.exe")
