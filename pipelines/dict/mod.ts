@@ -5,7 +5,7 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import { globOneDir, globOneFile } from "~/util/glob.ts"
-import { GitHub } from "~/util/github.ts"
+import { GitHub, ghWithRetry } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
 import logger from "~/util/log.ts"
 import { versionAsDev } from "~/util/shared.ts"
@@ -106,7 +106,7 @@ export async function runDictBuild() {
   const fstAssetPattern = `fst-${sourceLang}_*_noarch-all.pkt.tar.zst`
 
   logger.info(`Downloading FST from ${fstRepo}@${fstReleaseTag}`)
-  await run("gh", [
+  const download = await ghWithRetry([
     "release",
     "download",
     fstReleaseTag,
@@ -114,7 +114,13 @@ export async function runDictBuild() {
     fstRepo,
     "--pattern",
     fstAssetPattern,
+    "--clobber",
   ])
+  if (download.code !== 0) {
+    throw new Error(
+      `gh release download ${fstReleaseTag} --repo ${fstRepo} failed: ${download.stderr}`,
+    )
+  }
 
   const fstArchive = await globOneFile(fstAssetPattern)
   if (!fstArchive) {

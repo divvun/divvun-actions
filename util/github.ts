@@ -13,6 +13,105 @@ export class GitHubApiError extends Error {
   }
 }
 
+/** How long a gh call keeps retrying GitHub's transient failures. */
+const RETRY_DEADLINE_MS = 15 * 60 * 1000
+const RETRY_FIRST_DELAY_MS = 5 * 1000
+const RETRY_MAX_DELAY_MS = 2 * 60 * 1000
+
+/**
+ * A gh failure worth retrying: GitHub answering 5xx (it has failed release
+ * asset writes with HTTP 500 for minutes while reporting no incident) or the
+ * connection dropping. 4xx answers are the request's own fault and are not.
+ */
+function isTransient(stderr: string): boolean {
+  return new RegExp(
+    [
+      "HTTP 5\\d\\d",
+      "connection reset",
+      "connection refused",
+      "unexpected EOF",
+      "i/o timeout",
+      "TLS handshake timeout",
+      "timed out",
+      "temporarily unavailable",
+    ].join("|"),
+    "i",
+  ).test(stderr)
+}
+
+export interface GhResult {
+  code: number
+  stdout: Uint8Array
+  stderr: string
+}
+
+/**
+ * Runs `gh args`, retrying transient failures (isTransient) with a doubling
+ * delay, from RETRY_FIRST_DELAY_MS up to RETRY_MAX_DELAY_MS, until
+ * RETRY_DEADLINE_MS has passed since the first attempt; then the last result
+ * is returned. gh's stderr is captured to classify the failure and written to
+ * this process's stderr after each attempt so the build log keeps it. stdout
+ * is captured when `capture` is set and passed through otherwise.
+ * `alreadyDone`, when given, is asked before each retry whether the failed
+ * attempt took effect after all (a 5xx can follow a completed write); if so
+ * the call counts as a success.
+ */
+export async function ghWithRetry(
+  args: string[],
+  opts: {
+    capture?: boolean
+    stdin?: Uint8Array
+    alreadyDone?: () => Promise<boolean>
+  } = {},
+): Promise<GhResult> {
+  const deadline = Date.now() + RETRY_DEADLINE_MS
+  let delay = RETRY_FIRST_DELAY_MS
+  for (let attempt = 1;; attempt++) {
+    const proc = new Deno.Command("gh", {
+      args,
+      stdin: opts.stdin ? "piped" : "null",
+      stdout: opts.capture ? "piped" : "inherit",
+      stderr: "piped",
+    }).spawn()
+    if (opts.stdin) {
+      const w = proc.stdin.getWriter()
+      await w.write(opts.stdin)
+      await w.close()
+    }
+    const out = await proc.output()
+    const stderr = new TextDecoder().decode(out.stderr)
+    if (stderr) {
+      await Deno.stderr.write(out.stderr)
+    }
+    const result = {
+      code: out.code,
+      stdout: opts.capture ? out.stdout : new Uint8Array(),
+      stderr: stderr.trim(),
+    }
+    if (result.code === 0 || !isTransient(stderr)) {
+      return result
+    }
+    if (Date.now() + delay > deadline) {
+      logger.warning(
+        `gh ${args[0]} ${args[1] ?? ""}: still failing after ${attempt} attempts over ${
+          RETRY_DEADLINE_MS / 60000
+        } minutes; giving up`,
+      )
+      return result
+    }
+    logger.warning(
+      `gh ${args[0]} ${args[1] ?? ""} failed transiently (attempt ${attempt}); retrying in ${
+        delay / 1000
+      }s`,
+    )
+    await new Promise((resolve) => setTimeout(resolve, delay))
+    delay = Math.min(delay * 2, RETRY_MAX_DELAY_MS)
+    if (opts.alreadyDone && await opts.alreadyDone()) {
+      return { code: 0, stdout: new Uint8Array(), stderr: "" }
+    }
+  }
+}
+
 export interface GitHubRelease {
   tagName: string
   name: string
@@ -86,25 +185,16 @@ export class GitHub {
   }
 
   async #api(args: string[], body?: unknown): Promise<unknown> {
-    const proc = new Deno.Command("gh", {
-      args: ["api", ...args],
-      stdin: body === undefined ? "null" : "piped",
-      stdout: "piped",
-      stderr: "piped",
-    }).spawn()
-
-    if (body !== undefined) {
-      const w = proc.stdin.getWriter()
-      await w.write(new TextEncoder().encode(JSON.stringify(body)))
-      await w.close()
-    }
-
-    const { code, stdout, stderr } = await proc.output()
+    const { code, stdout, stderr } = await ghWithRetry(["api", ...args], {
+      capture: true,
+      stdin: body === undefined
+        ? undefined
+        : new TextEncoder().encode(JSON.stringify(body)),
+    })
     if (code !== 0) {
-      const err = new TextDecoder().decode(stderr).trim()
-      const status = err.match(/HTTP (\d{3})/)?.[1]
+      const status = stderr.match(/HTTP (\d{3})/)?.[1]
       throw new GitHubApiError(
-        `gh api ${args.join(" ")} failed (${code}): ${err}`,
+        `gh api ${args.join(" ")} failed (${code}): ${stderr}`,
         status ? Number(status) : null,
       )
     }
@@ -360,11 +450,16 @@ export class GitHub {
     logger.info(
       `Creating GitHub release: gh ${args.map((a) => `"${a}"`).join(" ")}`,
     )
-    const proc = new Deno.Command("gh", {
-      args,
-    }).spawn()
-
-    const { code } = await proc.output()
+    // A 5xx can follow a release that was created after all; the retry would
+    // then fail as a duplicate, so check first and finish with an upload.
+    const { code } = await ghWithRetry(args, {
+      alreadyDone: async () => {
+        if (!await this.releaseExists(tag)) return false
+        logger.info(`Release ${tag} was created; uploading its assets`)
+        if (artifacts.length > 0) await this.uploadRelease(tag, artifacts)
+        return true
+      },
+    })
     if (code !== 0) {
       throw new Error(`Failed to create GitHub release: exit code ${code}`)
     }
@@ -384,11 +479,8 @@ export class GitHub {
     logger.info(
       `Uploading to release: gh ${args.map((a) => `"${a}"`).join(" ")}`,
     )
-    const proc = new Deno.Command("gh", {
-      args,
-    }).spawn()
-
-    const { code } = await proc.output()
+    // --clobber makes a repeated upload replace what a failed one left.
+    const { code } = await ghWithRetry(args)
     if (code !== 0) {
       throw new Error(`Failed to upload to release: exit code ${code}`)
     }
@@ -408,8 +500,7 @@ export class GitHub {
       this.#repo,
     ]
 
-    const toDraft = new Deno.Command("gh", { args: editArgs(true) }).spawn()
-    const { code: draftCode } = await toDraft.output()
+    const { code: draftCode } = await ghWithRetry(editArgs(true))
     if (draftCode !== 0) {
       logger.warning(
         `Failed to set release ${tag} to draft: exit code ${draftCode}`,
@@ -417,9 +508,7 @@ export class GitHub {
       return
     }
 
-    const toPublished = new Deno.Command("gh", { args: editArgs(false) })
-      .spawn()
-    const { code: publishCode } = await toPublished.output()
+    const { code: publishCode } = await ghWithRetry(editArgs(false))
     if (publishCode !== 0) {
       logger.warning(
         `Failed to publish release ${tag}: exit code ${publishCode}`,
@@ -430,13 +519,10 @@ export class GitHub {
   async releaseExists(tag: string): Promise<boolean> {
     const args = ["release", "view", tag, "--repo", this.#repo]
 
-    const proc = new Deno.Command("gh", {
-      args,
-      stdout: "null",
-      stderr: "null",
-    }).spawn()
-
-    const { code } = await proc.output()
+    const { code, stderr } = await ghWithRetry(args, { capture: true })
+    if (code !== 0 && !/release not found/i.test(stderr)) {
+      throw new Error(`Failed to look up release ${tag}: ${stderr}`)
+    }
     return code === 0
   }
 
@@ -494,13 +580,10 @@ export class GitHub {
         "assets",
       ]
 
-      const viewProc = new Deno.Command("gh", {
-        args: viewArgs,
-        stdout: "piped",
-        stderr: "piped",
-      })
-
-      const { code: viewCode, stdout: viewStdout } = await viewProc.output()
+      const { code: viewCode, stdout: viewStdout } = await ghWithRetry(
+        viewArgs,
+        { capture: true },
+      )
       if (viewCode === 0) {
         const releaseData = JSON.parse(
           new TextDecoder().decode(viewStdout),
@@ -520,12 +603,12 @@ export class GitHub {
             "--yes",
           ]
 
-          const deleteProc = new Deno.Command("gh", {
-            args: deleteArgs,
-          }).spawn()
-
-          const { code: deleteCode } = await deleteProc.output()
-          if (deleteCode !== 0) {
+          // A retried delete of an asset the failed attempt removed after all
+          // answers "not found", which is what we wanted.
+          const { code: deleteCode, stderr: deleteErr } = await ghWithRetry(
+            deleteArgs,
+          )
+          if (deleteCode !== 0 && !/not found/i.test(deleteErr)) {
             logger.warning(
               `Failed to delete asset ${asset.name}: exit code ${deleteCode}`,
             )
@@ -549,8 +632,7 @@ export class GitHub {
       }
       editArgs.push(`--draft=${draft}`, `--prerelease=${prerelease}`)
 
-      const editProc = new Deno.Command("gh", { args: editArgs }).spawn()
-      const { code: editCode } = await editProc.output()
+      const { code: editCode } = await ghWithRetry(editArgs)
       if (editCode !== 0) {
         logger.warning(
           `Failed to update release metadata for ${tag}: exit code ${editCode}`,
@@ -588,16 +670,9 @@ export class GitHub {
       `Fetching GitHub releases: gh ${args.map((a) => `"${a}"`).join(" ")}`,
     )
 
-    const proc = new Deno.Command("gh", {
-      args,
-      stdout: "piped",
-      stderr: "piped",
-    })
-
-    const { code, stdout, stderr } = await proc.output()
+    const { code, stdout, stderr } = await ghWithRetry(args, { capture: true })
     if (code !== 0) {
-      const errorText = new TextDecoder().decode(stderr)
-      throw new Error(`Failed to fetch GitHub releases: ${errorText}`)
+      throw new Error(`Failed to fetch GitHub releases: ${stderr}`)
     }
 
     const releases = JSON.parse(new TextDecoder().decode(stdout)) as Array<{
@@ -680,16 +755,11 @@ export class GitHub {
       `Downloading release assets: gh ${args.map((a) => `"${a}"`).join(" ")}`,
     )
 
-    const proc = new Deno.Command("gh", {
-      args,
-      stdout: "piped",
-      stderr: "piped",
-    })
-
-    const { code, stdout, stderr } = await proc.output()
+    // --clobber so a retry can overwrite a partial download.
+    args.push("--clobber")
+    const { code, stdout, stderr } = await ghWithRetry(args, { capture: true })
     if (code !== 0) {
-      const errorText = new TextDecoder().decode(stderr)
-      throw new Error(`Failed to download release assets: ${errorText}`)
+      throw new Error(`Failed to download release assets: ${stderr}`)
     }
 
     const outputText = new TextDecoder().decode(stdout)

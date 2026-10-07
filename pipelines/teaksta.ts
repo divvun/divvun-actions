@@ -3,6 +3,7 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
+import { ghWithRetry } from "~/util/github.ts"
 import { globOneFile } from "~/util/glob.ts"
 import { bumpKustomizeImageTag } from "~/util/k8s-config.ts"
 import logger from "~/util/log.ts"
@@ -182,7 +183,7 @@ async function releaseAsset(
     `^${escapeRegExp(prefix)}(.+)${escapeRegExp(suffix)}$`,
   )
 
-  const result = await builder.output("gh", [
+  const result = await ghWithRetry([
     "release",
     "view",
     tag,
@@ -190,14 +191,14 @@ async function releaseAsset(
     repo,
     "--json",
     "assets",
-  ])
-  if (result.status.code !== 0) {
+  ], { capture: true })
+  if (result.code !== 0) {
     throw new Error(
-      `gh release view ${tag} --repo ${repo} failed: ${result.stderr.trim()}`,
+      `gh release view ${tag} --repo ${repo} failed: ${result.stderr}`,
     )
   }
 
-  const { assets } = JSON.parse(result.stdout) as {
+  const { assets } = JSON.parse(new TextDecoder().decode(result.stdout)) as {
     assets: { name: string; url: string }[]
   }
   const matches = assets.flatMap((asset) => {
@@ -252,7 +253,7 @@ async function cachedReleaseAsset(opts: {
 
   logger.info(`Downloading ${opts.label} from ${opts.repo}@${opts.tag}`)
   await fs.ensureDir(cacheDir)
-  await builder.exec("gh", [
+  const download = await ghWithRetry([
     "release",
     "download",
     opts.tag,
@@ -264,6 +265,11 @@ async function cachedReleaseAsset(opts: {
     cacheDir,
     "--clobber",
   ])
+  if (download.code !== 0) {
+    throw new Error(
+      `gh release download ${opts.tag} --repo ${opts.repo} failed: ${download.stderr}`,
+    )
+  }
 
   if (!(await fs.exists(assetPath))) {
     throw new Error(`${asset.name} not found in ${cacheDir} after download`)
