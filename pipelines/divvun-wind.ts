@@ -27,9 +27,6 @@ const RELEASE_DIR = `target/${TARGET}/release`
  * a Linux agent cannot execute them.
  */
 export const BUILD_COMMANDS = [
-  // rustup 1.28+ installs the toolchain and targets that rust-toolchain.toml
-  // pins only when asked to.
-  "rustup toolchain install",
   "cargo fmt --all -- --check",
   `cargo xwin clippy --workspace --all-targets --locked --target ${TARGET} -- -D warnings`,
   `cargo xwin test --workspace --locked --no-run --target ${TARGET}`,

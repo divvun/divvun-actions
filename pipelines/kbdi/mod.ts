@@ -79,9 +79,6 @@ export function pipelineKbdi(): BuildkitePipeline {
           },
           label: "Build",
           command: [
-            // rustup 1.28+ installs the toolchain and targets that
-            // rust-toolchain.toml pins only when asked to.
-            "rustup toolchain install",
             `cargo xwin build --locked --bin kbdi --release --target ${arch}`,
             `buildkite-agent artifact upload ${binaryPath(arch)}`,
           ],
