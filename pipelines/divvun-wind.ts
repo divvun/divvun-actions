@@ -8,6 +8,7 @@ import {
 } from "~/actions/divvun-wind/bundle.ts"
 import type { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
+import { downloadBinary } from "~/util/artifact_download.ts"
 import { assetStem, assetTarget } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
@@ -98,10 +99,9 @@ export async function runWindInstaller() {
   )
   using downloaded = await makeTempDir({ prefix: "wind-binaries-" })
   for (const name of product.payloads) {
-    await builder.downloadArtifacts(
-      path.join("target", TARGET, "release", name),
-      downloaded.path,
-    )
+    // Artifact paths are not OS paths: path.join would give backslashes on
+    // the Windows agent, which match nothing (see downloadBinary).
+    await downloadBinary(`target/${TARGET}/release/${name}`, downloaded.path)
   }
   const signed = windReleaseMode() !== null
   const result = await bundleWind({
