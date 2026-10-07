@@ -172,19 +172,33 @@ RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_
     rm gh.deb && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
-# rust@1.99.0 (targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android)
+# rust@1.99.0 (targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android, x86_64-pc-windows-msvc, i686-pc-windows-msvc, aarch64-pc-windows-msvc)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     --default-toolchain 1.99.0 \
     -t aarch64-linux-android \
     -t armv7-linux-androideabi \
-    -t x86_64-linux-android
+    -t x86_64-linux-android \
+    -t x86_64-pc-windows-msvc \
+    -t i686-pc-windows-msvc \
+    -t aarch64-pc-windows-msvc
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # rust extras
 RUN ~/.cargo/bin/cargo install cross --git https://github.com/cross-rs/cross && \
     curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash && \
     ~/.cargo/bin/cargo binstall -y just && \
-    ~/.cargo/bin/cargo binstall -y cargo-ndk
+    ~/.cargo/bin/cargo binstall -y cargo-ndk && \
+    ~/.cargo/bin/cargo binstall -y cargo-xwin
+
+# cargo-xwin (MSVC CRT + SDK for x86,x86_64,aarch64)
+RUN ln -sf /usr/lib/llvm-23/bin/clang-cl /usr/local/bin/clang-cl && \
+    ln -sf /usr/lib/llvm-23/bin/lld-link /usr/local/bin/lld-link && \
+    ln -sf /usr/lib/llvm-23/bin/llvm-lib /usr/local/bin/llvm-lib && \
+    ln -sf /usr/lib/llvm-23/bin/llvm-rc /usr/local/bin/llvm-rc
+COPY cargo-xwin-clang.sh /usr/local/bin/clang
+RUN chmod +x /usr/local/bin/clang
+ENV XWIN_ARCH="x86,x86_64,aarch64"
+RUN cargo xwin cache xwin
 
 # box@da96a74
 RUN cargo install box-cli \
