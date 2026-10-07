@@ -327,9 +327,9 @@ export async function runLangTests(opts: {
   // results for a rebuilt one describe a speller that was never shipped.
   const shipped = await spellerArchives()
 
-  // Run make check in the build directory
+  // -k: a failing suite mustn't skip later subdirs (e.g. typosreport)
   const proc = new Deno.Command("bash", {
-    args: ["-c", "make -j$(nproc) check"],
+    args: ["-c", "make -k -j$(nproc) check"],
     cwd: path.join(Deno.cwd(), "build"),
     stdout: "inherit",
     stderr: "inherit",
