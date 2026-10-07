@@ -1,6 +1,6 @@
 // kbdgen's `v4` branch never reaches pahkat. Its builds publish kbdgen and
-// the text service installer to the KBDGEN_V4_TAG prerelease, which keyboard
-// pipelines whose slug ends in `-v4` build from (pipelineDesktopKeyboardV4).
+// the text service installer to the KBDGEN_V4_TAG prerelease, which the
+// "kbdgen v4 (test)" group of a format 4 keyboard's pipeline builds from.
 
 import * as builder from "~/builder.ts"
 

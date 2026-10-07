@@ -26,6 +26,47 @@ async function runSigncode(
   }
 }
 
+const SIGN_URL = "https://sign.necessary.nu/windows/sign"
+const SIGN_ATTEMPTS = 4
+
+// The service answers 5xx when its HSM or timestamp authority fails for a
+// moment and asks the caller to try again; 4xx means the request itself is
+// wrong, so only 5xx and network errors are retried, with backoff.
+async function requestSignature(
+  tosignData: Uint8Array<ArrayBuffer>,
+  bearerToken: string,
+): Promise<Uint8Array> {
+  let failure = ""
+  for (let attempt = 1; attempt <= SIGN_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(SIGN_URL, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${bearerToken}` },
+        body: tosignData,
+      })
+      if (response.ok) {
+        return new Uint8Array(await response.arrayBuffer())
+      }
+      const body = (await response.text()).trim()
+      failure = `Signing service returned ${response.status}${
+        body ? `: ${body}` : ""
+      }`
+      if (response.status < 500) {
+        throw new Error(failure)
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message === failure) throw e
+      failure = `Signing service request failed: ${e}`
+    }
+    if (attempt < SIGN_ATTEMPTS) {
+      const delay = 5000 * 2 ** (attempt - 1)
+      console.error(`${failure}; retrying in ${delay / 1000}s`)
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
+  }
+  throw new Error(`${failure} (after ${SIGN_ATTEMPTS} attempts)`)
+}
+
 export async function necessaryCodeSign(
   inputFile: string,
   bearerToken: string,
@@ -45,15 +86,10 @@ export async function necessaryCodeSign(
 
   // Step 2: Send to signing service
   const tosignData = await Deno.readFile(tosignPath)
-  const response = await fetch("https://sign.necessary.nu/windows/sign", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${bearerToken}` },
-    body: tosignData,
-  })
-  if (!response.ok) {
-    throw new Error(`Signing service returned ${response.status}`)
-  }
-  await Deno.writeFile(signedPath, new Uint8Array(await response.arrayBuffer()))
+  await Deno.writeFile(
+    signedPath,
+    await requestSignature(tosignData, bearerToken),
+  )
 
   // Step 3: Attach signature to original file
   await runSigncode("attach-signature", [
