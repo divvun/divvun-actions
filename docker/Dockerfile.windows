@@ -114,8 +114,8 @@ RUN Write-Output 'rsigncode dev-latest refresh: 2026-10-07' ; \
     Remove-Item -Force rsigncode.zip ; \
     Remove-Item -Recurse -Force rsigncode-tmp
 
-# outto (dev-latest @ 2026-10-05)
-RUN Write-Output 'outto dev-latest refresh: 2026-10-05' ; \
+# outto (dev-latest @ 2026-10-07)
+RUN Write-Output 'outto dev-latest refresh: 2026-10-07' ; \
     $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/divvun/outto/releases/tags/dev-latest' ; \
     $asset = $rel.assets | Where-Object { $_.name -match '^outto[-_]x86[-_]64[-_]pc[-_]windows[-_]msvc[-_].+\.zip$' } | Select-Object -First 1 ; \
     if (-not $asset) { throw "No outto windows asset on dev-latest" } ; \
