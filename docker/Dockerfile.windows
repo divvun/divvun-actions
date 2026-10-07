@@ -103,8 +103,8 @@ RUN Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
 # rust-nightly (rust-src)
 RUN rustup toolchain install nightly --component rust-src
 
-# rsigncode (dev-latest @ 2026-10-05)
-RUN Write-Output 'rsigncode dev-latest refresh: 2026-10-05' ; \
+# rsigncode (dev-latest @ 2026-10-07)
+RUN Write-Output 'rsigncode dev-latest refresh: 2026-10-07' ; \
     $resp = Invoke-RestMethod 'https://api.github.com/repos/divvun/rsigncode/releases/tags/dev-latest' ; \
     $asset = $resp.assets | Where-Object { $_.name -match '^rsigncode[-_]x86[-_]64[-_]pc[-_]windows[-_]msvc[-_].+\.zip$' } | Select-Object -First 1 ; \
     if (-not $asset) { throw 'no rsigncode-x86_64-pc-windows-msvc asset on dev-latest' } ; \
