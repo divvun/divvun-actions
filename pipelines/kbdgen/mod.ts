@@ -1,7 +1,10 @@
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import * as builder from "~/builder.ts"
-import { tipSteps } from "./tip.ts"
+import { isKbdgenV4Build } from "~/actions/kbdgen/v4.ts"
+import { hasTextService } from "~/actions/kbd-tsf/installer.ts"
+import { TIP_BUILD_KEY, tipSteps } from "./tip.ts"
+import { v4PublishStep } from "./v4.ts"
 
 const platforms = {
   macos: ["x86_64-apple-darwin", "aarch64-apple-darwin"],
@@ -104,10 +107,22 @@ export function pipelineKbdgen() {
     }
   }
 
-  pipeline.steps.push({
-    group: "Text service",
-    steps: tipSteps("build-windows-x86_64-pc-windows-msvc", command),
-  })
+  // The pipeline is generated in the checkout, so only commits that have the
+  // text service crate build it.
+  const textService = hasTextService(".")
+  if (textService) {
+    pipeline.steps.push({
+      group: "Text service",
+      steps: tipSteps("build-windows-x86_64-pc-windows-msvc", command),
+    })
+  }
+
+  if (isKbdgenV4Build()) {
+    pipeline.steps.push(v4PublishStep(
+      textService ? [...buildStepKeys, TIP_BUILD_KEY] : buildStepKeys,
+      command,
+    ))
+  }
 
   if (builder.env.branch === "main") {
     pipeline.steps.push(command({

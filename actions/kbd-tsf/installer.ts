@@ -14,10 +14,7 @@ import logger from "~/util/log.ts"
 export const TIP_NAME = "divvun-tip"
 /** One installer serves x86, x64 and Arm64 Windows. */
 export const TIP_TARGET = "windows"
-/**
- * The rolling prerelease of the kbdgen repository that main's builds
- * replace, and that keyboard builds embed.
- */
+/** The rolling prerelease of the kbdgen repository that main's builds replace. */
 export const TIP_DEV_TAG = "kbd-tsf-dev-latest"
 
 /**
@@ -41,6 +38,15 @@ export const TIP_DLLS = [
 
 const CRATE_MANIFEST = path.join("crates", "kbd-tsf", "Cargo.toml")
 const PACKAGE_VERSION = /^(version\s*=\s*)"([^"]+)"/m
+
+/** Whether `workspace` has the text service crate; kbdgen's main does not. */
+export function hasTextService(workspace: string): boolean {
+  try {
+    return Deno.statSync(path.join(workspace, CRATE_MANIFEST)).isFile
+  } catch {
+    return false
+  }
+}
 
 /** The `kbd-tsf` package version, which names the install directory. */
 export async function readTipVersion(workspace: string): Promise<string> {

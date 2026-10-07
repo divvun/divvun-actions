@@ -16,6 +16,7 @@ import {
   TIP_TARGET,
 } from "~/actions/kbd-tsf/installer.ts"
 import type { CommandStep } from "~/builder/pipeline.ts"
+import { isKbdgenV4Build } from "~/actions/kbdgen/v4.ts"
 import { assetFileName } from "~/util/asset_name.ts"
 import { downloadBinary } from "~/util/artifact_download.ts"
 import { GitHub } from "~/util/github.ts"
@@ -30,7 +31,7 @@ const TIP_RELEASE_TAG =
 /** The artifacts passed from the Windows build to the publish step. */
 const INSTALLER = `${TIP_NAME}.exe`
 const RECORD = `${TIP_NAME}.json`
-const BUILD_KEY = "kbd-tsf-installer"
+export const TIP_BUILD_KEY = "kbd-tsf-installer"
 
 type TipRecord = {
   version: string
@@ -39,20 +40,27 @@ type TipRecord = {
   blake3: string
 }
 
-/** Release for a `kbd-tsf-v*` tag, dev for main, otherwise nothing published. */
-export function tipReleaseMode(): "release" | "dev" | null {
+/**
+ * Release for a `kbd-tsf-v*` tag, dev for main, v4 for kbdgen's v4 branch
+ * (published with kbdgen by runKbdgenPublishV4), otherwise nothing published.
+ */
+export function tipReleaseMode(): "release" | "dev" | "v4" | null {
   if (builder.env.pullRequest && builder.env.pullRequest !== "false") {
     return null
   }
   if (builder.env.tag) {
     return TIP_RELEASE_TAG.test(builder.env.tag) ? "release" : null
   }
+  if (isKbdgenV4Build()) {
+    return "v4"
+  }
   return builder.env.branch === "main" ? "dev" : null
 }
 
 /**
  * The steps that turn `kbdgenStep`'s x64 Windows kbdgen into a text service
- * installer, and publish it from main and from release tags.
+ * installer, and publish it from main and from release tags. On the v4
+ * branch, the kbdgen v4 publish step publishes it instead.
  */
 export function tipSteps(
   kbdgenStep: string,
@@ -60,7 +68,7 @@ export function tipSteps(
 ): CommandStep[] {
   const mode = tipReleaseMode()
   const steps = [command({
-    key: BUILD_KEY,
+    key: TIP_BUILD_KEY,
     label: `Text service installer${mode ? " (signed)" : " (unsigned)"}`,
     agents: { queue: "windows" },
     depends_on: kbdgenStep,
@@ -75,13 +83,13 @@ export function tipSteps(
       },
     }],
   })]
-  if (mode) {
+  if (mode === "release" || mode === "dev") {
     steps.push(command({
       label: `Publish text service (${
         mode === "release" ? "release" : TIP_DEV_TAG
       })`,
       agents: { queue: "linux" },
-      depends_on: BUILD_KEY,
+      depends_on: TIP_BUILD_KEY,
       command: "divvun-actions run kbd-tsf-publish",
       concurrency: 1,
       concurrency_group: "kbdgen/kbd-tsf-releases",
@@ -142,24 +150,19 @@ export async function runTipInstaller() {
 }
 
 /**
- * Publishes the signed installer as `divvun-tip_windows_<version>.exe` with a
- * minisigned BLAKE3SUMS, to the `kbd-tsf-v*` release or to the rolling
- * TIP_DEV_TAG prerelease that keyboard builds embed.
+ * Downloads this commit's signed installer into `directory`, checked against
+ * its build record, as `divvun-tip_windows_<version>.exe`, and returns that
+ * name and version.
  */
-export async function runTipPublish() {
-  const mode = tipReleaseMode()
-  if (!mode || !builder.env.repo) {
-    throw new Error(
-      "Publishing the text service needs main or a kbd-tsf-v* tag, outside a pull request",
-    )
-  }
-  using artifacts = await makeTempDir({ prefix: "kbd-tsf-publish-" })
-  await builder.downloadArtifacts(INSTALLER, artifacts.path)
-  await builder.downloadArtifacts(RECORD, artifacts.path)
+export async function downloadTipAsset(
+  directory: string,
+): Promise<{ name: string; version: string }> {
+  await builder.downloadArtifacts(INSTALLER, directory)
+  await builder.downloadArtifacts(RECORD, directory)
   const record: TipRecord = JSON.parse(
-    await Deno.readTextFile(path.join(artifacts.path, RECORD)),
+    await Deno.readTextFile(path.join(directory, RECORD)),
   )
-  const installer = path.join(artifacts.path, INSTALLER)
+  const installer = path.join(directory, INSTALLER)
   if (!record.signed || record.commit !== builder.env.commit) {
     throw new Error("The installer is not this commit's signed build")
   }
@@ -167,7 +170,24 @@ export async function runTipPublish() {
     throw new Error("The installer does not match its build record")
   }
   const name = assetFileName(TIP_NAME, TIP_TARGET, record.version, "exe")
-  await Deno.rename(installer, path.join(artifacts.path, name))
+  await Deno.rename(installer, path.join(directory, name))
+  return { name, version: record.version }
+}
+
+/**
+ * Publishes the signed installer as `divvun-tip_windows_<version>.exe` with a
+ * minisigned BLAKE3SUMS, to the `kbd-tsf-v*` release or to the rolling
+ * TIP_DEV_TAG prerelease.
+ */
+export async function runTipPublish() {
+  const mode = tipReleaseMode()
+  if ((mode !== "release" && mode !== "dev") || !builder.env.repo) {
+    throw new Error(
+      "Publishing the text service needs main or a kbd-tsf-v* tag, outside a pull request",
+    )
+  }
+  using artifacts = await makeTempDir({ prefix: "kbd-tsf-publish-" })
+  const { name, version } = await downloadTipAsset(artifacts.path)
   const { checksumFile, signatureFile } = await createSignedChecksums(
     [name],
     await builder.secrets(),
@@ -178,13 +198,13 @@ export async function runTipPublish() {
   if (mode === "release") {
     await gh.createRelease(builder.env.tag!, files, {
       latest: false,
-      name: `Divvun Text Service ${record.version}`,
+      name: `Divvun Text Service ${version}`,
     })
   } else {
     await gh.updateRelease(TIP_DEV_TAG, files, {
       draft: false,
       prerelease: true,
-      name: `Divvun Text Service ${record.version}`,
+      name: `Divvun Text Service ${version}`,
     })
   }
 }

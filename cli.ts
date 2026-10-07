@@ -100,6 +100,7 @@ import {
 } from "./pipelines/divvunspell/mod.ts"
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
 import { runTipInstaller, runTipPublish } from "./pipelines/kbdgen/tip.ts"
+import { runKbdgenPublishV4 } from "./pipelines/kbdgen/v4.ts"
 import {
   pipelineLang,
   runLangBundle,
@@ -399,6 +400,10 @@ async function runPipeline(args: any) {
     }
     case "kbdgen-deploy": {
       await runKbdgenDeploy()
+      break
+    }
+    case "kbdgen-publish-v4": {
+      await runKbdgenPublishV4()
       break
     }
     case "kbd-tsf-installer": {
