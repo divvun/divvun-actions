@@ -9,7 +9,7 @@ import {
 } from "~/actions/kbdi/v4.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
-import { downloadBinary } from "~/util/artifact_download.ts"
+import { downloadBinary, downloadBinaryCmd } from "~/util/artifact_download.ts"
 import { assetFileName } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums } from "~/util/hash.ts"
@@ -42,47 +42,77 @@ const msvcEnvCmd = (arch: string) => {
 }
 
 /**
+ * Downloads the unsigned kbdi that `buildKey` uploaded, signs it and uploads
+ * it as `signed/<path>`. It runs on Linux, where a failed signing fails the
+ * step, rather than on the Windows agent, whose PowerShell carries on past a
+ * failed native command.
+ */
+function createSignStep(triple: string, buildKey: string): CommandStep {
+  const src = binaryPath(triple)
+  const signed = `signed/${src}`
+  return command({
+    key: `sign-windows-${triple}`,
+    label: "Sign",
+    agents: { queue: "linux" },
+    command: [
+      "echo '--- Downloading unsigned binary'",
+      downloadBinaryCmd(src),
+      "echo '--- Signing'",
+      `divvun-actions sign ${src}`,
+      "echo '--- Uploading signed binary'",
+      `mkdir -p signed/target/${triple}/release`,
+      `mv ${src} ${signed}`,
+      `buildkite-agent artifact upload ${signed}`,
+    ],
+    depends_on: buildKey,
+  })
+}
+
+/**
  * Builds and signs kbdi for every KBDI_BUILDS target on every push, each in
- * its own group, and from kbdi's main and v4 branches publishes them to the
- * branch's prerelease (kbdiPrerelease).
+ * its own group, and from kbdi's main and v4 branches publishes the signed
+ * builds to the branch's prerelease (kbdiPrerelease).
  */
 export function pipelineKbdi(): BuildkitePipeline {
   const pipeline: BuildkitePipeline = { steps: [] }
-  const buildStepKeys: string[] = []
+  const signStepKeys: string[] = []
 
   for (const { target: arch } of KBDI_BUILDS) {
     const buildKey = `build-windows-${arch}`
-    buildStepKeys.push(buildKey)
+    const signStep = createSignStep(arch, buildKey)
+    signStepKeys.push(signStep.key!)
     pipeline.steps.push({
-      group: `windows ${arch}`,
-      steps: [command({
-        key: buildKey,
-        agents: {
-          queue: "windows",
-        },
-        label: "Build and sign",
-        command: [
-          // rustup 1.28+ installs the toolchain and targets that
-          // rust-toolchain.toml pins only when asked to.
-          "rustup toolchain install",
-          `msvc-env ${
-            msvcEnvCmd(arch)
-          } | Invoke-Expression; cargo build --locked --bin kbdi --release --target ${arch}`,
-          `divvun-actions sign ${binaryPath(arch)}`,
-          `buildkite-agent artifact upload ${binaryPath(arch)}`,
-        ],
-        plugins: [
-          {
-            "cache#v1.7.0": {
-              manifest: "Cargo.lock",
-              path: "target",
-              restore: "file",
-              save: "file",
-              "key-extra": arch,
-            },
+      group: arch,
+      steps: [
+        command({
+          key: buildKey,
+          agents: {
+            queue: "windows",
           },
-        ],
-      })],
+          label: "Build",
+          command: [
+            // rustup 1.28+ installs the toolchain and targets that
+            // rust-toolchain.toml pins only when asked to.
+            "rustup toolchain install; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }",
+            `msvc-env ${
+              msvcEnvCmd(arch)
+            } | Invoke-Expression; cargo build --locked --bin kbdi --release --target ${arch}; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }`,
+            `buildkite-agent artifact upload ${binaryPath(arch)}`,
+          ],
+          plugins: [
+            {
+              "cache#v1.7.0": {
+                manifest: "Cargo.lock",
+                path: "target",
+                restore: "file",
+                save: "file",
+                "key-extra": arch,
+              },
+            },
+          ],
+        }),
+        signStep,
+      ],
     })
   }
 
@@ -91,7 +121,7 @@ export function pipelineKbdi(): BuildkitePipeline {
     pipeline.steps.push(command({
       label: `Publish (${prerelease.tag})`,
       command: "divvun-actions run kbdi-publish",
-      depends_on: buildStepKeys,
+      depends_on: signStepKeys,
       agents: {
         queue: "linux",
       },
@@ -104,16 +134,16 @@ export function pipelineKbdi(): BuildkitePipeline {
 }
 
 /**
- * The signed kbdi a build step uploaded for `triple`. A Windows agent may
- * store its path with backslashes, which a Linux download keeps in the file
- * name, so the one `kbdi.exe` under the fresh `directory` is taken whatever
- * its path.
+ * The signed kbdi a sign step uploaded for `triple`. Should its path have
+ * been stored with backslashes, which a Linux download keeps in the file
+ * name, the one `kbdi.exe` under the fresh `directory` is still taken
+ * whatever its path.
  */
 async function downloadKbdi(
   triple: string,
   directory: string,
 ): Promise<string> {
-  await downloadBinary(binaryPath(triple), directory)
+  await downloadBinary(`signed/${binaryPath(triple)}`, directory)
   const found: string[] = []
   for await (const entry of fs.walk(directory, { includeDirs: false })) {
     if (entry.path.split(/[\\/]/).at(-1) === "kbdi.exe") {
