@@ -102,7 +102,7 @@ import {
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
 import { runTipInstaller, runTipPublish } from "./pipelines/kbdgen/tip.ts"
 import { runKbdgenPublishV4 } from "./pipelines/kbdgen/v4.ts"
-import { pipelineKbdi, runKbdiPublishV4 } from "./pipelines/kbdi/mod.ts"
+import { pipelineKbdi, runKbdiPublish } from "./pipelines/kbdi/mod.ts"
 import {
   pipelineLang,
   runLangBundle,
@@ -416,8 +416,8 @@ async function runPipeline(args: any) {
       await runKbdgenPublishV4()
       break
     }
-    case "kbdi-publish-v4": {
-      await runKbdiPublishV4()
+    case "kbdi-publish": {
+      await runKbdiPublish()
       break
     }
     case "kbd-tsf-installer": {

@@ -1,11 +1,14 @@
-// kbdi's `v4` branch never reaches pahkat. Its builds publish kbdi to the
-// KBDI_V4_TAG prerelease, which the kbdgen v4 keyboard builds download
-// (actions/keyboard/build/toolchain.ts). Production kbdi is released to
-// pahkat's devtools by the Taskcluster tasks kbdi's .taskcluster.yml runs.
+// kbdi never reaches pahkat from Buildkite. Pushes to its `main` branch
+// publish kbdi to the KBDI_DEV_TAG prerelease, and pushes to its `v4` branch
+// to the KBDI_V4_TAG prerelease, which the kbdgen v4 keyboard builds download
+// (actions/keyboard/build/toolchain.ts).
 
 import * as builder from "~/builder.ts"
 
 export const KBDI_REPO = "divvun/kbdi"
+export const KBDI_DEV_BRANCH = "main"
+/** The rolling prerelease of KBDI_REPO that each KBDI_DEV_BRANCH build replaces. */
+export const KBDI_DEV_TAG = "dev-latest"
 export const KBDI_V4_BRANCH = "v4"
 /** The rolling prerelease of KBDI_REPO that each v4 build replaces. */
 export const KBDI_V4_TAG = "v4-latest"
@@ -35,10 +38,44 @@ export const KBDI_BUILDS = [
   },
 ] as const
 
-/** A push to KBDI_V4_BRANCH, outside a pull request and a tag. */
-export function isKbdiV4Build(): boolean {
+/** A rolling prerelease of KBDI_REPO that a branch's builds replace. */
+export type KbdiPrerelease = {
+  tag: string
+  /** The release title for a build of `version`. */
+  name: (version: string) => string
+  /**
+   * Whether the version carries `+build.<n>`. v4-latest's names never have,
+   * and dev-latest's do, as the other tools' dev-latest releases' do.
+   */
+  buildNumber: boolean
+}
+
+/**
+ * The prerelease this build replaces: KBDI_DEV_TAG for a push to
+ * KBDI_DEV_BRANCH and KBDI_V4_TAG for one to KBDI_V4_BRANCH, outside a pull
+ * request and a tag.
+ */
+export function kbdiPrerelease(): KbdiPrerelease | null {
   if (builder.env.pullRequest && builder.env.pullRequest !== "false") {
-    return false
+    return null
   }
-  return !builder.env.tag && builder.env.branch === KBDI_V4_BRANCH
+  if (builder.env.tag) {
+    return null
+  }
+  switch (builder.env.branch) {
+    case KBDI_DEV_BRANCH:
+      return {
+        tag: KBDI_DEV_TAG,
+        name: (version) => `v${version}`,
+        buildNumber: true,
+      }
+    case KBDI_V4_BRANCH:
+      return {
+        tag: KBDI_V4_TAG,
+        name: (version) => `kbdi v4 ${version}`,
+        buildNumber: false,
+      }
+    default:
+      return null
+  }
 }

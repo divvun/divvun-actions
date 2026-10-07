@@ -3,10 +3,9 @@ import * as path from "@std/path"
 import * as toml from "@std/toml"
 import * as builder from "~/builder.ts"
 import {
-  isKbdiV4Build,
   KBDI_BUILDS,
   KBDI_NAME,
-  KBDI_V4_TAG,
+  kbdiPrerelease,
 } from "~/actions/kbdi/v4.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
@@ -32,67 +31,72 @@ function binaryPath(triple: string): string {
   return `target/${triple}/release/kbdi.exe`
 }
 
-/**
- * The MSVC environment for `triple`'s build. msvc-env provides x64 and arm64
- * environments, and an x64 one would link i686 against x64 libraries, so the
- * i686 build leaves finding MSVC to rustc.
- */
-function msvcEnvPrefix(triple: string): string {
-  if (triple.startsWith("aarch64")) {
-    return "msvc-env arm64 | Invoke-Expression; "
+const msvcEnvCmd = (arch: string) => {
+  if (arch.startsWith("aarch64")) {
+    return "arm64"
   }
-  if (triple.startsWith("x86_64")) {
-    return "msvc-env x64 | Invoke-Expression; "
+  if (arch.startsWith("i686")) {
+    return "x86"
   }
-  return ""
+  return "x64"
 }
 
 /**
- * Builds and signs kbdi for every KBDI_BUILDS target on every push, and from
- * the v4 branch publishes them to KBDI_V4_TAG. Production kbdi is released by
- * kbdi's Taskcluster tasks, and nothing here deploys to pahkat.
+ * Builds and signs kbdi for every KBDI_BUILDS target on every push, each in
+ * its own group, and from kbdi's main and v4 branches publishes them to the
+ * branch's prerelease (kbdiPrerelease).
  */
 export function pipelineKbdi(): BuildkitePipeline {
   const pipeline: BuildkitePipeline = { steps: [] }
   const buildStepKeys: string[] = []
 
-  for (const { target: triple } of KBDI_BUILDS) {
-    const key = `build-${triple}`
-    buildStepKeys.push(key)
-    pipeline.steps.push(command({
-      key,
-      label: `Build and sign ${triple}`,
-      agents: { queue: "windows" },
-      command: [
-        // rustup 1.28+ installs the toolchain and targets that
-        // rust-toolchain.toml pins only when asked to.
-        "rustup toolchain install",
-        `${
-          msvcEnvPrefix(triple)
-        }cargo build --locked --release --bin kbdi --target ${triple}`,
-        `divvun-actions sign ${binaryPath(triple)}`,
-        `buildkite-agent artifact upload ${binaryPath(triple)}`,
-      ],
-      plugins: [{
-        "cache#v1.7.0": {
-          manifest: "Cargo.lock",
-          path: "target",
-          restore: "file",
-          save: "file",
-          "key-extra": triple,
+  for (const { target: arch } of KBDI_BUILDS) {
+    const buildKey = `build-windows-${arch}`
+    buildStepKeys.push(buildKey)
+    pipeline.steps.push({
+      group: `windows ${arch}`,
+      steps: [command({
+        key: buildKey,
+        agents: {
+          queue: "windows",
         },
-      }],
-    }))
+        label: "Build and sign",
+        command: [
+          // rustup 1.28+ installs the toolchain and targets that
+          // rust-toolchain.toml pins only when asked to.
+          "rustup toolchain install",
+          `msvc-env ${
+            msvcEnvCmd(arch)
+          } | Invoke-Expression; cargo build --locked --bin kbdi --release --target ${arch}`,
+          `divvun-actions sign ${binaryPath(arch)}`,
+          `buildkite-agent artifact upload ${binaryPath(arch)}`,
+        ],
+        plugins: [
+          {
+            "cache#v1.7.0": {
+              manifest: "Cargo.lock",
+              path: "target",
+              restore: "file",
+              save: "file",
+              "key-extra": arch,
+            },
+          },
+        ],
+      })],
+    })
   }
 
-  if (isKbdiV4Build()) {
+  const prerelease = kbdiPrerelease()
+  if (prerelease) {
     pipeline.steps.push(command({
-      label: `Publish kbdi v4 (${KBDI_V4_TAG})`,
-      command: "divvun-actions run kbdi-publish-v4",
+      label: `Publish (${prerelease.tag})`,
+      command: "divvun-actions run kbdi-publish",
       depends_on: buildStepKeys,
-      agents: { queue: "linux" },
+      agents: {
+        queue: "linux",
+      },
       concurrency: 1,
-      concurrency_group: `kbdi/${KBDI_V4_TAG}`,
+      concurrency_group: `kbdi/${prerelease.tag}`,
     }))
   }
 
@@ -125,12 +129,16 @@ async function downloadKbdi(
 }
 
 /**
- * Replaces KBDI_V4_TAG's assets with this build's kbdi for every target, as
- * `kbdi_<target>_<version>.exe`, with a minisigned BLAKE3SUMS of them.
+ * Replaces the assets of this branch's prerelease (kbdiPrerelease) with this
+ * build's kbdi for every target, as `kbdi_<target>_<version>.exe`, with a
+ * minisigned BLAKE3SUMS of them.
  */
-export async function runKbdiPublishV4() {
-  if (!isKbdiV4Build() || !builder.env.repo) {
-    throw new Error("Publishing kbdi v4 needs a push to the v4 branch")
+export async function runKbdiPublish() {
+  const prerelease = kbdiPrerelease()
+  if (!prerelease || !builder.env.repo) {
+    throw new Error(
+      "Publishing kbdi needs a push to the main or v4 branch",
+    )
   }
   const cargo = toml.parse(await Deno.readTextFile("Cargo.toml")) as {
     package?: { version?: string }
@@ -138,10 +146,10 @@ export async function runKbdiPublishV4() {
   const version = versionAsDev(
     cargo.package?.version,
     builder.env.buildTimestamp,
-    undefined,
+    prerelease.buildNumber ? builder.env.buildNumber : undefined,
   )
 
-  using work = await makeTempDir({ prefix: "kbdi-v4-" })
+  using work = await makeTempDir({ prefix: "kbdi-publish-" })
   const assets = path.join(work.path, "assets")
   await Deno.mkdir(assets)
 
@@ -162,9 +170,9 @@ export async function runKbdiPublishV4() {
     await builder.secrets(),
     assets,
   )
-  logger.info(`Publishing to ${KBDI_V4_TAG}: ${names.join(", ")}`)
+  logger.info(`Publishing to ${prerelease.tag}: ${names.join(", ")}`)
   await new GitHub(builder.env.repo).updateRelease(
-    KBDI_V4_TAG,
+    prerelease.tag,
     [
       ...names.map((name) => path.join(assets, name)),
       checksumFile,
@@ -173,7 +181,7 @@ export async function runKbdiPublishV4() {
     {
       draft: false,
       prerelease: true,
-      name: `kbdi v4 ${version}`,
+      name: prerelease.name(version),
     },
   )
 }
