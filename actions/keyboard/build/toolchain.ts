@@ -9,7 +9,12 @@ import {
   KBDGEN_V4_TAG,
   KBDGEN_WINDOWS_TARGET,
 } from "~/actions/kbdgen/v4.ts"
-import sign from "~/services/windows-codesign.ts"
+import {
+  KBDI_BUILDS,
+  KBDI_NAME,
+  KBDI_REPO,
+  KBDI_V4_TAG,
+} from "~/actions/kbdi/v4.ts"
 import { assetGhPattern, assetPsPattern } from "~/util/asset_name.ts"
 import logger from "~/util/log.ts"
 import { PahkatPrefix } from "~/util/shared.ts"
@@ -22,9 +27,10 @@ import { downloadTipInstaller } from "./tip.ts"
  * and `wow64`.
  *
  * `v4`: kbdgen and the text service installer from the KBDGEN_V4_TAG
- * prerelease, and kbdi built from KBDI_V4_BRANCH. kbdgen builds its own
- * layout DLLs for every LAYOUT_DLL_VARIANTS entry and reads format 4
- * bundles; the installers embed the text service.
+ * prerelease of KBDGEN_REPO, and kbdi from the KBDI_V4_TAG prerelease of
+ * KBDI_REPO. kbdgen builds its own layout DLLs for every
+ * LAYOUT_DLL_VARIANTS entry and reads format 4 bundles; the installers embed
+ * the text service.
  */
 export type KeyboardToolchainKind = "production" | "v4"
 
@@ -42,16 +48,6 @@ export type KeyboardToolchain =
     /** The verified text service installer the keyboard installers embed. */
     tipInstaller: string
   }
-
-/** kbdi with text service profiles (`kbdi keyboard_install` registering them). */
-const KBDI_REPO = "https://github.com/divvun/kbdi.git"
-export const KBDI_V4_BRANCH = "kbdgen-tsf-profiles"
-
-/** kbdi.exe runs on x86 Windows, kbdi-x64.exe in 64-bit install mode. */
-const KBDI_BUILDS = [
-  { triple: "i686-pc-windows-msvc", name: "kbdi.exe" },
-  { triple: "x86_64-pc-windows-msvc", name: "kbdi-x64.exe" },
-]
 
 /** The Rust targets kbdgen builds layout DLLs for (`kbdl.build`). */
 const LAYOUT_DLL_TARGETS = [
@@ -99,51 +95,32 @@ export async function prepareWindowsToolchain(
   return {
     kind,
     kbdgen,
-    kbdiBinDir: await buildKbdi(workDir),
+    kbdiBinDir: await downloadKbdi(workDir),
     tipInstaller: await downloadTipInstaller(KBDGEN_V4_TAG, tipDir),
   }
 }
 
 /**
- * Builds and signs kbdi from KBDI_V4_BRANCH into `<workDir>/kbdi-bin`. Its
- * rust-toolchain.toml pins the toolchain and its targets, which rustup
- * installs.
+ * The keyboard payload's kbdi builds from the KBDI_V4_TAG prerelease of
+ * KBDI_REPO, each checked against its BLAKE3SUMS, in `<workDir>/kbdi-bin`
+ * under the names the production payload has.
  */
-async function buildKbdi(workDir: string): Promise<string> {
-  const source = path.join(workDir, "kbdi")
-  await builder.exec("git", [
-    "clone",
-    "--depth",
-    "1",
-    "--branch",
-    KBDI_V4_BRANCH,
-    KBDI_REPO,
-    source,
-  ])
-  const { stdout } = await builder.output("git", ["rev-parse", "HEAD"], {
-    cwd: source,
-  })
-  logger.info(`Building kbdi ${KBDI_V4_BRANCH} at ${stdout.trim()}`)
-  await builder.exec("rustup", ["toolchain", "install"], { cwd: source })
-
+async function downloadKbdi(workDir: string): Promise<string> {
   const binDir = path.join(workDir, "kbdi-bin")
   await Deno.mkdir(binDir)
-  for (const { triple, name } of KBDI_BUILDS) {
-    await builder.exec("cargo", [
-      "build",
-      "--release",
-      "--locked",
-      "--bin",
-      "kbdi",
-      "--target",
-      triple,
-    ], { cwd: source })
-    const binary = path.join(binDir, name)
-    await Deno.copyFile(
-      path.join(source, "target", triple, "release", "kbdi.exe"),
-      binary,
-    )
-    await sign(binary)
+  for (const { target, payload, keyboardPayload } of KBDI_BUILDS) {
+    if (!keyboardPayload) continue
+    const directory = path.join(workDir, `kbdi-${target}`)
+    await Deno.mkdir(directory)
+    const kbdi = await downloadVerifiedReleaseAsset({
+      repo: KBDI_REPO,
+      tag: KBDI_V4_TAG,
+      ghPattern: assetGhPattern(KBDI_NAME, target, "exe"),
+      pattern: new RegExp(assetPsPattern(KBDI_NAME, target, "exe")),
+      label: `kbdi ${target}`,
+      directory,
+    })
+    await Deno.copyFile(kbdi, path.join(binDir, payload))
   }
   return binDir
 }

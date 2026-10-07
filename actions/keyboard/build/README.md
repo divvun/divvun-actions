@@ -25,8 +25,10 @@ steps, with kbdgen and kbdi from pahkat.
 
 The `v4` toolchain downloads kbdgen and the text service installer from the
 `v4-latest` prerelease of `divvun/kbdgen`, which kbdgen's `v4` branch
-replaces on every build, checks both against its `BLAKE3SUMS`, and builds
-kbdi from its `kbdgen-tsf-profiles` branch. kbdgen builds the layout DLLs
+replaces on every build, and the x86 and x64 kbdi from the `v4-latest`
+prerelease of `divvun/kbdi`, which kbdi's `v4` branch replaces on every
+build (`pipelines/kbdi`), and checks each against its release's
+`BLAKE3SUMS`. kbdgen builds the layout DLLs
 for x86, x64, Arm64 and WOW64 itself, which needs the i686, x86_64 and
 aarch64 `pc-windows-msvc` Rust targets on the agent.
 
