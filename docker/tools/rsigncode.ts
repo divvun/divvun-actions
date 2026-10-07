@@ -11,7 +11,7 @@ import {
  * rsigncode it fetched first. This token is echoed inside the RUN, so changing
  * it is a cache miss.
  */
-const REFRESH = "2026-10-05"
+const REFRESH = "2026-10-07"
 
 /**
  * Install rsigncode (Authenticode signing tool) from the divvun/rsigncode
