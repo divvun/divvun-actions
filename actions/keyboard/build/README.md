@@ -25,9 +25,9 @@ steps, with kbdgen and kbdi from pahkat.
 
 Pushes to the keyboard's `v4` branch also deploy the signed installer
 (`runDesktopKeyboardDeployWindowsV4`). It is added to the keyboard
-repository's `v4-nightly` prerelease as
-`<repo>-kbdgen-v4-outto_<version>_windows.exe`, and the release keeps every
-earlier build's installer. Its download URL becomes the Windows payload of a
+repository's rolling `v4-latest` prerelease as
+`<repo>-kbdgen-v4-outto_<version>_windows.exe`, replacing the previous
+build's assets as production's `dev-latest` does. Its download URL becomes the Windows payload of a
 `nightly` release of the keyboard's package in `https://pahkat.uit.no/main/`,
 the production one, versioned with the installer's own version, which outto
 registers as the Add/Remove Programs `DisplayVersion`. The payload is of kind

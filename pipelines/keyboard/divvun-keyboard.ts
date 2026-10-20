@@ -473,12 +473,11 @@ const KBDGEN_V4_PACKAGE_SUFFIX = "-kbdgen-v4-outto"
 const KBDGEN_V4_PUBLISH_BRANCH = "v4"
 
 /**
- * The prerelease of the keyboard's repository that kbdgen v4 installers are
- * published to. Each build adds its installer under a name with its own
- * version and none is deleted, so the URL of every nightly pahkat release
- * stays valid. main replaces production's dev-latest, a release of its own.
+ * The rolling prerelease of the keyboard's repository that kbdgen v4
+ * installers are published to. Like production's dev-latest, which main
+ * replaces, each build replaces its assets.
  */
-const KBDGEN_V4_RELEASE_TAG = "v4-nightly"
+const KBDGEN_V4_RELEASE_TAG = "v4-latest"
 
 /** A push to KBDGEN_V4_PUBLISH_BRANCH, outside a pull request and a tag. */
 function isKbdgenV4Publish(): boolean {
@@ -489,8 +488,8 @@ function isKbdgenV4Publish(): boolean {
 }
 
 /**
- * Publishes the signed installer of a kbdgen v4 build: adds it to the
- * KBDGEN_V4_RELEASE_TAG prerelease of the keyboard's repository and makes
+ * Publishes the signed installer of a kbdgen v4 build: replaces the assets of
+ * the KBDGEN_V4_RELEASE_TAG prerelease of the keyboard's repository and makes
  * that asset's download URL the Windows payload of a nightly release of the
  * keyboard's pahkat package, the one production deploys to.
  */
@@ -539,7 +538,6 @@ export async function runDesktopKeyboardDeployWindowsV4() {
     draft: false,
     prerelease: true,
     name: releaseName,
-    keepAssets: true,
   })
   const artifactUrl = await gh.releaseAssetUrl(
     KBDGEN_V4_RELEASE_TAG,

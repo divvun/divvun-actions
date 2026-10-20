@@ -557,9 +557,7 @@ export class GitHub {
   /**
    * Publish `artifacts` to the `tag` release, creating it (and the tag, at
    * HEAD) when missing. An existing release's other assets are deleted, so it
-   * holds only `artifacts`, unless `keepAssets` is set: then only the assets
-   * named like one of `artifacts` are replaced, and every earlier asset's
-   * download URL stays valid.
+   * holds only `artifacts`.
    */
   async updateRelease(
     tag: string,
@@ -568,20 +566,14 @@ export class GitHub {
       draft?: boolean
       prerelease?: boolean
       name?: string
-      keepAssets?: boolean
     } = {},
   ) {
-    const { draft = true, prerelease = true, name, keepAssets = false } =
-      options
+    const { draft = true, prerelease = true, name } = options
 
     const exists = await this.releaseExists(tag)
 
     if (exists) {
-      if (keepAssets) {
-        logger.info(`Release ${tag} exists, keeping its assets`)
-      } else {
-        await this.#deleteReleaseAssets(tag)
-      }
+      await this.#deleteReleaseAssets(tag)
 
       logger.info(`Uploading new artifacts to existing release ${tag}...`)
       await this.uploadRelease(tag, artifacts)
@@ -674,8 +666,7 @@ export class GitHub {
   /**
    * The download URL of the asset `name` of the `tag` release, as GitHub
    * gives it (`browser_download_url`). Throws when the release has no such
-   * asset. Reads every page of the release's assets, which a release that
-   * keeps its assets (`updateRelease`'s `keepAssets`) can fill.
+   * asset. Reads every page of the release's assets.
    */
   async releaseAssetUrl(tag: string, name: string): Promise<string> {
     const slug = await this.#canonicalSlug()
