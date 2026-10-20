@@ -32,21 +32,27 @@ build (`pipelines/kbdi`), and checks each against its release's
 for x86, x64, Arm64 and WOW64 itself, which needs the i686, x86_64 and
 aarch64 `pc-windows-msvc` Rust targets on the agent.
 
-Both v4 installers embed the Divvun keyboard text service, the TSF text
+The v4 installer embeds the Divvun keyboard text service, the TSF text
 input processor built from kbdgen's `crates/kbd-tsf` (kbdgen spec
 `tsf.installer.bundle`), as
-`dependencies/divvun-tip/divvun-tip-installer.exe`.
+`dependencies/divvun-tip/divvun-tip-installer.exe`. That is itself an outto
+installer (`actions/kbd-tsf/installer.ts`), built and published by the
+kbdgen pipeline (`pipelines/kbdgen/tip.ts`).
 
 The keyboard installer runs it silently before any `kbdi keyboard_install`,
 so kbdi registers each layout's TSF profile. It installs into
 `%ProgramFiles%\Divvun\Text Service\<version>`, registers its DLLs with
-regsvr32, deletes older versions (at restart while loaded), and refuses to
-replace a newer version. A failure leaves the keyboards on their layouts.
+regsvr32, deletes older versions (moving loaded DLLs aside until the next
+restart), refuses to replace a newer version, and takes over a text service
+that the earlier Inno Setup installer installed. A failure leaves the
+keyboards on their layouts.
 
 On uninstall the keyboard runs `kbdi keyboard_uninstall` for its layouts and
-then the text service's uninstaller, which refuses while any keyboard's
-profile remains under its CLSID in `CTF\TIP`. The last keyboard removed
-therefore removes the text service.
+then the text service's uninstaller,
+`%ProgramFiles%\Divvun\Text Service\.outto\no.divvun.text-service\uninstall.exe`,
+which exits 2 without changing anything while any keyboard's profile remains
+under its CLSID in `CTF\TIP`. The last keyboard removed therefore removes
+the text service.
 
 Validation on Windows:
 

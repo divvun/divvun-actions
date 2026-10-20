@@ -1,32 +1,61 @@
 // The installer of the Divvun keyboard text service (kbdgen's crates/kbd-tsf):
-// `kbdgen tsf` builds its four DLLs, which are signed and packed by
-// divvun-tip.iss. kbdgen spec: tsf.arch.builds, tsf.security.signing,
-// tsf.register.upgrade.
+// `kbdgen tsf` builds its four DLLs, which are signed and packed by outto.
+// kbdgen spec: tsf.arch.builds, tsf.arch.registration, tsf.security.signing,
+// tsf.register.server, tsf.register.upgrade, tsf.register.uninstall,
+// tsf.installer.bundle.
 
 import * as path from "@std/path"
 import * as toml from "@std/toml"
+import { makeOuttoInstaller, windowsOuttoSigning } from "~/actions/outto/lib.ts"
 import * as builder from "~/builder.ts"
 import sign from "~/services/windows-codesign.ts"
 import * as target from "~/target.ts"
 import logger from "~/util/log.ts"
+import { OuttoBuilder } from "~/util/outto.ts"
+import { makeTempDir } from "~/util/temp.ts"
 
 /** The release asset name, `divvun-tip_windows_<version>.exe`. */
 export const TIP_NAME = "divvun-tip"
-/** One installer serves x86, x64 and Arm64 Windows. */
+/** One installer serves x64 and Arm64 Windows. */
 export const TIP_TARGET = "windows"
 /** The rolling prerelease of the kbdgen repository that main's builds replace. */
 export const TIP_DEV_TAG = "kbd-tsf-dev-latest"
 
 /**
- * Where divvun-tip.iss installs the text service: `{commonpf}\Divvun\Text
- * Service`, one directory per version, and its Inno uninstaller beside them.
- * Keyboard installers run the uninstaller from here.
+ * What tells one text service installation from another: the CLSID that
+ * kbd-tsf compiles in (a test build's `KBD_TSF_CLSID`), the outto package
+ * id, which names its Add/Remove Programs entry, the AppId of the Inno
+ * Setup installer it replaces, and its directory under `%ProgramFiles%`. A
+ * test build gives each its own value, so it never touches the real one.
  */
-export const TIP_APP_DIR = "Divvun\\Text Service"
-export const TIP_UNINSTALLER = "unins000.exe"
+export type TipIdentity = {
+  clsid: string
+  packageId: string
+  innoAppId: string
+  appDir: string
+}
 
-/** Silent, without message boxes or restarts, for both setup and uninstaller. */
-export const TIP_SILENT_ARGS = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART"
+export const TIP_IDENTITY: TipIdentity = {
+  clsid: "{5E668C8A-2FB8-41D2-90B1-9C132653FA9D}",
+  packageId: "no.divvun.text-service",
+  innoAppId: "D75B9208-31F3-44DA-9F6F-CD1AD320E17A",
+  appDir: "Divvun/Text Service",
+}
+
+/**
+ * The uninstaller outto keeps in the installation's receipt, which keyboard
+ * installers run (`#{pf}` is the 64-bit `%ProgramFiles%`).
+ */
+export function tipUninstallerPath(
+  identity: TipIdentity = TIP_IDENTITY,
+): string {
+  return `#{pf}/${identity.appDir}/.outto/${identity.packageId}/uninstall.exe`
+}
+
+/** Silent, without message boxes or restarts. */
+export const TIP_INSTALL_ARGS = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART"
+/** The uninstaller never restarts, and older outto refuses `/NORESTART`. */
+export const TIP_UNINSTALL_ARGS = "/VERYSILENT /SUPPRESSMSGBOXES"
 
 /** The four PE files `kbdgen tsf` writes (tsf.security.signing). */
 export const TIP_DLLS = [
@@ -126,29 +155,117 @@ export async function signTipDlls(dlls: string[]): Promise<void> {
 }
 
 /**
- * Compiles divvun-tip.iss into `<outputDir>/<baseName>.exe` from the
- * directory holding the four DLLs. Signing signs the installer and its
- * uninstaller through `divvun-actions sign`, as the keyboard installers do.
+ * The outto manifest of the text service installer, for the DLLs in
+ * `payloadDir`:
+ *
+ * - every version in its own directory, `<appDir>\<version>`, under the
+ *   64-bit `%ProgramFiles%`, whose ACL the files inherit: the x86 DLL on
+ *   every Windows, and the x64 DLL on x64 Windows; on Arm64 also the arm64
+ *   DLL and the Arm64X forwarder (tsf.register.upgrade,
+ *   tsf.security.appcontainer, tsf.arch.builds). A version directory's files
+ *   never change, so an existing one stays: a loaded DLL cannot be
+ *   overwritten anyway.
+ * - registration with SysWOW64's regsvr32 for the x86 DLL, then System32's
+ *   for the native DLL that owns the categories (tsf.arch.registration). A
+ *   failure fails the install, which unregisters what it registered and
+ *   leaves older versions in place.
+ * - never a downgrade: the installed version is the directory that
+ *   `InprocServer32` names. The same version installs again.
+ * - once registered, every other version directory goes, with what is left
+ *   of an Inno Setup install, which this one takes over rather than running
+ *   its uninstaller: that would refuse while keyboards use it, which they
+ *   always do. A loaded DLL is moved to the Windows temporary directory and
+ *   deleted from there at the next restart.
+ * - no closing of the processes that have the text service loaded.
+ * - the uninstaller refuses while any language profile remains under the
+ *   CLSID in `CTF\TIP` (tsf.register.uninstall); otherwise it unregisters
+ *   the native DLL, then the x86 one, and removes the files.
  */
-export async function compileTipInstaller(opts: {
+export function tipOuttoConfig(
+  version: string,
+  payloadDir: string,
+  identity: TipIdentity = TIP_IDENTITY,
+): OuttoBuilder {
+  const versionDir = "#{app}/#{package.version}"
+  const config = new OuttoBuilder(payloadDir, "windows")
+    .id(identity.packageId)
+    .name("Divvun Text Service")
+    .version(version)
+    .publisher("Divvun")
+    .url("https://divvun.no/")
+    .privileges("admin")
+    .defaultDir(`#{pf}/${identity.appDir}`)
+    .disableDirPage()
+    .restartManager(false)
+    .upgradePolicy("overwrite")
+    .legacyInnoAppId(identity.innoAppId, "adopt")
+    .refuseDowngrade({
+      registry_key:
+        `HKLM\\SOFTWARE\\Classes\\CLSID\\${identity.clsid}\\InprocServer32`,
+      from: "parent_dir_name",
+    })
+    .pruneOnInstall(["#{app}"])
+    .refuseUninstallWhile({
+      registry_key:
+        `HKLM\\SOFTWARE\\Microsoft\\CTF\\TIP\\${identity.clsid}\\LanguageProfile\\*\\*`,
+      message:
+        "Divvun keyboards still use the Divvun Text Service. Uninstall them first.",
+    })
+
+  const file = (source: string, arch?: "x64" | "arm64") =>
+    config.file({ source, dest: versionDir, overwrite: "never", arch })
+  file("divvun_tip_x86.dll")
+  file("divvun_tip_x64.dll", "x64")
+  file("divvun_tip_x64.dll", "arm64")
+  file("divvun_tip_arm64.dll", "arm64")
+  file("divvun_tip.dll", "arm64")
+
+  config.com({
+    file: `${versionDir}/divvun_tip_x86.dll`,
+    action: "regserver",
+    host: "x86",
+  })
+  config.com({
+    file: `${versionDir}/divvun_tip_x64.dll`,
+    action: "regserver",
+    arch: "x64",
+  })
+  config.com({
+    file: `${versionDir}/divvun_tip_arm64.dll`,
+    action: "regserver",
+    arch: "arm64",
+  })
+  return config
+}
+
+/**
+ * Builds the text service installer at `outputPath` from the directory
+ * holding the four DLLs. Signing signs the installer and the uninstaller it
+ * carries through `divvun-actions sign`, as the keyboard installers do.
+ */
+export async function buildTipInstaller(opts: {
   version: string
   payloadDir: string
-  outputDir: string
-  baseName: string
+  outputPath: string
   sign: boolean
+  identity?: TipIdentity
 }): Promise<string> {
-  const script = path.join(import.meta.dirname ?? "", "divvun-tip.iss")
-  const args = [
-    `/DTipVersion=${opts.version}`,
-    `/DPayloadDir=${path.resolve(opts.payloadDir)}`,
-    `/DOutputBaseFilename=${opts.baseName}`,
-    `/O${path.resolve(opts.outputDir)}`,
-  ]
-  if (opts.sign) {
-    const signer = path.join(target.projectPath, "bin", "divvun-actions.bat")
-    args.push("/DSign", `/Ssigntool=$q${signer}$q sign $f`)
-  }
-  args.push(script)
-  await builder.exec("iscc.exe", args)
-  return path.join(opts.outputDir, `${opts.baseName}.exe`)
+  using configDir = await makeTempDir({ prefix: "divvun-tip-outto-" })
+  const configPath = path.join(configDir.path, "outto.toml")
+  const config = tipOuttoConfig(opts.version, opts.payloadDir, opts.identity)
+  logger.info(`Text service outto manifest:\n${config.build()}`)
+  await config.write(configPath)
+  const signing = opts.sign
+    ? windowsOuttoSigning(
+      path.join(target.projectPath, "bin", "divvun-actions.bat"),
+    )
+    : {}
+  const result = await makeOuttoInstaller({
+    configPath,
+    sourceDir: path.resolve(opts.payloadDir),
+    outputPath: path.resolve(opts.outputPath),
+    target: "windows",
+    ...signing,
+  })
+  return result.path
 }

@@ -7,7 +7,7 @@ import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import {
   buildTipDlls,
-  compileTipInstaller,
+  buildTipInstaller,
   readTipVersion,
   setTipVersion,
   signTipDlls,
@@ -135,11 +135,10 @@ export async function runTipInstaller() {
     await signTipDlls(dlls)
   }
 
-  const installer = await compileTipInstaller({
+  const installer = await buildTipInstaller({
     version,
     payloadDir,
-    outputDir: path.resolve("."),
-    baseName: TIP_NAME,
+    outputPath: path.resolve(INSTALLER),
     sign: signed,
   })
   const record: TipRecord = {

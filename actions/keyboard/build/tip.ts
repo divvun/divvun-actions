@@ -8,11 +8,11 @@
 
 import * as path from "@std/path"
 import {
-  TIP_APP_DIR,
+  TIP_INSTALL_ARGS,
   TIP_NAME,
-  TIP_SILENT_ARGS,
   TIP_TARGET,
-  TIP_UNINSTALLER,
+  TIP_UNINSTALL_ARGS,
+  tipUninstallerPath,
 } from "~/actions/kbd-tsf/installer.ts"
 import { assetPsPattern } from "~/util/asset_name.ts"
 import { OuttoBuilder } from "~/util/outto.ts"
@@ -21,9 +21,6 @@ import { downloadVerifiedReleaseAsset } from "./release_asset.ts"
 
 export const TIP_DIRECTORY = "dependencies/divvun-tip"
 export const TIP_INSTALLER = "divvun-tip-installer.exe"
-
-/** Inno's `/SP-` skips the "This will install" prompt. */
-export const TIP_INSTALL_ARGS = `${TIP_SILENT_ARGS} /SP-`
 
 /** `tag`'s text service installer, checked against its BLAKE3SUMS. */
 export function downloadTipInstaller(
@@ -80,13 +77,16 @@ export function addTipInstallToOutto(manifest: OuttoBuilder): void {
 /**
  * Adds the text service's uninstaller to an outto keyboard manifest. Call it
  * after adding the layouts' `kbdi keyboard_uninstall` runs: Windows ignores
- * the removal of a TIP string once the text service is unregistered.
+ * the removal of a TIP string once the text service is unregistered. It
+ * exits 2 without changing anything while another keyboard's profile
+ * remains, and outto only logs a hook's failure, or a missing uninstaller,
+ * so neither fails the keyboard's uninstall.
  */
 export function addTipUninstallToOutto(manifest: OuttoBuilder): void {
   manifest.run({
     phase: "before_uninstall",
-    command: `#{pf}/${TIP_APP_DIR.replaceAll("\\", "/")}/${TIP_UNINSTALLER}`,
-    arguments: TIP_SILENT_ARGS,
+    command: tipUninstallerPath(),
+    arguments: TIP_UNINSTALL_ARGS,
     wait: true,
     show: "hidden",
   })
