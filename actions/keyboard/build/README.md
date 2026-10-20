@@ -19,9 +19,23 @@ remove other keyboards' data.
 
 A keyboard bundle with a format 4 layout gets only the "kbdgen v4 (test)"
 group (`pipelineDesktopKeyboard`), which builds the outto installer with the
-`v4` toolchain (`toolchain.ts`) and uploads it as a build artifact without
-deploying it; kbdgen v4 keyboards get no Inno Setup installer. Other bundles
-keep the production steps, with kbdgen and kbdi from pahkat.
+`v4` toolchain (`toolchain.ts`) and uploads it as a build artifact; kbdgen v4
+keyboards get no Inno Setup installer. Other bundles keep the production
+steps, with kbdgen and kbdi from pahkat.
+
+Pushes to the keyboard's `v4` branch also deploy the signed installer
+(`runDesktopKeyboardDeployWindowsV4`). It is added to the keyboard
+repository's `v4-nightly` prerelease as
+`<repo>-kbdgen-v4-outto_<version>_windows.exe`, and the release keeps every
+earlier build's installer. Its download URL becomes the Windows payload of a
+`nightly` release of the keyboard's package in `https://pahkat.uit.no/main/`,
+the production one, versioned with the installer's own version, which outto
+registers as the Add/Remove Programs `DisplayVersion`. The payload is of kind
+`inno`, so pahkat installs it with `/VERYSILENT /SP- /SUPPRESSMSGBOXES
+/NORESTART`; its product code is the outto package id,
+`no.divvun.keyboard.<name>`, and its `uninstall_args`, `/VERYSILENT
+/SUPPRESSMSGBOXES /NORESTART`, replace the `--dir` that the install's
+`QuietUninstallString` passes, which the uninstaller does without.
 
 The `v4` toolchain downloads kbdgen and the text service installer from the
 `v4-latest` prerelease of `divvun/kbdgen`, which kbdgen's `v4` branch

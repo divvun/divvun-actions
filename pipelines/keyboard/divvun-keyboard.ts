@@ -6,6 +6,7 @@ import keyboardBuild, {
 } from "~/actions/keyboard/build/mod.ts"
 import type { KeyboardToolchainKind } from "~/actions/keyboard/build/toolchain.ts"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
+import { NIGHTLY_CHANNEL } from "~/actions/version.ts"
 import * as builder from "~/builder.ts"
 import {
   BuildkitePipeline,
@@ -13,7 +14,7 @@ import {
   GroupStep,
 } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
-import { globOneFile } from "~/util/glob.ts"
+import { globFiles, globOneFile } from "~/util/glob.ts"
 import { GitHub } from "~/util/github.ts"
 import logger from "~/util/log.ts"
 import { makeTempDir } from "~/util/temp.ts"
@@ -93,20 +94,10 @@ export async function runDivvunKeyboardAndroid(kbdgenBundlePath: string) {
 async function createWindowsPackage(
   payloadPath: string,
   packageId: string,
-  bundlePath: string,
-  channel: string | null,
+  version: string,
   unsigned: boolean,
 ): Promise<string> {
   using tempDir = await makeTempDir()
-
-  // Get version from kbdgen bundle
-  const target = await Kbdgen.loadTarget(bundlePath, "windows")
-  const baseVersion = target.version as string
-
-  // Apply channel and timestamp if this is a dev build
-  const version = channel
-    ? await versionAsNightly(baseVersion, builder.env.buildNumber)
-    : baseVersion
 
   const pathItems = [packageId, version, "windows"]
   const unsignedSuffix = unsigned ? ".UNSIGNED" : ""
@@ -135,27 +126,30 @@ export async function runDesktopKeyboardWindows(
     toolchain,
   })
 
+  // keyboardBuild stamped the bundle's windows target with the installer's
+  // version, nightly unless a release tag is built. A v4 build is named and
+  // deployed with exactly that: pahkat compares the release version with the
+  // DisplayVersion outto registers, which is that version. Production builds
+  // stamp the nightly version again, with the build number.
+  const target = await Kbdgen.loadTarget(kbdgenBundlePath, "windows")
+  const builtVersion = target.version as string
+  const fullVersion = channel && toolchain !== "v4"
+    ? await versionAsNightly(builtVersion, builder.env.buildNumber)
+    : builtVersion
+
   // kbdgen v4 test builds are named apart from production ones.
   const packageId = toolchain === "v4"
-    ? `${builder.env.repoName}-kbdgen-v4-outto`
+    ? `${builder.env.repoName}${KBDGEN_V4_PACKAGE_SUFFIX}`
     : builder.env.repoName
   const artifactPath = await createWindowsPackage(
     payloadPath,
     packageId,
-    kbdgenBundlePath,
-    channel,
+    fullVersion,
     unsigned,
   )
 
   // Upload artifact for later deployment
   await builder.uploadArtifacts(artifactPath)
-
-  // Get the full version (including dev timestamp) from the artifact
-  const target = await Kbdgen.loadTarget(kbdgenBundlePath, "windows")
-  const baseVersion = target.version as string
-  const fullVersion = channel
-    ? await versionAsNightly(baseVersion, builder.env.buildNumber)
-    : baseVersion
 
   // Store metadata for deployment
   await builder.setMetadata("windows-channel", channel || "")
@@ -468,25 +462,144 @@ function isFormat4Bundle(bundlePath: string): boolean {
   }
 }
 
+/** What a kbdgen v4 build's installer name adds to the repository's name. */
+const KBDGEN_V4_PACKAGE_SUFFIX = "-kbdgen-v4-outto"
+
+/**
+ * The branch whose kbdgen v4 builds are published: keyboard-vro's format 4
+ * bundle lives on `v4`. The "kbdgen v4 (test)" group builds every branch of
+ * a format 4 bundle, but only pushes to this one deploy.
+ */
+const KBDGEN_V4_PUBLISH_BRANCH = "v4"
+
+/**
+ * The prerelease of the keyboard's repository that kbdgen v4 installers are
+ * published to. Each build adds its installer under a name with its own
+ * version and none is deleted, so the URL of every nightly pahkat release
+ * stays valid. main replaces production's dev-latest, a release of its own.
+ */
+const KBDGEN_V4_RELEASE_TAG = "v4-nightly"
+
+/** A push to KBDGEN_V4_PUBLISH_BRANCH, outside a pull request and a tag. */
+function isKbdgenV4Publish(): boolean {
+  if (builder.env.pullRequest && builder.env.pullRequest !== "false") {
+    return false
+  }
+  return !builder.env.tag && builder.env.branch === KBDGEN_V4_PUBLISH_BRANCH
+}
+
+/**
+ * Publishes the signed installer of a kbdgen v4 build: adds it to the
+ * KBDGEN_V4_RELEASE_TAG prerelease of the keyboard's repository and makes
+ * that asset's download URL the Windows payload of a nightly release of the
+ * keyboard's pahkat package, the one production deploys to.
+ */
+export async function runDesktopKeyboardDeployWindowsV4() {
+  if (!isKbdgenV4Publish()) {
+    throw new Error(
+      `kbdgen v4 keyboards are deployed from pushes to ` +
+        `${KBDGEN_V4_PUBLISH_BRANCH} only`,
+    )
+  }
+
+  using tempDir = await makeTempDir()
+  await builder.downloadArtifacts(
+    `*${KBDGEN_V4_PACKAGE_SUFFIX}_*_windows*.exe`,
+    tempDir.path,
+  )
+  const files = await globFiles("*.exe", { root: tempDir.path })
+  if (files.length !== 1) {
+    throw new Error(`Expected one kbdgen v4 installer, found ${files.length}`)
+  }
+  const payloadPath = files[0]
+  const assetName = path.basename(payloadPath)
+  if (assetName.includes(".UNSIGNED.")) {
+    throw new Error(`Refusing to publish unsigned installer: ${assetName}`)
+  }
+
+  const bundlePath = await builder.metadata("bundle-path")
+  const version = await builder.metadata("windows-version")
+  const channel = await builder.metadata("windows-channel")
+  if (channel !== NIGHTLY_CHANNEL) {
+    throw new Error(
+      `kbdgen v4 keyboards are deployed to pahkat's ${NIGHTLY_CHANNEL} ` +
+        `channel only, not "${channel}"`,
+    )
+  }
+
+  const buildNumber = builder.env.buildNumber
+  const releaseName = buildNumber
+    ? `v${version} (build ${buildNumber})`
+    : `v${version}`
+  logger.info(
+    `Publishing ${assetName} to ${KBDGEN_V4_RELEASE_TAG} as ${releaseName}`,
+  )
+  const gh = new GitHub(builder.env.repo)
+  await gh.updateRelease(KBDGEN_V4_RELEASE_TAG, [payloadPath], {
+    draft: false,
+    prerelease: true,
+    name: releaseName,
+    keepAssets: true,
+  })
+  const artifactUrl = await gh.releaseAssetUrl(
+    KBDGEN_V4_RELEASE_TAG,
+    assetName,
+  )
+  logger.info(`Registering ${artifactUrl} with pahkat (${channel})`)
+
+  const allSecrets = await builder.secrets()
+  await keyboardDeploy({
+    packageId: builder.env.repoName,
+    keyboardType: KeyboardType.Windows,
+    bundlePath,
+    channel,
+    version,
+    pahkatRepo: "https://pahkat.uit.no/main/",
+    payloadPath,
+    artifactUrl,
+    installer: "outto",
+    secrets: {
+      awsAccessKeyId: allSecrets.get("s3/accessKeyId"),
+      awsSecretAccessKey: allSecrets.get("s3/secretAccessKey"),
+      pahkatApiKey: allSecrets.get("pahkat/apiKey"),
+    },
+  })
+}
+
 /**
  * The outto Windows installer built with kbdgen v4, its text service and
  * kbdi with text service profiles (actions/keyboard/build/toolchain.ts),
- * uploaded as a build artifact only: nothing here deploys or publishes.
+ * uploaded as a build artifact. Pushes to KBDGEN_V4_PUBLISH_BRANCH also
+ * deploy it (runDesktopKeyboardDeployWindowsV4).
  */
 function kbdgenV4Group(): GroupStep {
+  const steps: CommandStep[] = [
+    command({
+      label: "Build Windows keyboard with kbdgen v4 (outto)",
+      key: "build-windows-kbdgen-v4-outto",
+      command: "divvun-actions run divvun-keyboard-windows-v4 outto",
+      agents: {
+        queue: "windows",
+      },
+    }),
+  ]
+  if (isKbdgenV4Publish()) {
+    steps.push(command({
+      label: `Deploy (${KBDGEN_V4_RELEASE_TAG}, pahkat ${NIGHTLY_CHANNEL})`,
+      command: "divvun-actions run divvun-keyboard-deploy-windows-v4",
+      depends_on: "build-windows-kbdgen-v4-outto",
+      agents: {
+        queue: "linux",
+      },
+      // Two builds adding to the release at once could both try to create it.
+      concurrency: 1,
+      concurrency_group: `${builder.env.repoName}/kbdgen-v4-deploy`,
+    }))
+  }
   return {
     group: "kbdgen v4 (test)",
     key: "kbdgen-v4",
-    steps: [
-      command({
-        label: "Build Windows keyboard with kbdgen v4 (outto)",
-        key: "build-windows-kbdgen-v4-outto",
-        command: "divvun-actions run divvun-keyboard-windows-v4 outto",
-        agents: {
-          queue: "windows",
-        },
-      }),
-    ],
+    steps,
   }
 }
 

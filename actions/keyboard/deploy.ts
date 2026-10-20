@@ -14,6 +14,8 @@ import {
   WindowsExecutableKind,
 } from "~/util/shared.ts"
 
+import type { InstallerKind } from "./build/mod.ts"
+import { keyboardPackageId } from "./build/outto.ts"
 import { KeyboardType } from "./types.ts"
 
 type ArtifactInfo = {
@@ -35,6 +37,13 @@ export type Props = {
   pahkatRepo: string
   packageId: string
   version: string
+  /**
+   * Where the payload is already published, such as a GitHub release asset:
+   * pahkat is pointed at it and nothing is uploaded to pahkat's artifacts.
+   */
+  artifactUrl?: string
+  /** The Windows installer the payload is. Defaults to "legacy" (Inno). */
+  installer?: InstallerKind
   secrets: {
     pahkatApiKey: string
     awsAccessKeyId: string
@@ -60,10 +69,12 @@ export default async function keyboardDeploy({
   pahkatRepo,
   packageId,
   version,
+  artifactUrl,
+  installer = "legacy",
   secrets,
 }: Props) {
   const repoPackageUrl = `${pahkatRepo}packages/${packageId}`
-  const artifactInfo = createArtifactInfo(payloadPath)
+  const artifactInfo = createArtifactInfo(payloadPath, artifactUrl)
 
   const metadata = keyboardType === KeyboardType.MacOS
     ? await createMacOSMetadata(
@@ -79,6 +90,7 @@ export default async function keyboardDeploy({
       version,
       channel,
       artifactInfo,
+      installer,
       secrets,
     )
     : (() => {
@@ -98,14 +110,19 @@ export default async function keyboardDeploy({
     secrets,
     {
       metadataJsonPath,
+      skipArtifactUpload: artifactUrl != null,
     },
   )
 }
 
-function createArtifactInfo(payloadPath: string): ArtifactInfo {
+function createArtifactInfo(
+  payloadPath: string,
+  artifactUrl: string | undefined,
+): ArtifactInfo {
   return {
     path: payloadPath,
-    url: `${PahkatUploader.ARTIFACTS_URL}${path.basename(payloadPath)}`,
+    url: artifactUrl ??
+      `${PahkatUploader.ARTIFACTS_URL}${path.basename(payloadPath)}`,
     size: getArtifactSize(payloadPath),
   }
 }
@@ -143,20 +160,60 @@ async function createMacOSMetadata(
   return { platform, payloadMetadata }
 }
 
+/**
+ * What pahkat passes to an outto keyboard's uninstaller. pahkat runs the
+ * program of the install's QuietUninstallString with these in place of that
+ * string's own arguments, `--dir <install dir> /VERYSILENT`; the uninstaller
+ * finds its install from its own place in `<install dir>\.outto\<id>\`.
+ * Without them pahkat passes Inno's switches, and the uninstallers of
+ * keyboards built with an outto that did not yet accept `/SP-` refuse it.
+ */
+const OUTTO_UNINSTALL_ARGS = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART"
+
 async function createWindowsMetadata(
   bundlePath: string,
   version: string,
   channel: string | null,
   artifactInfo: ArtifactInfo,
+  installer: InstallerKind,
   secrets: Props["secrets"],
 ): Promise<PlatformMetadata> {
+  const platform = "windows"
+  // Both installers replace layout DLLs in System32 that running processes
+  // have loaded, and delete them on uninstall, only at the next restart.
+  // pahkat asks for one after installing a package it found not installed,
+  // not after an update (RebootSpec.Update), whose text service every
+  // process started afterwards loads without one.
+  const requiresReboot = [RebootSpec.Install, RebootSpec.Uninstall]
+
+  if (installer === "outto") {
+    // pahkat installs kind inno with Inno's switches, `/VERYSILENT /SP-
+    // /SUPPRESSMSGBOXES /NORESTART`, which outto's installer takes. A
+    // payload's `args` would replace the whole command line, the installer's
+    // path in pahkat's download cache included, so there is no other way.
+    // The product code names the Add/Remove Programs key, which outto names
+    // after the package id; its DisplayVersion is the outto manifest's
+    // version, which pahkat compares with `version`.
+    const payloadMetadata = await PahkatUploader.release.windowsExecutable(
+      releaseReq(version, platform, channel),
+      artifactInfo.url,
+      1,
+      artifactInfo.size,
+      WindowsExecutableKind.Inno,
+      keyboardPackageId(bundlePath),
+      requiresReboot,
+      secrets,
+      { uninstallArgs: OUTTO_UNINSTALL_ARGS },
+    )
+    return { platform, payloadMetadata }
+  }
+
   const target = await Kbdgen.loadTarget(bundlePath, "windows")
   const productCode = validateProductCode(
     WindowsExecutableKind.Inno,
     target.uuid,
   )
 
-  const platform = "windows"
   const payloadMetadata = await PahkatUploader.release.windowsExecutable(
     releaseReq(version, platform, channel),
     artifactInfo.url,
@@ -164,7 +221,7 @@ async function createWindowsMetadata(
     artifactInfo.size,
     WindowsExecutableKind.Inno,
     productCode,
-    [RebootSpec.Install, RebootSpec.Uninstall],
+    requiresReboot,
     secrets,
   )
 

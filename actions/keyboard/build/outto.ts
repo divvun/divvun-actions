@@ -2,8 +2,9 @@
 // (Windows) / pkgbuild+productbuild (macOS).
 //
 // Opt-in: callers select this path via the `installer: "outto"` flag on
-// keyboardBuild() (see ./mod.ts). Until the matching Pahkat upload type
-// lands, this path stops at "signed artifact written to disk".
+// keyboardBuild() (see ./mod.ts). pahkat has no payload type of its own for
+// an outto installer; the kbdgen v4 deploy registers the Windows one as an
+// Inno-kind Windows executable (../deploy.ts).
 
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"

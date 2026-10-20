@@ -742,6 +742,14 @@ export class PahkatUploader {
       secrets: {
         pahkatApiKey: string
       },
+      extra: {
+        /**
+         * What pahkat passes to the program in the install's
+         * QuietUninstallString, in place of the arguments that string has.
+         * Without it pahkat passes the arguments of `kind`.
+         */
+        uninstallArgs?: string
+      } = {},
     ): Promise<string> {
       const payloadArgs = [
         "windows-executable",
@@ -758,6 +766,11 @@ export class PahkatUploader {
       if (kind != null) {
         payloadArgs.push("-k")
         payloadArgs.push(kind)
+      }
+
+      if (extra.uninstallArgs != null) {
+        payloadArgs.push("--uninstall-args")
+        payloadArgs.push(extra.uninstallArgs)
       }
 
       if (requiresReboot.length > 0) {

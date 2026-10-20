@@ -554,6 +554,13 @@ export class GitHub {
     logger.info(`Successfully force-pushed tag ${tag} to HEAD`)
   }
 
+  /**
+   * Publish `artifacts` to the `tag` release, creating it (and the tag, at
+   * HEAD) when missing. An existing release's other assets are deleted, so it
+   * holds only `artifacts`, unless `keepAssets` is set: then only the assets
+   * named like one of `artifacts` are replaced, and every earlier asset's
+   * download URL stays valid.
+   */
   async updateRelease(
     tag: string,
     artifacts: string[],
@@ -561,59 +568,19 @@ export class GitHub {
       draft?: boolean
       prerelease?: boolean
       name?: string
+      keepAssets?: boolean
     } = {},
   ) {
-    const { draft = true, prerelease = true, name } = options
+    const { draft = true, prerelease = true, name, keepAssets = false } =
+      options
 
     const exists = await this.releaseExists(tag)
 
     if (exists) {
-      logger.info(`Release ${tag} exists, fetching assets to delete...`)
-
-      const viewArgs = [
-        "release",
-        "view",
-        tag,
-        "--repo",
-        this.#repo,
-        "--json",
-        "assets",
-      ]
-
-      const { code: viewCode, stdout: viewStdout } = await ghWithRetry(
-        viewArgs,
-        { capture: true },
-      )
-      if (viewCode === 0) {
-        const releaseData = JSON.parse(
-          new TextDecoder().decode(viewStdout),
-        ) as {
-          assets: Array<{ name: string }>
-        }
-
-        for (const asset of releaseData.assets) {
-          logger.info(`Deleting asset ${asset.name} from release ${tag}...`)
-          const deleteArgs = [
-            "release",
-            "delete-asset",
-            tag,
-            asset.name,
-            "--repo",
-            this.#repo,
-            "--yes",
-          ]
-
-          // A retried delete of an asset the failed attempt removed after all
-          // answers "not found", which is what we wanted.
-          const { code: deleteCode, stderr: deleteErr } = await ghWithRetry(
-            deleteArgs,
-          )
-          if (deleteCode !== 0 && !/not found/i.test(deleteErr)) {
-            logger.warning(
-              `Failed to delete asset ${asset.name}: exit code ${deleteCode}`,
-            )
-          }
-        }
+      if (keepAssets) {
+        logger.info(`Release ${tag} exists, keeping its assets`)
+      } else {
+        await this.#deleteReleaseAssets(tag)
       }
 
       logger.info(`Uploading new artifacts to existing release ${tag}...`)
@@ -651,6 +618,87 @@ export class GitHub {
         name,
       })
     }
+  }
+
+  async #deleteReleaseAssets(tag: string) {
+    logger.info(`Release ${tag} exists, fetching assets to delete...`)
+
+    const viewArgs = [
+      "release",
+      "view",
+      tag,
+      "--repo",
+      this.#repo,
+      "--json",
+      "assets",
+    ]
+
+    const { code: viewCode, stdout: viewStdout } = await ghWithRetry(
+      viewArgs,
+      { capture: true },
+    )
+    if (viewCode !== 0) {
+      return
+    }
+    const releaseData = JSON.parse(
+      new TextDecoder().decode(viewStdout),
+    ) as {
+      assets: Array<{ name: string }>
+    }
+
+    for (const asset of releaseData.assets) {
+      logger.info(`Deleting asset ${asset.name} from release ${tag}...`)
+      const deleteArgs = [
+        "release",
+        "delete-asset",
+        tag,
+        asset.name,
+        "--repo",
+        this.#repo,
+        "--yes",
+      ]
+
+      // A retried delete of an asset the failed attempt removed after all
+      // answers "not found", which is what we wanted.
+      const { code: deleteCode, stderr: deleteErr } = await ghWithRetry(
+        deleteArgs,
+      )
+      if (deleteCode !== 0 && !/not found/i.test(deleteErr)) {
+        logger.warning(
+          `Failed to delete asset ${asset.name}: exit code ${deleteCode}`,
+        )
+      }
+    }
+  }
+
+  /**
+   * The download URL of the asset `name` of the `tag` release, as GitHub
+   * gives it (`browser_download_url`). Throws when the release has no such
+   * asset. Reads every page of the release's assets, which a release that
+   * keeps its assets (`updateRelease`'s `keepAssets`) can fill.
+   */
+  async releaseAssetUrl(tag: string, name: string): Promise<string> {
+    const slug = await this.#canonicalSlug()
+    const release = await this.#api([`repos/${slug}/releases/tags/${tag}`]) as {
+      id: number
+    }
+    const { code, stdout, stderr } = await ghWithRetry([
+      "api",
+      "--paginate",
+      `repos/${slug}/releases/${release.id}/assets?per_page=100`,
+      "--jq",
+      ".[] | [.name, .browser_download_url] | @tsv",
+    ], { capture: true })
+    if (code !== 0) {
+      throw new Error(`Failed to list the assets of release ${tag}: ${stderr}`)
+    }
+    for (const line of new TextDecoder().decode(stdout).split("\n")) {
+      const [assetName, url] = line.split("\t")
+      if (assetName === name && url) {
+        return url
+      }
+    }
+    throw new Error(`Release ${tag} of ${slug} has no asset ${name}`)
   }
 
   async getLatestRelease(
