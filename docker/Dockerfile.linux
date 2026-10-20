@@ -172,9 +172,9 @@ RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_
     rm gh.deb && \
     rm -rf /var/lib/apt/lists/* && apt-get clean
 
-# rust@1.99.0 (targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android, x86_64-pc-windows-msvc, i686-pc-windows-msvc, aarch64-pc-windows-msvc)
+# rust@1.99.1 (targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android, x86_64-pc-windows-msvc, i686-pc-windows-msvc, aarch64-pc-windows-msvc)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-    --default-toolchain 1.99.0 \
+    --default-toolchain 1.99.1 \
     -t aarch64-linux-android \
     -t armv7-linux-androideabi \
     -t x86_64-linux-android \

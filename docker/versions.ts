@@ -17,7 +17,7 @@ export const versions = {
   vulkan: "1.4.363.0",
   libtorch: "2.14.1",
   rustupScriptSource: "https://sh.rustup.rs",
-  rust: "1.99.0",
+  rust: "1.99.1",
   vcpkg: "2026.07.29",
   nodeChocoVersion: "24.21.0",
   openssh: "10.0.0.0",
