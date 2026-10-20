@@ -838,7 +838,7 @@ export async function createCiPipeline(): Promise<BuildkitePipeline> {
       break
     }
     case "outto": {
-      pipeline = pipelineOutto()
+      pipeline = await pipelineOutto()
       break
     }
     case "rsigncode": {

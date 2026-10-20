@@ -92,9 +92,13 @@ function createSignStep(
   })
 }
 
-export function pipelineOutto(): BuildkitePipeline {
+// outto compiles this in as the version its binaries report.
+const BUILD_VERSION_ENV = "OUTTO_BUILD_VERSION"
+
+export async function pipelineOutto(): Promise<BuildkitePipeline> {
   const isRelease = builder.env.tag?.match(/^v/)
   const isMainBranch = builder.env.branch === "main"
+  const env = { [BUILD_VERSION_ENV]: await outtoBuildVersion() }
 
   const steps: BuildkitePipeline["steps"] = []
   const publishDependKeys: string[] = []
@@ -119,6 +123,7 @@ export function pipelineOutto(): BuildkitePipeline {
         label: "Build",
         command: [buildCmd, ...uploadCmds],
         agents: { queue: queue(target) },
+        env,
       }))
 
       // outto-core is platform-neutral; outto-windows admin tests are
@@ -139,6 +144,7 @@ export function pipelineOutto(): BuildkitePipeline {
         label: "Build",
         command: [buildCmd, ...uploadCmds],
         agents: { queue: queue(target) },
+        env,
       }))
 
       groupSteps.push(command({
@@ -171,6 +177,7 @@ export function pipelineOutto(): BuildkitePipeline {
         command: "divvun-actions run outto-publish",
         agents: { queue: "linux" },
         depends_on: publishDependKeys,
+        env,
       }),
     )
   }
@@ -198,6 +205,24 @@ async function readCrateVersion(crateTomlPath: string): Promise<string> {
   throw new Error(`Could not determine version from ${crateTomlPath}`)
 }
 
+/**
+ * The version of this build's binaries: a release's tag without its `v`,
+ * else the crate version as a dev version,
+ * `0.1.0-dev.<timestamp>+build.<n>`. The pipeline works it out once, so
+ * that the binaries the build steps compile and the archive names the
+ * publish step gives them agree.
+ */
+async function outtoBuildVersion(): Promise<string> {
+  if (builder.env.tag?.match(/^v/)) {
+    return builder.env.tag.slice(1)
+  }
+  return versionAsDev(
+    await readCrateVersion("crates/cli/Cargo.toml"),
+    builder.env.buildTimestamp,
+    builder.env.buildNumber,
+  )
+}
+
 export async function runOuttoPublish() {
   const isRelease = builder.env.tag?.match(/^v/)
   const isMainBranch = builder.env.branch === "main"
@@ -220,15 +245,12 @@ export async function runOuttoPublish() {
   }
 
   // Version comes from crates/cli/Cargo.toml — that's the publishable CLI.
+  // A dev build's is the one the pipeline compiled into its binaries.
   let version: string
   if (isRelease) {
     version = builder.env.tag!
   } else {
-    version = versionAsDev(
-      await readCrateVersion("crates/cli/Cargo.toml"),
-      builder.env.buildTimestamp,
-      builder.env.buildNumber,
-    )
+    version = Deno.env.get(BUILD_VERSION_ENV) ?? await outtoBuildVersion()
   }
 
   using archivePath = await makeTempDir({ prefix: "outto-" })
