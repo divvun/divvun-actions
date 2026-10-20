@@ -78,7 +78,7 @@ export async function buildKeyboardWindowsOutto(
   const enableCommands: string[] = []
   for (const layout of layouts) {
     enableCommands.push(
-      addLayoutToOuttoManifest(oBuilder, layout),
+      addLayoutToOuttoManifest(oBuilder, layout, bundle.appName),
     )
   }
   if (toolchain.kind === "v4") {
@@ -262,11 +262,13 @@ function addV4Files(oBuilder: OuttoBuilder) {
  * layout that an Inno installer registered under the unclosed `{guid`: the
  * Inno uninstaller that legacyInnoAppId runs passes a code that matches
  * nothing, so without this keyboard_install would register the layout a
- * second time beside it.
+ * second time beside it. The shortcut goes in the Start Menu folder
+ * `startMenuFolder`, where the Inno installers' `{group}` put it.
  */
 function addLayoutToOuttoManifest(
   oBuilder: OuttoBuilder,
   layout: WindowsLayout,
+  startMenuFolder: string,
 ): string {
   oBuilder.run({
     phase: "after_install",
@@ -307,9 +309,10 @@ function addLayoutToOuttoManifest(
   const enableArgs =
     `keyboard_enable -g "${layout.productCode}" -t "${layout.languageCode}"`
   oBuilder.shortcut({
-    name: `Enable ${layout.displayName}`,
+    name: `Enable ${layout.displayName} keyboard`,
     target: "#{app}/kbdi.exe",
     location: "start_menu",
+    subfolder: startMenuFolder,
     arguments: enableArgs,
     description: `Enable ${layout.displayName} keyboard layout`,
   })
