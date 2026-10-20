@@ -53,7 +53,7 @@ export async function buildKeyboardWindowsOutto(
   const project = await Kbdgen.loadProjectBundle(bundlePath)
 
   const oBuilder = new OuttoBuilder(payloadDir, "windows")
-    .id(`{${bundle.uuid}}`)
+    .id(keyboardPackageId(bundlePath))
     .name(bundle.appName)
     .version(bundle.version)
     .publisher(project.organisation)
@@ -61,6 +61,9 @@ export async function buildKeyboardWindowsOutto(
     .privileges("admin")
     .architecture("any")
     .defaultDir(`#{pf}/${bundle.appName}`)
+    // The Inno Setup installer's AppId is the bundle's UUID; installing over
+    // its install runs its uninstaller first.
+    .legacyInnoAppId(bundle.uuid)
 
   if (toolchain.kind === "v4") {
     addV4Files(oBuilder)
@@ -160,6 +163,24 @@ export async function buildKeyboardWindowsOutto(
       path.join(target.projectPath, "bin/divvun-actions.bat"),
     ),
   })
+}
+
+/**
+ * The outto package id of the keyboard bundle `<name>.kbdgen`,
+ * `no.divvun.keyboard.<name>`, as spellers are `no.divvun.speller.<tag>`.
+ * It names the install's Add/Remove Programs entry, which is what a package
+ * index's product code has to match.
+ */
+export function keyboardPackageId(bundlePath: string): string {
+  const name = path.basename(bundlePath).replace(/\.kbdgen$/i, "")
+    .toLowerCase()
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) {
+    throw new Error(
+      `${bundlePath} is not named <name>.kbdgen with a name of letters, ` +
+        "digits and hyphens, so it gives no outto package id",
+    )
+  }
+  return `no.divvun.keyboard.${name}`
 }
 
 /**
