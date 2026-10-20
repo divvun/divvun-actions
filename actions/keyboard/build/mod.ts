@@ -13,9 +13,7 @@ import {
   type WindowsLayout,
 } from "./layouts.ts"
 import { NIGHTLY_CHANNEL } from "../../version.ts"
-import { stageTipInstaller } from "./tip.ts"
 import {
-  type KeyboardToolchain,
   type KeyboardToolchainKind,
   prepareWindowsToolchain,
 } from "./toolchain.ts"
@@ -69,6 +67,9 @@ export default async function keyboardBuild({
   }
 
   const installerKind = resolveInstallerKind(installer)
+  if (toolchain === "v4" && installerKind !== "outto") {
+    throw new Error("kbdgen v4 keyboards are built with outto only")
+  }
   const platform = keyboardType === KeyboardType.MacOS ? "macos" : "windows"
   const channel = await determineVersionAndChannel(
     bundlePath,
@@ -170,12 +171,7 @@ async function buildWindowsKeyboard(
     )
   }
 
-  return await createWindowsInstaller(
-    bundlePath,
-    payloadDir,
-    layouts,
-    toolchain,
-  )
+  return await createWindowsInstaller(bundlePath, payloadDir, layouts)
 }
 
 async function copyKbdiExecutables(
@@ -242,19 +238,14 @@ async function createWindowsInstaller(
   bundlePath: string,
   payloadDir: string,
   layouts: WindowsLayout[],
-  toolchain: KeyboardToolchain,
 ): Promise<InstallerResult> {
   await stageWindInstaller(payloadDir)
-  if (toolchain.kind === "v4") {
-    await stageTipInstaller(payloadDir, toolchain.tipInstaller)
-  }
 
   logger.debug("Generating Inno Setup script")
   const issPath = await generateKbdInnoFromBundle(
     bundlePath,
     payloadDir,
     layouts,
-    toolchain,
   )
 
   logger.debug("Creating Windows installer")

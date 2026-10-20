@@ -317,7 +317,7 @@ async function runPipeline(args: any) {
     case "divvun-keyboard-windows-v4": {
       await runDesktopKeyboardWindows(
         desktopKeyboardBundlePath(),
-        installerArg(args._[1]),
+        installerArg(args._[1]) ?? "outto",
         "v4",
       )
       break

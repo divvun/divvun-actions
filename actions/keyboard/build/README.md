@@ -1,6 +1,6 @@
 # Windows keyboard installers
 
-Both the outto and legacy Inno Setup builds bundle the x64 installer from
+The outto and Inno Setup builds bundle the x64 installer from
 `divvun/divvun-wind`'s `dev-latest` release. The build downloads it through the
 authenticated GitHub CLI, checks its entry in `BLAKE3SUMS`, and embeds it with
 `install-wind.ps1`. Missing, ambiguous or mismatched downloads fail the build.
@@ -18,10 +18,10 @@ remove other keyboards' data.
 ## kbdgen v4 and the Divvun Text Service
 
 A keyboard bundle with a format 4 layout gets only the "kbdgen v4 (test)"
-group (`pipelineDesktopKeyboard`), which builds the Inno Setup and outto
-installers with the `v4` toolchain (`toolchain.ts`) and uploads them as
-build artifacts without deploying them. Other bundles keep the production
-steps, with kbdgen and kbdi from pahkat.
+group (`pipelineDesktopKeyboard`), which builds the outto installer with the
+`v4` toolchain (`toolchain.ts`) and uploads it as a build artifact without
+deploying it; kbdgen v4 keyboards get no Inno Setup installer. Other bundles
+keep the production steps, with kbdgen and kbdi from pahkat.
 
 The `v4` toolchain downloads kbdgen and the text service installer from the
 `v4-latest` prerelease of `divvun/kbdgen`, which kbdgen's `v4` branch

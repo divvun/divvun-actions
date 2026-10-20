@@ -135,11 +135,9 @@ export async function runDesktopKeyboardWindows(
     toolchain,
   })
 
-  // The v4 group's Inno and outto builds upload side by side.
+  // kbdgen v4 test builds are named apart from production ones.
   const packageId = toolchain === "v4"
-    ? `${builder.env.repoName}-kbdgen-v4-${
-      installer === "outto" ? "outto" : "inno"
-    }`
+    ? `${builder.env.repoName}-kbdgen-v4-outto`
     : builder.env.repoName
   const artifactPath = await createWindowsPackage(
     payloadPath,
@@ -471,23 +469,15 @@ function isFormat4Bundle(bundlePath: string): boolean {
 }
 
 /**
- * Windows installers built with kbdgen v4, its text service and kbdi with
- * text service profiles (actions/keyboard/build/toolchain.ts), uploaded as
- * build artifacts only: nothing here deploys or publishes.
+ * The outto Windows installer built with kbdgen v4, its text service and
+ * kbdi with text service profiles (actions/keyboard/build/toolchain.ts),
+ * uploaded as a build artifact only: nothing here deploys or publishes.
  */
 function kbdgenV4Group(): GroupStep {
   return {
     group: "kbdgen v4 (test)",
     key: "kbdgen-v4",
     steps: [
-      command({
-        label: "Build Windows keyboard with kbdgen v4 (Inno Setup)",
-        key: "build-windows-kbdgen-v4",
-        command: "divvun-actions run divvun-keyboard-windows-v4 legacy",
-        agents: {
-          queue: "windows",
-        },
-      }),
       command({
         label: "Build Windows keyboard with kbdgen v4 (outto)",
         key: "build-windows-kbdgen-v4-outto",
