@@ -10,7 +10,7 @@ const REPO = "divvun/outto"
  * outto it fetched first. This token is echoed inside the RUN, so changing it
  * is a cache miss.
  */
-const REFRESH = "2026-10-20.4"
+const REFRESH = "2026-10-20.5"
 
 /**
  * Install outto from the rolling `dev-latest` GitHub Release on `divvun/outto`.
