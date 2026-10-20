@@ -22,6 +22,13 @@ import { downloadVerifiedReleaseAsset } from "./release_asset.ts"
 export const TIP_DIRECTORY = "dependencies/divvun-tip"
 export const TIP_INSTALLER = "divvun-tip-installer.exe"
 
+/**
+ * When the keyboard's installer or uninstaller runs with `/LOG`, outto gives
+ * the text service's a log next to its own, `install.log` giving
+ * `/LOG=install.text-service.log`; otherwise no argument.
+ */
+const TIP_LOG_ARG = "#{log_arg:text-service}"
+
 /** `tag`'s text service installer, checked against its BLAKE3SUMS. */
 export function downloadTipInstaller(
   tag: string,
@@ -68,7 +75,7 @@ export function addTipInstallToOutto(manifest: OuttoBuilder): void {
   manifest.run({
     phase: "after_install",
     command: `#{app}/${TIP_DIRECTORY}/${TIP_INSTALLER}`,
-    arguments: TIP_INSTALL_ARGS,
+    arguments: `${TIP_INSTALL_ARGS} ${TIP_LOG_ARG}`,
     wait: true,
     show: "hidden",
   })
@@ -86,7 +93,7 @@ export function addTipUninstallToOutto(manifest: OuttoBuilder): void {
   manifest.run({
     phase: "before_uninstall",
     command: tipUninstallerPath(),
-    arguments: TIP_UNINSTALL_ARGS,
+    arguments: `${TIP_UNINSTALL_ARGS} ${TIP_LOG_ARG}`,
     wait: true,
     show: "hidden",
   })
