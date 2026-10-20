@@ -275,6 +275,37 @@ export async function runDesktopKeyboardMacOS(
  */
 const OUTTO_DEV_TAG = "dev-latest"
 
+/**
+ * The outto installers' artifact names, from createWindowsPackage and
+ * createMacosOuttoArtifact: `<repoName>_<version><suffix>`. The legacy macOS
+ * build uploads a .pkg into the same build, so these must stay narrow enough
+ * to exclude it.
+ */
+const OUTTO_ARTIFACTS = [
+  { platform: "macos", label: "macOS", suffix: "_macos.app.zip" },
+  { platform: "windows", label: "Windows", suffix: "_windows.exe" },
+]
+
+/**
+ * Names the release after the kbdgen target version of each platform in it.
+ * Each target carries its own version, so they can differ.
+ */
+async function outtoReleaseName(files: string[]): Promise<string> {
+  const bundlePath = desktopKeyboardBundlePath()
+  const versions: { label: string; version: string }[] = []
+  for (const { platform, label, suffix } of OUTTO_ARTIFACTS) {
+    if (!files.some((file) => file.endsWith(suffix))) continue
+    const target = await Kbdgen.loadTarget(bundlePath, platform)
+    versions.push({ label, version: target.version as string })
+  }
+
+  const name = new Set(versions.map((v) => v.version)).size === 1
+    ? `v${versions[0].version}`
+    : versions.map((v) => `${v.label} v${v.version}`).join(", ")
+  const buildNumber = builder.env.buildNumber
+  return buildNumber ? `${name} (build ${buildNumber})` : name
+}
+
 /** Download one artifact glob, tolerating the producing step having soft-failed. */
 async function downloadOuttoArtifacts(pattern: string, outputDir: string) {
   try {
@@ -290,13 +321,9 @@ async function downloadOuttoArtifacts(pattern: string, outputDir: string) {
 export async function runDesktopKeyboardDeployOutto() {
   using tempDir = await makeTempDir()
 
-  // Artifact names come from createWindowsPackage/createMacosOuttoArtifact:
-  //   <repoName>_<version>_windows.exe
-  //   <repoName>_<version>_macos.app.zip
-  // The legacy macOS build uploads a .pkg into this same build, so these
-  // patterns must stay narrow enough to exclude it.
-  await downloadOuttoArtifacts("*_windows.exe", tempDir.path)
-  await downloadOuttoArtifacts("*_macos.app.zip", tempDir.path)
+  for (const { suffix } of OUTTO_ARTIFACTS) {
+    await downloadOuttoArtifacts(`*${suffix}`, tempDir.path)
+  }
 
   const files: string[] = []
   for await (const entry of Deno.readDir(tempDir.path)) {
@@ -317,17 +344,9 @@ export async function runDesktopKeyboardDeployOutto() {
     )
   }
 
-  // Both the legacy and outto macOS builds write this, and agree on the value.
-  // Only used to name the release, so a miss is not worth failing the deploy.
-  let version: string | undefined
-  try {
-    version = await builder.metadata("macos-version")
-  } catch {
-    logger.warning("No macos-version metadata; leaving the release name as is")
-  }
-
+  const name = await outtoReleaseName(files)
   logger.info(
-    `Publishing to ${OUTTO_DEV_TAG}: ${
+    `Publishing ${name} to ${OUTTO_DEV_TAG}: ${
       files.map((f) => path.basename(f)).join(", ")
     }`,
   )
@@ -335,7 +354,7 @@ export async function runDesktopKeyboardDeployOutto() {
   await gh.updateRelease(OUTTO_DEV_TAG, files, {
     draft: false,
     prerelease: true,
-    name: version ? `v${version}` : undefined,
+    name,
   })
 }
 
