@@ -35,13 +35,11 @@ export type OuttoKeyboardResult = {
  * DLLs, kbdi and (v4) the text service; the manifest and the installer go to
  * `outputDir`.
  *
- * The v4 package is x64-only. outto's installer stub is an x86_64 binary,
- * and its Windows architecture selectors are `x86` (which also matches x64),
- * `x64` and `any`: it has none for Arm64, where it would skip every
- * x86/x64 file but still run kbdi. Refusing Arm64 up front beats a
- * half-installed keyboard; kbdgen spec tsf.installer.layout-dlls requires
- * Arm64 (`arm64/*.dll` to `#{sys}`, `wow64/*.dll` to SysWOW64, as the Inno
- * installer does), which needs an `arm64` selector in outto first.
+ * outto's installer stub is an x86_64 binary, so no outto package runs on
+ * x86 Windows or on Arm64 Windows 10. The v4 package runs on x64 and on
+ * Arm64 Windows 11, which emulates the stub and kbdi-x64.exe; outto's `x64`
+ * and `arm64` selectors tell those apart (kbdgen spec
+ * tsf.installer.layout-dlls).
  */
 export async function buildKeyboardWindowsOutto(
   bundlePath: string,
@@ -61,7 +59,7 @@ export async function buildKeyboardWindowsOutto(
     .publisher(project.organisation)
     .url(bundle.url)
     .privileges("admin")
-    .architecture(toolchain.kind === "v4" ? "x64" : "any")
+    .architecture("any")
     .defaultDir(`#{pf}/${bundle.appName}`)
 
   if (toolchain.kind === "v4") {
@@ -205,9 +203,11 @@ function addLegacyFiles(oBuilder: OuttoBuilder) {
 }
 
 /**
- * kbdgen v4's payload on x64: kbdi-x64.exe as kbdi.exe, and the layout DLLs
- * per kbdgen spec tsf.installer.layout-dlls (see LAYOUT_DLL_VARIANTS). The
- * x86 DLL has no place here: outto cannot run on x86 Windows.
+ * kbdgen v4's payload on x64 and Arm64: kbdi-x64.exe as kbdi.exe, and the
+ * layout DLLs per kbdgen spec tsf.installer.layout-dlls (see
+ * LAYOUT_DLL_VARIANTS): System32 gets the x64 or the arm64 DLL, SysWOW64
+ * the wow64 one, where the redirector sends x86 processes on both. The x86
+ * DLL has no place here: outto cannot run on x86 Windows.
  */
 function addV4Files(oBuilder: OuttoBuilder) {
   oBuilder.file({
@@ -220,6 +220,12 @@ function addV4Files(oBuilder: OuttoBuilder) {
     source: "x64/*.dll",
     dest: "#{sys}",
     arch: "x64",
+    overwrite: "always",
+  })
+  oBuilder.file({
+    source: "arm64/*.dll",
+    dest: "#{sys}",
+    arch: "arm64",
     overwrite: "always",
   })
   oBuilder.file({
