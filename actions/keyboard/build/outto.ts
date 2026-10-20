@@ -78,7 +78,7 @@ export async function buildKeyboardWindowsOutto(
   const enableCommands: string[] = []
   for (const layout of layouts) {
     enableCommands.push(
-      addLayoutToOuttoManifest(oBuilder, layout, toolchain.kind === "v4"),
+      addLayoutToOuttoManifest(oBuilder, layout),
     )
   }
   if (toolchain.kind === "v4") {
@@ -258,25 +258,23 @@ function addV4Files(oBuilder: OuttoBuilder) {
 
 /**
  * Adds one layout's kbdi runs and shortcut, all passing the braced product
- * code, and returns its `keyboard_enable` arguments. `replaceLegacy` first
- * removes the layout that an older Inno installer registered under the
- * unclosed `{guid`, which keyboard_install would otherwise register a
+ * code, and returns its `keyboard_enable` arguments. It first removes the
+ * layout that an Inno installer registered under the unclosed `{guid`: the
+ * Inno uninstaller that legacyInnoAppId runs passes a code that matches
+ * nothing, so without this keyboard_install would register the layout a
  * second time beside it.
  */
 function addLayoutToOuttoManifest(
   oBuilder: OuttoBuilder,
   layout: WindowsLayout,
-  replaceLegacy: boolean,
 ): string {
-  if (replaceLegacy) {
-    oBuilder.run({
-      phase: "after_install",
-      command: "#{app}/kbdi.exe",
-      arguments: `keyboard_uninstall "${layout.legacyProductCode}"`,
-      wait: true,
-      show: "hidden",
-    })
-  }
+  oBuilder.run({
+    phase: "after_install",
+    command: "#{app}/kbdi.exe",
+    arguments: `keyboard_uninstall "${layout.legacyProductCode}"`,
+    wait: true,
+    show: "hidden",
+  })
 
   const installArgs: string[] = [
     "keyboard_install",
