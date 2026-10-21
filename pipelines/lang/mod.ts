@@ -83,6 +83,13 @@ const TTS_TEXTPROC_RELEASE_TAG = /^tts-textproc-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 const TEAKSTA_RELEASE_TAG = /^teaksta-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 const PROOFING_RELEASE_TAG = /^x-proofing-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 
+/** Repos whose spellers get a GitHub release but never go to pahkat. */
+const PAHKAT_EXCLUDED_SUFFIXES = ["-x-private", "-x-testing"]
+
+export function isPahkatPublishable(repoName: string): boolean {
+  return !PAHKAT_EXCLUDED_SUFFIXES.some((suffix) => repoName.endsWith(suffix))
+}
+
 function isConfigActive(config: BuildProps | undefined | null): boolean {
   if (!config) return false
   return Object.entries(config).some(([_key, value]) => {
@@ -380,6 +387,13 @@ export async function runLangDeploy() {
 
     logger.info("Speller GitHub release created successfully")
 
+    if (!isPahkatPublishable(builder.env.repoName)) {
+      logger.info(
+        `Skipping pahkat publish for ${builder.env.repoName} (private/testing repo)`,
+      )
+      return
+    }
+
     const pahkatSecrets = {
       awsAccessKeyId: allSecrets.get("s3/accessKeyId"),
       awsSecretAccessKey: allSecrets.get("s3/secretAccessKey"),
@@ -479,6 +493,13 @@ export async function runLangDeploy() {
     )
 
     logger.info("Speller dev-latest GitHub release updated successfully")
+
+    if (!isPahkatPublishable(builder.env.repoName)) {
+      logger.info(
+        `Skipping pahkat publish for ${builder.env.repoName} (private/testing repo)`,
+      )
+      return
+    }
 
     const pahkatSecrets = {
       awsAccessKeyId: allSecrets.get("s3/accessKeyId"),

@@ -12,7 +12,12 @@ import {
   validateProductCode,
   WindowsExecutableKind,
 } from "~/util/shared.ts"
-import { derivePackageId, SpellerManifest, SpellerType } from "./manifest.ts"
+import {
+  deriveLangTag,
+  derivePackageId,
+  SpellerManifest,
+  SpellerType,
+} from "./manifest.ts"
 
 async function loadManifest(manifestPath: string): Promise<SpellerManifest> {
   const manifestString = await Deno.readTextFile(manifestPath)
@@ -191,6 +196,12 @@ export default async function spellerDeploy({
 
     logger.debug(`Renaming from ${payloadPath} to ${artifactPath}`)
     await Deno.rename(payloadPath, artifactPath)
+
+    await PahkatUploader.ensurePackage(repoPackageUrl, {
+      name: manifest.speller.name,
+      description: manifest.speller.description,
+      tags: ["cat:spellers", `lang:${deriveLangTag()}`],
+    }, secrets)
 
     await PahkatUploader.upload(
       artifactPath,

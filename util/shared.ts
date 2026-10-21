@@ -567,6 +567,61 @@ export class PahkatUploader {
     return result.stdout
   }
 
+  /**
+   * Create the package in the pahkat repo if it doesn't exist yet. `upload`
+   * only PATCHes, which reposrv answers with 404 for an unknown package.
+   */
+  static async ensurePackage(
+    repoPackageUrl: string,
+    metadata: {
+      name: Record<string, string>
+      description: Record<string, string>
+      tags: string[]
+    },
+    secrets: { pahkatApiKey: string },
+  ) {
+    if (Deno.env.get("PAHKAT_NO_DEPLOY") === "true") {
+      logger.debug("Skipping package check because `PAHKAT_NO_DEPLOY` is true")
+      return
+    }
+
+    const existing = await fetch(`${repoPackageUrl}/index.toml`)
+    await existing.body?.cancel()
+    if (existing.ok) {
+      return
+    }
+    if (existing.status !== 404) {
+      throw new Error(
+        `Could not check for pahkat package at ${repoPackageUrl}: ${existing.status} ${existing.statusText}`,
+      )
+    }
+
+    logger.info(`Creating pahkat package at ${repoPackageUrl}`)
+    const response = await fetch(repoPackageUrl, {
+      method: "POST",
+      headers: {
+        "authorization": `Bearer ${secrets.pahkatApiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(metadata),
+    })
+    const text = await response.text()
+
+    if (response.ok) {
+      logger.info(`Created pahkat package at ${repoPackageUrl}`)
+      return
+    }
+    // Another deploy created it between our check and the POST.
+    if (response.status === 409) {
+      logger.info(`Pahkat package at ${repoPackageUrl} already exists`)
+      return
+    }
+
+    throw new Error(
+      `Failed to create pahkat package at ${repoPackageUrl}: ${response.status} ${response.statusText}\n${text}`,
+    )
+  }
+
   static async upload(
     artifactPath: string,
     _artifactUrl: string,

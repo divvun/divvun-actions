@@ -18,6 +18,11 @@ export type WindowsSpellerManifest = {
 }
 
 export type SpellerManifest = {
+  // Package name and description per language tag
+  speller: {
+    name: { [lang: string]: string }
+    description: { [lang: string]: string }
+  }
   package: {
     speller: {
       name: string
