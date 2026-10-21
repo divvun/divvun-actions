@@ -84,7 +84,7 @@ const TEAKSTA_RELEASE_TAG = /^teaksta-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 const PROOFING_RELEASE_TAG = /^x-proofing-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 
 /** Repos whose spellers get a GitHub release but never go to pahkat. */
-const PAHKAT_EXCLUDED_SUFFIXES = ["-x-private", "-x-testing"]
+const PAHKAT_EXCLUDED_SUFFIXES = ["-x-private", "-x-testing", "-zxx"]
 
 export function isPahkatPublishable(repoName: string): boolean {
   return !PAHKAT_EXCLUDED_SUFFIXES.some((suffix) => repoName.endsWith(suffix))
