@@ -84,10 +84,38 @@ const TEAKSTA_RELEASE_TAG = /^teaksta-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 const PROOFING_RELEASE_TAG = /^x-proofing-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 
 /** Repos whose spellers get a GitHub release but never go to pahkat. */
-const PAHKAT_EXCLUDED_SUFFIXES = ["-x-private", "-x-testing", "-zxx"]
+const PAHKAT_EXCLUDED_SUFFIXES = ["-x-private", "-x-sensitive"]
 
-export function isPahkatPublishable(repoName: string): boolean {
-  return !PAHKAT_EXCLUDED_SUFFIXES.some((suffix) => repoName.endsWith(suffix))
+/** Why a repo's spellers stay off pahkat, or null if they should publish. */
+export function pahkatSkipReason(
+  repoName: string,
+  buildConfig: BuildProps | undefined,
+  isPrivate: boolean,
+): string | null {
+  if (buildConfig?.spellers !== true) {
+    return "build.spellers is not true in .build-config.yml"
+  }
+  const suffix = PAHKAT_EXCLUDED_SUFFIXES.find((s) => repoName.endsWith(s))
+  if (suffix) {
+    return `repo name ends in ${suffix}`
+  }
+  if (isPrivate) {
+    return "repo is private"
+  }
+  return null
+}
+
+/**
+ * `pahkatSkipReason` for this build. The GitHub lookup only runs once the
+ * config and name checks pass, and throws rather than guessing on failure.
+ */
+async function pahkatSkipReasonForBuild(gh: GitHub): Promise<string | null> {
+  const config = yaml.parse(await Deno.readTextFile(".build-config.yml")) as {
+    build?: BuildProps
+  } | null
+  const repoName = builder.env.repoName
+  return pahkatSkipReason(repoName, config?.build, false) ??
+    pahkatSkipReason(repoName, config?.build, await gh.isPrivate())
 }
 
 function isConfigActive(config: BuildProps | undefined | null): boolean {
@@ -387,9 +415,10 @@ export async function runLangDeploy() {
 
     logger.info("Speller GitHub release created successfully")
 
-    if (!isPahkatPublishable(builder.env.repoName)) {
+    const pahkatSkip = await pahkatSkipReasonForBuild(gh)
+    if (pahkatSkip) {
       logger.info(
-        `Skipping pahkat publish for ${builder.env.repoName} (private/testing repo)`,
+        `Skipping pahkat publish for ${builder.env.repoName}: ${pahkatSkip}`,
       )
       return
     }
@@ -494,9 +523,10 @@ export async function runLangDeploy() {
 
     logger.info("Speller dev-latest GitHub release updated successfully")
 
-    if (!isPahkatPublishable(builder.env.repoName)) {
+    const pahkatSkip = await pahkatSkipReasonForBuild(gh)
+    if (pahkatSkip) {
       logger.info(
-        `Skipping pahkat publish for ${builder.env.repoName} (private/testing repo)`,
+        `Skipping pahkat publish for ${builder.env.repoName}: ${pahkatSkip}`,
       )
       return
     }

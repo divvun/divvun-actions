@@ -304,6 +304,15 @@ export class GitHub {
   }
 
   /**
+   * Whether the repo is private. Unlike `repoMetadata`, a failed lookup throws
+   * rather than defaulting to public, so callers can fail closed.
+   */
+  async isPrivate(): Promise<boolean> {
+    const repo = await this.#getRepo() as { private?: boolean }
+    return repo.private === true
+  }
+
+  /**
    * Repo facts the docs-data step needs in one place: visibility (which selects
    * the private publishing path — see `actions/lang/docs-publish.ts`) and, for a
    * private repo only, the `license` / `issues` / `DocCI` badge inputs.
