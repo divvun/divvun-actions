@@ -26,6 +26,10 @@ import {
  * badge row, the giellalt.github.io lang tables), and the lang- pipeline
  * publishes those.
  *
+ * No maturity badge for `template-*`: a template has no maturity of its own
+ * (none carries a `maturity-*` topic, so the badge always said Undefined),
+ * and nothing displays a template's badges.
+ *
  * Shares its publish tail (`publishGeneratedDocsData`) with the lang-
  * producer so there is exactly one implementation of the badge SVG rendering
  * and `generated/docs-data` publish logic, regardless of repo type. See
@@ -62,10 +66,12 @@ export async function runDocsDataPublish() {
       root,
       "PKG",
     ])
-    await emit("pkg-maturity.json", [
-      path.join(scripts, "make-maturity.json.sh"),
-      await gutRepoName(),
-    ])
+    if (!builder.env.repoName.startsWith("template-")) {
+      await emit("pkg-maturity.json", [
+        path.join(scripts, "make-maturity.json.sh"),
+        await gutRepoName(),
+      ])
+    }
 
     await publishGeneratedDocsData(gh, outDir, repoMeta)
   } finally {
