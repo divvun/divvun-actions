@@ -13,15 +13,18 @@ import {
 /**
  * Publish `generated/docs-data` for the giella-core family of repos that
  * don't build an FST or speller: `shared-*` (lexicon fragments), `giella-core`
- * itself, and `template-*`. These only ever need the "Class 1" badges —
- * package version, lemma count, maturity — which `make-version-json.sh` /
- * `make-lemmacount.json.sh` / `make-maturity.json.sh` produce by reading
- * `configure.ac`, the lexc source and the GitHub topics API directly. None of
- * that needs `./configure` or `make` to have run, so unlike
+ * itself, and `template-*`. These only ever need the package version and
+ * maturity badges, which `make-version-json.sh` / `make-maturity.json.sh`
+ * produce by reading `configure.ac` and the GitHub topics API directly. None
+ * of that needs `./configure` or `make` to have run, so unlike
  * `actions/lang/docs-publish.ts` this needs no build artifacts — just a
  * checkout of the repo (already done by Buildkite) and, for everything except
  * giella-core itself, a shallow clone of giella-core for its `scripts/`
  * (`giellaCoreScripts`).
+ *
+ * No lemma count: only lang- repos' counts are shown anywhere (README, docs
+ * badge row, the giellalt.github.io lang tables), and the lang- pipeline
+ * publishes those.
  *
  * Shares its publish tail (`publishGeneratedDocsData`) with the lang-
  * producer so there is exactly one implementation of the badge SVG rendering
@@ -58,10 +61,6 @@ export async function runDocsDataPublish() {
       path.join(scripts, "make-version-json.sh"),
       root,
       "PKG",
-    ])
-    await emit("fst-lemmacount.json", [
-      path.join(scripts, "make-lemmacount.json.sh"),
-      root,
     ])
     await emit("pkg-maturity.json", [
       path.join(scripts, "make-maturity.json.sh"),
