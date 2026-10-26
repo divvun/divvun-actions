@@ -141,7 +141,7 @@ async function generateDocsData(
   await emit("pkg-version.json", "bash", [
     path.join(scripts, "make-version-json.sh"),
     root,
-    "FST",
+    "PKG",
   ])
   await emit("speller-version.json", "bash", [
     path.join(scripts, "make-version-json.sh"),

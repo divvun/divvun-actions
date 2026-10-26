@@ -13,8 +13,8 @@ import {
 /**
  * Publish `generated/docs-data` for the giella-core family of repos that
  * don't build an FST or speller: `shared-*` (lexicon fragments), `giella-core`
- * itself, and `template-*`. These only ever need the "Class 1" badges — FST
- * version, lemma count, maturity — which `make-version-json.sh` /
+ * itself, and `template-*`. These only ever need the "Class 1" badges —
+ * package version, lemma count, maturity — which `make-version-json.sh` /
  * `make-lemmacount.json.sh` / `make-maturity.json.sh` produce by reading
  * `configure.ac`, the lexc source and the GitHub topics API directly. None of
  * that needs `./configure` or `make` to have run, so unlike
@@ -57,7 +57,7 @@ export async function runDocsDataPublish() {
     await emit("pkg-version.json", [
       path.join(scripts, "make-version-json.sh"),
       root,
-      "FST",
+      "PKG",
     ])
     await emit("fst-lemmacount.json", [
       path.join(scripts, "make-lemmacount.json.sh"),
