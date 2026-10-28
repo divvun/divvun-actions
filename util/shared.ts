@@ -1068,6 +1068,20 @@ export class Kbdgen {
     // Do the build
     await Deno.writeTextFile(appStoreKeyJsonPath.path, secrets.appStoreKeyJson)
 
+    // EXPERIMENT: pre-clone giellakbd-ios from a branch. kbdgen's CloneGiellaKbd
+    // step clones main into output/repo and ignores git's exit status, so when
+    // the folder already exists its clone fails harmlessly and the build uses ours.
+    const giellakbdIosBranch = "CHANGE-ME"
+    const repoDir = path.join(cwd, "output", "repo")
+    await Deno.remove(repoDir, { recursive: true }).catch(() => {})
+    await builder.exec("git", [
+      "clone",
+      "--branch",
+      giellakbdIosBranch,
+      "https://github.com/divvun/giellakbd-ios.git",
+      repoDir,
+    ])
+
     await builder.exec("kbdgen", [
       "target",
       "--output-path",
