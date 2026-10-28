@@ -1071,7 +1071,7 @@ export class Kbdgen {
     // EXPERIMENT: pre-clone giellakbd-ios from a branch. kbdgen's CloneGiellaKbd
     // step clones main into output/repo and ignores git's exit status, so when
     // the folder already exists its clone fails harmlessly and the build uses ours.
-    const giellakbdIosBranch = "CHANGE-ME"
+    const giellakbdIosBranch = "feature/sentry-spm"
     const repoDir = path.join(cwd, "output", "repo")
     await Deno.remove(repoDir, { recursive: true }).catch(() => {})
     await builder.exec("git", [
