@@ -1082,7 +1082,24 @@ export class Kbdgen {
       repoDir,
     ])
 
-    await builder.exec("kbdgen", [
+    // EXPERIMENT: build kbdgen from a branch with Swift Package Manager support
+    // in its pbxproj parser, instead of using the kbdgen installed on the agent.
+    const kbdgenBranch = "ios-spm"
+    await using kbdgenRoot = await makeTempDir({ prefix: "kbdgen-" })
+    await builder.exec("cargo", [
+      "install",
+      "--git",
+      "https://github.com/divvun/kbdgen.git",
+      "--branch",
+      kbdgenBranch,
+      "--locked",
+      "--root",
+      kbdgenRoot.path,
+      "kbdgen",
+    ])
+    const kbdgen = path.join(kbdgenRoot.path, "bin", "kbdgen")
+
+    await builder.exec(kbdgen, [
       "target",
       "--output-path",
       "output",
