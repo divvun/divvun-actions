@@ -31,7 +31,11 @@ const BINARIES = [
   "cg-mwesplit",
 ] as const
 
-const CARGO_BUILD = `cargo build --release --locked -p cg3 --bins`
+// The tools live in cg3-cli; cg3 is the library alone.
+const CARGO_BUILD = `cargo build --release --locked -p cg3-cli --bins`
+
+// binaryen, for wasm-opt, which crates/cg3-wasm/package.sh runs.
+const BINARYEN = "version_123"
 
 function command(input: CommandStep): CommandStep {
   return {
@@ -88,6 +92,58 @@ function createSignStep(target: string, buildKey: string): CommandStep {
     agents: { queue: "linux" },
     command: steps,
     depends_on: buildKey,
+  })
+}
+
+// The wasm-bindgen CLI must be the exact version cg3-wasm pins, so read the pin
+// rather than repeat it here.
+function wasmBindgenVersion(): string {
+  // deno-lint-ignore no-explicit-any
+  const manifest = toml.parse(
+    Deno.readTextFileSync("crates/cg3-wasm/Cargo.toml"),
+  ) as any
+  const pin = manifest?.dependencies?.["wasm-bindgen"]
+  const version = typeof pin === "string" ? pin.replace(/^=/, "") : undefined
+  if (!version) {
+    throw new Error("crates/cg3-wasm/Cargo.toml does not pin wasm-bindgen")
+  }
+  return version
+}
+
+/**
+ * Builds the @divvun/cg3 npm package and checks it: the library on wasm32,
+ * the binding's tests under Node, the package loaded in Node, its declarations
+ * under `deno check`, and byte-for-byte parity with vislcg3 over the corpus.
+ * The image has no wasm32 target, wasm-bindgen or wasm-opt, so the step
+ * installs them. The package is uploaded for the npm publish step.
+ */
+function wasmPackageStep(): CommandStep {
+  const binaryen = `/tmp/binaryen-${BINARYEN}`
+  return command({
+    key: "wasm-package",
+    label: "wasm package",
+    agents: { queue: "linux" },
+    command: [
+      "echo '--- Installing the wasm tools'",
+      "rustup target add wasm32-unknown-unknown",
+      `cargo binstall -y --force wasm-bindgen-cli@${wasmBindgenVersion()}`,
+      `curl -sSfL https://github.com/WebAssembly/binaryen/releases/download/${BINARYEN}/binaryen-${BINARYEN}-x86_64-linux.tar.gz | tar xz -C /tmp`,
+      `export PATH="${binaryen}/bin:$$PATH"`,
+      "echo '--- The library on wasm32'",
+      "cargo check --locked -p cg3 --lib --target wasm32-unknown-unknown",
+      "echo '--- Tests under Node'",
+      "cargo test --locked -p cg3-wasm --target wasm32-unknown-unknown",
+      "echo '--- Building @divvun/cg3'",
+      "crates/cg3-wasm/package.sh",
+      "echo '--- Checking it against vislcg3'",
+      "cargo build --locked -p cg3-cli",
+      "target/debug/cg-comp test/T_Select/grammar.cg3 /tmp/select.cg3b",
+      "node crates/cg3-wasm/smoke/node.mjs /tmp/select.cg3b test/T_Select/input.txt test/T_Select/expected.txt",
+      "(cd crates/cg3-wasm/smoke && deno check)",
+      "node crates/cg3-wasm/parity/parity.mjs target/debug test",
+      "tar -czf cg3-npm-package.tgz -C crates/cg3-wasm pkg",
+      "buildkite-agent artifact upload cg3-npm-package.tgz",
+    ],
   })
 }
 
@@ -150,6 +206,8 @@ export function pipelineCg3Rs(): BuildkitePipeline {
     })
   }
 
+  steps.push(wasmPackageStep())
+
   if (isRelease || isMainBranch) {
     steps.push(
       command({
@@ -157,6 +215,17 @@ export function pipelineCg3Rs(): BuildkitePipeline {
         command: "divvun-actions run cg3-rs-publish",
         agents: { queue: "linux" },
         depends_on: publishDependKeys,
+      }),
+    )
+  }
+
+  if (isRelease) {
+    steps.push(
+      command({
+        label: "Publish @divvun/cg3 to npm",
+        command: "divvun-actions run cg3-rs-npm-publish",
+        agents: { queue: "linux" },
+        depends_on: "wasm-package",
       }),
     )
   }
@@ -349,4 +418,43 @@ export async function runCg3RsPublish() {
       { draft: false, prerelease: true, name: `v${version}` },
     )
   }
+}
+
+/**
+ * Publishes the @divvun/cg3 package the wasm-package step built, on a version
+ * tag only, and only when the tag names the package's version. Needs the
+ * `npm/token` secret: an npm token allowed to publish to the @divvun scope.
+ */
+export async function runCg3RsNpmPublish() {
+  const tag = builder.env.tag
+  if (!tag?.match(/^v/)) {
+    throw new Error("cg3-rs-npm-publish requires a version tag")
+  }
+
+  using tempDir = await makeTempDir()
+  await builder.downloadArtifacts("cg3-npm-package.tgz", tempDir.path)
+  await builder.exec("tar", [
+    "-xzf",
+    path.join(tempDir.path, "cg3-npm-package.tgz"),
+    "-C",
+    tempDir.path,
+  ])
+  const pkgDir = path.join(tempDir.path, "pkg")
+
+  const manifest = JSON.parse(
+    await Deno.readTextFile(path.join(pkgDir, "package.json")),
+  )
+  if (`v${manifest.version}` !== tag) {
+    throw new Error(
+      `tag ${tag} does not name the package version ${manifest.version}`,
+    )
+  }
+
+  // npm never packs .npmrc, so the token stays out of the published package.
+  const token = (await builder.secrets()).get("npm/token")
+  await Deno.writeTextFile(
+    path.join(pkgDir, ".npmrc"),
+    `//registry.npmjs.org/:_authToken=${token}\n`,
+  )
+  await builder.exec("npm", ["publish", "--access", "public"], { cwd: pkgDir })
 }

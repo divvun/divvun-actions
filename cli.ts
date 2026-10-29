@@ -50,7 +50,11 @@ import {
 } from "./pipelines/rsigncode.ts"
 import { pipelineHfstRs, runHfstRsPublish } from "./pipelines/hfst-rs.ts"
 import { pipelineFomaRs, runFomaRsPublish } from "./pipelines/foma-rs.ts"
-import { pipelineCg3Rs, runCg3RsPublish } from "./pipelines/cg3-rs.ts"
+import {
+  pipelineCg3Rs,
+  runCg3RsNpmPublish,
+  runCg3RsPublish,
+} from "./pipelines/cg3-rs.ts"
 import {
   pipelineDivvunActions,
   runDivvunActionsBuildImage,
@@ -483,6 +487,10 @@ async function runPipeline(args: any) {
     }
     case "cg3-rs-publish": {
       await runCg3RsPublish()
+      break
+    }
+    case "cg3-rs-npm-publish": {
+      await runCg3RsNpmPublish()
       break
     }
     case "divvun-actions-build-image": {
