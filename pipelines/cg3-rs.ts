@@ -34,7 +34,7 @@ const BINARIES = [
 // The tools live in cg3-cli; cg3 is the library alone.
 const CARGO_BUILD = `cargo build --release --locked -p cg3-cli --bins`
 
-// binaryen, for wasm-opt, which crates/cg3-wasm/package.sh runs.
+// binaryen, for wasm-opt, which js/build.mjs runs.
 const BINARYEN = "version_123"
 
 function command(input: CommandStep): CommandStep {
@@ -112,8 +112,9 @@ function wasmBindgenVersion(): string {
 
 /**
  * Builds the @divvun/cg3 npm package and checks it: the library on wasm32,
- * the binding's tests under Node, the package loaded in Node, its declarations
- * under `deno check`, and byte-for-byte parity with vislcg3 over the corpus.
+ * the binding's tests under Node, the declarations under `deno check`, and the
+ * JavaScript suite, which runs the API contract and byte-for-byte parity with
+ * vislcg3 over the corpus in each runtime the agent has and skips the rest.
  * The image has no wasm32 target, wasm-bindgen or wasm-opt, so the step
  * installs them. The package is uploaded for the npm publish step.
  */
@@ -133,15 +134,13 @@ function wasmPackageStep(): CommandStep {
       "cargo check --locked -p cg3 --lib --target wasm32-unknown-unknown",
       "echo '--- Tests under Node'",
       "cargo test --locked -p cg3-wasm --target wasm32-unknown-unknown",
-      "echo '--- Building @divvun/cg3'",
-      "crates/cg3-wasm/package.sh",
+      "echo '--- Building @divvun/cg3 and its test build'",
+      "node js/build.mjs --test",
+      "echo '--- Its declarations'",
+      "deno check",
       "echo '--- Checking it against vislcg3'",
-      "cargo build --locked -p cg3-cli",
-      "target/debug/cg-comp test/T_Select/grammar.cg3 /tmp/select.cg3b",
-      "node crates/cg3-wasm/smoke/node.mjs /tmp/select.cg3b test/T_Select/input.txt test/T_Select/expected.txt",
-      "(cd crates/cg3-wasm/smoke && deno check)",
-      "node crates/cg3-wasm/parity/parity.mjs target/debug test",
-      "tar -czf cg3-npm-package.tgz -C crates/cg3-wasm pkg",
+      "node js/test/run.mjs",
+      "tar -czf cg3-npm-package.tgz -C js cg3",
       "buildkite-agent artifact upload cg3-npm-package.tgz",
     ],
   })
@@ -439,7 +438,7 @@ export async function runCg3RsNpmPublish() {
     "-C",
     tempDir.path,
   ])
-  const pkgDir = path.join(tempDir.path, "pkg")
+  const pkgDir = path.join(tempDir.path, "cg3")
 
   const manifest = JSON.parse(
     await Deno.readTextFile(path.join(pkgDir, "package.json")),
