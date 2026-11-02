@@ -29,6 +29,16 @@ export type BumpArgoHelmImageTagOptions = {
   commitMessage: string
 }
 
+export type BumpArgoKustomizeImageTagOptions = {
+  /** Full image name without tag, e.g. "ghcr.io/divvun/pahkat-server". */
+  imageName: string
+  /** New tag (e.g. "sha-deadbeef"). Replaces any existing tag or digest. */
+  tag: string
+  /** Path within the k8s-config repo to the Argo CD Application manifest. */
+  applicationPath: string
+  commitMessage: string
+}
+
 export type BumpChartImageTagOptions = {
   /** Full image name without tag, e.g. "ghcr.io/divvun/divvun-worker-grammar". */
   imageName: string
@@ -154,6 +164,54 @@ export async function bumpArgoHelmImageTag(
       image.set("tag", opts.tag)
       helm.set("values", String(valuesDoc))
 
+      return String(doc)
+    },
+  })
+}
+
+/**
+ * The image an Argo CD kustomize image override deploys, without its tag or
+ * digest. An override is `[<name in the manifests>=]<image>[:<tag>|@<digest>]`,
+ * and a registry host may carry a port, so only a colon after the last slash
+ * starts a tag.
+ */
+function kustomizeOverrideImage(override: string): string {
+  const image = override.slice(override.indexOf("=") + 1).split("@")[0]
+  const tagStart = image.indexOf(":", image.lastIndexOf("/") + 1)
+  return tagStart === -1 ? image : image.slice(0, tagStart)
+}
+
+/**
+ * Bump an image tag in an Argo CD Application's
+ * `spec.source.kustomize.images`: for a service whose Kustomize manifests
+ * live in its own repository, the pin is kept here in k8s-config instead.
+ */
+export async function bumpArgoKustomizeImageTag(
+  opts: BumpArgoKustomizeImageTagOptions,
+): Promise<void> {
+  await updateK8sConfigFile({
+    path: opts.applicationPath,
+    commitMessage: opts.commitMessage,
+    update(source) {
+      const doc = YAML.parseDocument(source)
+      const images = doc.getIn(["spec", "source", "kustomize", "images"])
+      if (!YAML.isSeq(images)) {
+        throw new Error(
+          `No spec.source.kustomize.images sequence in ${opts.applicationPath}`,
+        )
+      }
+      const entry = images.items.find((item) =>
+        YAML.isScalar(item) && typeof item.value === "string" &&
+        kustomizeOverrideImage(item.value) === opts.imageName
+      ) as YAML.Scalar<string> | undefined
+      if (!entry) {
+        throw new Error(
+          `No kustomize image override for ${opts.imageName} in ${opts.applicationPath}`,
+        )
+      }
+      const value = entry.value
+      const prefix = value.slice(0, value.indexOf("=") + 1)
+      entry.value = `${prefix}${opts.imageName}:${opts.tag}`
       return String(doc)
     },
   })

@@ -86,6 +86,11 @@ import {
   runTeakstaModels,
 } from "./pipelines/teaksta.ts"
 import {
+  pipelinePahkatServer,
+  runPahkatServerBumpManifest,
+  runPahkatServerDeploy,
+} from "./pipelines/pahkat-server.ts"
+import {
   DIVVUN_WORKER_GRAMMAR,
   DIVVUN_WORKER_SPELLER,
   pipelineWorkerCd,
@@ -576,6 +581,14 @@ async function runPipeline(args: any) {
       await runTeakstaBumpManifest()
       break
     }
+    case "pahkat-server-deploy": {
+      await runPahkatServerDeploy()
+      break
+    }
+    case "pahkat-server-bump-manifest": {
+      await runPahkatServerBumpManifest()
+      break
+    }
     case "divvun-worker-grammar-deploy": {
       await runWorkerCdDeploy(DIVVUN_WORKER_GRAMMAR)
       break
@@ -888,6 +901,10 @@ export async function createCiPipeline(): Promise<BuildkitePipeline> {
     }
     case "teaksta": {
       pipeline = pipelineTeaksta()
+      break
+    }
+    case "pahkat-next": {
+      pipeline = pipelinePahkatServer()
       break
     }
     case "divvun-worker-grammar": {
