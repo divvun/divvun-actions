@@ -79,12 +79,18 @@ Deno.test("proofing DAG: grammar, spelling, disabled, main, PR and release tags"
         const fromScratch = steps.filter((step) =>
           step.key === "speller-build" || step.key === "tts-textproc-build"
         )
-        ok(fromScratch.length > 0, context)
+        // Spellers off: nothing builds unless a TTS release asks for it.
+        const builds = source !== "disabled" ||
+          tag?.startsWith("tts-textproc-") === true
+        strictEqual(fromScratch.length > 0, builds, context)
         strictEqual(
           steps.filter((step) => step.key === "lang-deps").length,
-          1,
+          builds ? 1 : 0,
           context,
         )
+        if (source === "disabled") {
+          ok(!steps.some((step) => step.key?.startsWith("speller-")), context)
+        }
         for (const step of fromScratch) {
           strictEqual(step.depends_on, "lang-deps", `${step.key} ${context}`)
         }

@@ -21,8 +21,6 @@ Deno.test("analyser release: built and deployed apart from the speller", async (
           `build:
   analysers: ${analysers}
   spellers: ${spellers}
-  grammar-checkers: true
-  tts-textproc: true
 `,
         )
         for (
@@ -69,6 +67,28 @@ Deno.test("analyser release: built and deployed apart from the speller", async (
               analysers ? "lang-deps,analyser-build" : "",
               context,
             )
+          }
+          // Spellers off: no speller step to fail, and nothing waiting on one.
+          if (!spellers) {
+            ok(
+              !steps.some((step) =>
+                step.key?.startsWith("speller-") ||
+                step.key === "docs-publish" ||
+                step.command === "divvun-actions run lang-deploy"
+              ),
+              context,
+            )
+          }
+          // Other products' tags on a branch reading "main" still schedule
+          // the speller's deploy chain; that predates the analyser release.
+          const checkDeps = !tag || tag.startsWith("analyser-")
+          for (const step of checkDeps ? steps : []) {
+            for (const dep of [step.depends_on ?? []].flat()) {
+              ok(
+                steps.some((producer) => producer.key === dep),
+                `${step.key ?? step.command} needs ${dep}: ${context}`,
+              )
+            }
           }
           ok(
             !steps.some((step) =>

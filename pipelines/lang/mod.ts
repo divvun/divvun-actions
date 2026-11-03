@@ -1318,7 +1318,13 @@ export async function pipelineLang() {
   // We only deploy on main branch or release tags. An analyser tag builds
   // nothing else, so nothing else may deploy from it.
   const isMainDeploy = builder.env.branch === "main" && !isAnalyserReleaseTag
-  const isSpellerDeploy = isSpellerReleaseTag || isMainDeploy
+  // Repos with spellers off have no speller to build, test or ship. The
+  // grammar checker still builds on the speller workspace, so it keeps the
+  // speller build (no repo has grammar checkers without spellers).
+  const hasSpellerBuild = buildConfig?.spellers === true ||
+    buildConfig?.["grammar-checkers"] === true
+  const hasSpellers = buildConfig?.spellers === true
+  const isSpellerDeploy = hasSpellers && (isSpellerReleaseTag || isMainDeploy)
   const isGrammarDeploy = isGrammarReleaseTag || isMainDeploy
   const isTtsTextprocDeploy = isTtsTextprocReleaseTag || isMainDeploy
   const isTeakstaDeploy = isTeakstaReleaseTag || builder.env.branch === "main"
@@ -1337,7 +1343,7 @@ export async function pipelineLang() {
 
   // Speller build is needed for everything except textproc-only and
   // analyser-only releases
-  if (!isTtsTextprocReleaseTag && !isAnalyserReleaseTag) {
+  if (hasSpellerBuild && !isTtsTextprocReleaseTag && !isAnalyserReleaseTag) {
     buildSteps.push(spellerBuildStep)
   }
 
@@ -1394,18 +1400,20 @@ export async function pipelineLang() {
   const testSteps: CommandStep[] = []
 
   if (!isReleaseTag) {
-    testSteps.push(command({
-      key: "speller-test",
-      label: `Test Spellers${toolchainTag}`,
-      command: "divvun-actions run lang-speller-test",
-      depends_on: "speller-build",
-      soft_fail: true,
-      timeout_in_minutes: 60,
-      agents: {
-        queue: "linux",
-        ...extra,
-      },
-    }))
+    if (hasSpellerBuild) {
+      testSteps.push(command({
+        key: "speller-test",
+        label: `Test Spellers${toolchainTag}`,
+        command: "divvun-actions run lang-speller-test",
+        depends_on: "speller-build",
+        soft_fail: true,
+        timeout_in_minutes: 60,
+        agents: {
+          queue: "linux",
+          ...extra,
+        },
+      }))
+    }
 
     if (
       buildConfig?.["grammar-checkers"] === true &&
@@ -1431,7 +1439,7 @@ export async function pipelineLang() {
   // read by `raw.githubusercontent.com` URL. main only, soft_fail — never
   // blocks a build. See docs/badgedata-artifact-migration.md.
   const docsSteps: CommandStep[] = []
-  if (!isReleaseTag && builder.env.branch === "main") {
+  if (hasSpellerBuild && !isReleaseTag && builder.env.branch === "main") {
     docsSteps.push(command({
       key: "docs-publish",
       label: "Publish Docs Data",
@@ -1621,13 +1629,15 @@ export async function pipelineLang() {
   }
 
   // Construct pipeline with phase-based groups
-  const steps: any[] = [
-    {
+  const steps: any[] = []
+
+  if (buildSteps.length > 0) {
+    steps.push({
       group: "Build",
       key: "build",
       steps: buildSteps,
-    },
-  ]
+    })
+  }
 
   if (testSteps.length > 0) {
     steps.push({
