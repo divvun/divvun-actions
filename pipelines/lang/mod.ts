@@ -18,7 +18,10 @@ import langAnalyserBuild, {
 } from "~/actions/lang/build-analyser.ts"
 import langGrammarBuild from "~/actions/lang/build-grammar.ts"
 import { runLangDocsPublish } from "~/actions/lang/docs-publish.ts"
-import langSpellerBuild from "~/actions/lang/build-speller.ts"
+import langSpellerBuild, {
+  DESKTOP_ZHFST,
+  MOBILE_ZHFST,
+} from "~/actions/lang/build-speller.ts"
 import langTeakstaBundleBuild from "~/actions/lang/build-teaksta-bundle.ts"
 import langTtsTextprocBuild from "~/actions/lang/build-tts-textproc.ts"
 import langCheck from "~/actions/lang/check.ts"
@@ -269,7 +272,11 @@ export async function runLangBundle(
     installer?: InstallerKind
   },
 ) {
-  await builder.downloadArtifacts("build/tools/spellcheckers/*.zhfst", ".")
+  // Each installer packs only its own variant.
+  await builder.downloadArtifacts(
+    target === "mobile" ? MOBILE_ZHFST : DESKTOP_ZHFST,
+    ".",
+  )
 
   const spellerPaths = JSON.parse(await builder.metadata("speller-paths"))
   let manifest
@@ -302,6 +309,31 @@ export async function runLangBundle(
     spellerPaths,
     installer,
   })
+}
+
+/**
+ * Download each desktop .zhfst (the hfst-ospell speller, for CKospell and the
+ * like) and rename it `<package>_<version>_noarch-desktop-<tag>.zhfst` for the
+ * release.
+ */
+async function versionedDesktopZhfsts(
+  packageName: string,
+  version: string,
+): Promise<string[]> {
+  await builder.downloadArtifacts(DESKTOP_ZHFST, ".")
+  const spellerPaths = JSON.parse(await builder.metadata("speller-paths")) as {
+    desktop: Record<string, string>
+  }
+  const out: string[] = []
+  for (const [tag, file] of Object.entries(spellerPaths.desktop)) {
+    const versioned = `${packageName}_${version}_noarch-desktop-${tag}.zhfst`
+    await Deno.rename(file, versioned)
+    out.push(versioned)
+  }
+  if (out.length === 0) {
+    throw new Error("No desktop .zhfst in the speller-paths metadata")
+  }
+  return out
 }
 
 function extractVersionFromTag(tag: string): string | null {
@@ -393,6 +425,7 @@ export async function runLangDeploy() {
       versionedWindowsFile,
       versionedMacosFile,
       versionedMobileFile,
+      ...await versionedDesktopZhfsts(packageName, versionWithBuild),
     ]
     const allSecrets = await builder.secrets()
     const { checksumFile, signatureFile } = await createSignedChecksums(
@@ -491,6 +524,7 @@ export async function runLangDeploy() {
       versionedWindowsFile,
       versionedMacosFile,
       versionedMobileFile,
+      ...await versionedDesktopZhfsts(packageName, devVersion),
     ]
     const allSecrets = await builder.secrets()
     const { checksumFile, signatureFile } = await createSignedChecksums(

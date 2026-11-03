@@ -69,6 +69,14 @@ export class Autotools {
   }
 }
 
+/**
+ * The speller archives CI uses. giella-core also writes `<tag>.zhfst`, a hard
+ * link to `<tag>-desktop.zhfst`, which nothing here reads, so it is never
+ * uploaded. `*-mobile.zhfst` includes the `-x-predict-mobile` models.
+ */
+export const DESKTOP_ZHFST = "build/tools/spellcheckers/*-desktop.zhfst"
+export const MOBILE_ZHFST = "build/tools/spellcheckers/*-mobile.zhfst"
+
 export type Output = {
   spellerPaths: {
     mobile: {
@@ -148,7 +156,7 @@ export default async function langSpellerBuild(
   // For the grammar-build, speller-test and proofing-build steps.
   await uploadWorkspaceSnapshot("speller")
 
-  await builder.uploadArtifacts("build/tools/spellcheckers/*.zhfst")
+  await builder.uploadArtifacts(`${DESKTOP_ZHFST};${MOBILE_ZHFST}`)
 
   // For the docs-publish step, which has no configured tree of its own.
   if (builder.env.branch === "main") {
