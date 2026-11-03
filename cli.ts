@@ -115,6 +115,8 @@ import { runKbdgenPublishV4 } from "./pipelines/kbdgen/v4.ts"
 import { pipelineKbdi, runKbdiPublish } from "./pipelines/kbdi/mod.ts"
 import {
   pipelineLang,
+  runLangAnalyserBuild,
+  runLangAnalyserDeploy,
   runLangBundle,
   runLangDeploy,
   runLangDeps,
@@ -400,6 +402,14 @@ async function runPipeline(args: any) {
     }
     case "lang-tts-textproc-deploy": {
       await runLangTtsTextprocDeploy()
+      break
+    }
+    case "lang-analyser-build": {
+      await runLangAnalyserBuild()
+      break
+    }
+    case "lang-analyser-deploy": {
+      await runLangAnalyserDeploy()
       break
     }
     case "lang-teaksta-bundle-build": {

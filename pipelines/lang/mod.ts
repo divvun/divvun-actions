@@ -12,6 +12,10 @@ import {
   proofingPackage,
   proofingSource,
 } from "~/actions/proofing/source.ts"
+import langAnalyserBuild, {
+  ANALYSER_DRB,
+  ANALYSER_FST_BUNDLE,
+} from "~/actions/lang/build-analyser.ts"
 import langGrammarBuild from "~/actions/lang/build-grammar.ts"
 import { runLangDocsPublish } from "~/actions/lang/docs-publish.ts"
 import langSpellerBuild from "~/actions/lang/build-speller.ts"
@@ -82,6 +86,7 @@ const GRAMMAR_RELEASE_TAG = /^grammar-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 const TTS_TEXTPROC_RELEASE_TAG = /^tts-textproc-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 const TEAKSTA_RELEASE_TAG = /^teaksta-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 const PROOFING_RELEASE_TAG = /^x-proofing-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
+const ANALYSER_RELEASE_TAG = /^analyser-(.*?)\/v\d+\.\d+\.\d+(-\S+)?$/
 
 /** Repos whose spellers get a GitHub release but never go to pahkat. */
 const PAHKAT_EXCLUDED_SUFFIXES = ["-x-private", "-x-sensitive"]
@@ -199,6 +204,10 @@ export async function runLangTtsTextprocBuild() {
   }
 
   await langTtsTextprocBuild(buildConfig!)
+}
+
+export async function runLangAnalyserBuild() {
+  await langAnalyserBuild()
 }
 
 export async function runLangTeakstaBundleBuild() {
@@ -326,14 +335,10 @@ export async function runLangDeploy() {
   await builder.downloadArtifacts("*.pkt.tar.zst", ".")
   await builder.downloadArtifacts("*.exe", ".")
   await builder.downloadArtifacts("*.pkg", ".")
-  await builder.downloadArtifacts("fst-bundle.pkt.tar.zst", ".")
 
   const windowsFiles = await globOneFile("*.exe")
   const macosFiles = await globOneFile("*.pkg")
   const mobileFiles = await globOneFile("*-mobile.pkt.tar.zst")
-  const fstBundle = (await fs.exists("fst-bundle.pkt.tar.zst"))
-    ? "fst-bundle.pkt.tar.zst"
-    : null
 
   logger.info("Deploying language files:")
   logger.info(`- Windows: ${windowsFiles}`)
@@ -384,17 +389,10 @@ export async function runLangDeploy() {
     await Deno.rename(macosFiles, versionedMacosFile)
     await Deno.rename(mobileFiles, versionedMobileFile)
 
-    const versionedFstFile =
-      `fst-${langCode}_${versionWithBuild}_noarch-all.pkt.tar.zst`
-    if (fstBundle) {
-      await Deno.rename(fstBundle, versionedFstFile)
-    }
-
     const artifacts = [
       versionedWindowsFile,
       versionedMacosFile,
       versionedMobileFile,
-      ...(fstBundle ? [versionedFstFile] : []),
     ]
     const allSecrets = await builder.secrets()
     const { checksumFile, signatureFile } = await createSignedChecksums(
@@ -489,17 +487,10 @@ export async function runLangDeploy() {
     await Deno.rename(macosFiles, versionedMacosFile)
     await Deno.rename(mobileFiles, versionedMobileFile)
 
-    const versionedFstFile =
-      `fst-${langCode}_${devVersion}_noarch-all.pkt.tar.zst`
-    if (fstBundle) {
-      await Deno.rename(fstBundle, versionedFstFile)
-    }
-
     const artifacts = [
       versionedWindowsFile,
       versionedMacosFile,
       versionedMobileFile,
-      ...(fstBundle ? [versionedFstFile] : []),
     ]
     const allSecrets = await builder.secrets()
     const { checksumFile, signatureFile } = await createSignedChecksums(
@@ -1104,6 +1095,97 @@ export async function runLangTeakstaBundleDeploy() {
   }
 }
 
+/**
+ * The analysers, generators and analyser `bundle.drb` as their own release,
+ * `analyser-<lang>/vX.Y.Z` or `analyser-<lang>/dev-latest` from main.
+ */
+export async function runLangAnalyserDeploy() {
+  const tag = builder.env.tag
+  const isAnalyserReleaseTag = ANALYSER_RELEASE_TAG.test(tag ?? "")
+  if (!isAnalyserReleaseTag && builder.env.branch !== "main") {
+    logger.info("Not main or an analyser release tag; nothing to deploy")
+    return
+  }
+  if (!builder.env.repo) {
+    throw new Error("No repository information available")
+  }
+
+  const langMatch = builder.env.repoName?.match(/lang-(.+)/)
+  if (!langMatch) {
+    throw new Error(
+      `Could not extract language code from repo: ${builder.env.repoName}`,
+    )
+  }
+  const packageName = `analyser-${langMatch[1]}`
+
+  let version: string
+  let prerelease = true
+  if (isAnalyserReleaseTag) {
+    const tagVersion = extractVersionFromTag(tag!)
+    if (!tagVersion) {
+      throw new Error(`Could not extract version from tag: ${tag}`)
+    }
+    prerelease = isPrerelease(tagVersion)
+    version = builder.env.buildNumber
+      ? `${tagVersion}+build.${builder.env.buildNumber}`
+      : tagVersion
+  } else {
+    const manifest = toml.parse(
+      await Deno.readTextFile("./manifest.toml"),
+    ) as { package: Record<string, { version?: string } | undefined> }
+    const baseVersion = manifest.package.analyser?.version ??
+      manifest.package.speller?.version
+    if (!baseVersion) {
+      throw new Error(
+        "manifest.toml has neither package.analyser.version nor " +
+          "package.speller.version",
+      )
+    }
+    version = versionAsDev(
+      baseVersion,
+      builder.env.buildTimestamp,
+      builder.env.buildNumber,
+    )
+  }
+
+  await builder.downloadArtifacts(ANALYSER_FST_BUNDLE, ".")
+  await downloadCompressedArtifacts(ANALYSER_DRB)
+  for (const file of [ANALYSER_FST_BUNDLE, ANALYSER_DRB]) {
+    if (!await fs.exists(file)) {
+      throw new Error(`${file} not found for deployment`)
+    }
+  }
+
+  const fstFile = `${packageName}_${version}_noarch-all.pkt.tar.zst`
+  const drbFile = `${packageName}_${version}_noarch-all.drb`
+  await Deno.rename(ANALYSER_FST_BUNDLE, fstFile)
+  await Deno.rename(ANALYSER_DRB, drbFile)
+
+  const artifacts = [fstFile, drbFile]
+  const { checksumFile, signatureFile } = await createSignedChecksums(
+    artifacts,
+    await builder.secrets(),
+  )
+  logger.info(`Artifacts: ${artifacts.join(", ")}`)
+
+  const gh = new GitHub(builder.env.repo)
+  if (isAnalyserReleaseTag) {
+    logger.info(`Creating GitHub release ${tag} (pre-release: ${prerelease})`)
+    await gh.createRelease(tag!, [...artifacts, checksumFile, signatureFile], {
+      prerelease,
+    })
+  } else {
+    const releaseTag = `${packageName}/dev-latest`
+    logger.info(`Updating GitHub release ${releaseTag}`)
+    await gh.updateRelease(
+      releaseTag,
+      [...artifacts, checksumFile, signatureFile],
+      { draft: false, prerelease: true, name: `${packageName}/v${version}` },
+    )
+  }
+  logger.info("Analyser GitHub release published")
+}
+
 // Anything using more than like 20gb of RAM is considered large
 const LARGE_BUILDS = [
   "lang-kal",
@@ -1118,8 +1200,10 @@ export async function pipelineLang() {
   )
   const isTeakstaReleaseTag = TEAKSTA_RELEASE_TAG.test(builder.env.tag ?? "")
   const isProofingReleaseTag = PROOFING_RELEASE_TAG.test(builder.env.tag ?? "")
+  const isAnalyserReleaseTag = ANALYSER_RELEASE_TAG.test(builder.env.tag ?? "")
   const isReleaseTag = isSpellerReleaseTag || isGrammarReleaseTag ||
-    isTtsTextprocReleaseTag || isTeakstaReleaseTag || isProofingReleaseTag
+    isTtsTextprocReleaseTag || isTeakstaReleaseTag || isProofingReleaseTag ||
+    isAnalyserReleaseTag
 
   const extra: Record<string, string> =
     LARGE_BUILDS.includes(builder.env.repoName) ? { size: "large" } : {}
@@ -1214,12 +1298,33 @@ export async function pipelineLang() {
     teakstaBundleBuildStep.priority = 10
   }
 
-  // We only deploy on main branch or release tags
-  const isSpellerDeploy = isSpellerReleaseTag || builder.env.branch === "main"
-  const isGrammarDeploy = isGrammarReleaseTag || builder.env.branch === "main"
-  const isTtsTextprocDeploy = isTtsTextprocReleaseTag ||
-    builder.env.branch === "main"
+  // Builds from scratch beside speller-build, so it neither waits on it nor
+  // needs spellers enabled.
+  const analyserBuildStep = command({
+    key: "analyser-build",
+    label: `Build Analysers${toolchainTag}`,
+    command: "divvun-actions run lang-analyser-build",
+    depends_on: "lang-deps",
+    agents: {
+      queue: "linux",
+      ...extra,
+    },
+  })
+
+  if (extra.size === "large") {
+    analyserBuildStep.priority = 10
+  }
+
+  // We only deploy on main branch or release tags. An analyser tag builds
+  // nothing else, so nothing else may deploy from it.
+  const isMainDeploy = builder.env.branch === "main" && !isAnalyserReleaseTag
+  const isSpellerDeploy = isSpellerReleaseTag || isMainDeploy
+  const isGrammarDeploy = isGrammarReleaseTag || isMainDeploy
+  const isTtsTextprocDeploy = isTtsTextprocReleaseTag || isMainDeploy
   const isTeakstaDeploy = isTeakstaReleaseTag || builder.env.branch === "main"
+  // Built only to be released, on main and its own release tags.
+  const isAnalyserDeploy = buildConfig?.analysers === true &&
+    (isAnalyserReleaseTag || (!isReleaseTag && builder.env.branch === "main"))
   // Proofing uses the combined grammar DRB when enabled, otherwise a spelling
   // pipeline built from the speller workspace. Other product tags never depend
   // on a proofing producer that their release build omitted.
@@ -1230,14 +1335,17 @@ export async function pipelineLang() {
   // Build phase steps array
   const buildSteps: CommandStep[] = []
 
-  // Speller build is needed for everything except textproc-only releases
-  if (!isTtsTextprocReleaseTag) {
+  // Speller build is needed for everything except textproc-only and
+  // analyser-only releases
+  if (!isTtsTextprocReleaseTag && !isAnalyserReleaseTag) {
     buildSteps.push(spellerBuildStep)
   }
 
   if (
     buildConfig?.["grammar-checkers"] === true &&
-    (isGrammarReleaseTag || (!isSpellerReleaseTag && !isTtsTextprocReleaseTag))
+    (isGrammarReleaseTag ||
+      (!isSpellerReleaseTag && !isTtsTextprocReleaseTag &&
+        !isAnalyserReleaseTag))
   ) {
     buildSteps.push(grammarBuildStep)
   }
@@ -1245,16 +1353,20 @@ export async function pipelineLang() {
   if (
     isTtsTextprocReleaseTag ||
     (buildConfig?.["tts-textproc"] === true && !isSpellerReleaseTag &&
-      !isTeakstaReleaseTag)
+      !isTeakstaReleaseTag && !isAnalyserReleaseTag)
   ) {
     buildSteps.push(ttsTextprocBuildStep)
+  }
+
+  if (isAnalyserDeploy) {
+    buildSteps.push(analyserBuildStep)
   }
 
   // The teaksta bundle is assembled from the grammar checker's models, so it
   // can only be built where the grammar checkers are, and never on a release
   // tag that suppresses the speller/grammar chain it hangs off.
   const canBuildTeaksta = buildConfig?.["grammar-checkers"] === true &&
-    !isSpellerReleaseTag && !isTtsTextprocReleaseTag
+    !isSpellerReleaseTag && !isTtsTextprocReleaseTag && !isAnalyserReleaseTag
 
   if (
     canBuildTeaksta &&
@@ -1491,6 +1603,17 @@ export async function pipelineLang() {
       })`,
       command: "divvun-actions run lang-teaksta-bundle-deploy",
       depends_on: "teaksta-bundle-build",
+      agents: {
+        queue: "linux",
+      },
+    }))
+  }
+
+  if (isAnalyserDeploy) {
+    deploySteps.push(command({
+      label: `Deploy Analysers (${isAnalyserReleaseTag ? "Release" : "Dev"})`,
+      command: "divvun-actions run lang-analyser-deploy",
+      depends_on: "analyser-build",
       agents: {
         queue: "linux",
       },

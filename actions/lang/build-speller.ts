@@ -1,14 +1,12 @@
 import * as fs from "@std/fs"
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
-import { globFiles } from "~/util/glob.ts"
 import logger from "~/util/log.ts"
-import { Tar } from "~/util/shared.ts"
 import { BuildProps } from "../../pipelines/lang/mod.ts"
 import { setupLangDependencies, uploadWorkspaceSnapshot } from "./common.ts"
 import { uploadPkgVariants } from "./docs-publish.ts"
 
-class Autotools {
+export class Autotools {
   private directory: string
 
   constructor(directory: string) {
@@ -155,14 +153,6 @@ export default async function langSpellerBuild(
   // For the docs-publish step, which has no configured tree of its own.
   if (builder.env.branch === "main") {
     await uploadPkgVariants()
-  }
-
-  const hfstolFiles = await globFiles("build/src/fst/*.hfstol")
-  if (hfstolFiles.length > 0) {
-    await Tar.createFlatPkt(hfstolFiles, "fst-bundle.pkt.tar.zst")
-    await builder.uploadArtifacts("fst-bundle.pkt.tar.zst")
-  } else {
-    logger.info("No .hfstol files found, skipping FST bundle")
   }
 
   // Glob the zhfst files made available in the spellcheckers directory.
