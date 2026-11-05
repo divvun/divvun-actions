@@ -116,7 +116,9 @@ export function pahkatSkipReason(
  * `pahkatSkipReason` for this build. The GitHub lookup only runs once the
  * config and name checks pass, and throws rather than guessing on failure.
  */
-async function pahkatSkipReasonForBuild(gh: GitHub): Promise<string | null> {
+export async function pahkatSkipReasonForBuild(
+  gh: GitHub,
+): Promise<string | null> {
   const config = yaml.parse(await Deno.readTextFile(".build-config.yml")) as {
     build?: BuildProps
   } | null
@@ -778,7 +780,7 @@ export async function runLangGrammarDeploy() {
   }
 }
 
-async function readProofingSource() {
+export async function readProofingSource() {
   const config = yaml.parse(await Deno.readTextFile(".build-config.yml")) as {
     build?: BuildProps
   }
@@ -1617,6 +1619,20 @@ export async function pipelineLang() {
         queue: "linux",
       },
     }))
+    deploySteps.push(command({
+      label: `Publish Speller to Pahkat (${
+        isSpellerReleaseTag ? "Release" : "Dev"
+      })`,
+      command: "divvun-actions run speller-pahkat-publish",
+      depends_on: [
+        "speller-bundle-windows",
+        "speller-bundle-mobile",
+        "speller-bundle-macos",
+      ],
+      agents: {
+        queue: "linux",
+      },
+    }))
   }
 
   if (buildConfig?.["grammar-checkers"] === true && isGrammarDeploy) {
@@ -1636,6 +1652,21 @@ export async function pipelineLang() {
     deploySteps.push(command({
       label: `Deploy Proofing (${isProofingReleaseTag ? "Release" : "Dev"})`,
       command: "divvun-actions run lang-proofing-deploy",
+      depends_on: [
+        "proofing-bundle-macos",
+        "proofing-bundle-windows",
+        "proofing-bundle-linux",
+      ],
+      soft_fail: true,
+      agents: {
+        queue: "linux",
+      },
+    }))
+    deploySteps.push(command({
+      label: `Publish Proofing to Pahkat (${
+        isProofingReleaseTag ? "Release" : "Dev"
+      })`,
+      command: "divvun-actions run proofing-pahkat-publish",
       depends_on: [
         "proofing-bundle-macos",
         "proofing-bundle-windows",

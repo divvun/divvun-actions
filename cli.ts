@@ -134,6 +134,10 @@ import {
   runLangTtsTextprocBuild,
   runLangTtsTextprocDeploy,
 } from "./pipelines/lang/mod.ts"
+import {
+  runProofingPahkatPublish,
+  runSpellerPahkatPublish,
+} from "./pipelines/lang/pahkat.ts"
 import pipelineLibpahkat, {
   runLibpahkatAndroid,
   runLibpahkatIos,
@@ -392,6 +396,14 @@ async function runPipeline(args: any) {
     }
     case "lang-proofing-deploy": {
       await runLangProofingDeploy()
+      break
+    }
+    case "speller-pahkat-publish": {
+      await runSpellerPahkatPublish()
+      break
+    }
+    case "proofing-pahkat-publish": {
+      await runProofingPahkatPublish()
       break
     }
     case "lang-tts-textproc-build": {
