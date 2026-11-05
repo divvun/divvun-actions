@@ -96,18 +96,21 @@ export async function runDivvunKeyboardAndroid(kbdgenBundlePath: string) {
   }
 }
 
+/**
+ * Made in the current directory, as createMacosPackage and
+ * createMacosOuttoArtifact are: a temporary directory would be removed when
+ * the function returns, before the package is uploaded.
+ */
 async function createWindowsPackage(
   payloadPath: string,
   packageId: string,
   version: string,
   unsigned: boolean,
 ): Promise<string> {
-  using tempDir = await makeTempDir()
-
   const pathItems = [packageId, version, "windows"]
   const unsignedSuffix = unsigned ? ".UNSIGNED" : ""
   const packageFileName = `${pathItems.join("_")}${unsignedSuffix}.exe`
-  const packagePath = path.join(tempDir.path, packageFileName)
+  const packagePath = path.resolve(packageFileName)
 
   await Deno.copyFile(payloadPath, packagePath)
   return packagePath
@@ -170,8 +173,6 @@ async function createMacosPackage(
   bundlePath: string,
   channel: string | null,
 ): Promise<string> {
-  using tempDir = await makeTempDir()
-
   // Get version from kbdgen bundle
   const target = await Kbdgen.loadTarget(bundlePath, "macos")
   const baseVersion = target.version as string
@@ -183,7 +184,7 @@ async function createMacosPackage(
 
   const pathItems = [packageId, version, "macos"]
   const packageFileName = `${pathItems.join("_")}.pkg`
-  const packagePath = path.join(tempDir.path, packageFileName)
+  const packagePath = path.resolve(packageFileName)
 
   await Deno.copyFile(payloadPath, packagePath)
   return packagePath
@@ -200,8 +201,6 @@ async function createMacosOuttoArtifact(
   bundlePath: string,
   channel: string | null,
 ): Promise<string> {
-  using tempDir = await makeTempDir()
-
   const target = await Kbdgen.loadTarget(bundlePath, "macos")
   const baseVersion = target.version as string
   const version = channel
@@ -209,7 +208,7 @@ async function createMacosOuttoArtifact(
     : baseVersion
 
   const archiveName = `${packageId}_${version}_macos.app.zip`
-  const archivePath = path.join(tempDir.path, archiveName)
+  const archivePath = path.resolve(archiveName)
   await Ditto.zipApp(appPath, archivePath)
   return archivePath
 }
