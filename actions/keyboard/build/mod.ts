@@ -2,30 +2,42 @@ import * as path from "@std/path"
 import logger from "~/util/log.ts"
 import { isMatchingTag, Kbdgen } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
-import {
-  buildKeyboardMacOSOutto,
-  buildKeyboardWindowsOutto,
-  type OuttoKeyboardResult,
-} from "./outto.ts"
+import { type InstallerResult, makeInstaller } from "../../inno-setup/lib.ts"
+import { buildKeyboardMacOSOutto, buildKeyboardWindowsOutto } from "./outto.ts"
 import { KeyboardType } from "../types.ts"
+import { generateKbdInnoFromBundle } from "./iss.ts"
 import {
   loadWindowsLayouts,
   signLayoutDlls,
   stageInstallerPayload,
+  type WindowsLayout,
 } from "./layouts.ts"
 import { NIGHTLY_CHANNEL } from "../../version.ts"
 import {
   type KeyboardToolchainKind,
   prepareWindowsToolchain,
 } from "./toolchain.ts"
+import { stageWindInstaller } from "./wind.ts"
 
 // Taken straight from semver.org, with added 'v'
 const SEMVER_TAG_RE =
   /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
 
+/** Selects which installer toolchain to use. */
+export type InstallerKind = "legacy" | "outto"
+
+function resolveInstallerKind(explicit?: InstallerKind): InstallerKind {
+  if (explicit) return explicit
+  const env = Deno.env.get("DIVVUN_INSTALLER")
+  if (env === "outto" || env === "legacy") return env
+  return "legacy"
+}
+
 export type Props = {
   keyboardType: KeyboardType
   bundlePath: string
+  /** Installer toolchain. Defaults to env DIVVUN_INSTALLER, else "legacy". */
+  installer?: InstallerKind
   /** The kbdgen and kbdi a Windows build uses. Defaults to "production". */
   toolchain?: KeyboardToolchainKind
 }
@@ -39,6 +51,7 @@ export type Output = {
 export default async function keyboardBuild({
   keyboardType,
   bundlePath,
+  installer,
   toolchain = "production",
 }: Props): Promise<Output> {
   if (
@@ -53,6 +66,10 @@ export default async function keyboardBuild({
     throw new Error(`The ${toolchain} toolchain only builds Windows keyboards`)
   }
 
+  const installerKind = resolveInstallerKind(installer)
+  if (toolchain === "v4" && installerKind !== "outto") {
+    throw new Error("kbdgen v4 keyboards are built with outto only")
+  }
   const platform = keyboardType === KeyboardType.MacOS ? "macos" : "windows"
   const channel = await determineVersionAndChannel(
     bundlePath,
@@ -63,16 +80,26 @@ export default async function keyboardBuild({
   let unsigned = false
 
   if (keyboardType === KeyboardType.MacOS) {
-    const generatedBundleDir = await Kbdgen.buildMacOS(bundlePath)
-    const result = await buildKeyboardMacOSOutto({
-      bundlePath,
-      generatedBundleDir,
-      outputDir: path.dirname(generatedBundleDir),
-    })
-    payloadPath = result.path
-    unsigned = result.unsigned
+    if (installerKind === "outto") {
+      const generatedBundleDir = await Kbdgen.buildMacOS(bundlePath, {
+        noInstaller: true,
+      })
+      const result = await buildKeyboardMacOSOutto({
+        bundlePath,
+        generatedBundleDir,
+        outputDir: path.dirname(generatedBundleDir),
+      })
+      payloadPath = result.path
+      unsigned = result.unsigned
+    } else {
+      payloadPath = await Kbdgen.buildMacOS(bundlePath)
+    }
   } else {
-    const result = await buildWindowsKeyboard(bundlePath, toolchain)
+    const result = await buildWindowsKeyboard(
+      bundlePath,
+      installerKind,
+      toolchain,
+    )
     payloadPath = result.path
     unsigned = result.unsigned
   }
@@ -100,8 +127,9 @@ async function determineVersionAndChannel(
 
 async function buildWindowsKeyboard(
   bundlePath: string,
+  installerKind: InstallerKind,
   toolchainKind: KeyboardToolchainKind,
-): Promise<OuttoKeyboardResult> {
+): Promise<InstallerResult> {
   using work = await makeTempDir({ prefix: "keyboard-toolchain-" })
   const toolchain = await prepareWindowsToolchain(toolchainKind, work.path)
 
@@ -124,19 +152,26 @@ async function buildWindowsKeyboard(
     })
     await signLayoutDlls(payloadDir, layouts)
   } else {
+    // Production kbdgen's DLLs stay unsigned: its Inno installer falls back
+    // to an unsigned build when signing fails, which signing each DLL here
+    // would turn into a failed build.
     payloadDir = outputPath
     await copyKbdiExecutables(toolchain.kbdiBinDir, outputPath)
     await createArchitectureDirectories(outputPath)
   }
 
-  logger.debug("Creating Windows installer via outto")
-  return await buildKeyboardWindowsOutto(
-    bundlePath,
-    payloadDir,
-    outputPath,
-    layouts,
-    toolchain,
-  )
+  if (installerKind === "outto") {
+    logger.debug("Creating Windows installer via outto")
+    return await buildKeyboardWindowsOutto(
+      bundlePath,
+      payloadDir,
+      outputPath,
+      layouts,
+      toolchain,
+    )
+  }
+
+  return await createWindowsInstaller(bundlePath, payloadDir, layouts)
 }
 
 async function copyKbdiExecutables(
@@ -154,7 +189,7 @@ async function copyKbdiExecutables(
 async function createArchitectureDirectories(
   outputPath: string,
 ): Promise<void> {
-  logger.debug("Creating the i386, amd64 and wow64 payload directories")
+  logger.debug("Creating old-style directory structure for Inno Setup")
 
   const architectureMappings = [
     { from: "x86", to: "i386" },
@@ -197,4 +232,37 @@ async function copyArchitectureDirectory(
       }`,
     )
   }
+}
+
+async function createWindowsInstaller(
+  bundlePath: string,
+  payloadDir: string,
+  layouts: WindowsLayout[],
+): Promise<InstallerResult> {
+  await stageWindInstaller(payloadDir)
+
+  logger.debug("Generating Inno Setup script")
+  const issPath = await generateKbdInnoFromBundle(
+    bundlePath,
+    payloadDir,
+    layouts,
+  )
+
+  logger.debug("Creating Windows installer")
+  let result: InstallerResult
+  try {
+    result = await makeInstaller(issPath)
+    logger.debug("Installer created")
+  } catch (error) {
+    logger.warning(
+      `Signing failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+    logger.warning("Retrying without code signing...")
+    result = await makeInstaller(issPath, { skipSigning: true })
+    logger.debug("Unsigned installer created")
+  }
+
+  return result
 }

@@ -1,7 +1,9 @@
 import * as path from "@std/path"
 import { fastlanePilotUpload } from "~/actions/fastlane/pilot.ts"
 import keyboardBuildMeta from "~/actions/keyboard/build-meta.ts"
-import keyboardBuild from "~/actions/keyboard/build/mod.ts"
+import keyboardBuild, {
+  type InstallerKind,
+} from "~/actions/keyboard/build/mod.ts"
 import type { KeyboardToolchainKind } from "~/actions/keyboard/build/toolchain.ts"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
 import { NIGHTLY_CHANNEL } from "~/actions/version.ts"
@@ -113,13 +115,19 @@ async function createWindowsPackage(
 
 export async function runDesktopKeyboardWindows(
   kbdgenBundlePath: string,
+  installer?: InstallerKind,
   toolchain: KeyboardToolchainKind = "production",
 ) {
-  logger.info(`Building Divvun Keyboard for Windows (toolchain: ${toolchain})`)
+  logger.info(
+    `Building Divvun Keyboard for Windows (installer: ${
+      installer ?? "default"
+    }, toolchain: ${toolchain})`,
+  )
 
   const { payloadPath, channel, unsigned } = await keyboardBuild({
     keyboardType: KeyboardType.Windows,
     bundlePath: kbdgenBundlePath,
+    installer,
     toolchain,
   })
 
@@ -156,12 +164,37 @@ export async function runDesktopKeyboardWindows(
   logger.info("Windows keyboard built and artifact uploaded")
 }
 
+async function createMacosPackage(
+  payloadPath: string,
+  packageId: string,
+  bundlePath: string,
+  channel: string | null,
+): Promise<string> {
+  using tempDir = await makeTempDir()
+
+  // Get version from kbdgen bundle
+  const target = await Kbdgen.loadTarget(bundlePath, "macos")
+  const baseVersion = target.version as string
+
+  // Apply channel and timestamp if this is a dev build
+  const version = channel
+    ? await versionAsNightly(baseVersion, builder.env.buildNumber)
+    : baseVersion
+
+  const pathItems = [packageId, version, "macos"]
+  const packageFileName = `${pathItems.join("_")}.pkg`
+  const packagePath = path.join(tempDir.path, packageFileName)
+
+  await Deno.copyFile(payloadPath, packagePath)
+  return packagePath
+}
+
 /**
  * Wrap an outto-produced .app bundle into a ditto zip so Buildkite can
  * upload it as a single artifact. ditto preserves resource forks, xattrs,
  * and codesign signatures (plain `zip` doesn't).
  */
-async function createMacosPackage(
+async function createMacosOuttoArtifact(
   appPath: string,
   packageId: string,
   bundlePath: string,
@@ -181,23 +214,42 @@ async function createMacosPackage(
   return archivePath
 }
 
-export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
-  logger.info("Building Divvun Keyboard for macOS")
+export async function runDesktopKeyboardMacOS(
+  kbdgenBundlePath: string,
+  installer?: InstallerKind,
+) {
+  logger.info(
+    `Building Divvun Keyboard for macOS (installer: ${installer ?? "default"})`,
+  )
 
   await logXcodeVersion()
 
   const { payloadPath, channel } = await keyboardBuild({
     keyboardType: KeyboardType.MacOS,
     bundlePath: kbdgenBundlePath,
+    installer,
   })
   // Note: unsigned is always false for macOS builds
 
-  const artifactPath = await createMacosPackage(
-    payloadPath,
-    builder.env.repoName,
-    kbdgenBundlePath,
-    channel,
-  )
+  // outto on macOS emits a .app *directory*. Ditto-zip it to preserve
+  // codesign + xattrs and produce a single uploadable artifact. Legacy
+  // path produces a single .pkg file and uses createMacosPackage().
+  let artifactPath: string
+  if (installer === "outto") {
+    artifactPath = await createMacosOuttoArtifact(
+      payloadPath,
+      builder.env.repoName,
+      kbdgenBundlePath,
+      channel,
+    )
+  } else {
+    artifactPath = await createMacosPackage(
+      payloadPath,
+      builder.env.repoName,
+      kbdgenBundlePath,
+      channel,
+    )
+  }
 
   await builder.uploadArtifacts(artifactPath)
 
@@ -219,18 +271,20 @@ export async function runDesktopKeyboardMacOS(kbdgenBundlePath: string) {
 /**
  * Rolling pre-release the outto keyboard installers are published to.
  *
- * The old Pahkat has no payload type describing an outto `.exe` or an `.app`
- * bundle installer (see the note at the top of
- * actions/keyboard/build/outto.ts, and the hardcoded
- * WindowsExecutableKind.Inno in actions/keyboard/deploy.ts), so they are
- * published to GitHub the way outto, divvun-wind and divvun-runtime already
- * are.
+ * The legacy chain deploys to Pahkat, which outto cannot use yet: there is no
+ * Pahkat payload type describing an outto `.exe` or an `.app` bundle installer
+ * (see the note at the top of actions/keyboard/build/outto.ts, and the
+ * hardcoded WindowsExecutableKind.Inno in actions/keyboard/deploy.ts). Until
+ * that lands, publish to GitHub the way outto, divvun-wind and divvun-runtime
+ * already do.
  */
 const OUTTO_DEV_TAG = "dev-latest"
 
 /**
  * The outto installers' artifact names, from createWindowsPackage and
- * createMacosPackage: `<repoName>_<version><suffix>`.
+ * createMacosOuttoArtifact: `<repoName>_<version><suffix>`. The legacy macOS
+ * build uploads a .pkg into the same build, so these must stay narrow enough
+ * to exclude it.
  */
 const OUTTO_ARTIFACTS = [
   { platform: "macos", label: "macOS", suffix: "_macos.app.zip" },
@@ -257,15 +311,14 @@ async function outtoReleaseName(files: string[]): Promise<string> {
   return buildNumber ? `${name} (build ${buildNumber})` : name
 }
 
-/** Download one artifact glob, tolerating the producing step having failed. */
+/** Download one artifact glob, tolerating the producing step having soft-failed. */
 async function downloadOuttoArtifacts(pattern: string, outputDir: string) {
   try {
     await builder.downloadArtifacts(pattern, outputDir)
   } catch {
     // `buildkite-agent artifact download` exits non-zero when nothing matches.
-    // The deploy runs even when a build failed, so one platform missing is
-    // expected rather than fatal — publishing the one that did build is
-    // still useful.
+    // Both outto builds are soft_fail, so one platform missing is expected
+    // rather than fatal — publishing the one that did build is still useful.
     logger.warning(`No artifacts matched ${pattern}; skipping`)
   }
 }
@@ -291,8 +344,8 @@ export async function runDesktopKeyboardDeployOutto() {
 
   if (files.length === 0) {
     throw new Error(
-      "No signed outto keyboard installers to publish. The deploy runs even " +
-        "when the builds fail, so check whether they produced an artifact.",
+      "No signed outto keyboard installers to publish. Both outto build steps " +
+        "are soft_fail, so check whether they actually produced an artifact.",
     )
   }
 
@@ -554,7 +607,7 @@ function kbdgenV4Group(): GroupStep {
     command({
       label: "Build Windows keyboard with kbdgen v4 (outto)",
       key: "build-windows-kbdgen-v4-outto",
-      command: "divvun-actions run divvun-keyboard-windows-v4",
+      command: "divvun-actions run divvun-keyboard-windows-v4 outto",
       agents: {
         queue: "windows",
       },
@@ -592,62 +645,36 @@ export function pipelineDesktopKeyboard() {
   // would otherwise overwrite its assets with a one-off.
   const isMain = builder.env.branch === "main"
 
-  const steps: BuildkitePipeline["steps"] = [
-    // TODO: 2025-09-04 re-enable this once windows bundling components are updated.
-    // This is turned off for now because it currently creates an installer that appears
-    // to work, but does not actually install a keyboard on Win10/Win11.
-    // command({
-    //   label: "Build Divvun Keyboard for Windows",
-    //   key: "build-windows",
-    //   command: "divvun-actions run divvun-keyboard-windows",
-    //   agents: {
-    //     queue: "windows",
-    //   },
-    // }),
-    // command({
-    //   label: "Deploy Windows",
-    //   command: "divvun-actions run divvun-keyboard-deploy-windows",
-    //   depends_on: "build-windows",
-    //   agents: {
-    //     queue: "linux",
-    //   },
-    // }),
+  const outtoSteps: CommandStep[] = [
     command({
-      label: "Build Divvun Keyboard for Windows",
+      label: "Build Divvun Keyboard for Windows (outto)",
       key: "build-windows-outto",
-      command: "divvun-actions run divvun-keyboard-windows",
+      command: "divvun-actions run divvun-keyboard-windows outto",
       soft_fail: true,
       agents: {
         queue: "windows",
       },
     }),
     command({
-      label: "Build Divvun Keyboard for macOS",
-      key: "build-macos",
-      command: "divvun-actions run divvun-keyboard-macos",
+      label: "Build Divvun Keyboard for macOS (outto)",
+      key: "build-macos-outto",
+      command: "divvun-actions run divvun-keyboard-macos outto",
+      soft_fail: true,
       agents: {
         queue: "macos",
-      },
-    }),
-    command({
-      label: "Deploy macOS",
-      command: "divvun-actions run divvun-keyboard-deploy-macos",
-      depends_on: "build-macos",
-      agents: {
-        queue: "linux",
       },
     }),
   ]
 
   if (isMain) {
-    steps.push(
+    outtoSteps.push(
       command({
         label: `Deploy outto installers (${OUTTO_DEV_TAG})`,
         command: "divvun-actions run divvun-keyboard-deploy-outto",
-        // It publishes whatever did build, and fails only when nothing
-        // signed came out of either build.
-        depends_on: ["build-windows-outto", "build-macos"],
-        allow_dependency_failure: true,
+        // The builds are soft_fail, so this still runs when one platform did
+        // not produce an installer. It publishes whatever did build and fails
+        // only when nothing signed came out of either.
+        depends_on: ["build-windows-outto", "build-macos-outto"],
         agents: {
           queue: "linux",
         },
@@ -655,7 +682,55 @@ export function pipelineDesktopKeyboard() {
     )
   }
 
-  const pipeline: BuildkitePipeline = { steps }
+  const pipeline: BuildkitePipeline = {
+    steps: [
+      // TODO: 2025-09-04 re-enable this once windows bundling components are updated.
+      // This is turned off for now because it currently creates an installer that appears
+      // to work, but does not actually install a keyboard on Win10/Win11.
+      // command({
+      //   label: "Build Divvun Keyboard for Windows",
+      //   key: "build-windows",
+      //   command: "divvun-actions run divvun-keyboard-windows",
+      //   agents: {
+      //     queue: "windows",
+      //   },
+      // }),
+      // command({
+      //   label: "Deploy Windows",
+      //   command: "divvun-actions run divvun-keyboard-deploy-windows",
+      //   depends_on: "build-windows",
+      //   agents: {
+      //     queue: "linux",
+      //   },
+      // }),
+      command({
+        label: "Build Divvun Keyboard for macOS",
+        key: "build-macos",
+        command: "divvun-actions run divvun-keyboard-macos",
+        agents: {
+          queue: "macos",
+        },
+      }),
+      command({
+        label: "Deploy macOS",
+        command: "divvun-actions run divvun-keyboard-deploy-macos",
+        depends_on: "build-macos",
+        agents: {
+          queue: "linux",
+        },
+      }),
+      // Side group: outto builds, plus the dev-latest publish on main. Still
+      // isolated from the legacy Pahkat build/deploy chain — group key "outto"
+      // is intentionally not used in any depends_on outside this group, and
+      // the builds stay soft_fail so an outto regression cannot redden a
+      // keyboard build.
+      {
+        group: "Outto",
+        key: "outto",
+        steps: outtoSteps,
+      },
+    ],
+  }
 
   return pipeline
 }

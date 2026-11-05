@@ -37,7 +37,10 @@ import { globFiles, globOneFile } from "~/util/glob.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums, release } from "~/util/hash.ts"
 import { versionAsDev } from "~/util/shared.ts"
-import spellerBundle from "../../actions/speller/bundle.ts"
+import { SOFT_FAIL_EXIT_STATUS } from "~/util/soft_failure.ts"
+import spellerBundle, {
+  type InstallerKind,
+} from "../../actions/speller/bundle.ts"
 import spellerDeploy from "../../actions/speller/deploy.ts"
 import {
   deriveLangTag,
@@ -268,7 +271,10 @@ export async function runLangGrammarTest() {
 }
 
 export async function runLangBundle(
-  { target }: { target: "windows" | "macos" | "mobile" },
+  { target, installer }: {
+    target: "windows" | "macos" | "mobile"
+    installer?: InstallerKind
+  },
 ) {
   // Each installer packs only its own variant.
   await builder.downloadArtifacts(
@@ -305,7 +311,8 @@ export async function runLangBundle(
     spellerType,
     manifest,
     spellerPaths,
-    version: spellerReleaseVersion(manifest),
+    installer,
+    releaseVersion: spellerReleaseVersion(manifest),
   })
 }
 
@@ -340,9 +347,9 @@ function extractVersionFromTag(tag: string): string | null {
 }
 
 /**
- * The version of the speller release this build makes, which its installers
- * and its mobile package carry too: the tag's, with the build number, on a
- * speller release tag, and otherwise a dev version of the manifest's.
+ * The version of the speller release this build makes, which its Pahkat-next
+ * artifacts carry too: the tag's, with the build number, on a speller release
+ * tag, and otherwise a dev version of the manifest's.
  */
 function spellerReleaseVersion(manifest: SpellerManifest): string {
   const tag = builder.env.tag
@@ -371,15 +378,6 @@ function isPrerelease(version: string): boolean {
   }
 }
 
-/**
- * The speller's payloads, as spellerBundle uploads them. The proofing
- * packages of the same build are built the same way, so these name the
- * speller's.
- */
-const SPELLER_WINDOWS_ARTIFACT = "speller-*_noarch-windows*.exe"
-const SPELLER_MACOS_ARTIFACT = "speller-*_noarch-macos.app.zip"
-const SPELLER_MOBILE_ARTIFACT = "speller-*_noarch-mobile.pkt.box"
-
 export async function runLangDeploy() {
   const isSpellerReleaseTag = SPELLER_RELEASE_TAG.test(builder.env.tag ?? "")
   const isMainBranch = builder.env.branch === "main"
@@ -394,13 +392,13 @@ export async function runLangDeploy() {
     throw e
   }
 
-  await builder.downloadArtifacts(SPELLER_MOBILE_ARTIFACT, ".")
-  await builder.downloadArtifacts(SPELLER_WINDOWS_ARTIFACT, ".")
-  await builder.downloadArtifacts(SPELLER_MACOS_ARTIFACT, ".")
+  await builder.downloadArtifacts("*.pkt.tar.zst", ".")
+  await builder.downloadArtifacts("*.exe", ".")
+  await builder.downloadArtifacts("*.pkg", ".")
 
-  const windowsFiles = await globOneFile(SPELLER_WINDOWS_ARTIFACT)
-  const macosFiles = await globOneFile(SPELLER_MACOS_ARTIFACT)
-  const mobileFiles = await globOneFile(SPELLER_MOBILE_ARTIFACT)
+  const windowsFiles = await globOneFile("*.exe")
+  const macosFiles = await globOneFile("*.pkg")
+  const mobileFiles = await globOneFile("*-mobile.pkt.tar.zst")
 
   logger.info("Deploying language files:")
   logger.info(`- Windows: ${windowsFiles}`)
@@ -441,9 +439,9 @@ export async function runLangDeploy() {
     const versionedWindowsFile =
       `${packageName}_${versionWithBuild}_noarch-windows.exe`
     const versionedMacosFile =
-      `${packageName}_${versionWithBuild}_noarch-macos.app.zip`
+      `${packageName}_${versionWithBuild}_noarch-macos.pkg`
     const versionedMobileFile =
-      `${packageName}_${versionWithBuild}_noarch-mobile.pkt.box`
+      `${packageName}_${versionWithBuild}_noarch-mobile.pkt.tar.zst`
 
     await Deno.rename(windowsFiles, versionedWindowsFile)
     await Deno.rename(macosFiles, versionedMacosFile)
@@ -545,10 +543,9 @@ export async function runLangDeploy() {
 
     const versionedWindowsFile =
       `${packageName}_${devVersion}_noarch-windows.exe`
-    const versionedMacosFile =
-      `${packageName}_${devVersion}_noarch-macos.app.zip`
+    const versionedMacosFile = `${packageName}_${devVersion}_noarch-macos.pkg`
     const versionedMobileFile =
-      `${packageName}_${devVersion}_noarch-mobile.pkt.box`
+      `${packageName}_${devVersion}_noarch-mobile.pkt.tar.zst`
 
     await Deno.rename(windowsFiles, versionedWindowsFile)
     await Deno.rename(macosFiles, versionedMacosFile)
@@ -1547,6 +1544,10 @@ export async function pipelineLang() {
 
   // Bundle phase steps array (only on deploy)
   const bundleSteps: CommandStep[] = []
+  // The Pahkat-next outto installers go into their own group, apart from the
+  // Inno Setup and .pkg bundles the speller deploy takes. Each is soft_fail,
+  // so a failure cannot block that deploy.
+  const outtoBundleSteps: CommandStep[] = []
 
   if (isSpellerDeploy) {
     bundleSteps.push(command({
@@ -1564,6 +1565,9 @@ export async function pipelineLang() {
       key: "speller-bundle-mobile",
       command: "divvun-actions run lang-bundle mobile",
       depends_on: "speller-build",
+      // The Pahkat-next .pkt.box comes after the tarball; if it fails, the
+      // step soft fails and the speller deploy still runs.
+      soft_fail: [{ exit_status: SOFT_FAIL_EXIT_STATUS }],
       agents: {
         queue: "linux",
       },
@@ -1574,6 +1578,28 @@ export async function pipelineLang() {
       key: "speller-bundle-macos",
       command: "divvun-actions run lang-bundle macos",
       depends_on: "speller-build",
+      agents: {
+        queue: "macos",
+      },
+    }))
+
+    outtoBundleSteps.push(command({
+      label: "Bundle Speller (Windows, outto)",
+      key: "speller-bundle-windows-outto",
+      command: "divvun-actions run lang-bundle windows outto",
+      depends_on: "speller-build",
+      soft_fail: true,
+      agents: {
+        queue: "windows",
+      },
+    }))
+
+    outtoBundleSteps.push(command({
+      label: "Bundle Speller (macOS, outto)",
+      key: "speller-bundle-macos-outto",
+      command: "divvun-actions run lang-bundle macos outto",
+      depends_on: "speller-build",
+      soft_fail: true,
       agents: {
         queue: "macos",
       },
@@ -1755,6 +1781,14 @@ export async function pipelineLang() {
       group: "Bundle",
       key: "bundle",
       steps: bundleSteps,
+    })
+  }
+
+  if (outtoBundleSteps.length > 0) {
+    steps.push({
+      group: "Outto (Pahkat)",
+      key: "outto",
+      steps: outtoBundleSteps,
     })
   }
 

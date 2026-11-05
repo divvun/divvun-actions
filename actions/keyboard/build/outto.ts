@@ -1,7 +1,10 @@
-// The keyboard installers, built with outto: a self-extracting .exe on
-// Windows and an installer .app on macOS. The old pahkat has no payload type
-// of its own for an outto installer; the kbdgen v4 deploy registers the
-// Windows one as an Inno-kind Windows executable (../deploy.ts).
+// Keyboard installer build path that uses outto instead of Inno Setup
+// (Windows) / pkgbuild+productbuild (macOS).
+//
+// Opt-in: callers select this path via the `installer: "outto"` flag on
+// keyboardBuild() (see ./mod.ts). pahkat has no payload type of its own for
+// an outto installer; the kbdgen v4 deploy registers the Windows one as an
+// Inno-kind Windows executable (../deploy.ts).
 
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
@@ -27,7 +30,7 @@ export type OuttoKeyboardResult = {
 
 /**
  * Generate an outto manifest + run `outto build` for a kbdgen Windows
- * keyboard bundle.
+ * keyboard bundle. Mirrors generateKbdInnoFromBundle().
  *
  * outto packs all of `payloadDir`, the directory staged with the layout
  * DLLs, kbdi and (v4) the text service; the manifest and the installer go to
@@ -323,8 +326,8 @@ function addLayoutToOuttoManifest(
  * Wrap a kbdgen-produced keyboard layout `.bundle` (run kbdgen with
  * `--no-installer`) into an outto-built installer `.app`.
  *
- * The kbdgen bundle goes to `/Library/Keyboard Layouts/<bundle>`, where
- * kbdgen's own .pkg installed it.
+ * The kbdgen bundle goes to `/Library/Keyboard Layouts/<bundle>` per the
+ * legacy pkgbuild flow; outto preserves that placement.
  */
 export async function buildKeyboardMacOSOutto(opts: {
   bundlePath: string

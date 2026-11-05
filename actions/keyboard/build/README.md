@@ -1,6 +1,6 @@
 # Windows keyboard installers
 
-The outto build bundles the x64 installer from
+The outto and Inno Setup builds bundle the x64 installer from
 `divvun/divvun-wind`'s `dev-latest` release. The build downloads it through the
 authenticated GitHub CLI, checks its entry in `BLAKE3SUMS`, and embeds it with
 `install-wind.ps1`. Missing, ambiguous or mismatched downloads fail the build.
@@ -19,8 +19,9 @@ remove other keyboards' data.
 
 A keyboard bundle with a format 4 layout gets only the "kbdgen v4 (test)"
 group (`pipelineDesktopKeyboard`), which builds the outto installer with the
-`v4` toolchain (`toolchain.ts`) and uploads it as a build artifact. Other
-bundles keep the production steps, with kbdgen and kbdi from pahkat.
+`v4` toolchain (`toolchain.ts`) and uploads it as a build artifact; kbdgen v4
+keyboards get no Inno Setup installer. Other bundles keep the production
+steps, with kbdgen and kbdi from pahkat.
 
 Pushes to the keyboard's `v4` branch also deploy the signed installer
 (`runDesktopKeyboardDeployWindowsV4`). It is added to the keyboard

@@ -1147,8 +1147,10 @@ export class Kbdgen {
     )
   }
 
-  /** Build the keyboard layout `.bundle`, for outto to install. */
-  static async buildMacOS(bundlePath: string): Promise<string> {
+  static async buildMacOS(
+    bundlePath: string,
+    options: { noInstaller?: boolean } = {},
+  ): Promise<string> {
     logger.info("Building macOS")
     logger.setLogLevel("trace")
     const abs = path.resolve(bundlePath)
@@ -1195,8 +1197,8 @@ export class Kbdgen {
         abs,
         "macos",
         "build",
-        "--no-installer",
       ]
+      if (options.noInstaller) args.push("--no-installer")
 
       const proc = new Deno.Command("kbdgen", { args, cwd }).spawn()
 
@@ -1206,7 +1208,12 @@ export class Kbdgen {
       }
     }
 
-    return await Kbdgen.resolveOutput(path.join(cwd, "output", `*.bundle`))
+    if (options.noInstaller) {
+      // Bundle generation only — return the .bundle directory for the caller
+      // to wrap with their own installer.
+      return await Kbdgen.resolveOutput(path.join(cwd, "output", `*.bundle`))
+    }
+    return await Kbdgen.resolveOutput(path.join(cwd, "output", `*.pkg`))
   }
 
   static async buildWindows(

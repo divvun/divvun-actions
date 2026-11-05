@@ -14,10 +14,9 @@ import {
   WindowsExecutableKind,
 } from "~/util/shared.ts"
 
+import type { InstallerKind } from "./build/mod.ts"
 import { keyboardPackageId } from "./build/outto.ts"
 import { KeyboardType } from "./types.ts"
-
-type InstallerKind = "legacy" | "outto"
 
 type ArtifactInfo = {
   path: string

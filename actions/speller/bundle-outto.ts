@@ -1,5 +1,6 @@
-// The desktop speller installers, built with outto: a self-extracting .exe on
-// Windows and an installer .app on macOS.
+// The Pahkat-next desktop speller installers, built with outto beside the
+// Inno Setup and .pkg ones the old pahkat.uit.no serves: a self-extracting
+// .exe on Windows and an installer .app on macOS.
 
 import * as path from "@std/path"
 import * as toml from "@std/toml"
