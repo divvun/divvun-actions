@@ -17,6 +17,7 @@ import * as target from "~/target.ts"
 import { globFiles, globOneFile } from "~/util/glob.ts"
 import { GitHub } from "~/util/github.ts"
 import logger from "~/util/log.ts"
+import { uploadPahkatArtifact } from "~/util/pahkat_artifacts.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import { logXcodeVersion } from "~/util/xcode.ts"
 import keyboardDeploy from "../../actions/keyboard/deploy.ts"
@@ -164,6 +165,18 @@ export async function runDesktopKeyboardWindows(
   await builder.setMetadata("windows-version", fullVersion)
   await builder.setMetadata("bundle-path", kbdgenBundlePath)
 
+  if (installer === "outto") {
+    // Pahkat-next releases the installer under the version it records, the
+    // one keyboardBuild stamped, which a production build's name does not
+    // carry.
+    await uploadPahkatArtifact(builder.env.repoName, artifactPath, {
+      name: `${builder.env.repoName}_${builtVersion}_windows${
+        unsigned ? ".UNSIGNED" : ""
+      }.exe`,
+      keep: true,
+    })
+  }
+
   logger.info("Windows keyboard built and artifact uploaded")
 }
 
@@ -263,6 +276,14 @@ export async function runDesktopKeyboardMacOS(
   await builder.setMetadata("macos-channel", channel || "")
   await builder.setMetadata("macos-version", fullVersion)
   await builder.setMetadata("bundle-path", kbdgenBundlePath)
+
+  if (installer === "outto") {
+    // As for Windows: the version the installer records.
+    await uploadPahkatArtifact(builder.env.repoName, artifactPath, {
+      name: `${builder.env.repoName}_${baseVersion}_macos.app.zip`,
+      keep: true,
+    })
+  }
 
   logger.info("macOS keyboard built and artifact uploaded")
 }
