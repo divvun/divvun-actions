@@ -52,6 +52,7 @@ const DIVVUN_RELEASE_REPOSITORIES = new Set([
   "divvun-worker-grammar",
   "divvun-worker-speller",
   "pahkat",
+  "pahkat-next",
   "pdf-strings",
   "kielipankki-donatespeech-app",
   "divvunspell-libreoffice",

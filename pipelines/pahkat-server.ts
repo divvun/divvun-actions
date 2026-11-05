@@ -36,15 +36,11 @@ export function pipelinePahkatServer(): BuildkitePipeline {
         branches: "main",
       }),
       command({
-        // EXPECTED TO SOFT-FAIL until the server's Argo CD Application exists
-        // in k8s-config (Pahkat's server.deploy work adds it). Drop the
-        // soft_fail once this step has been seen green.
-        label: "Bump k8s app manifest (soft-fail until the app exists)",
+        label: "Bump k8s app manifest",
         command: "divvun-actions run pahkat-server-bump-manifest",
         agents: { queue: "linux" },
         branches: "main",
         depends_on: "build-push",
-        soft_fail: true,
       }),
     ],
   }

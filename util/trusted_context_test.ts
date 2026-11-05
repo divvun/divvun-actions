@@ -85,6 +85,7 @@ Deno.test("trusted context accepts only protected branches and strict release ta
   equal(isTrustedReleaseContext(environment({ repoPath: "example" })), false)
   equal(isTrustedReleaseContext(environment()), false)
   ok(isTrustedReleaseContext(environment({ repoPath: "divvun/box" })))
+  ok(isTrustedReleaseContext(environment({ repoPath: "divvun/pahkat-next" })))
   ok(
     isTrustedReleaseContext(environment({ repoPath: "giellalt/lang-sme" })),
   )
