@@ -14,8 +14,10 @@ import {
 import { makeTempDir } from "~/util/temp.ts"
 
 export type PktBoxFile = {
-  /** A regular file, stored at the archive's root under its own name. */
+  /** A regular file, stored at the archive's root. */
   path: string
+  /** Its name in the archive; its own by default. */
+  name?: string
   /**
    * Store it uncompressed: box maps only stored files, so a file a keyboard
    * reads in place from the archive must be stored. Others are zstd.
@@ -41,7 +43,10 @@ export async function createPktBox(
   const args = ["create", "--quiet", "--force", output]
   const names = new Set<string>()
   for (const file of files) {
-    const name = path.basename(file.path)
+    const name = file.name ?? path.basename(file.path)
+    if (name !== path.basename(name)) {
+      throw new Error(`${name} is not a name at the archive's root`)
+    }
     if (names.has(name)) {
       throw new Error(`Two files named ${name} for ${path.basename(output)}`)
     }

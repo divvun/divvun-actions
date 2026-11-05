@@ -1,4 +1,4 @@
-# Spelling-only x-proofing bundles
+# Spelling-only proofing bundles
 
 On main and `x-proofing-*/v*` tags, the language pipeline selects its proofing
 source from `.build-config.yml`:
@@ -21,8 +21,9 @@ run the language disambiguator or grammarchecker. The spelling rules mark unknow
 is English. Grammar-enabled languages retain their own pipelines and messages.
 
 The new Linux job bundles and smoke-loads the DRB before uploading it. All three
-OS jobs consume that one artifact: outto on Windows/macOS and a flat archive on
-Linux. Experimental soft-failure and GitHub-only release behavior are retained.
+OS jobs of the `proofing-<tag>` package consume that one artifact: outto on
+Windows/macOS and a `.pkt.box` on Linux. Soft-failure and GitHub-only release
+behavior are retained.
 
 Local checks: `deno check cli.ts`; `deno test --allow-read --allow-write
 actions/proofing/source_test.ts actions/proofing/speller_test.ts`. The pipeline

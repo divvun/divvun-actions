@@ -832,7 +832,7 @@ export async function runLangProofingBundle(
   }
 
   const langTag = deriveLangTag()
-  const packageId = `x-proofing-${langTag}`
+  const packageId = `proofing-${langTag}`
   const info = proofingPackage(source, manifest, langTag)
   const baseVersion = info.version
 
@@ -863,13 +863,13 @@ export async function runLangProofingDeploy() {
   const isProofingReleaseTag = PROOFING_RELEASE_TAG.test(builder.env.tag ?? "")
   const isMainBranch = builder.env.branch === "main"
 
-  await builder.downloadArtifacts("x-proofing-*_noarch-macos.app.zip", ".")
-  await builder.downloadArtifacts("x-proofing-*_noarch-windows*.exe", ".")
-  await builder.downloadArtifacts("x-proofing-*_noarch-linux.pkt.tar.zst", ".")
+  await builder.downloadArtifacts("proofing-*_noarch-macos.app.zip", ".")
+  await builder.downloadArtifacts("proofing-*_noarch-windows*.exe", ".")
+  await builder.downloadArtifacts("proofing-*_noarch-linux.pkt.box", ".")
 
-  const macosFile = await globOneFile("x-proofing-*_noarch-macos.app.zip")
-  const windowsFile = await globOneFile("x-proofing-*_noarch-windows*.exe")
-  const linuxFile = await globOneFile("x-proofing-*_noarch-linux.pkt.tar.zst")
+  const macosFile = await globOneFile("proofing-*_noarch-macos.app.zip")
+  const windowsFile = await globOneFile("proofing-*_noarch-windows*.exe")
+  const linuxFile = await globOneFile("proofing-*_noarch-linux.pkt.box")
 
   logger.info("Deploying proofing packages:")
   logger.info(`- macOS: ${macosFile}`)
@@ -895,7 +895,7 @@ export async function runLangProofingDeploy() {
   }
 
   const langTag = deriveLangTag()
-  const packageName = `x-proofing-${langTag}`
+  const packageName = `proofing-${langTag}`
   const artifacts = [macosFile, windowsFile, linuxFile].map((file) =>
     path.basename(file)
   )
@@ -1578,8 +1578,8 @@ export async function pipelineLang() {
     }))
   }
 
-  // Experimental proofing packages (x-proofing-<lang>): wrap the selected DRB
-  // per-OS. soft_fail keeps them from blocking the speller/grammar chain.
+  // Proofing packages (proofing-<tag>): wrap the selected DRB per-OS.
+  // soft_fail keeps them from blocking the speller/grammar chain.
   if (proofing && isProofingDeploy) {
     for (
       const [os, queue] of [

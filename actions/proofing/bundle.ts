@@ -1,4 +1,4 @@
-// Build experimental "proofing" packages.
+// Build the proofing packages, proofing-<tag>.
 //
 // A proofing package ships a single Divvun Runtime Bundle (.drb), containing
 // spelling and optionally grammar functionality, wrapped per-OS so the desktop
@@ -9,12 +9,10 @@
 //            Contents/Resources/<tag>.drb) into /Library/Services. Both consumers
 //            scan the Services dir and match the no.divvun.proofing. prefix.
 //   Windows: outto .exe that installs <tag>.drb into %ProgramData%\Divvun\Proofing.
-//   Linux:   flat .pkt.tar.zst tarball containing <tag>.drb (extract to
-//            /usr/share/divvun/proofing).
+//   Linux:   .pkt.box holding <tag>.drb at its root.
 //
-// This is experimental: the package id is x-proofing-<tag> and distribution is
-// GitHub-release-only (see pipelines/lang/mod.ts), which sidesteps the not-yet
-// wired outto Pahkat upload type.
+// They are published as the proofing release on GitHub (see
+// pipelines/lang/mod.ts).
 
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
@@ -22,21 +20,22 @@ import { makeOuttoInstaller } from "~/actions/outto/lib.ts"
 import macosSign from "~/services/macos-codesign.ts"
 import * as target from "~/target.ts"
 import { APP_CODESIGN_ID, codesignBundle } from "~/util/codesign-bundle.ts"
-import { Ditto, Tar } from "~/util/shared.ts"
+import { createPktBox } from "~/util/pkt_box.ts"
+import { Ditto } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import { OuttoBuilder } from "~/util/outto.ts"
 import logger from "~/util/log.ts"
 
 const PUBLISHER = "Universitetet i Tromsø - Norges arktiske universitet"
 const PROJECT_URL = "http://divvun.no/"
-/** Stable DNS-style bundle prefix the consumers match on. Never gets the x-. */
+/** Stable DNS-style bundle prefix the consumers match on. */
 const BUNDLE_PREFIX = "no.divvun.proofing"
 
 export type ProofingTarget = "macos" | "windows" | "linux"
 
 export type ProofingBundleProps = {
   target: ProofingTarget
-  /** Experimental package id, e.g. x-proofing-se. */
+  /** Package id, e.g. proofing-se. */
   packageId: string
   /** BCP-47 tag, e.g. se. Names the .drb and (macOS) the bundle dir. */
   langTag: string
@@ -95,8 +94,8 @@ async function buildMacOS(
 
   const oBuilder = new OuttoBuilder(stage.path, "macos")
     // outto requires a reverse-DNS package id (must contain a dot). The
-    // experimental x-proofing-<tag> name lives in the artifact filename only;
-    // this matches the bundle's CFBundleIdentifier.
+    // proofing-<tag> package id lives in the artifact filename only; this
+    // matches the bundle's CFBundleIdentifier.
     .id(`${BUNDLE_PREFIX}.${props.langTag}`)
     .name(props.name)
     .version(props.version)
@@ -155,7 +154,7 @@ async function buildWindows(
   // still removes the tracked <tag>.drb file itself.
   const oBuilder = new OuttoBuilder(stage.path, "windows")
     // outto requires a reverse-DNS package id (must contain a dot). The
-    // experimental x-proofing-<tag> name lives in the artifact filename only.
+    // proofing-<tag> package id lives in the artifact filename only.
     .id(`${BUNDLE_PREFIX}.${props.langTag}`)
     .name(props.name)
     .version(props.version)
@@ -213,16 +212,14 @@ async function buildWindows(
 async function buildLinux(
   props: ProofingBundleProps,
 ): Promise<ProofingBundleOutput> {
-  using stage = await makeTempDir({ prefix: "proofing-linux-" })
-
-  const stagedDrb = path.join(stage.path, `${props.langTag}.drb`)
-  await Deno.copyFile(props.drbPath, stagedDrb)
-
-  const outputName =
-    `${props.packageId}_${props.version}_noarch-linux.pkt.tar.zst`
+  const outputName = `${props.packageId}_${props.version}_noarch-linux.pkt.box`
   const outputPath = path.resolve(outputName)
-  await Tar.createFlatPkt([stagedDrb], outputPath)
-  logger.debug(`Created Linux proofing tarball at ${outputPath}`)
+  await createPktBox(outputPath, {
+    pkg: props.packageId,
+    version: props.version,
+    files: [{ path: props.drbPath, name: `${props.langTag}.drb` }],
+  })
+  logger.debug(`Created Linux proofing package at ${outputPath}`)
 
   await builder.uploadArtifacts(outputPath)
   return { payloadPath: outputPath, unsigned: false }
