@@ -306,7 +306,7 @@ export async function runHfstRsPublish() {
 
   const { checksumFile, signatureFile } = await createSignedChecksums(
     allArtifacts,
-    await builder.secrets(),
+    await builder.secrets("minisign/privateKey", "minisign/password"),
   )
 
   // createSignedChecksums writes into cwd, which is a different filesystem

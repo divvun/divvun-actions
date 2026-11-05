@@ -124,7 +124,7 @@ export async function runKbdgenPublishV4() {
 
   const { checksumFile, signatureFile } = await createSignedChecksums(
     names,
-    await builder.secrets(),
+    await builder.secrets("minisign/privateKey", "minisign/password"),
     assets,
   )
   logger.info(`Publishing to ${KBDGEN_V4_TAG}: ${names.join(", ")}`)

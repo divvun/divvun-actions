@@ -39,12 +39,32 @@ export default async function keyboardBuildMeta({
     throw new Error(`Unsupported repository for release builds: ${githubRepo}`)
   }
 
-  const secrets = await builder.secrets()
+  const repo = builder.env.repoName
+  const secrets = keyboardType === KeyboardType.Android
+    ? await builder.secrets(
+      "github/username",
+      "github/token",
+      `android/divvun/${repo}/keystore`,
+      `android/divvun/${repo}/keyalias`,
+      `android/divvun/${repo}/storePassword`,
+      `android/divvun/${repo}/keyPassword`,
+      "android/divvun/playStoreP12",
+      "android/divvun/playStoreAccount",
+    )
+    : await builder.secrets(
+      "github/username",
+      "github/token",
+      "ios/matchGitUrl",
+      "ios/matchPassword",
+      "ios/fastlaneUser",
+      "ios/fastlanePassword",
+      "macos/appStoreKeyJson",
+      "macos/adminPassword",
+    )
 
   if (keyboardType === KeyboardType.Android) {
     await Kbdgen.setBuildNumber(bundlePath, "android", buildStart)
     logger.info("Building Android")
-    const repo = builder.env.repoName
     payloadPath = await Kbdgen.buildAndroid(bundlePath, {
       githubUsername: secrets.get("github/username"),
       githubToken: secrets.get("github/token"),

@@ -180,7 +180,7 @@ export async function runKbdiPublish() {
 
   const { checksumFile, signatureFile } = await createSignedChecksums(
     names,
-    await builder.secrets(),
+    await builder.secrets("minisign/privateKey", "minisign/password"),
     assets,
   )
   logger.info(`Publishing to ${prerelease.tag}: ${names.join(", ")}`)

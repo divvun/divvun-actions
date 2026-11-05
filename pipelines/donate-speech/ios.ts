@@ -10,7 +10,12 @@ import { BUNDLE_ID, findBuildArtifact, KEYCHAIN_NAME } from "./mod.ts"
 export async function runDonateSpeechBuildIOS() {
   await logXcodeVersion()
 
-  const secrets = await builder.secrets()
+  const secrets = await builder.secrets(
+    "macos/appStoreKeyJson",
+    "macos/adminPassword",
+    "ios/matchGitUrl",
+    "ios/matchPassword",
+  )
   const apiKey = JSON.parse(secrets.get("macos/appStoreKeyJson"))
   const keychainPassword = secrets.get("macos/adminPassword")
 
@@ -95,7 +100,7 @@ export async function runDonateSpeechBuildIOS() {
 }
 
 export async function runDonateSpeechDeployIOS() {
-  const secrets = await builder.secrets()
+  const secrets = await builder.secrets("macos/appStoreKeyJson")
 
   using tempDir = await makeTempDir()
 

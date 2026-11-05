@@ -172,7 +172,11 @@ export async function runKbdgenDeploy() {
   const cargoToml = await loadCargoToml()
   const baseVersion = cargoToml.package.version
   const version = await versionAsNightly(baseVersion, builder.env.buildNumber)
-  const allSecrets = await builder.secrets()
+  const allSecrets = await builder.secrets(
+    "pahkat/apiKey",
+    "s3/accessKeyId",
+    "s3/secretAccessKey",
+  )
 
   const secrets = {
     pahkatApiKey: allSecrets.get("pahkat/apiKey"),

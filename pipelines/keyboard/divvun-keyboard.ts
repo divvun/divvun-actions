@@ -24,7 +24,10 @@ import { sentryUploadIOSDebugFiles } from "../../actions/sentry/upload-debug-fil
 import { Ditto, Kbdgen, versionAsNightly } from "../../util/shared.ts"
 
 export async function runDivvunKeyboardIOS(kbdgenBundlePath: string) {
-  const secrets = await builder.secrets()
+  const secrets = await builder.secrets(
+    "macos/appStoreKeyJson",
+    "sentry/token",
+  )
   // await builder.group("Initializing Pahkat", async () => {
   //   await pahkatInit({
   //     repoUrl: "https://pahkat.uit.no/devtools/",
@@ -76,7 +79,9 @@ export async function runDivvunKeyboardAndroid(kbdgenBundlePath: string) {
 
   if (builder.env.branch === "main") {
     await builder.group("Publishing APK to Google Play Console", async () => {
-      const secrets = await builder.secrets()
+      const secrets = await builder.secrets(
+        "android/divvun/googleServiceAccountJson",
+      )
       await builder.exec("./gradlew", ["publishApk"], {
         cwd: "output/repo",
         env: {
@@ -359,7 +364,11 @@ export async function runDesktopKeyboardDeployOutto() {
 }
 
 export async function runDesktopKeyboardDeploy(keyboardType: KeyboardType) {
-  const allSecrets = await builder.secrets()
+  const allSecrets = await builder.secrets(
+    "s3/accessKeyId",
+    "s3/secretAccessKey",
+    "pahkat/apiKey",
+  )
   const secrets = {
     awsAccessKeyId: allSecrets.get("s3/accessKeyId"),
     awsSecretAccessKey: allSecrets.get("s3/secretAccessKey"),
@@ -564,7 +573,11 @@ export async function runDesktopKeyboardDeployWindowsV4() {
   )
   logger.info(`Registering ${artifactUrl} with pahkat (${channel})`)
 
-  const allSecrets = await builder.secrets()
+  const allSecrets = await builder.secrets(
+    "s3/accessKeyId",
+    "s3/secretAccessKey",
+    "pahkat/apiKey",
+  )
   await keyboardDeploy({
     packageId: builder.env.repoName,
     keyboardType: KeyboardType.Windows,

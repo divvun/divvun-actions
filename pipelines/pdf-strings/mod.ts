@@ -81,7 +81,7 @@ export function pipelinePdfStrings(): BuildkitePipeline {
 }
 
 export async function runPdfStringsPublish() {
-  const secrets = await builder.secrets()
+  const secrets = await builder.secrets("pypiToken")
 
   let dryRun = true
   if (builder.env.tag && builder.env.tag.match(/^v/)) {

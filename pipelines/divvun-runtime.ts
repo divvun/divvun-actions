@@ -500,7 +500,7 @@ export async function runDivvunRuntimePublish() {
   // Create signed checksums for all artifacts
   const { checksumFile, signatureFile } = await createSignedChecksums(
     allArtifacts,
-    await builder.secrets(),
+    await builder.secrets("minisign/privateKey", "minisign/password"),
   )
 
   // Move checksum files to archive path. createSignedChecksums writes into

@@ -6,7 +6,12 @@ import { makeTempDir, makeTempFile } from "~/util/temp.ts"
 import { BUNDLE_ID_ANDROID, findBuildArtifact } from "./mod.ts"
 
 export async function runDonateSpeechBuildAndroid() {
-  const secrets = await builder.secrets()
+  const secrets = await builder.secrets(
+    "android/divvun/donate-your-speech/keystore",
+    "android/divvun/donate-your-speech/storePassword",
+    "android/divvun/donate-your-speech/keyalias",
+    "android/divvun/donate-your-speech/keyPassword",
+  )
 
   // Write the keystore file from base64 secret
   using keystoreFile = await makeTempFile({ suffix: ".jks" })
@@ -105,7 +110,9 @@ export async function runDonateSpeechBuildAndroid() {
 }
 
 export async function runDonateSpeechDeployAndroid() {
-  const secrets = await builder.secrets()
+  const secrets = await builder.secrets(
+    "android/divvun/googleServiceAccountJson",
+  )
 
   using tempDir = await makeTempDir()
 

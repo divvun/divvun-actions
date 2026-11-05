@@ -59,7 +59,10 @@ export async function downloadVerifiedReleaseAsset(opts: {
   directory: string
 }): Promise<string> {
   if (!Deno.env.get("GH_TOKEN") && !Deno.env.get("GITHUB_TOKEN")) {
-    Deno.env.set("GH_TOKEN", (await builder.secrets()).get("github/token"))
+    Deno.env.set(
+      "GH_TOKEN",
+      (await builder.secrets("github/token")).get("github/token"),
+    )
   }
   const gh = new GitHub(opts.repo)
   for (const pattern of [opts.ghPattern, "BLAKE3SUMS"]) {

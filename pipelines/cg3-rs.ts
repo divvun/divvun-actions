@@ -390,7 +390,7 @@ export async function runCg3RsPublish() {
 
   const { checksumFile, signatureFile } = await createSignedChecksums(
     allArtifacts,
-    await builder.secrets(),
+    await builder.secrets("minisign/privateKey", "minisign/password"),
   )
 
   // createSignedChecksums writes into cwd, which is a different filesystem
@@ -450,7 +450,7 @@ export async function runCg3RsNpmPublish() {
   }
 
   // npm never packs .npmrc, so the token stays out of the published package.
-  const token = (await builder.secrets()).get("npm/token")
+  const token = (await builder.secrets("npm/token")).get("npm/token")
   await Deno.writeTextFile(
     path.join(pkgDir, ".npmrc"),
     `//registry.npmjs.org/:_authToken=${token}\n`,

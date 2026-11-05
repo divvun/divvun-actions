@@ -13,7 +13,10 @@ export default async function sign(
   const pemFile = path.join(tempDir.path, "devid.pem")
   const keyJson = path.join(tempDir.path, "key.json")
 
-  const secrets = await builder.secrets()
+  const secrets = await builder.secrets(
+    "macos/appPem",
+    "macos/rcodesignKeyJson",
+  )
   await Deno.writeTextFile(pemFile, secrets.get("macos/appPem"))
   await Deno.writeTextFile(keyJson, secrets.get("macos/rcodesignKeyJson"))
 
@@ -69,7 +72,7 @@ export async function notarizeAndStaple(inputFile: string) {
   using tempDir = await makeTempDir({ prefix: "rcodesign-notary-" })
   const keyJson = path.join(tempDir.path, "key.json")
 
-  const secrets = await builder.secrets()
+  const secrets = await builder.secrets("macos/rcodesignKeyJson")
   await Deno.writeTextFile(keyJson, secrets.get("macos/rcodesignKeyJson"))
 
   await notarize(inputFile, keyJson)

@@ -305,7 +305,7 @@ export async function runOuttoPublish() {
 
   const { checksumFile, signatureFile } = await createSignedChecksums(
     allArtifacts,
-    await builder.secrets(),
+    await builder.secrets("minisign/privateKey", "minisign/password"),
   )
 
   const checksumDest = path.join(archivePath.path, checksumFile)

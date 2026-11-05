@@ -28,7 +28,10 @@ export function verifyWindDownload(directory: string): Promise<string> {
 /** Resolve dev-latest once per keyboard build; the resulting installer works offline. */
 export async function stageWindInstaller(buildDir: string): Promise<void> {
   if (!Deno.env.get("GH_TOKEN") && !Deno.env.get("GITHUB_TOKEN")) {
-    Deno.env.set("GH_TOKEN", (await builder.secrets()).get("github/token"))
+    Deno.env.set(
+      "GH_TOKEN",
+      (await builder.secrets("github/token")).get("github/token"),
+    )
   }
   using downloaded = await makeTempDir({ prefix: "keyboard-wind-" })
   const gh = new GitHub(REPO)

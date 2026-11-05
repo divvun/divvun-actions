@@ -54,7 +54,7 @@ export async function signSubethaedit(
   const pemFile = path.join(tempDir.path, "devid.pem")
   const emptyEntitlements = path.join(tempDir.path, "empty.entitlements")
 
-  const secrets = await builder.secrets()
+  const secrets = await builder.secrets("macos/appPem")
   await Deno.writeTextFile(pemFile, secrets.get("macos/appPem"))
   await Deno.writeTextFile(emptyEntitlements, EMPTY_ENTITLEMENTS)
 

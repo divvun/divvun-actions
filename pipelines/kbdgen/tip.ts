@@ -193,7 +193,7 @@ export async function runTipPublish() {
   const { name, version } = await downloadTipAsset(artifacts.path)
   const { checksumFile, signatureFile } = await createSignedChecksums(
     [name],
-    await builder.secrets(),
+    await builder.secrets("minisign/privateKey", "minisign/password"),
     artifacts.path,
   )
   const files = [path.join(artifacts.path, name), checksumFile, signatureFile]

@@ -22,7 +22,7 @@ export async function downloadDivvunRuntimeLib(
   // gh CLI on the agents won't run without GH_TOKEN; pull it from the secrets
   // store. Setting in the current process propagates to gh via inherited env.
   if (!Deno.env.get("GH_TOKEN")) {
-    const secrets = await builder.secrets()
+    const secrets = await builder.secrets("github/token")
     Deno.env.set("GH_TOKEN", secrets.get("github/token"))
   }
 

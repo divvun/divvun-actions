@@ -203,7 +203,7 @@ export async function runDictDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       [versionedFile],
-      await builder.secrets(),
+      await builder.secrets("minisign/privateKey", "minisign/password"),
     )
 
     logger.info(`Creating GitHub release for dictionary version ${tagVersion}`)
@@ -228,7 +228,7 @@ export async function runDictDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       [versionedFile],
-      await builder.secrets(),
+      await builder.secrets("minisign/privateKey", "minisign/password"),
     )
 
     logger.info(

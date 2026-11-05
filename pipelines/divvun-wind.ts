@@ -174,7 +174,7 @@ export async function runWindPublish() {
   }
   const { checksumFile, signatureFile } = await createSignedChecksums(
     files.map((file) => path.basename(file)),
-    await builder.secrets(),
+    await builder.secrets("minisign/privateKey", "minisign/password"),
     artifacts.path,
   )
   files.push(checksumFile, signatureFile)

@@ -167,4 +167,12 @@ export class SecretsStore {
   keys() {
     return this.#map.keys()
   }
+
+  only(keys: readonly string[]): SecretsStore {
+    const data: Record<string, string> = {}
+    for (const key of keys) {
+      data[key] = this.get(key)
+    }
+    return new SecretsStore(data)
+  }
 }

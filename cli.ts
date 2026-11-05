@@ -174,6 +174,11 @@ import macosSign from "./services/macos-codesign.ts"
 import sign from "./services/windows-codesign.ts"
 import { makeTempFile } from "./util/temp.ts"
 import type { InstallerKind } from "./actions/speller/bundle.ts"
+import {
+  isPrivilegedPipelineAction,
+  securePipelineForContext,
+} from "./util/privileged_action.ts"
+import { requireTrustedReleaseContext } from "./util/trusted_context.ts"
 
 /** Coerce a positional CLI arg to InstallerKind, or undefined when absent/unknown. */
 function installerArg(value: unknown): InstallerKind | undefined {
@@ -294,6 +299,7 @@ async function runSign(args: any) {
   if (skipSign) {
     return
   }
+  requireTrustedReleaseContext(builder.env, "sign an artifact")
   await sign(inputFile)
 }
 
@@ -305,6 +311,15 @@ function kbdgenBundlePathMobile(): string {
 
 async function runPipeline(args: any) {
   const pipeline = args._[0]
+
+  if (
+    isPrivilegedPipelineAction(
+      String(pipeline),
+      args._.slice(1).map((value: unknown) => String(value)),
+    )
+  ) {
+    requireTrustedReleaseContext(builder.env, `run '${pipeline}'`)
+  }
 
   switch (pipeline) {
     case "divvunspell":
@@ -976,7 +991,7 @@ export async function createCiPipeline(): Promise<BuildkitePipeline> {
     }
   }
 
-  return pipeline
+  return securePipelineForContext(pipeline, builder.env)
 }
 
 async function runCi(_args: any) {

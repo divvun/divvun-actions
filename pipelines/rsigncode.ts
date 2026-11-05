@@ -176,7 +176,7 @@ export async function runRsigncodePublish() {
 
   const { checksumFile, signatureFile } = await createSignedChecksums(
     allArtifacts,
-    await builder.secrets(),
+    await builder.secrets("minisign/privateKey", "minisign/password"),
   )
   await fs.copy(
     checksumFile,

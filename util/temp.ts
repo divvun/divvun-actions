@@ -12,16 +12,30 @@ export class DisposablePath {
   }
 
   [Symbol.dispose]() {
-    if (this.#isDisposed) {
-      Deno.removeSync(this.toString(), { recursive: true })
+    if (!this.#isDisposed) {
       this.#isDisposed = true
+      try {
+        Deno.removeSync(this.path, { recursive: true })
+      } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) {
+          this.#isDisposed = false
+          throw error
+        }
+      }
     }
   }
 
   async [Symbol.asyncDispose](): Promise<void> {
-    if (this.#isDisposed) {
-      await Deno.remove(this.toString(), { recursive: true })
+    if (!this.#isDisposed) {
       this.#isDisposed = true
+      try {
+        await Deno.remove(this.path, { recursive: true })
+      } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) {
+          this.#isDisposed = false
+          throw error
+        }
+      }
     }
   }
 

@@ -6,6 +6,7 @@ import { TextLineStream } from "@std/streams"
 import { buildkite as getEnv, Env } from "~/util/env.ts"
 import logger from "~/util/log.ts"
 import { OpenBao, SecretsStore } from "~/util/openbao.ts"
+import { requireTrustedReleaseContext } from "~/util/trusted_context.ts"
 
 const decoder = new TextDecoder()
 const encoder = new TextEncoder()
@@ -200,9 +201,13 @@ async function renewTokenInBackground(
   }
 }
 
-export async function secrets(): Promise<SecretsStore> {
+export async function secrets(
+  ...keys: [string, ...string[]]
+): Promise<SecretsStore> {
+  requireTrustedReleaseContext(env, "access CI secrets")
+
   if (redactedSecrets != null) {
-    return redactedSecrets
+    return redactedSecrets.only(keys)
   }
 
   const serviceToken = await bkSecret("divvun_actions_openbao_service_token")
@@ -223,7 +228,7 @@ export async function secrets(): Promise<SecretsStore> {
 
   redactedSecrets = raw
 
-  return redactedSecrets
+  return redactedSecrets.only(keys)
 }
 
 export async function group(name: string, callback: () => Promise<void>) {

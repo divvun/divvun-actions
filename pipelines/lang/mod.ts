@@ -427,7 +427,13 @@ export async function runLangDeploy() {
       versionedMobileFile,
       ...await versionedDesktopZhfsts(packageName, versionWithBuild),
     ]
-    const allSecrets = await builder.secrets()
+    const allSecrets = await builder.secrets(
+      "minisign/privateKey",
+      "minisign/password",
+      "s3/accessKeyId",
+      "s3/secretAccessKey",
+      "pahkat/apiKey",
+    )
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
       allSecrets,
@@ -526,7 +532,13 @@ export async function runLangDeploy() {
       versionedMobileFile,
       ...await versionedDesktopZhfsts(packageName, devVersion),
     ]
-    const allSecrets = await builder.secrets()
+    const allSecrets = await builder.secrets(
+      "minisign/privateKey",
+      "minisign/password",
+      "s3/accessKeyId",
+      "s3/secretAccessKey",
+      "pahkat/apiKey",
+    )
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
       allSecrets,
@@ -678,7 +690,7 @@ export async function runLangGrammarDeploy() {
     const artifacts = [versionedDrbFile, versionedZcheckFile]
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
-      await builder.secrets(),
+      await builder.secrets("minisign/privateKey", "minisign/password"),
     )
 
     logger.info(`Creating GitHub release for grammar version ${tagVersion}`)
@@ -712,7 +724,7 @@ export async function runLangGrammarDeploy() {
     const artifacts = [versionedDrbFile, versionedZcheckFile]
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
-      await builder.secrets(),
+      await builder.secrets("minisign/privateKey", "minisign/password"),
     )
 
     logger.info(
@@ -867,7 +879,7 @@ export async function runLangProofingDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
-      await builder.secrets(),
+      await builder.secrets("minisign/privateKey", "minisign/password"),
     )
 
     logger.info(`Creating GitHub release for proofing version ${tagVersion}`)
@@ -891,7 +903,7 @@ export async function runLangProofingDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
-      await builder.secrets(),
+      await builder.secrets("minisign/privateKey", "minisign/password"),
     )
 
     logger.info(
@@ -965,7 +977,7 @@ export async function runLangTtsTextprocDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       [versionedFile],
-      await builder.secrets(),
+      await builder.secrets("minisign/privateKey", "minisign/password"),
     )
 
     logger.info(
@@ -997,7 +1009,7 @@ export async function runLangTtsTextprocDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       [versionedFile],
-      await builder.secrets(),
+      await builder.secrets("minisign/privateKey", "minisign/password"),
     )
 
     logger.info(
@@ -1075,7 +1087,7 @@ export async function runLangTeakstaBundleDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       [versionedFile],
-      await builder.secrets(),
+      await builder.secrets("minisign/privateKey", "minisign/password"),
     )
 
     logger.info(`Creating GitHub release for teaksta bundle ${tagVersion}`)
@@ -1108,7 +1120,7 @@ export async function runLangTeakstaBundleDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       [versionedFile],
-      await builder.secrets(),
+      await builder.secrets("minisign/privateKey", "minisign/password"),
     )
 
     logger.info(
@@ -1198,7 +1210,7 @@ export async function runLangAnalyserDeploy() {
   const artifacts = [fstFile, drbFile]
   const { checksumFile, signatureFile } = await createSignedChecksums(
     artifacts,
-    await builder.secrets(),
+    await builder.secrets("minisign/privateKey", "minisign/password"),
   )
   logger.info(`Artifacts: ${artifacts.join(", ")}`)
 
