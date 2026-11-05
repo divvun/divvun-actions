@@ -26,5 +26,6 @@ export const {
   env,
   secrets,
   ciKey,
+  pahkatUploadToken,
   group,
 } = selectedBuilder

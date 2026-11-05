@@ -137,6 +137,25 @@ export class OpenBao {
     }
     return data
   }
+
+  /**
+   * An identity token OpenBao signs for its identity engine's role `role`,
+   * such as Pahkat's publisher token from `pahkat-main`.
+   */
+  async identityToken(role: string): Promise<string> {
+    const response = await (this.#client as any)[
+      `/identity/oidc/token/${role}`
+    ].get()
+    const json = await response.json()
+    const token = json?.data?.token
+    if (typeof token !== "string" || token === "") {
+      const errors = Array.isArray(json?.errors)
+        ? `: ${json.errors.join(", ")}`
+        : ""
+      throw new Error(`OpenBao gave no identity token for ${role}${errors}`)
+    }
+    return token
+  }
 }
 
 export class SecretsStore {

@@ -275,6 +275,20 @@ export async function ciKey(): Promise<CiKey> {
   return redactedCiKey
 }
 
+/**
+ * A publisher token for the Pahkat repository `repository`: an identity
+ * token OpenBao signs for its role `pahkat-<repository>`, addressed to
+ * pahkat-3.giellalt.org and valid for minutes. The server accepts each one
+ * once, so every `pahkat upload` run needs a fresh one.
+ */
+export async function pahkatUploadToken(repository: string): Promise<string> {
+  requireTrustedReleaseContext(env, "get a Pahkat publisher token")
+
+  const token = await (await vault()).identityToken(`pahkat-${repository}`)
+  await redactSecret(token)
+  return token
+}
+
 export async function group(name: string, callback: () => Promise<void>) {
   // deno-lint-ignore no-console
   console.log(`--- ${name}`)
