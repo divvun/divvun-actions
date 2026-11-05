@@ -303,6 +303,7 @@ export async function runLangBundle(
     spellerType,
     manifest,
     spellerPaths,
+    version: spellerReleaseVersion(manifest),
   })
 }
 
@@ -334,6 +335,29 @@ async function versionedDesktopZhfsts(
 function extractVersionFromTag(tag: string): string | null {
   const match = tag.match(/\/v(\d+\.\d+\.\d+(?:-\S+)?)$/)
   return match ? match[1] : null
+}
+
+/**
+ * The version of the speller release this build makes, which its installers
+ * and its mobile package carry too: the tag's, with the build number, on a
+ * speller release tag, and otherwise a dev version of the manifest's.
+ */
+function spellerReleaseVersion(manifest: SpellerManifest): string {
+  const tag = builder.env.tag
+  if (tag && SPELLER_RELEASE_TAG.test(tag)) {
+    const tagVersion = extractVersionFromTag(tag)
+    if (!tagVersion) {
+      throw new Error(`Could not extract version from tag: ${tag}`)
+    }
+    return builder.env.buildNumber
+      ? `${tagVersion}+build.${builder.env.buildNumber}`
+      : tagVersion
+  }
+  return versionAsDev(
+    manifest.package.speller.version,
+    builder.env.buildTimestamp,
+    builder.env.buildNumber,
+  )
 }
 
 function isPrerelease(version: string): boolean {
@@ -400,9 +424,7 @@ export async function runLangDeploy() {
 
     const prerelease = isPrerelease(tagVersion)
 
-    const versionWithBuild = builder.env.buildNumber
-      ? `${tagVersion}+build.${builder.env.buildNumber}`
-      : tagVersion
+    const versionWithBuild = spellerReleaseVersion(manifest)
 
     const langMatch = builder.env.repoName?.match(/lang-(.+)/)
     if (!langMatch) {
@@ -506,11 +528,7 @@ export async function runLangDeploy() {
       throw new Error("No repository information available")
     }
 
-    const devVersion = versionAsDev(
-      manifest.package.speller.version,
-      builder.env.buildTimestamp,
-      builder.env.buildNumber,
-    )
+    const devVersion = spellerReleaseVersion(manifest)
 
     const langMatch = builder.env.repoName?.match(/lang-(.+)/)
     if (!langMatch) {

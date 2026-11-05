@@ -1,13 +1,7 @@
 import * as path from "@std/path"
 
 import * as builder from "~/builder.ts"
-import {
-  Ditto,
-  SpellerPaths,
-  Tar,
-  ThfstTools,
-  versionAsNightly,
-} from "~/util/shared.ts"
+import { Ditto, SpellerPaths, Tar, ThfstTools } from "~/util/shared.ts"
 import { buildSpellerOutto } from "./bundle-outto.ts"
 import logger from "~/util/log.ts"
 import {
@@ -21,18 +15,19 @@ export type Props = {
   spellerType: SpellerType
   manifest: SpellerManifest
   spellerPaths: SpellerPaths
+  /** The version of the speller release the payload goes into. */
+  version: string
 }
 
 export type Output = {
   payloadPath: string
 }
 
-const RELEASE_TAG = /^speller-(.*?)\/v\d+\.\d+\.\d+(-\S+)?/
-
 export default async function spellerBundle({
   spellerType,
   manifest,
   spellerPaths,
+  version,
 }: Props): Promise<Output> {
   const spellerName = manifest.package.speller.name
   const packageId = derivePackageId(spellerType)
@@ -40,14 +35,6 @@ export default async function spellerBundle({
 
   let payloadPath: string
 
-  // TODO: allow release builds
-  const isSpellerReleaseTag = RELEASE_TAG.test(builder.env.tag ?? "")
-  const version = isSpellerReleaseTag
-    ? manifest.package.speller.version
-    : await versionAsNightly(
-      manifest.package.speller.version,
-      builder.env.buildNumber,
-    )
   logger.debug(
     `Speller bundle for ${spellerType} with version ${version} and langTag ${langTag}`,
   )
