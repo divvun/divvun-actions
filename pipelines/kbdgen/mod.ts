@@ -10,7 +10,7 @@ import { hasTextService } from "~/actions/kbd-tsf/installer.ts"
 import { TIP_BUILD_KEY, tipSteps } from "./tip.ts"
 import { v4PublishStep } from "./v4.ts"
 
-const platforms = {
+export const platforms = {
   macos: ["x86_64-apple-darwin", "aarch64-apple-darwin"],
   linux: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"],
   windows: ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"],
@@ -26,7 +26,7 @@ function command(input: CommandStep): CommandStep {
   }
 }
 
-function kbdgenPath(os: string, arch: string): string {
+export function kbdgenPath(os: string, arch: string): string {
   return `target/${arch}/release/kbdgen${os === "windows" ? ".exe" : ""}`
 }
 
@@ -168,6 +168,14 @@ export function pipelineKbdgen() {
     pipeline.steps.push(command({
       label: "Deploy",
       command: "divvun-actions run kbdgen-deploy",
+      depends_on: binaryStepKeys,
+      agents: {
+        queue: "linux",
+      },
+    }))
+    pipeline.steps.push(command({
+      label: "Publish to Pahkat",
+      command: "divvun-actions run kbdgen-pahkat-publish",
       depends_on: binaryStepKeys,
       agents: {
         queue: "linux",

@@ -110,6 +110,7 @@ import {
   runLibdivvunFstPublish,
 } from "./pipelines/divvunspell/mod.ts"
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
+import { runKbdgenPahkatPublish } from "./pipelines/kbdgen/pahkat.ts"
 import { runTipInstaller, runTipPublish } from "./pipelines/kbdgen/tip.ts"
 import { runKbdgenPublishV4 } from "./pipelines/kbdgen/v4.ts"
 import { pipelineKbdi, runKbdiPublish } from "./pipelines/kbdi/mod.ts"
@@ -440,6 +441,10 @@ async function runPipeline(args: any) {
     }
     case "kbdgen-deploy": {
       await runKbdgenDeploy()
+      break
+    }
+    case "kbdgen-pahkat-publish": {
+      await runKbdgenPahkatPublish()
       break
     }
     case "kbdgen-publish-v4": {
