@@ -11,15 +11,16 @@
 //   Windows: outto .exe that installs <tag>.drb into %ProgramData%\Divvun\Proofing.
 //   Linux:   .pkt.box holding <tag>.drb at its root.
 //
-// They are published as the proofing release on GitHub (see
+// Each is uploaded as a Pahkat artifact (util/pahkat_artifacts.ts), which
+// the proofing release on GitHub takes under its own name (see
 // pipelines/lang/mod.ts).
 
 import * as path from "@std/path"
-import * as builder from "~/builder.ts"
 import { makeOuttoInstaller } from "~/actions/outto/lib.ts"
 import macosSign from "~/services/macos-codesign.ts"
 import * as target from "~/target.ts"
 import { APP_CODESIGN_ID, codesignBundle } from "~/util/codesign-bundle.ts"
+import { uploadPahkatArtifact } from "~/util/pahkat_artifacts.ts"
 import { createPktBox } from "~/util/pkt_box.ts"
 import { Ditto } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
@@ -48,7 +49,7 @@ export type ProofingBundleProps = {
 }
 
 export type ProofingBundleOutput = {
-  /** Path to the uploaded artifact. */
+  /** The Buildkite artifact the payload was uploaded as. */
   payloadPath: string
   unsigned: boolean
 }
@@ -134,8 +135,8 @@ async function buildMacOS(
   await Ditto.zipApp(result.path, uploadPath)
   logger.debug(`Zipped .app for upload: ${uploadPath}`)
 
-  await builder.uploadArtifacts(uploadPath)
-  return { payloadPath: uploadPath, unsigned: false }
+  const artifact = await uploadPahkatArtifact(props.packageId, uploadPath)
+  return { payloadPath: artifact, unsigned: false }
 }
 
 // ── Windows ──────────────────────────────────────────────────────────────────
@@ -203,8 +204,8 @@ async function buildWindows(
     })
   }
 
-  await builder.uploadArtifacts(result.path)
-  return { payloadPath: result.path, unsigned: result.unsigned }
+  const artifact = await uploadPahkatArtifact(props.packageId, result.path)
+  return { payloadPath: artifact, unsigned: result.unsigned }
 }
 
 // ── Linux ────────────────────────────────────────────────────────────────────
@@ -221,8 +222,8 @@ async function buildLinux(
   })
   logger.debug(`Created Linux proofing package at ${outputPath}`)
 
-  await builder.uploadArtifacts(outputPath)
-  return { payloadPath: outputPath, unsigned: false }
+  const artifact = await uploadPahkatArtifact(props.packageId, outputPath)
+  return { payloadPath: artifact, unsigned: false }
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────

@@ -36,6 +36,10 @@ import { downloadCompressedArtifacts } from "~/util/compressed_artifact.ts"
 import { globFiles, globOneFile } from "~/util/glob.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums, release } from "~/util/hash.ts"
+import {
+  PAHKAT_ARTIFACT_SUFFIX,
+  pahkatArtifactName,
+} from "~/util/pahkat_artifacts.ts"
 import { versionAsDev } from "~/util/shared.ts"
 import { SOFT_FAIL_EXIT_STATUS } from "~/util/soft_failure.ts"
 import spellerBundle, {
@@ -862,13 +866,23 @@ export async function runLangProofingDeploy() {
   const isProofingReleaseTag = PROOFING_RELEASE_TAG.test(builder.env.tag ?? "")
   const isMainBranch = builder.env.branch === "main"
 
-  await builder.downloadArtifacts("proofing-*_noarch-macos.app.zip", ".")
-  await builder.downloadArtifacts("proofing-*_noarch-windows*.exe", ".")
-  await builder.downloadArtifacts("proofing-*_noarch-linux.pkt.box", ".")
+  const langTag = deriveLangTag()
+  const packageName = `proofing-${langTag}`
 
-  const macosFile = await globOneFile("proofing-*_noarch-macos.app.zip")
-  const windowsFile = await globOneFile("proofing-*_noarch-windows*.exe")
-  const linuxFile = await globOneFile("proofing-*_noarch-linux.pkt.box")
+  // The bundle steps leave Pahkat artifacts; the release takes them under
+  // their own names.
+  await builder.downloadArtifacts(`pahkat/${packageName}/*`, ".")
+  for (
+    const artifact of await globFiles(
+      `pahkat/${packageName}/*${PAHKAT_ARTIFACT_SUFFIX}`,
+    )
+  ) {
+    await Deno.rename(artifact, pahkatArtifactName(artifact))
+  }
+
+  const macosFile = await globOneFile(`${packageName}_*_noarch-macos.app.zip`)
+  const windowsFile = await globOneFile(`${packageName}_*_noarch-windows*.exe`)
+  const linuxFile = await globOneFile(`${packageName}_*_noarch-linux.pkt.box`)
 
   logger.info("Deploying proofing packages:")
   logger.info(`- macOS: ${macosFile}`)
@@ -893,8 +907,6 @@ export async function runLangProofingDeploy() {
     throw e
   }
 
-  const langTag = deriveLangTag()
-  const packageName = `proofing-${langTag}`
   const artifacts = [macosFile, windowsFile, linuxFile].map((file) =>
     path.basename(file)
   )
