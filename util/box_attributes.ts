@@ -1,5 +1,7 @@
 // Archive attributes for a box archive the box CLI wrote. The CLI sets only
-// its own, so the ones a .pkt.box needs are added to its trailer here.
+// its own, so the ones a .pkt.box needs are added to its trailer here. Once
+// the CI image's box can set them itself (`box create --attr`), this module
+// goes and createPktBox passes the attributes to it instead.
 //
 // A version 1 trailer begins with the attribute-key schema and the archive's
 // attribute map (box spec attributes.root); records, path index and block
@@ -7,7 +9,7 @@
 // those first two parts are rewritten, and new keys go after the existing
 // ones, so every key index the records hold stays valid.
 
-export const BOX_HEADER_SIZE = 32
+const BOX_HEADER_SIZE = 32
 
 const MAGIC = [0xff, 0x42, 0x4f, 0x58]
 const FLAG_EXTERNAL_LINKS = 0b01
@@ -204,4 +206,41 @@ function safe(value: bigint): number {
     throw new Error(`The box archive's trailer holds a value too large: ${value}`)
   }
   return Number(value)
+}
+
+/**
+ * Rewrite the trailer of `archive` in place with `attributes` added. The
+ * trailer starts where it did, so the header that points at it stands.
+ */
+export async function setArchiveAttributes(
+  archive: string,
+  attributes: Record<string, string>,
+): Promise<void> {
+  using file = await Deno.open(archive, { read: true, write: true })
+  const header = new Uint8Array(BOX_HEADER_SIZE)
+  await readFully(file, header)
+  const offset = boxTrailerOffset(header)
+
+  const { size } = await file.stat()
+  const trailer = new Uint8Array(size - offset)
+  await file.seek(offset, Deno.SeekMode.Start)
+  await readFully(file, trailer)
+
+  const updated = withArchiveAttributes(trailer, attributes)
+  await file.truncate(offset)
+  await file.seek(offset, Deno.SeekMode.Start)
+  let written = 0
+  while (written < updated.length) {
+    written += await file.write(updated.subarray(written))
+  }
+  await file.sync()
+}
+
+async function readFully(file: Deno.FsFile, buffer: Uint8Array) {
+  let read = 0
+  while (read < buffer.length) {
+    const n = await file.read(buffer.subarray(read))
+    if (n === null) throw new Error("The box archive ends early")
+    read += n
+  }
 }

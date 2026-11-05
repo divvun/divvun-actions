@@ -6,11 +6,7 @@
 
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
-import {
-  BOX_HEADER_SIZE,
-  boxTrailerOffset,
-  withArchiveAttributes,
-} from "~/util/box_attributes.ts"
+import { setArchiveAttributes } from "~/util/box_attributes.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
 export type PktBoxFile = {
@@ -66,41 +62,4 @@ export async function createPktBox(
     "pahkat.version": version,
   })
   await builder.exec("box", ["validate", "--quiet", output])
-}
-
-/**
- * Rewrite the trailer of `archive` in place with `attributes` added. The
- * trailer starts where it did, so the header that points at it stands.
- */
-async function setArchiveAttributes(
-  archive: string,
-  attributes: Record<string, string>,
-): Promise<void> {
-  using file = await Deno.open(archive, { read: true, write: true })
-  const header = new Uint8Array(BOX_HEADER_SIZE)
-  await readFully(file, header)
-  const offset = boxTrailerOffset(header)
-
-  const { size } = await file.stat()
-  const trailer = new Uint8Array(size - offset)
-  await file.seek(offset, Deno.SeekMode.Start)
-  await readFully(file, trailer)
-
-  const updated = withArchiveAttributes(trailer, attributes)
-  await file.truncate(offset)
-  await file.seek(offset, Deno.SeekMode.Start)
-  let written = 0
-  while (written < updated.length) {
-    written += await file.write(updated.subarray(written))
-  }
-  await file.sync()
-}
-
-async function readFully(file: Deno.FsFile, buffer: Uint8Array) {
-  let read = 0
-  while (read < buffer.length) {
-    const n = await file.read(buffer.subarray(read))
-    if (n === null) throw new Error("The box archive ends early")
-    read += n
-  }
 }
