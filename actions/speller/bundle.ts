@@ -1,7 +1,8 @@
 import * as path from "@std/path"
 
 import * as builder from "~/builder.ts"
-import { Ditto, SpellerPaths, Tar, ThfstTools } from "~/util/shared.ts"
+import { createPktBox } from "~/util/pkt_box.ts"
+import { Ditto, SpellerPaths, ThfstTools } from "~/util/shared.ts"
 import { buildSpellerOutto } from "./bundle-outto.ts"
 import logger from "~/util/log.ts"
 import {
@@ -51,13 +52,17 @@ export default async function spellerBundle({
       bhfstPaths.push(langTagBhfst)
     }
 
-    const pktPath = `${packageId}_${version}_noarch-mobile.pkt.tar.zst`
+    payloadPath = `${packageId}_${version}_noarch-mobile.pkt.box`
     logger.debug(
-      `Creating pkt from [${bhfstPaths.join(", ")}] at ${pktPath}`,
+      `Creating ${payloadPath} from [${bhfstPaths.join(", ")}]`,
     )
-    payloadPath = pktPath
-    await Tar.createFlatPkt(bhfstPaths, payloadPath)
-    logger.debug(`Created pkt at ${payloadPath}`)
+    // The keyboards read the spellers in place from the kept archive.
+    await createPktBox(payloadPath, {
+      pkg: packageId,
+      version,
+      files: bhfstPaths.map((file) => ({ path: file, stored: true })),
+    })
+    logger.debug(`Created ${payloadPath}`)
   } else if (
     spellerType == SpellerType.Windows || spellerType == SpellerType.MacOS
   ) {

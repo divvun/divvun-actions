@@ -370,12 +370,13 @@ function isPrerelease(version: string): boolean {
 }
 
 /**
- * The speller's outto installers, as spellerBundle uploads them. The proofing
- * installers of the same build are also outto installers, so these name the
+ * The speller's payloads, as spellerBundle uploads them. The proofing
+ * packages of the same build are built the same way, so these name the
  * speller's.
  */
 const SPELLER_WINDOWS_ARTIFACT = "speller-*_noarch-windows*.exe"
 const SPELLER_MACOS_ARTIFACT = "speller-*_noarch-macos.app.zip"
+const SPELLER_MOBILE_ARTIFACT = "speller-*_noarch-mobile.pkt.box"
 
 export async function runLangDeploy() {
   const isSpellerReleaseTag = SPELLER_RELEASE_TAG.test(builder.env.tag ?? "")
@@ -391,13 +392,13 @@ export async function runLangDeploy() {
     throw e
   }
 
-  await builder.downloadArtifacts("*.pkt.tar.zst", ".")
+  await builder.downloadArtifacts(SPELLER_MOBILE_ARTIFACT, ".")
   await builder.downloadArtifacts(SPELLER_WINDOWS_ARTIFACT, ".")
   await builder.downloadArtifacts(SPELLER_MACOS_ARTIFACT, ".")
 
   const windowsFiles = await globOneFile(SPELLER_WINDOWS_ARTIFACT)
   const macosFiles = await globOneFile(SPELLER_MACOS_ARTIFACT)
-  const mobileFiles = await globOneFile("*-mobile.pkt.tar.zst")
+  const mobileFiles = await globOneFile(SPELLER_MOBILE_ARTIFACT)
 
   logger.info("Deploying language files:")
   logger.info(`- Windows: ${windowsFiles}`)
@@ -440,7 +441,7 @@ export async function runLangDeploy() {
     const versionedMacosFile =
       `${packageName}_${versionWithBuild}_noarch-macos.app.zip`
     const versionedMobileFile =
-      `${packageName}_${versionWithBuild}_noarch-mobile.pkt.tar.zst`
+      `${packageName}_${versionWithBuild}_noarch-mobile.pkt.box`
 
     await Deno.rename(windowsFiles, versionedWindowsFile)
     await Deno.rename(macosFiles, versionedMacosFile)
@@ -545,7 +546,7 @@ export async function runLangDeploy() {
     const versionedMacosFile =
       `${packageName}_${devVersion}_noarch-macos.app.zip`
     const versionedMobileFile =
-      `${packageName}_${devVersion}_noarch-mobile.pkt.tar.zst`
+      `${packageName}_${devVersion}_noarch-mobile.pkt.box`
 
     await Deno.rename(windowsFiles, versionedWindowsFile)
     await Deno.rename(macosFiles, versionedMacosFile)
