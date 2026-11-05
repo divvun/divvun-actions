@@ -173,18 +173,11 @@ import {
 import macosSign from "./services/macos-codesign.ts"
 import sign from "./services/windows-codesign.ts"
 import { makeTempFile } from "./util/temp.ts"
-import type { InstallerKind } from "./actions/speller/bundle.ts"
 import {
   isPrivilegedPipelineAction,
   securePipelineForContext,
 } from "./util/privileged_action.ts"
 import { requireTrustedReleaseContext } from "./util/trusted_context.ts"
-
-/** Coerce a positional CLI arg to InstallerKind, or undefined when absent/unknown. */
-function installerArg(value: unknown): InstallerKind | undefined {
-  if (value === "outto" || value === "legacy") return value
-  return undefined
-}
 
 enum Command {
   Run = "run",
@@ -335,23 +328,16 @@ async function runPipeline(args: any) {
     }
     case "divvun-keyboard-windows": {
       const kbdgenBundlePath = builder.env.repoName.split("-")[1] + ".kbdgen"
-      await runDesktopKeyboardWindows(
-        kbdgenBundlePath,
-        installerArg(args._[1]),
-      )
+      await runDesktopKeyboardWindows(kbdgenBundlePath)
       break
     }
     case "divvun-keyboard-windows-v4": {
-      await runDesktopKeyboardWindows(
-        desktopKeyboardBundlePath(),
-        installerArg(args._[1]) ?? "outto",
-        "v4",
-      )
+      await runDesktopKeyboardWindows(desktopKeyboardBundlePath(), "v4")
       break
     }
     case "divvun-keyboard-macos": {
       const kbdgenBundlePath = builder.env.repoName.split("-")[1] + ".kbdgen"
-      await runDesktopKeyboardMacOS(kbdgenBundlePath, installerArg(args._[1]))
+      await runDesktopKeyboardMacOS(kbdgenBundlePath)
       break
     }
     case "lang-deps": {
@@ -383,10 +369,7 @@ async function runPipeline(args: any) {
       break
     }
     case "lang-bundle": {
-      await runLangBundle({
-        target: args._[1],
-        installer: installerArg(args._[2]),
-      })
+      await runLangBundle({ target: args._[1] })
       break
     }
     case "lang-deploy": {

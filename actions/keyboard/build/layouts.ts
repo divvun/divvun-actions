@@ -1,6 +1,5 @@
-// What both Windows keyboard installers (Inno Setup and outto) need to know
-// about a kbdgen bundle's layouts and, for kbdgen v4, the layout DLLs kbdgen
-// built for them.
+// What the Windows keyboard installer needs to know about a kbdgen bundle's
+// layouts and, for kbdgen v4, the layout DLLs kbdgen built for them.
 
 // deno-lint-ignore-file no-explicit-any
 import * as path from "@std/path"

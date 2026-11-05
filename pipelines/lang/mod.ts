@@ -37,9 +37,7 @@ import { globFiles, globOneFile } from "~/util/glob.ts"
 import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums, release } from "~/util/hash.ts"
 import { versionAsDev } from "~/util/shared.ts"
-import spellerBundle, {
-  type InstallerKind,
-} from "../../actions/speller/bundle.ts"
+import spellerBundle from "../../actions/speller/bundle.ts"
 import spellerDeploy from "../../actions/speller/deploy.ts"
 import {
   deriveLangTag,
@@ -268,10 +266,7 @@ export async function runLangGrammarTest() {
 }
 
 export async function runLangBundle(
-  { target, installer }: {
-    target: "windows" | "macos" | "mobile"
-    installer?: InstallerKind
-  },
+  { target }: { target: "windows" | "macos" | "mobile" },
 ) {
   // Each installer packs only its own variant.
   await builder.downloadArtifacts(
@@ -308,7 +303,6 @@ export async function runLangBundle(
     spellerType,
     manifest,
     spellerPaths,
-    installer,
   })
 }
 
@@ -351,6 +345,14 @@ function isPrerelease(version: string): boolean {
   }
 }
 
+/**
+ * The speller's outto installers, as spellerBundle uploads them. The proofing
+ * installers of the same build are also outto installers, so these name the
+ * speller's.
+ */
+const SPELLER_WINDOWS_ARTIFACT = "speller-*_noarch-windows*.exe"
+const SPELLER_MACOS_ARTIFACT = "speller-*_noarch-macos.app.zip"
+
 export async function runLangDeploy() {
   const isSpellerReleaseTag = SPELLER_RELEASE_TAG.test(builder.env.tag ?? "")
   const isMainBranch = builder.env.branch === "main"
@@ -366,11 +368,11 @@ export async function runLangDeploy() {
   }
 
   await builder.downloadArtifacts("*.pkt.tar.zst", ".")
-  await builder.downloadArtifacts("*.exe", ".")
-  await builder.downloadArtifacts("*.pkg", ".")
+  await builder.downloadArtifacts(SPELLER_WINDOWS_ARTIFACT, ".")
+  await builder.downloadArtifacts(SPELLER_MACOS_ARTIFACT, ".")
 
-  const windowsFiles = await globOneFile("*.exe")
-  const macosFiles = await globOneFile("*.pkg")
+  const windowsFiles = await globOneFile(SPELLER_WINDOWS_ARTIFACT)
+  const macosFiles = await globOneFile(SPELLER_MACOS_ARTIFACT)
   const mobileFiles = await globOneFile("*-mobile.pkt.tar.zst")
 
   logger.info("Deploying language files:")
@@ -414,7 +416,7 @@ export async function runLangDeploy() {
     const versionedWindowsFile =
       `${packageName}_${versionWithBuild}_noarch-windows.exe`
     const versionedMacosFile =
-      `${packageName}_${versionWithBuild}_noarch-macos.pkg`
+      `${packageName}_${versionWithBuild}_noarch-macos.app.zip`
     const versionedMobileFile =
       `${packageName}_${versionWithBuild}_noarch-mobile.pkt.tar.zst`
 
@@ -522,7 +524,8 @@ export async function runLangDeploy() {
 
     const versionedWindowsFile =
       `${packageName}_${devVersion}_noarch-windows.exe`
-    const versionedMacosFile = `${packageName}_${devVersion}_noarch-macos.pkg`
+    const versionedMacosFile =
+      `${packageName}_${devVersion}_noarch-macos.app.zip`
     const versionedMobileFile =
       `${packageName}_${devVersion}_noarch-mobile.pkt.tar.zst`
 
@@ -1523,10 +1526,6 @@ export async function pipelineLang() {
 
   // Bundle phase steps array (only on deploy)
   const bundleSteps: CommandStep[] = []
-  // Outto validation steps go into their own side group so they're isolated
-  // from the legacy bundle/deploy chain. Each is soft_fail and the group's
-  // key is not referenced by any downstream step.
-  const outtoBundleSteps: CommandStep[] = []
 
   if (isSpellerDeploy) {
     bundleSteps.push(command({
@@ -1558,32 +1557,10 @@ export async function pipelineLang() {
         queue: "macos",
       },
     }))
-
-    outtoBundleSteps.push(command({
-      label: "Bundle Speller (Windows, outto)",
-      key: "speller-bundle-windows-outto",
-      command: "divvun-actions run lang-bundle windows outto",
-      depends_on: "speller-build",
-      soft_fail: true,
-      agents: {
-        queue: "windows",
-      },
-    }))
-
-    outtoBundleSteps.push(command({
-      label: "Bundle Speller (macOS, outto)",
-      key: "speller-bundle-macos-outto",
-      command: "divvun-actions run lang-bundle macos outto",
-      depends_on: "speller-build",
-      soft_fail: true,
-      agents: {
-        queue: "macos",
-      },
-    }))
   }
 
   // Experimental proofing packages (x-proofing-<lang>): wrap the selected DRB
-  // per-OS. soft_fail keeps them from blocking the legacy speller/grammar chain.
+  // per-OS. soft_fail keeps them from blocking the speller/grammar chain.
   if (proofing && isProofingDeploy) {
     for (
       const [os, queue] of [
@@ -1728,16 +1705,6 @@ export async function pipelineLang() {
       group: "Bundle",
       key: "bundle",
       steps: bundleSteps,
-    })
-  }
-
-  if (outtoBundleSteps.length > 0) {
-    // Side group: isolated from the legacy bundle/deploy chain. Group key
-    // "outto" is intentionally not used in any depends_on.
-    steps.push({
-      group: "Outto (validation)",
-      key: "outto",
-      steps: outtoBundleSteps,
     })
   }
 

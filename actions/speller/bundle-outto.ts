@@ -1,10 +1,5 @@
-// Speller installer build path that uses outto instead of Inno Setup (Windows)
-// or pkgbuild/productbuild (macOS).
-//
-// Opt-in: callers select this path via the `installer: "outto"` flag on
-// spellerBundle(). Until the matching Pahkat upload type lands, this path
-// stops at "signed artifact written to disk" — uploads still go through the
-// legacy code path.
+// The desktop speller installers, built with outto: a self-extracting .exe on
+// Windows and an installer .app on macOS.
 
 import * as path from "@std/path"
 import * as toml from "@std/toml"
@@ -98,6 +93,14 @@ async function buildWindows(
     .privileges("admin")
     .architecture("any")
     .defaultDir(`#{commonpf}/WinDivvun/Spellers/${props.langTag}`)
+    // The Inno Setup speller installed the same files into the same
+    // directory under this AppId. Its uninstaller would delete the files the
+    // spell checker holds open only at the next restart, after outto has
+    // written their replacements, so outto takes the install over instead.
+    .legacyInnoAppId(
+      innoAppId(props.manifest.windows.system_product_code),
+      "adopt",
+    )
 
   // Files: each zhfst + speller.toml end up in #{app}.
   for (const name of zhfstNames) {
@@ -174,6 +177,22 @@ async function buildWindows(
   return { payloadPath: result.path, unsigned: result.unsigned }
 }
 
+/**
+ * The bare GUID outto takes as an Inno Setup AppId, from a manifest's
+ * `system_product_code`, which names the Inno install's Add/Remove Programs
+ * key: `{<GUID>}_is1`.
+ */
+function innoAppId(systemProductCode: string): string {
+  const guid = systemProductCode.replace(/_is1$/, "").replace(/^\{(.*)\}$/, "$1")
+  if (!/^[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$/.test(guid)) {
+    throw new Error(
+      `system_product_code ${systemProductCode} does not name an Inno Setup ` +
+        "AppId of the form {<GUID>}_is1",
+    )
+  }
+  return guid
+}
+
 // ── macOS ──────────────────────────────────────────────────────────────────
 
 async function buildMacOS(
@@ -191,9 +210,8 @@ async function buildMacOS(
   const bundleName = `${packageName}.${props.langTag}.bundle`
   const bundleDir = path.join(stage.path, bundleName)
 
-  // Build the speller bundle (Info.plist + speller.zhfst). Same payload shape
-  // as bundle-macos.ts:createBundle, just inlined here so the outto path is
-  // self-contained.
+  // The speller bundle MacDivvun finds in /Library/Services: Info.plist and
+  // speller.zhfst.
   const contentsDir = path.join(bundleDir, "Contents")
   const resourcesDir = path.join(contentsDir, "Resources")
   await Deno.mkdir(resourcesDir, { recursive: true })

@@ -5,7 +5,6 @@
 //   - Windows: a self-extracting `.exe`
 //   - macOS:   an `.app` bundle
 //
-// This module is the opt-in equivalent of actions/inno-setup/lib.ts:makeInstaller.
 // It assumes `outto` is on PATH (provisioned by the builder image).
 
 import * as path from "@std/path"
