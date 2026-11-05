@@ -1,4 +1,5 @@
 import * as fs from "@std/fs"
+import * as path from "@std/path"
 import * as semver from "@std/semver"
 import * as toml from "@std/toml"
 import * as yaml from "@std/yaml"
@@ -34,7 +35,7 @@ import * as target from "~/target.ts"
 import { downloadCompressedArtifacts } from "~/util/compressed_artifact.ts"
 import { globFiles, globOneFile } from "~/util/glob.ts"
 import { GitHub } from "~/util/github.ts"
-import { createSignedChecksums } from "~/util/hash.ts"
+import { createSignedChecksums, release } from "~/util/hash.ts"
 import { versionAsDev } from "~/util/shared.ts"
 import spellerBundle, {
   type InstallerKind,
@@ -428,22 +429,26 @@ export async function runLangDeploy() {
       ...await versionedDesktopZhfsts(packageName, versionWithBuild),
     ]
     const allSecrets = await builder.secrets(
-      "minisign/privateKey",
-      "minisign/password",
       "s3/accessKeyId",
       "s3/secretAccessKey",
       "pahkat/apiKey",
     )
+    const gh = new GitHub(builder.env.repo)
+    const pahkatSkip = await pahkatSkipReasonForBuild(gh)
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
-      allSecrets,
+      await builder.ciKey(),
+      release(builder.env, {
+        tag: builder.env.tag,
+        version: versionWithBuild,
+        package: pahkatSkip ? undefined : `main/${packageName}`,
+      }),
     )
 
     logger.info(`Creating GitHub release for speller version ${tagVersion}`)
     logger.info(`Pre-release: ${prerelease}`)
     logger.info(`Artifacts: ${artifacts.join(", ")}`)
 
-    const gh = new GitHub(builder.env.repo)
     await gh.createRelease(
       builder.env.tag,
       [...artifacts, checksumFile, signatureFile],
@@ -452,7 +457,6 @@ export async function runLangDeploy() {
 
     logger.info("Speller GitHub release created successfully")
 
-    const pahkatSkip = await pahkatSkipReasonForBuild(gh)
     if (pahkatSkip) {
       logger.info(
         `Skipping pahkat publish for ${builder.env.repoName}: ${pahkatSkip}`,
@@ -533,15 +537,20 @@ export async function runLangDeploy() {
       ...await versionedDesktopZhfsts(packageName, devVersion),
     ]
     const allSecrets = await builder.secrets(
-      "minisign/privateKey",
-      "minisign/password",
       "s3/accessKeyId",
       "s3/secretAccessKey",
       "pahkat/apiKey",
     )
+    const gh = new GitHub(builder.env.repo)
+    const pahkatSkip = await pahkatSkipReasonForBuild(gh)
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
-      allSecrets,
+      await builder.ciKey(),
+      release(builder.env, {
+        tag: releaseTag,
+        version: devVersion,
+        package: pahkatSkip ? undefined : `main/${packageName}`,
+      }),
     )
 
     logger.info(
@@ -551,7 +560,6 @@ export async function runLangDeploy() {
     logger.info(`Artifacts: ${artifacts.join(", ")}`)
 
     const releaseName = `${packageName}/v${devVersion}`
-    const gh = new GitHub(builder.env.repo)
     await gh.updateRelease(
       releaseTag,
       [...artifacts, checksumFile, signatureFile],
@@ -560,7 +568,6 @@ export async function runLangDeploy() {
 
     logger.info("Speller dev-latest GitHub release updated successfully")
 
-    const pahkatSkip = await pahkatSkipReasonForBuild(gh)
     if (pahkatSkip) {
       logger.info(
         `Skipping pahkat publish for ${builder.env.repoName}: ${pahkatSkip}`,
@@ -690,7 +697,8 @@ export async function runLangGrammarDeploy() {
     const artifacts = [versionedDrbFile, versionedZcheckFile]
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
-      await builder.secrets("minisign/privateKey", "minisign/password"),
+      await builder.ciKey(),
+      release(builder.env, { tag: builder.env.tag, version: versionWithBuild }),
     )
 
     logger.info(`Creating GitHub release for grammar version ${tagVersion}`)
@@ -724,7 +732,8 @@ export async function runLangGrammarDeploy() {
     const artifacts = [versionedDrbFile, versionedZcheckFile]
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
-      await builder.secrets("minisign/privateKey", "minisign/password"),
+      await builder.ciKey(),
+      release(builder.env, { tag: releaseTag, version: devVersion }),
     )
 
     logger.info(
@@ -865,7 +874,9 @@ export async function runLangProofingDeploy() {
 
   const langTag = deriveLangTag()
   const packageName = `x-proofing-${langTag}`
-  const artifacts = [macosFile, windowsFile, linuxFile]
+  const artifacts = [macosFile, windowsFile, linuxFile].map((file) =>
+    path.basename(file)
+  )
 
   if (isProofingReleaseTag) {
     if (!builder.env.tag) {
@@ -879,7 +890,8 @@ export async function runLangProofingDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
-      await builder.secrets("minisign/privateKey", "minisign/password"),
+      await builder.ciKey(),
+      release(builder.env, { tag: builder.env.tag, version: tagVersion }),
     )
 
     logger.info(`Creating GitHub release for proofing version ${tagVersion}`)
@@ -903,7 +915,8 @@ export async function runLangProofingDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
-      await builder.secrets("minisign/privateKey", "minisign/password"),
+      await builder.ciKey(),
+      release(builder.env, { tag: releaseTag, version: devVersion }),
     )
 
     logger.info(
@@ -977,7 +990,8 @@ export async function runLangTtsTextprocDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       [versionedFile],
-      await builder.secrets("minisign/privateKey", "minisign/password"),
+      await builder.ciKey(),
+      release(builder.env, { tag: builder.env.tag, version: versionWithBuild }),
     )
 
     logger.info(
@@ -1009,7 +1023,8 @@ export async function runLangTtsTextprocDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       [versionedFile],
-      await builder.secrets("minisign/privateKey", "minisign/password"),
+      await builder.ciKey(),
+      release(builder.env, { tag: releaseTag, version: devVersion }),
     )
 
     logger.info(
@@ -1087,7 +1102,8 @@ export async function runLangTeakstaBundleDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       [versionedFile],
-      await builder.secrets("minisign/privateKey", "minisign/password"),
+      await builder.ciKey(),
+      release(builder.env, { tag: builder.env.tag, version: versionWithBuild }),
     )
 
     logger.info(`Creating GitHub release for teaksta bundle ${tagVersion}`)
@@ -1120,7 +1136,8 @@ export async function runLangTeakstaBundleDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       [versionedFile],
-      await builder.secrets("minisign/privateKey", "minisign/password"),
+      await builder.ciKey(),
+      release(builder.env, { tag: releaseTag, version: devVersion }),
     )
 
     logger.info(
@@ -1207,21 +1224,26 @@ export async function runLangAnalyserDeploy() {
   await Deno.rename(ANALYSER_FST_BUNDLE, fstFile)
   await Deno.rename(ANALYSER_DRB, drbFile)
 
+  const releaseTag = isAnalyserReleaseTag ? tag! : `${packageName}/dev-latest`
   const artifacts = [fstFile, drbFile]
   const { checksumFile, signatureFile } = await createSignedChecksums(
     artifacts,
-    await builder.secrets("minisign/privateKey", "minisign/password"),
+    await builder.ciKey(),
+    release(builder.env, { tag: releaseTag, version }),
   )
   logger.info(`Artifacts: ${artifacts.join(", ")}`)
 
   const gh = new GitHub(builder.env.repo)
   if (isAnalyserReleaseTag) {
-    logger.info(`Creating GitHub release ${tag} (pre-release: ${prerelease})`)
-    await gh.createRelease(tag!, [...artifacts, checksumFile, signatureFile], {
-      prerelease,
-    })
+    logger.info(
+      `Creating GitHub release ${releaseTag} (pre-release: ${prerelease})`,
+    )
+    await gh.createRelease(
+      releaseTag,
+      [...artifacts, checksumFile, signatureFile],
+      { prerelease },
+    )
   } else {
-    const releaseTag = `${packageName}/dev-latest`
     logger.info(`Updating GitHub release ${releaseTag}`)
     await gh.updateRelease(
       releaseTag,

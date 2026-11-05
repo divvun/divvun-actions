@@ -5,6 +5,7 @@ import * as path from "@std/path"
 import { TextLineStream } from "@std/streams"
 import { buildkite as getEnv, Env } from "~/util/env.ts"
 import logger from "~/util/log.ts"
+import type { CiKey } from "~/util/hash.ts"
 import { OpenBao, SecretsStore } from "~/util/openbao.ts"
 import { requireTrustedReleaseContext } from "~/util/trusted_context.ts"
 
@@ -210,17 +211,7 @@ export async function secrets(
     return redactedSecrets.only(keys)
   }
 
-  const serviceToken = await bkSecret("divvun_actions_openbao_service_token")
-  if (serviceToken == null) {
-    throw new Error("No service token found")
-  }
-  const endpoint = "https://vault.giellalt.org"
-
-  // Fire off renewal check in background - doesn't block
-  renewTokenInBackground(serviceToken, endpoint)
-
-  const vault = await OpenBao.fromServiceToken(endpoint, serviceToken)
-  const raw = await vault.secrets()
+  const raw = await (await vault()).secrets()
 
   for (const value of raw.values()) {
     await redactSecret(value)
@@ -229,6 +220,59 @@ export async function secrets(
   redactedSecrets = raw
 
   return redactedSecrets.only(keys)
+}
+
+let vaultLogin: Promise<OpenBao> | undefined
+
+/** One OpenBao login per process: each mints a one-use AppRole secret id. */
+function vault(): Promise<OpenBao> {
+  vaultLogin ??= (async () => {
+    const serviceToken = await bkSecret("divvun_actions_openbao_service_token")
+    if (serviceToken == null) {
+      throw new Error("No service token found")
+    }
+    const endpoint = "https://vault.giellalt.org"
+
+    // Fire off renewal check in background - doesn't block
+    renewTokenInBackground(serviceToken, endpoint)
+
+    return await OpenBao.fromServiceToken(endpoint, serviceToken)
+  })()
+  return vaultLogin
+}
+
+let redactedCiKey: CiKey | undefined
+
+/**
+ * Pahkat's CI key, which signs every release's BLAKE3SUMS. Its secret half
+ * and its password are separate entries, so a leak of one is not enough to
+ * sign.
+ */
+export async function ciKey(): Promise<CiKey> {
+  requireTrustedReleaseContext(env, "sign with the CI key")
+
+  if (redactedCiKey != null) {
+    return redactedCiKey
+  }
+
+  const client = await vault()
+  const { secretKey } = await client.entry("pahkat-ci-key")
+  const { password } = await client.entry("pahkat-ci-key-password")
+  if (!secretKey || !password) {
+    throw new Error("OpenBao's entries for the CI key are incomplete")
+  }
+
+  // Line by line, as the redactor takes one value at a time; the key file's
+  // fixed first line is not secret, and redacting it would mask it everywhere.
+  for (const line of secretKey.split("\n")) {
+    if (line.trim() !== "" && !line.startsWith("untrusted comment:")) {
+      await redactSecret(line.trim())
+    }
+  }
+  await redactSecret(password)
+
+  redactedCiKey = { secretKey, password }
+  return redactedCiKey
 }
 
 export async function group(name: string, callback: () => Promise<void>) {

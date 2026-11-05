@@ -25,5 +25,6 @@ export const {
   downloadArtifacts,
   env,
   secrets,
+  ciKey,
   group,
 } = selectedBuilder

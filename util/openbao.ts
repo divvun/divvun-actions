@@ -126,6 +126,17 @@ export class OpenBao {
     const json = await response.json()
     return new SecretsStore(json.data.data)
   }
+
+  /** The fields of one entry of the ci mount other than build. */
+  async entry(name: string): Promise<Record<string, string>> {
+    const response = await (this.#client as any)[`/ci/data/${name}`].get()
+    const json = await response.json()
+    const data = json?.data?.data
+    if (data == null) {
+      throw new Error(`OpenBao has no entry ci/${name}`)
+    }
+    return data
+  }
 }
 
 export class SecretsStore {

@@ -6,7 +6,7 @@ import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import { globOneDir, globOneFile } from "~/util/glob.ts"
 import { GitHub, ghWithRetry } from "~/util/github.ts"
-import { createSignedChecksums } from "~/util/hash.ts"
+import { createSignedChecksums, release } from "~/util/hash.ts"
 import logger from "~/util/log.ts"
 import { versionAsDev } from "~/util/shared.ts"
 
@@ -203,7 +203,11 @@ export async function runDictDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       [versionedFile],
-      await builder.secrets("minisign/privateKey", "minisign/password"),
+      await builder.ciKey(),
+      release(builder.env, {
+        tag: builder.env.tag,
+        version: versionWithBuild,
+      }),
     )
 
     logger.info(`Creating GitHub release for dictionary version ${tagVersion}`)
@@ -228,7 +232,8 @@ export async function runDictDeploy() {
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       [versionedFile],
-      await builder.secrets("minisign/privateKey", "minisign/password"),
+      await builder.ciKey(),
+      release(builder.env, { tag: releaseTag, version: devVersion }),
     )
 
     logger.info(

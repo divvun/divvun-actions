@@ -1,4 +1,3 @@
-import * as fs from "@std/fs"
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
@@ -6,7 +5,7 @@ import * as targetModule from "~/target.ts"
 import { downloadBinary } from "~/util/artifact_download.ts"
 import { assetFileName, assetStem } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
-import { createSignedChecksums } from "~/util/hash.ts"
+import { createSignedChecksums, release } from "~/util/hash.ts"
 import { Tar, versionAsDev, Zip } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
@@ -174,22 +173,15 @@ export async function runRsigncodePublish() {
     allArtifacts.push(outPath)
   }
 
-  const { checksumFile, signatureFile } = await createSignedChecksums(
-    allArtifacts,
-    await builder.secrets("minisign/privateKey", "minisign/password"),
+  await createSignedChecksums(
+    allArtifacts.map((file) => path.basename(file)),
+    await builder.ciKey(),
+    release(builder.env, {
+      tag: isRelease ? builder.env.tag! : "dev-latest",
+      version,
+    }),
+    archivePath.path,
   )
-  await fs.copy(
-    checksumFile,
-    path.join(archivePath.path, checksumFile),
-    { overwrite: true },
-  )
-  await fs.copy(
-    signatureFile,
-    path.join(archivePath.path, signatureFile),
-    { overwrite: true },
-  )
-  await Deno.remove(checksumFile)
-  await Deno.remove(signatureFile)
 
   const gh = new GitHub(builder.env.repo)
   if (isRelease) {

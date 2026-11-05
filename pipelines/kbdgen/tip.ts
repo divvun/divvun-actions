@@ -23,7 +23,7 @@ import {
 import { assetFileName } from "~/util/asset_name.ts"
 import { downloadBinary } from "~/util/artifact_download.ts"
 import { GitHub } from "~/util/github.ts"
-import { blake3Hash, createSignedChecksums } from "~/util/hash.ts"
+import { blake3Hash, createSignedChecksums, release } from "~/util/hash.ts"
 import { versionAsDev } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
@@ -193,7 +193,11 @@ export async function runTipPublish() {
   const { name, version } = await downloadTipAsset(artifacts.path)
   const { checksumFile, signatureFile } = await createSignedChecksums(
     [name],
-    await builder.secrets("minisign/privateKey", "minisign/password"),
+    await builder.ciKey(),
+    release(builder.env, {
+      tag: mode === "release" ? builder.env.tag! : TIP_DEV_TAG,
+      version,
+    }),
     artifacts.path,
   )
   const files = [path.join(artifacts.path, name), checksumFile, signatureFile]

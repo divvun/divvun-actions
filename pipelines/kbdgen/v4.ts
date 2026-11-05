@@ -12,7 +12,7 @@ import { hasTextService } from "~/actions/kbd-tsf/installer.ts"
 import type { CommandStep } from "~/builder/pipeline.ts"
 import { assetFileName, assetStem } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
-import { createSignedChecksums } from "~/util/hash.ts"
+import { createSignedChecksums, release } from "~/util/hash.ts"
 import logger from "~/util/log.ts"
 import { versionAsDev } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
@@ -124,7 +124,8 @@ export async function runKbdgenPublishV4() {
 
   const { checksumFile, signatureFile } = await createSignedChecksums(
     names,
-    await builder.secrets("minisign/privateKey", "minisign/password"),
+    await builder.ciKey(),
+    release(builder.env, { tag: KBDGEN_V4_TAG, version }),
     assets,
   )
   logger.info(`Publishing to ${KBDGEN_V4_TAG}: ${names.join(", ")}`)

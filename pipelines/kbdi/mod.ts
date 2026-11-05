@@ -12,7 +12,7 @@ import * as target from "~/target.ts"
 import { downloadBinary, downloadBinaryCmd } from "~/util/artifact_download.ts"
 import { assetFileName } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
-import { createSignedChecksums } from "~/util/hash.ts"
+import { createSignedChecksums, release } from "~/util/hash.ts"
 import logger from "~/util/log.ts"
 import { versionAsDev } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
@@ -180,7 +180,8 @@ export async function runKbdiPublish() {
 
   const { checksumFile, signatureFile } = await createSignedChecksums(
     names,
-    await builder.secrets("minisign/privateKey", "minisign/password"),
+    await builder.ciKey(),
+    release(builder.env, { tag: prerelease.tag, version }),
     assets,
   )
   logger.info(`Publishing to ${prerelease.tag}: ${names.join(", ")}`)

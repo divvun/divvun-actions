@@ -11,7 +11,7 @@ import * as targetModule from "~/target.ts"
 import { downloadBinary } from "~/util/artifact_download.ts"
 import { assetStem, assetTarget } from "~/util/asset_name.ts"
 import { GitHub } from "~/util/github.ts"
-import { createSignedChecksums } from "~/util/hash.ts"
+import { createSignedChecksums, release } from "~/util/hash.ts"
 import { versionAsDev } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
@@ -174,7 +174,11 @@ export async function runWindPublish() {
   }
   const { checksumFile, signatureFile } = await createSignedChecksums(
     files.map((file) => path.basename(file)),
-    await builder.secrets("minisign/privateKey", "minisign/password"),
+    await builder.ciKey(),
+    release(builder.env, {
+      tag: mode === "release" ? builder.env.tag! : "dev-latest",
+      version: record.version,
+    }),
     artifacts.path,
   )
   files.push(checksumFile, signatureFile)
