@@ -101,13 +101,12 @@ async function createWindowsPackage(
   packageId: string,
   version: string,
   unsigned: boolean,
+  outputDir: string,
 ): Promise<string> {
-  using tempDir = await makeTempDir()
-
   const pathItems = [packageId, version, "windows"]
   const unsignedSuffix = unsigned ? ".UNSIGNED" : ""
   const packageFileName = `${pathItems.join("_")}${unsignedSuffix}.exe`
-  const packagePath = path.join(tempDir.path, packageFileName)
+  const packagePath = path.join(outputDir, packageFileName)
 
   await Deno.copyFile(payloadPath, packagePath)
   return packagePath
@@ -146,11 +145,13 @@ export async function runDesktopKeyboardWindows(
   const packageId = toolchain === "v4"
     ? `${builder.env.repoName}${KBDGEN_V4_PACKAGE_SUFFIX}`
     : builder.env.repoName
+  using packageDir = await makeTempDir()
   const artifactPath = await createWindowsPackage(
     payloadPath,
     packageId,
     fullVersion,
     unsigned,
+    packageDir.path,
   )
 
   // Upload artifact for later deployment
@@ -169,9 +170,8 @@ async function createMacosPackage(
   packageId: string,
   bundlePath: string,
   channel: string | null,
+  outputDir: string,
 ): Promise<string> {
-  using tempDir = await makeTempDir()
-
   // Get version from kbdgen bundle
   const target = await Kbdgen.loadTarget(bundlePath, "macos")
   const baseVersion = target.version as string
@@ -183,7 +183,7 @@ async function createMacosPackage(
 
   const pathItems = [packageId, version, "macos"]
   const packageFileName = `${pathItems.join("_")}.pkg`
-  const packagePath = path.join(tempDir.path, packageFileName)
+  const packagePath = path.join(outputDir, packageFileName)
 
   await Deno.copyFile(payloadPath, packagePath)
   return packagePath
@@ -199,9 +199,8 @@ async function createMacosOuttoArtifact(
   packageId: string,
   bundlePath: string,
   channel: string | null,
+  outputDir: string,
 ): Promise<string> {
-  using tempDir = await makeTempDir()
-
   const target = await Kbdgen.loadTarget(bundlePath, "macos")
   const baseVersion = target.version as string
   const version = channel
@@ -209,7 +208,7 @@ async function createMacosOuttoArtifact(
     : baseVersion
 
   const archiveName = `${packageId}_${version}_macos.app.zip`
-  const archivePath = path.join(tempDir.path, archiveName)
+  const archivePath = path.join(outputDir, archiveName)
   await Ditto.zipApp(appPath, archivePath)
   return archivePath
 }
@@ -234,6 +233,7 @@ export async function runDesktopKeyboardMacOS(
   // outto on macOS emits a .app *directory*. Ditto-zip it to preserve
   // codesign + xattrs and produce a single uploadable artifact. Legacy
   // path produces a single .pkg file and uses createMacosPackage().
+  using packageDir = await makeTempDir()
   let artifactPath: string
   if (installer === "outto") {
     artifactPath = await createMacosOuttoArtifact(
@@ -241,6 +241,7 @@ export async function runDesktopKeyboardMacOS(
       builder.env.repoName,
       kbdgenBundlePath,
       channel,
+      packageDir.path,
     )
   } else {
     artifactPath = await createMacosPackage(
@@ -248,6 +249,7 @@ export async function runDesktopKeyboardMacOS(
       builder.env.repoName,
       kbdgenBundlePath,
       channel,
+      packageDir.path,
     )
   }
 

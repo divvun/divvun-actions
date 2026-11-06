@@ -50,6 +50,7 @@ async function createTarball(
   version: string,
   platform: string,
   architecture: string,
+  outputDir: string,
 ): Promise<string> {
   using tempDir = await makeTempDir()
 
@@ -64,10 +65,9 @@ async function createTarball(
   // Ensure binary has execute permissions
   await Deno.chmod(distBinaryPath, 0o755)
 
-  // Create .tar.zst file in temp directory
   const pathItems = [packageId, version, platform, architecture]
   const tarZstFileName = `${pathItems.join("_")}.tar.zst`
-  const tarZstPath = path.join(tempDir.path, tarZstFileName)
+  const tarZstPath = path.join(outputDir, tarZstFileName)
 
   await Tar.createFlatTarZst([binDir], tarZstPath)
 
@@ -122,12 +122,14 @@ export default async function kbdgenDeploy({
     const rustTarget = path.basename(path.dirname(path.dirname(payloadPath)))
     const architecture = extractArchitecture(rustTarget)
 
+    using tarballDir = await makeTempDir()
     const txzPath = await createTarball(
       payloadPath,
       packageId,
       version,
       platform,
       architecture,
+      tarballDir.path,
     )
 
     const artifactUrl = `${PahkatUploader.ARTIFACTS_URL}${

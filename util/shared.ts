@@ -225,8 +225,6 @@ export class Zip {
         args: ["-c", ["bsdtar", "-a", "-cf", filePath, "*"].join(" ")],
         cwd: stagingDir,
       }).spawn()
-
-      return filePath
     } else {
       proc = new Deno.Command("bash", {
         args: ["-c", ["zip", "-r9", filePath, "*"].join(" ")],
