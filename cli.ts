@@ -9,6 +9,7 @@ import {
   runMsgrammarPublish,
 } from "~/pipelines/msgrammar.ts"
 import { BuildkitePipeline } from "~/builder/pipeline.ts"
+import { BUILD_TIMESTAMP } from "~/util/env.ts"
 import {
   desktopKeyboardBundlePath,
   pipelineDesktopKeyboard,
@@ -1020,6 +1021,10 @@ async function runCi(_args: any) {
   logger.info("Running CI")
   await logJobEnvironment()
   const pipeline = await createCiPipeline()
+  pipeline.env = {
+    ...pipeline.env,
+    [BUILD_TIMESTAMP]: builder.env.buildTimestamp,
+  }
 
   // Strip undefined values from pipeline object before YAML serialization
   // JSON.stringify removes undefined properties, then parse reconstructs the clean object

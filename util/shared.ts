@@ -1265,7 +1265,7 @@ export async function versionAsNightly(
   if (verChunks == null) {
     throw new Error(`Provided version '${version}' is not semantic.`)
   }
-  const devTs = new Date().toISOString().split(".")[0] + "Z"
+  const devTs = builder.env.buildTimestamp.split(".")[0] + "Z"
   const devTsFormatted = devTs.replace(/[-:]/g, "")
   const buildPart = buildNumber ? `+build.${buildNumber}` : ""
 

@@ -1,17 +1,21 @@
 import { memoize } from "@std/cache"
 
+/**
+ * The time the build's pipeline was uploaded, which runCi gives every step
+ * of the build, so that every dev version they stamp is the same.
+ */
+export const BUILD_TIMESTAMP = "DIVVUN_BUILD_TIMESTAMP"
+
+/** The agent's tags, keyed in lower case as they are written, such as `queue`. */
 function metadata(prefix: string): Record<string, string> {
-  const env: Record<string, string> = {}
-  for (const key in Deno.env) {
-    if (key.startsWith(`${prefix}_AGENT_META_DATA_`)) {
-      const name = key.replace(`${prefix}_AGENT_META_DATA_`, "")
-      const value = Deno.env.get(key)
-      if (value != null) {
-        env[name] = value
-      }
+  const start = `${prefix}_AGENT_META_DATA_`
+  const tags: Record<string, string> = {}
+  for (const [key, value] of Object.entries(Deno.env.toObject())) {
+    if (key.startsWith(start)) {
+      tags[key.slice(start.length).toLowerCase()] = value
     }
   }
-  return env
+  return tags
 }
 
 function parseBuildkiteUrl(url: string) {
@@ -42,7 +46,7 @@ function parseConfigFromEnv() {
   return null
 }
 
-const env = (prefix: string): Env => {
+export const env = (prefix: string): Env => {
   const repo = Deno.env.get(`${prefix}_REPO`) ?? ""
   const repoUrl = parseBuildkiteUrl(repo)
   const repoProtocol = repoUrl.protocol.replace(/:$/, "")
@@ -51,7 +55,7 @@ const env = (prefix: string): Env => {
   const repoName = repoPath.split("/").pop()!
   const config = parseConfigFromEnv()
   const agentMetaData = metadata(prefix)
-  const buildTimestamp = agentMetaData["BUILD_TIMESTAMP"] ??
+  const buildTimestamp = Deno.env.get(BUILD_TIMESTAMP) ??
     new Date().toISOString()
 
   return {
