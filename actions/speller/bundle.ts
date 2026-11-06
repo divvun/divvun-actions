@@ -294,7 +294,11 @@ async function bundlePahkatMobile(
     await createPktBox(box, {
       pkg: packageId,
       version,
-      files: bhfstPaths.map((file) => ({ path: file, stored: true })),
+      files: bhfstPaths.map((file) => ({
+        path: file,
+        at: `share/divvun/spellers/${path.basename(file)}`,
+        stored: true,
+      })),
     })
     const artifact = await uploadPahkatArtifact(packageId, box)
     logger.info(`Uploaded the Pahkat-next mobile speller as ${artifact}`)

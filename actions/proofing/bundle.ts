@@ -9,7 +9,8 @@
 //            Contents/Resources/<tag>.drb) into /Library/Services. Both consumers
 //            scan the Services dir and match the no.divvun.proofing. prefix.
 //   Windows: outto .exe that installs <tag>.drb into %ProgramData%\Divvun\Proofing.
-//   Linux:   .pkt.box holding <tag>.drb at its root.
+//   Linux:   .pkt.box holding share/divvun/proofing/<tag>.drb, where under a
+//            prefix such as /usr the LibreOffice extension looks for it.
 //
 // Each is uploaded as a Pahkat artifact (util/pahkat_artifacts.ts), which
 // the proofing release on GitHub takes under its own name (see
@@ -218,7 +219,10 @@ async function buildLinux(
   await createPktBox(outputPath, {
     pkg: props.packageId,
     version: props.version,
-    files: [{ path: props.drbPath, name: `${props.langTag}.drb` }],
+    files: [{
+      path: props.drbPath,
+      at: `share/divvun/proofing/${props.langTag}.drb`,
+    }],
   })
   logger.debug(`Created Linux proofing package at ${outputPath}`)
 

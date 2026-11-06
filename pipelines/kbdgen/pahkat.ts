@@ -57,7 +57,7 @@ export async function runKbdgenPahkatPublish() {
       await createPktBox(box, {
         pkg: PACKAGE,
         version,
-        files: [{ path: binary }],
+        files: [{ path: binary, at: `bin/${path.basename(binary)}` }],
       })
       artifacts.push({ path: box, kind: "box", os: [os as Os], arch: [arch] })
     }

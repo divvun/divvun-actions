@@ -3,17 +3,24 @@
 // `box create --attr` sets as strings, name the release it belongs to, whose
 // every file carries the `blake3` attribute `box create` writes by default,
 // and which holds no links and allows neither escaped paths nor external
-// links.
+// links. Its files sit where they go under a Unix prefix (artifact.box-layout):
+// the client links each into its prefix at the same path.
 
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
+/** The top-level directories of a prefix a package may put files in. */
+const PREFIX_DIRS = ["bin", "lib", "share"]
+
 export type PktBoxFile = {
-  /** A regular file, stored at the archive's root. */
+  /** A regular file. */
   path: string
-  /** Its name in the archive; its own by default. */
-  name?: string
+  /**
+   * Where it goes in the archive, and so in the prefix: under `bin/`,
+   * `lib/` or `share/`, such as `share/divvun/proofing/se.drb`.
+   */
+  at: string
   /**
    * Store it uncompressed: box maps only stored files, so a file a keyboard
    * reads in place from the archive must be stored. Others are zstd.
@@ -49,18 +56,26 @@ export async function createPktBox(
   ]
   const names = new Set<string>()
   for (const file of files) {
-    const name = file.name ?? path.basename(file.path)
-    if (name !== path.basename(name)) {
-      throw new Error(`${name} is not a name at the archive's root`)
+    const parts = file.at.split("/")
+    if (
+      parts.length < 2 || !PREFIX_DIRS.includes(parts[0]) ||
+      parts.some((part) => part === "" || part === "." || part === "..") ||
+      file.at.includes("\\")
+    ) {
+      throw new Error(
+        `${file.at} is not a path under ${PREFIX_DIRS.join("/, ")}/`,
+      )
     }
-    if (names.has(name)) {
-      throw new Error(`Two files named ${name} for ${path.basename(output)}`)
+    if (names.has(file.at)) {
+      throw new Error(`Two files at ${file.at} for ${path.basename(output)}`)
     }
-    names.add(name)
+    names.add(file.at)
     // A copy is a regular file even where the source is a link, so the
     // archive cannot hold one.
-    await Deno.copyFile(file.path, path.join(stage.path, name))
-    args.push(file.stored ? "--stored" : "--zstd", name)
+    const staged = path.join(stage.path, ...parts)
+    await Deno.mkdir(path.dirname(staged), { recursive: true })
+    await Deno.copyFile(file.path, staged)
+    args.push(file.stored ? "--stored" : "--zstd", file.at)
   }
   if (names.size === 0) {
     throw new Error(`No files for ${path.basename(output)}`)
