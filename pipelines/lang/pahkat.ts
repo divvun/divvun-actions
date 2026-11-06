@@ -45,9 +45,11 @@ function spellerArtifacts(langTag: string): ArtifactSource[] {
       outtoId,
     },
     {
+      // The .bhfst files under share/divvun/spellers serve Linux as they do
+      // the keyboards, such as the cluster's speller workers.
       name: "*_noarch-mobile.pkt.box",
       kind: "box",
-      os: ["ios", "android"],
+      os: ["linux", "ios", "android"],
     },
   ]
 }
