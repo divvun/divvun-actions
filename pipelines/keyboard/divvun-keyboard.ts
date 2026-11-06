@@ -646,6 +646,15 @@ function kbdgenV4Group(): GroupStep {
       concurrency_group: `${builder.env.repoName}/kbdgen-v4-deploy`,
     }))
   }
+  steps.push(command({
+    label: "Publish to Pahkat",
+    command: "divvun-actions run keyboard-pahkat-publish",
+    depends_on: "build-windows-kbdgen-v4-outto",
+    soft_fail: true,
+    agents: {
+      queue: "linux",
+    },
+  }))
   return {
     group: "kbdgen v4 (test)",
     key: "kbdgen-v4",
@@ -701,6 +710,17 @@ export function pipelineDesktopKeyboard() {
       }),
     )
   }
+
+  outtoSteps.push(command({
+    label: "Publish to Pahkat",
+    command: "divvun-actions run keyboard-pahkat-publish",
+    depends_on: ["build-windows-outto", "build-macos-outto"],
+    allow_dependency_failure: true,
+    soft_fail: true,
+    agents: {
+      queue: "linux",
+    },
+  }))
 
   const pipeline: BuildkitePipeline = {
     steps: [

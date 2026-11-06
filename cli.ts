@@ -113,6 +113,7 @@ import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
 import { runKbdgenPahkatPublish } from "./pipelines/kbdgen/pahkat.ts"
 import { runTipInstaller, runTipPublish } from "./pipelines/kbdgen/tip.ts"
 import { runKbdgenPublishV4 } from "./pipelines/kbdgen/v4.ts"
+import { runKeyboardPahkatPublish } from "./pipelines/keyboard/pahkat.ts"
 import { pipelineKbdi, runKbdiPublish } from "./pipelines/kbdi/mod.ts"
 import {
   pipelineLang,
@@ -494,6 +495,10 @@ async function runPipeline(args: any) {
     }
     case "divvun-keyboard-deploy-windows-v4": {
       await runDesktopKeyboardDeployWindowsV4()
+      break
+    }
+    case "keyboard-pahkat-publish": {
+      await runKeyboardPahkatPublish()
       break
     }
     case "box-publish": {
