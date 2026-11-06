@@ -138,10 +138,7 @@ import {
   runLangTtsTextprocBuild,
   runLangTtsTextprocDeploy,
 } from "./pipelines/lang/mod.ts"
-import {
-  runProofingPahkatPublish,
-  runSpellerPahkatPublish,
-} from "./pipelines/lang/pahkat.ts"
+import { runProofingPahkatPublish } from "./pipelines/lang/pahkat.ts"
 import pipelineLibpahkat, {
   runLibpahkatAndroid,
   runLibpahkatIos,
@@ -181,7 +178,7 @@ import {
 import macosSign from "./services/macos-codesign.ts"
 import sign from "./services/windows-codesign.ts"
 import { makeTempFile } from "./util/temp.ts"
-import type { InstallerKind } from "./actions/speller/bundle.ts"
+import type { InstallerKind } from "./actions/keyboard/build/mod.ts"
 import {
   isPrivilegedPipelineAction,
   securePipelineForContext,
@@ -391,10 +388,7 @@ async function runPipeline(args: any) {
       break
     }
     case "lang-bundle": {
-      await runLangBundle({
-        target: args._[1],
-        installer: installerArg(args._[2]),
-      })
+      await runLangBundle({ target: args._[1] })
       break
     }
     case "lang-deploy": {
@@ -417,10 +411,6 @@ async function runPipeline(args: any) {
     }
     case "lang-proofing-deploy": {
       await runLangProofingDeploy()
-      break
-    }
-    case "speller-pahkat-publish": {
-      await runSpellerPahkatPublish()
       break
     }
     case "proofing-pahkat-publish": {

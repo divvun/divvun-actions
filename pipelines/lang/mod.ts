@@ -41,11 +41,8 @@ import {
   pahkatArtifactName,
 } from "~/util/pahkat_artifacts.ts"
 import { Tar, versionAsDev } from "~/util/shared.ts"
-import { SOFT_FAIL_EXIT_STATUS } from "~/util/soft_failure.ts"
 import { makeTempDir } from "~/util/temp.ts"
-import spellerBundle, {
-  type InstallerKind,
-} from "../../actions/speller/bundle.ts"
+import spellerBundle from "../../actions/speller/bundle.ts"
 import spellerDeploy from "../../actions/speller/deploy.ts"
 import {
   deriveLangTag,
@@ -276,10 +273,7 @@ export async function runLangGrammarTest() {
 }
 
 export async function runLangBundle(
-  { target, installer }: {
-    target: "windows" | "macos" | "mobile"
-    installer?: InstallerKind
-  },
+  { target }: { target: "windows" | "macos" | "mobile" },
 ) {
   // Each installer packs only its own variant.
   await builder.downloadArtifacts(
@@ -316,8 +310,6 @@ export async function runLangBundle(
     spellerType,
     manifest,
     spellerPaths,
-    installer,
-    releaseVersion: spellerReleaseVersion(manifest),
   })
 }
 
@@ -352,9 +344,9 @@ function extractVersionFromTag(tag: string): string | null {
 }
 
 /**
- * The version of the speller release this build makes, which its Pahkat-next
- * artifacts carry too: the tag's, with the build number, on a speller release
- * tag, and otherwise a dev version of the manifest's.
+ * The version of the speller release this build makes: the tag's, with the
+ * build number, on a speller release tag, and otherwise a dev version of the
+ * manifest's.
  */
 function spellerReleaseVersion(manifest: SpellerManifest): string {
   const tag = builder.env.tag
@@ -1588,10 +1580,6 @@ export async function pipelineLang() {
 
   // Bundle phase steps array (only on deploy)
   const bundleSteps: CommandStep[] = []
-  // The Pahkat-next outto installers go into their own group, apart from the
-  // Inno Setup and .pkg bundles the speller deploy takes. Each is soft_fail,
-  // so a failure cannot block that deploy.
-  const outtoBundleSteps: CommandStep[] = []
 
   if (isSpellerDeploy) {
     bundleSteps.push(command({
@@ -1609,9 +1597,6 @@ export async function pipelineLang() {
       key: "speller-bundle-mobile",
       command: "divvun-actions run lang-bundle mobile",
       depends_on: "speller-build",
-      // The Pahkat-next .pkt.box comes after the tarball; if it fails, the
-      // step soft fails and the speller deploy still runs.
-      soft_fail: [{ exit_status: SOFT_FAIL_EXIT_STATUS }],
       agents: {
         queue: "linux",
       },
@@ -1622,28 +1607,6 @@ export async function pipelineLang() {
       key: "speller-bundle-macos",
       command: "divvun-actions run lang-bundle macos",
       depends_on: "speller-build",
-      agents: {
-        queue: "macos",
-      },
-    }))
-
-    outtoBundleSteps.push(command({
-      label: "Bundle Speller (Windows, outto)",
-      key: "speller-bundle-windows-outto",
-      command: "divvun-actions run lang-bundle windows outto",
-      depends_on: "speller-build",
-      soft_fail: true,
-      agents: {
-        queue: "windows",
-      },
-    }))
-
-    outtoBundleSteps.push(command({
-      label: "Bundle Speller (macOS, outto)",
-      key: "speller-bundle-macos-outto",
-      command: "divvun-actions run lang-bundle macos outto",
-      depends_on: "speller-build",
-      soft_fail: true,
       agents: {
         queue: "macos",
       },
@@ -1685,21 +1648,6 @@ export async function pipelineLang() {
         "speller-bundle-mobile",
         "speller-bundle-macos",
       ],
-      agents: {
-        queue: "linux",
-      },
-    }))
-    deploySteps.push(command({
-      label: `Publish Speller to Pahkat (${
-        isSpellerReleaseTag ? "Release" : "Dev"
-      })`,
-      command: "divvun-actions run speller-pahkat-publish",
-      depends_on: [
-        "speller-bundle-windows-outto",
-        "speller-bundle-mobile",
-        "speller-bundle-macos-outto",
-      ],
-      soft_fail: true,
       agents: {
         queue: "linux",
       },
@@ -1828,14 +1776,6 @@ export async function pipelineLang() {
       group: "Bundle",
       key: "bundle",
       steps: bundleSteps,
-    })
-  }
-
-  if (outtoBundleSteps.length > 0) {
-    steps.push({
-      group: "Outto (Pahkat)",
-      key: "outto",
-      steps: outtoBundleSteps,
     })
   }
 

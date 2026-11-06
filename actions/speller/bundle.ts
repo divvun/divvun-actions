@@ -7,18 +7,13 @@ import {
 } from "~/actions/inno-setup/lib.ts"
 import * as builder from "~/builder.ts"
 import { InnoSetupBuilder } from "~/util/inno.ts"
-import { uploadPahkatArtifact } from "~/util/pahkat_artifacts.ts"
-import { createPktBox } from "~/util/pkt_box.ts"
 import {
-  Ditto,
   SpellerPaths,
   Tar,
   ThfstTools,
   versionAsNightly,
 } from "~/util/shared.ts"
-import { SoftFailure } from "~/util/soft_failure.ts"
 import { createInstaller } from "./bundle-macos.ts"
-import { buildSpellerOutto, type SpellerOuttoProps } from "./bundle-outto.ts"
 import logger from "~/util/log.ts"
 import {
   deriveLangTag,
@@ -27,36 +22,10 @@ import {
   SpellerType,
 } from "./manifest.ts"
 
-/**
- * Selects which installer toolchain to use: "legacy" builds what the old
- * pahkat.uit.no serves, Inno Setup and a .pkg, and "outto" the Pahkat-next
- * installers.
- */
-export type InstallerKind = "legacy" | "outto"
-
-/**
- * Resolve the installer toolchain. Callers may pass `installer` directly;
- * otherwise we honour the DIVVUN_INSTALLER env var ("legacy" | "outto").
- * Defaults to "legacy".
- */
-export function resolveInstallerKind(explicit?: InstallerKind): InstallerKind {
-  if (explicit) return explicit
-  const env = Deno.env.get("DIVVUN_INSTALLER")
-  if (env === "outto" || env === "legacy") return env
-  return "legacy"
-}
-
 export type Props = {
   spellerType: SpellerType
   manifest: SpellerManifest
   spellerPaths: SpellerPaths
-  /** Installer toolchain. Defaults to env DIVVUN_INSTALLER, else "legacy". */
-  installer?: InstallerKind
-  /**
-   * The version of the speller's release, which its Pahkat-next artifacts
-   * carry. The old artifacts keep the version they always had.
-   */
-  releaseVersion: string
 }
 
 export type Output = {
@@ -74,28 +43,12 @@ export default async function spellerBundle({
   spellerType,
   manifest,
   spellerPaths,
-  installer,
-  releaseVersion,
 }: Props): Promise<Output> {
-  const installerKind = resolveInstallerKind(installer)
   const spellerName = manifest.package.speller.name
   const packageId = derivePackageId(spellerType)
   const langTag = deriveLangTag()
 
-  if (installerKind === "outto") {
-    return await bundlePahkatInstaller({
-      spellerType,
-      packageId,
-      langTag,
-      version: releaseVersion,
-      spellerName,
-      manifest,
-      spellerPaths,
-    })
-  }
-
   let payloadPath: string
-  const bhfstPaths: string[] = []
 
   // TODO: allow release builds
   const isSpellerReleaseTag = RELEASE_TAG.test(builder.env.tag ?? "")
@@ -110,6 +63,8 @@ export default async function spellerBundle({
   )
 
   if (spellerType == SpellerType.Mobile) {
+    const bhfstPaths = []
+
     for (const [langTag, zhfstPath] of Object.entries(spellerPaths.mobile)) {
       const bhfstPath = await ThfstTools.zhfstToBhfst(zhfstPath)
       const langTagBhfst = `${path.dirname(bhfstPath)}/${langTag}.bhfst`
@@ -269,68 +224,7 @@ export default async function spellerBundle({
   await builder.setMetadata("speller-version", version)
   await builder.setMetadata("speller-type", spellerType)
 
-  if (spellerType == SpellerType.Mobile) {
-    await bundlePahkatMobile(packageId, releaseVersion, bhfstPaths)
-  }
-
   return {
     payloadPath,
   }
-}
-
-/**
- * The Pahkat-next mobile speller, made from the same .bhfst files as the
- * tarball, which is uploaded by then: if this fails, the step soft fails and
- * the old deploy still gets the tarball. The keyboards read the spellers in
- * place from the kept archive, so they are stored uncompressed.
- */
-async function bundlePahkatMobile(
-  packageId: string,
-  version: string,
-  bhfstPaths: string[],
-) {
-  const box = `${packageId}_${version}_noarch-mobile.pkt.box`
-  try {
-    await createPktBox(box, {
-      pkg: packageId,
-      version,
-      files: bhfstPaths.map((file) => ({
-        path: file,
-        at: `share/divvun/spellers/${path.basename(file)}`,
-        stored: true,
-      })),
-    })
-    const artifact = await uploadPahkatArtifact(packageId, box)
-    logger.info(`Uploaded the Pahkat-next mobile speller as ${artifact}`)
-  } catch (e) {
-    throw new SoftFailure(`Could not make the Pahkat-next ${box}`, e)
-  }
-}
-
-/**
- * A Pahkat-next desktop installer, built with outto and uploaded as a
- * Pahkat artifact, which no old deploy step downloads. The macOS .app is a
- * directory, so it goes up ditto-zipped, which keeps its signature.
- */
-async function bundlePahkatInstaller(
-  props: Omit<SpellerOuttoProps, "buildNumber">,
-): Promise<Output> {
-  if (
-    props.spellerType !== SpellerType.Windows &&
-    props.spellerType !== SpellerType.MacOS
-  ) {
-    throw new Error(`No outto installer for ${props.spellerType}`)
-  }
-  const result = await buildSpellerOutto({
-    ...props,
-    buildNumber: parseInt(builder.env.buildNumber ?? "1"),
-  })
-  let file = result.payloadPath
-  if (props.spellerType === SpellerType.MacOS) {
-    file = `${result.payloadPath}.zip`
-    await Ditto.zipApp(result.payloadPath, file)
-  }
-  const artifact = await uploadPahkatArtifact(props.packageId, file)
-  logger.info(`Uploaded the Pahkat-next installer as ${artifact}`)
-  return { payloadPath: artifact }
 }

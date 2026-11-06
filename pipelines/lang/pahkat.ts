@@ -1,6 +1,7 @@
-// A lang-* build's Pahkat packages, main/speller-<lang> and
-// main/proofing-<tag>, published to the Pahkat server beside the build's
-// GitHub releases.
+// A lang-* build's Pahkat package, main/proofing-<tag>, published to the
+// Pahkat server beside the build's GitHub releases. Spellers are not
+// Pahkat-3 packages: proofing does their work, spelling always and grammar
+// where the language has it.
 
 import * as toml from "@std/toml"
 import { proofingLocales, proofingPackage } from "~/actions/proofing/source.ts"
@@ -23,38 +24,14 @@ import { pahkatSkipReasonForBuild, readProofingSource } from "./mod.ts"
 
 /**
  * Whom a GiellaLT release names as its authors, which its sources do not
- * say: the two groups every speller's description names.
+ * say: the two groups every language's description names.
  */
 const GIELLALT_AUTHORS = ["Divvun", "Giellatekno"]
 
 /**
- * Which of the speller's Pahkat artifacts make up its release, and what
- * each is. The outto ids are the ones the bundle steps build with.
+ * Which of the proofing build's Pahkat artifacts make up its release, and
+ * what each is. The outto ids are the ones the bundle steps build with.
  */
-function spellerArtifacts(langTag: string): ArtifactSource[] {
-  const outtoId = `no.divvun.speller.${langTag}`
-  return [
-    {
-      name: "*_noarch-windows*.exe",
-      kind: "outto-windows",
-      outtoId,
-    },
-    {
-      name: "*_noarch-macos.app.zip",
-      kind: "outto-macos",
-      outtoId,
-    },
-    {
-      // The .bhfst files under share/divvun/spellers serve Linux as they do
-      // the keyboards, such as the cluster's speller workers.
-      name: "*_noarch-mobile.pkt.box",
-      kind: "box",
-      os: ["linux", "ios", "android"],
-    },
-  ]
-}
-
-/** Likewise for a proofing release. */
 function proofingArtifacts(langTag: string): ArtifactSource[] {
   const outtoId = `no.divvun.proofing.${langTag}`
   return [
@@ -85,49 +62,6 @@ async function readManifest(): Promise<SpellerManifest> {
 /** Why this build publishes nothing to Pahkat, or null if it does. */
 async function skipReason(): Promise<string | null> {
   return await pahkatSkipReasonForBuild(new GitHub(builder.env.repo))
-}
-
-/**
- * Publish the speller release a speller tag or main build made, as
- * main/speller-<lang>, `<lang>` what the repository's name has after
- * `lang-`. Its version is the one its artifacts carry.
- */
-export async function runSpellerPahkatPublish() {
-  const skip = await skipReason()
-  if (skip) {
-    logger.info(`Not publishing the speller to Pahkat: ${skip}`)
-    return
-  }
-
-  const lang = builder.env.repoName.match(/^lang-(.+)$/)?.[1]
-  if (!lang) {
-    throw new Error(`${builder.env.repoName} is not named lang-<lang>`)
-  }
-  const id = `speller-${lang}`
-  const langTag = deriveLangTag()
-  const manifest = await readManifest()
-
-  using dir = await makeTempDir({ prefix: "pahkat-speller-" })
-  const artifacts = await downloadArtifacts(
-    id,
-    spellerArtifacts(langTag),
-    dir.path,
-  )
-
-  await publishRelease({
-    package: id,
-    version: oneVersion(artifacts, id),
-    tag: builder.env.tag || `${id}/dev-latest`,
-    metadata: {
-      names: manifest.speller.name,
-      descriptions: manifest.speller.description,
-      authors: GIELLALT_AUTHORS,
-      ...await repositoryLicense(),
-      languages: [langTag],
-      tags: ["cat:spellers"],
-    },
-    artifacts,
-  })
 }
 
 /**
