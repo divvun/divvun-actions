@@ -200,10 +200,10 @@ RUN chmod +x /usr/local/bin/clang
 ENV XWIN_ARCH="x86,x86_64,aarch64"
 RUN cargo xwin cache xwin
 
-# box@da96a74
+# box@bfdb748
 RUN cargo install box-cli \
     --git https://github.com/bbqsrc/box \
-    --rev da96a74656aef7f582a061c16fc0b70288ed514a \
+    --rev bfdb748010e313595d03d013b4db057788538d73 \
     --locked
 
 # rsigncode (dev-latest @ 2026-10-07)

@@ -1,7 +1,10 @@
 import type { Tool } from "../lib/image.ts"
 import { versions } from "../versions.ts"
 
-/** Install the box archive CLI used to package generated TTS bundles. */
+/**
+ * Install the box archive CLI, which packs generated TTS bundles and .pkt.box
+ * packages. createPktBox needs `box create --attr`.
+ */
 export function box(): Tool {
   return {
     name: `box@${versions.box.slice(0, 7)}`,

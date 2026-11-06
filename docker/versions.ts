@@ -5,7 +5,7 @@ export const versions = {
   just: "1.58.0",
   nodejs: "24.x",
   uv: "0.12.23",
-  box: "da96a74656aef7f582a061c16fc0b70288ed514a",
+  box: "bfdb748010e313595d03d013b4db057788538d73",
   llvm: 23,
   // Alpine's own LLVM packages, which stop short of the Ubuntu version above.
   // The alpine image's package list and the static-lib-build pipelines

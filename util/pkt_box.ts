@@ -1,12 +1,12 @@
 // Pahkat box packages, `.pkt.box` (pahkat spec artifact.box-*): a box archive
-// whose archive attributes `pahkat.package` and `pahkat.version` name the
-// release it belongs to, whose every file carries the `blake3` attribute
-// `box create` writes by default, and which holds no links and allows
-// neither escaped paths nor external links.
+// whose archive attributes `pahkat.package` and `pahkat.version`, which
+// `box create --attr` sets as strings, name the release it belongs to, whose
+// every file carries the `blake3` attribute `box create` writes by default,
+// and which holds no links and allows neither escaped paths nor external
+// links.
 
 import * as path from "@std/path"
 import * as builder from "~/builder.ts"
-import { setArchiveAttributes } from "~/util/box_attributes.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
 export type PktBoxFile = {
@@ -36,7 +36,17 @@ export async function createPktBox(
   const output = path.resolve(archive)
   using stage = await makeTempDir({ prefix: "pkt-box-" })
 
-  const args = ["create", "--quiet", "--force", output]
+  // The options go before the archive: everything after it is an input.
+  const args = [
+    "create",
+    "--quiet",
+    "--force",
+    "--attr",
+    `pahkat.package=${pkg}`,
+    "--attr",
+    `pahkat.version=${version}`,
+    output,
+  ]
   const names = new Set<string>()
   for (const file of files) {
     const name = file.name ?? path.basename(file.path)
@@ -57,9 +67,5 @@ export async function createPktBox(
   }
 
   await builder.exec("box", args, { cwd: stage.path })
-  await setArchiveAttributes(output, {
-    "pahkat.package": pkg,
-    "pahkat.version": version,
-  })
   await builder.exec("box", ["validate", "--quiet", output])
 }
