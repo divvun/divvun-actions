@@ -177,6 +177,7 @@ export function pipelineKbdgen() {
       label: "Publish to Pahkat",
       command: "divvun-actions run kbdgen-pahkat-publish",
       depends_on: binaryStepKeys,
+      soft_fail: true,
       agents: {
         queue: "linux",
       },

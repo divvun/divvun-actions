@@ -1663,10 +1663,11 @@ export async function pipelineLang() {
       })`,
       command: "divvun-actions run speller-pahkat-publish",
       depends_on: [
-        "speller-bundle-windows",
+        "speller-bundle-windows-outto",
         "speller-bundle-mobile",
-        "speller-bundle-macos",
+        "speller-bundle-macos-outto",
       ],
+      soft_fail: true,
       agents: {
         queue: "linux",
       },

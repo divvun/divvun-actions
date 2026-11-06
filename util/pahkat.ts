@@ -10,6 +10,10 @@ import { ghWithRetry } from "~/util/github.ts"
 import { globFiles } from "~/util/glob.ts"
 import { createSignedChecksums, release } from "~/util/hash.ts"
 import logger from "~/util/log.ts"
+import {
+  pahkatArtifactName,
+  pahkatArtifactPath,
+} from "~/util/pahkat_artifacts.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
 export const PAHKAT_SERVER = "https://pahkat-3.giellalt.org/"
@@ -145,25 +149,32 @@ export function byVersion(
   return versions
 }
 
-/** Where an artifact is among the build's Buildkite artifacts. */
+/** Where an artifact is among the build's Pahkat artifacts. */
 export type ArtifactSource = Omit<Artifact, "path"> & {
-  /** A `buildkite-agent artifact download` pattern for exactly one file. */
-  pattern: string
+  /**
+   * A pattern for exactly one file of the package's Pahkat artifacts
+   * (util/pahkat_artifacts.ts), by its own name, such as
+   * `*_noarch-mobile.pkt.box`.
+   */
+  name: string
   /** Leave the artifact out when the build did not make it, not fail. */
   optional?: boolean
 }
 
 /**
- * Download each source's artifact into `dir`. An unsigned Windows installer
- * (`.UNSIGNED.` in its name, from an outto build whose signing failed) is
- * never published.
+ * Download the artifact each source names among the Pahkat artifacts the
+ * build uploaded for the package `pkg`, into `dir` under its own name. An
+ * unsigned Windows installer (`.UNSIGNED.` in its name, from an outto build
+ * whose signing failed) is never published.
  */
 export async function downloadArtifacts(
+  pkg: string,
   sources: ArtifactSource[],
   dir: string,
 ): Promise<Artifact[]> {
   const artifacts: Artifact[] = []
-  for (const [index, { pattern, optional, ...artifact }] of sources.entries()) {
+  for (const [index, { name, optional, ...artifact }] of sources.entries()) {
+    const pattern = pahkatArtifactPath(pkg, name)
     const into = path.join(dir, String(index))
     await Deno.mkdir(into)
     try {
@@ -196,7 +207,9 @@ export async function downloadArtifacts(
       }
       throw ExpectedError.create(`No signed artifact matches ${pattern}`)
     }
-    artifacts.push({ ...artifact, path: signed[0] })
+    const file = path.join(into, pahkatArtifactName(signed[0]))
+    await Deno.rename(signed[0], file)
+    artifacts.push({ ...artifact, path: file })
   }
   return artifacts
 }

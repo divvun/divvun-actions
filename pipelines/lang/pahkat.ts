@@ -28,24 +28,24 @@ import { pahkatSkipReasonForBuild, readProofingSource } from "./mod.ts"
 const GIELLALT_AUTHORS = ["Divvun", "Giellatekno"]
 
 /**
- * Which of the build's Buildkite artifacts make up a speller release, and
- * what each is. The outto ids are the ones the bundle steps build with.
+ * Which of the speller's Pahkat artifacts make up its release, and what
+ * each is. The outto ids are the ones the bundle steps build with.
  */
 function spellerArtifacts(langTag: string): ArtifactSource[] {
   const outtoId = `no.divvun.speller.${langTag}`
   return [
     {
-      pattern: "speller-*_noarch-windows.exe",
+      name: "*_noarch-windows*.exe",
       kind: "outto-windows",
       outtoId,
     },
     {
-      pattern: "speller-*_noarch-macos.app.zip",
+      name: "*_noarch-macos.app.zip",
       kind: "outto-macos",
       outtoId,
     },
     {
-      pattern: "speller-*_noarch-mobile.pkt.box",
+      name: "*_noarch-mobile.pkt.box",
       kind: "box",
       os: ["ios", "android"],
     },
@@ -57,17 +57,17 @@ function proofingArtifacts(langTag: string): ArtifactSource[] {
   const outtoId = `no.divvun.proofing.${langTag}`
   return [
     {
-      pattern: "proofing-*_noarch-windows.exe",
+      name: "*_noarch-windows*.exe",
       kind: "outto-windows",
       outtoId,
     },
     {
-      pattern: "proofing-*_noarch-macos.app.zip",
+      name: "*_noarch-macos.app.zip",
       kind: "outto-macos",
       outtoId,
     },
     {
-      pattern: "proofing-*_noarch-linux.pkt.box",
+      name: "*_noarch-linux.pkt.box",
       kind: "box",
       os: ["linux"],
     },
@@ -106,7 +106,11 @@ export async function runSpellerPahkatPublish() {
   const manifest = await readManifest()
 
   using dir = await makeTempDir({ prefix: "pahkat-speller-" })
-  const artifacts = await downloadArtifacts(spellerArtifacts(langTag), dir.path)
+  const artifacts = await downloadArtifacts(
+    id,
+    spellerArtifacts(langTag),
+    dir.path,
+  )
 
   await publishRelease({
     package: id,
@@ -143,6 +147,7 @@ export async function runProofingPahkatPublish() {
 
   using dir = await makeTempDir({ prefix: "pahkat-proofing-" })
   const artifacts = await downloadArtifacts(
+    id,
     proofingArtifacts(langTag),
     dir.path,
   )
