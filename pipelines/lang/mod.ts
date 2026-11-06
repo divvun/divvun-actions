@@ -40,8 +40,9 @@ import {
   PAHKAT_ARTIFACT_SUFFIX,
   pahkatArtifactName,
 } from "~/util/pahkat_artifacts.ts"
-import { versionAsDev } from "~/util/shared.ts"
+import { Tar, versionAsDev } from "~/util/shared.ts"
 import { SOFT_FAIL_EXIT_STATUS } from "~/util/soft_failure.ts"
+import { makeTempDir } from "~/util/temp.ts"
 import spellerBundle, {
   type InstallerKind,
 } from "../../actions/speller/bundle.ts"
@@ -810,6 +811,20 @@ export async function runLangProofingBuild() {
   })
 }
 
+/**
+ * The version of the proofing packages a build makes: the tag's on a
+ * proofing release tag, and otherwise a dev version of `base`, the
+ * manifest's.
+ */
+function proofingVersion(base: string): string {
+  const tagVersion = builder.env.tag
+    ? extractVersionFromTag(builder.env.tag)
+    : null
+  return PROOFING_RELEASE_TAG.test(builder.env.tag ?? "") && tagVersion
+    ? tagVersion
+    : versionAsDev(base, builder.env.buildTimestamp, builder.env.buildNumber)
+}
+
 export async function runLangProofingBundle(
   { target }: { target: ProofingTarget },
 ) {
@@ -835,28 +850,15 @@ export async function runLangProofingBundle(
   }
 
   const langTag = deriveLangTag()
-  const packageId = `proofing-${langTag}`
   const info = proofingPackage(source, manifest, langTag)
-  const baseVersion = info.version
-
-  const isProofingReleaseTag = PROOFING_RELEASE_TAG.test(builder.env.tag ?? "")
-  const tagVersion = builder.env.tag
-    ? extractVersionFromTag(builder.env.tag)
-    : null
-  const version = isProofingReleaseTag && tagVersion
-    ? tagVersion
-    : versionAsDev(
-      baseVersion,
-      builder.env.buildTimestamp,
-      builder.env.buildNumber,
-    )
 
   await proofingBundle({
     target,
-    packageId,
+    packageId: `proofing-${langTag}`,
+    releaseId: `x-proofing-${langTag}`,
     langTag,
     name: `${info.name} (proofing)`,
-    version,
+    version: proofingVersion(info.version),
     buildNumber: parseInt(builder.env.buildNumber ?? "1"),
     drbPath: drbFiles[0],
   })
@@ -867,22 +869,67 @@ export async function runLangProofingDeploy() {
   const isMainBranch = builder.env.branch === "main"
 
   const langTag = deriveLangTag()
-  const packageName = `proofing-${langTag}`
+  const pahkatPackage = `proofing-${langTag}`
+  const packageName = `x-proofing-${langTag}`
 
-  // The bundle steps leave Pahkat artifacts; the release takes them under
-  // their own names.
-  await builder.downloadArtifacts(`pahkat/${packageName}/*`, ".")
+  let manifest: SpellerManifest
+  try {
+    manifest = toml.parse(
+      await Deno.readTextFile("./manifest.toml"),
+    ) as SpellerManifest
+  } catch (e) {
+    logger.error("Failed to read manifest.toml:", e)
+    throw e
+  }
+  const source = await readProofingSource()
+
+  // The bundle steps leave the installers as Pahkat artifacts of
+  // proofing-<tag>; the release takes them under its own id, as always.
+  for (const kind of ["app.zip", "exe"]) {
+    await builder.downloadArtifacts(
+      `pahkat/${pahkatPackage}/*.${kind}${PAHKAT_ARTIFACT_SUFFIX}`,
+      ".",
+    )
+  }
   for (
     const artifact of await globFiles(
-      `pahkat/${packageName}/*${PAHKAT_ARTIFACT_SUFFIX}`,
+      `pahkat/${pahkatPackage}/*${PAHKAT_ARTIFACT_SUFFIX}`,
     )
   ) {
-    await Deno.rename(artifact, pahkatArtifactName(artifact))
+    const name = pahkatArtifactName(artifact)
+    await Deno.rename(
+      artifact,
+      `${packageName}${name.slice(pahkatPackage.length)}`,
+    )
   }
+
+  // The Linux asset is the flat tarball of <tag>.drb it has always been,
+  // made here rather than in the Linux bundle step, whose .pkt.box is for
+  // Pahkat-3 alone.
+  const drb = proofingArtifact(source)
+  await downloadCompressedArtifacts(drb)
+  const drbFiles = await globFiles(drb)
+  if (drbFiles.length !== 1) {
+    throw new Error(
+      `Expected one ${source} .drb file for proofing, found ${drbFiles.length}`,
+    )
+  }
+  using stage = await makeTempDir({ prefix: "proofing-linux-" })
+  const stagedDrb = path.join(stage.path, `${langTag}.drb`)
+  await Deno.copyFile(drbFiles[0], stagedDrb)
+  const version = proofingVersion(
+    proofingPackage(source, manifest, langTag).version,
+  )
+  await Tar.createFlatPkt(
+    [stagedDrb],
+    path.resolve(`${packageName}_${version}_noarch-linux.pkt.tar.zst`),
+  )
 
   const macosFile = await globOneFile(`${packageName}_*_noarch-macos.app.zip`)
   const windowsFile = await globOneFile(`${packageName}_*_noarch-windows*.exe`)
-  const linuxFile = await globOneFile(`${packageName}_*_noarch-linux.pkt.box`)
+  const linuxFile = await globOneFile(
+    `${packageName}_*_noarch-linux.pkt.tar.zst`,
+  )
 
   logger.info("Deploying proofing packages:")
   logger.info(`- macOS: ${macosFile}`)
@@ -895,16 +942,6 @@ export async function runLangProofingDeploy() {
 
   if (!builder.env.repo) {
     throw new Error("No repository information available")
-  }
-
-  let manifest: SpellerManifest
-  try {
-    manifest = toml.parse(
-      await Deno.readTextFile("./manifest.toml"),
-    ) as SpellerManifest
-  } catch (e) {
-    logger.error("Failed to read manifest.toml:", e)
-    throw e
   }
 
   const artifacts = [macosFile, windowsFile, linuxFile].map((file) =>
@@ -939,26 +976,21 @@ export async function runLangProofingDeploy() {
     )
     logger.info("Proofing GitHub release created successfully")
   } else if (isMainBranch) {
-    const devVersion = versionAsDev(
-      proofingPackage(await readProofingSource(), manifest).version,
-      builder.env.buildTimestamp,
-      builder.env.buildNumber,
-    )
     const releaseTag = `x-proofing-${langTag}/dev-latest`
 
     const { checksumFile, signatureFile } = await createSignedChecksums(
       artifacts,
       await builder.ciKey(),
-      release(builder.env, { tag: releaseTag, version: devVersion }),
+      release(builder.env, { tag: releaseTag, version }),
     )
 
     logger.info(
-      `Creating dev-latest GitHub release for proofing version ${devVersion}`,
+      `Creating dev-latest GitHub release for proofing version ${version}`,
     )
     logger.info(`Release tag: ${releaseTag}`)
     logger.info(`Artifacts: ${artifacts.join(", ")}`)
 
-    const releaseName = `${packageName}/v${devVersion}`
+    const releaseName = `${packageName}/v${version}`
     const gh = new GitHub(builder.env.repo)
     await gh.updateRelease(
       releaseTag,
@@ -1691,10 +1723,12 @@ export async function pipelineLang() {
     deploySteps.push(command({
       label: `Deploy Proofing (${isProofingReleaseTag ? "Release" : "Dev"})`,
       command: "divvun-actions run lang-proofing-deploy",
+      // It makes the Linux tarball from the .drb itself, so the Linux
+      // bundle step, whose .pkt.box is for Pahkat-3, cannot hold it up.
       depends_on: [
+        proofing === "grammar" ? "grammar-build" : "proofing-build",
         "proofing-bundle-macos",
         "proofing-bundle-windows",
-        "proofing-bundle-linux",
       ],
       soft_fail: true,
       agents: {

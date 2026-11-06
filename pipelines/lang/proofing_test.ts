@@ -72,6 +72,21 @@ Deno.test("proofing DAG: grammar, spelling, disabled, main, PR and release tags"
           step.command === "divvun-actions run lang-proofing-deploy"
         )
         strictEqual(deploy.length, enabled ? 1 : 0)
+        // The GitHub release makes its Linux tarball from the .drb, so the
+        // Linux bundle step, whose .pkt.box is Pahkat-3's, cannot hold it up.
+        for (const step of deploy) {
+          const needs = step.depends_on as string[]
+          ok(!needs.includes("proofing-bundle-linux"), `${source} ${tag}`)
+          ok(
+            needs.includes(
+              source === "grammar" ? "grammar-build" : "proofing-build",
+            ),
+            `${source} ${tag}`,
+          )
+          for (const need of needs) {
+            ok(steps.some((producer) => producer.key === need), need)
+          }
+        }
 
         // One lang-deps step decides the dependency repos for every step
         // that builds from scratch.

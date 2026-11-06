@@ -12,9 +12,10 @@
 //   Linux:   .pkt.box holding share/divvun/proofing/<tag>.drb, where under a
 //            prefix such as /usr the LibreOffice extension looks for it.
 //
-// Each is uploaded as a Pahkat artifact (util/pahkat_artifacts.ts), which
-// the proofing release on GitHub takes under its own name (see
-// pipelines/lang/mod.ts).
+// Each is uploaded as a Pahkat artifact (util/pahkat_artifacts.ts) named
+// for proofing-<tag>. The GitHub release goes on as before Pahkat-3, under
+// the id x-proofing-<tag>: its deploy (pipelines/lang/mod.ts) renames the
+// installers back, and makes its own Linux .pkt.tar.zst from the .drb.
 
 import * as path from "@std/path"
 import { makeOuttoInstaller } from "~/actions/outto/lib.ts"
@@ -39,6 +40,11 @@ export type ProofingBundleProps = {
   target: ProofingTarget
   /** Package id, e.g. proofing-se. */
   packageId: string
+  /**
+   * The id the GitHub release names its assets with, e.g. x-proofing-se,
+   * which the installers are built under, so they are as they always were.
+   */
+  releaseId: string
   /** BCP-47 tag, e.g. se. Names the .drb and (macOS) the bundle dir. */
   langTag: string
   /** Human-readable installer name. */
@@ -117,7 +123,7 @@ async function buildMacOS(
   const configPath = path.join(stage.path, "outto.toml")
   await oBuilder.write(configPath)
 
-  const outputName = `${props.packageId}_${props.version}_noarch-macos.app`
+  const outputName = `${props.releaseId}_${props.version}_noarch-macos.app`
   const outputPath = path.resolve(outputName)
 
   const result = await makeOuttoInstaller({
@@ -136,7 +142,9 @@ async function buildMacOS(
   await Ditto.zipApp(result.path, uploadPath)
   logger.debug(`Zipped .app for upload: ${uploadPath}`)
 
-  const artifact = await uploadPahkatArtifact(props.packageId, uploadPath)
+  const artifact = await uploadPahkatArtifact(props.packageId, uploadPath, {
+    name: pahkatName(props, uploadPath),
+  })
   return { payloadPath: artifact, unsigned: false }
 }
 
@@ -172,7 +180,7 @@ async function buildWindows(
   const configPath = path.join(stage.path, "outto.toml")
   await oBuilder.write(configPath)
 
-  const outputName = `${props.packageId}_${props.version}_noarch-windows.exe`
+  const outputName = `${props.releaseId}_${props.version}_noarch-windows.exe`
   const outputPath = path.resolve(outputName)
 
   // Sign command: existing divvun-actions.bat wraps signtool.
@@ -195,7 +203,7 @@ async function buildWindows(
     )
     logger.warning("Retrying outto build without signing...")
     const unsignedOutput = path.resolve(
-      `${props.packageId}_${props.version}_noarch-windows.UNSIGNED.exe`,
+      `${props.releaseId}_${props.version}_noarch-windows.UNSIGNED.exe`,
     )
     result = await makeOuttoInstaller({
       configPath,
@@ -205,7 +213,9 @@ async function buildWindows(
     })
   }
 
-  const artifact = await uploadPahkatArtifact(props.packageId, result.path)
+  const artifact = await uploadPahkatArtifact(props.packageId, result.path, {
+    name: pahkatName(props, result.path),
+  })
   return { payloadPath: artifact, unsigned: result.unsigned }
 }
 
@@ -231,6 +241,15 @@ async function buildLinux(
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+/** An installer's name in the Pahkat release: its own, for proofing-<tag>. */
+function pahkatName(props: ProofingBundleProps, file: string): string {
+  const name = path.basename(file)
+  if (!name.startsWith(`${props.releaseId}_`)) {
+    throw new Error(`${name} is not named for ${props.releaseId}`)
+  }
+  return `${props.packageId}${name.slice(props.releaseId.length)}`
+}
 
 /**
  * Minimal Info.plist for the proofing bundle. No NSServices: the MacDivvun
