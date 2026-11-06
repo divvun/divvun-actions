@@ -26,6 +26,20 @@ async function runSigncode(
   }
 }
 
+/**
+ * An error with the errors it was caused by. A failed fetch says only
+ * "fetch failed"; why, such as a refused connection or an untrusted
+ * certificate, is in its cause.
+ */
+function withCauses(error: unknown): string {
+  const parts: string[] = []
+  for (let e: unknown = error; e != null && parts.length < 5;) {
+    parts.push(String(e))
+    e = e instanceof Error ? e.cause : undefined
+  }
+  return parts.join(": caused by ")
+}
+
 const SIGN_URL = "https://sign.necessary.nu/windows/sign"
 const SIGN_ATTEMPTS = 4
 
@@ -56,7 +70,7 @@ async function requestSignature(
       }
     } catch (e) {
       if (e instanceof Error && e.message === failure) throw e
-      failure = `Signing service request failed: ${e}`
+      failure = `Signing service request failed: ${withCauses(e)}`
     }
     if (attempt < SIGN_ATTEMPTS) {
       const delay = 5000 * 2 ** (attempt - 1)
