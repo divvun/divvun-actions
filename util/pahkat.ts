@@ -8,7 +8,7 @@ import * as builder from "~/builder.ts"
 import { ExpectedError } from "~/util/error.ts"
 import { ghWithRetry } from "~/util/github.ts"
 import { globFiles } from "~/util/glob.ts"
-import { createSignedChecksums, release } from "~/util/hash.ts"
+import { checkRelease, createSignedChecksums, release } from "~/util/hash.ts"
 import logger from "~/util/log.ts"
 import {
   pahkatArtifactName,
@@ -21,35 +21,104 @@ export const PAHKAT_SERVER = "https://pahkat-3.giellalt.org/"
 /** The server's one repository, which every package name starts with. */
 export const PAHKAT_REPOSITORY = "main"
 
+/** The CLI's package, which divvun/pahkat-next's main builds publish. */
+export const PAHKAT_CLI_PACKAGE = "pahkat"
+
 /**
- * The pahkat CLI that publishes and installs. How CI gets it is not
- * settled, as divvun/pahkat-next publishes no CLI yet; until it is, this is
- * whichever `pahkat` the agent has on its PATH.
+ * The CI key the server's key list names, which signs every release's
+ * BLAKE3SUMS, the CLI's too. A CLI fetched from the server runs only once
+ * its release verifies against it.
  */
-const PAHKAT_CLI = "pahkat"
+const PAHKAT_CI_KEY = "RWQkp7YVzweZBSfw15ZgnFk5JC2XL7RpuRMf+Py/i+THc1JMVpUzBR3r"
 
-let cli: Promise<string> | undefined
+let fetched: Promise<string> | undefined
 
-/** The pahkat CLI, once it has been found and its version logged. */
+/** The pahkat CLI, fetched from the server once per process. */
 function pahkatCli(): Promise<string> {
-  cli ??= (async () => {
+  fetched ??= fetchCli()
+  return fetched
+}
+
+/**
+ * The newest pahkat CLI the server offers for this agent on the dev
+ * channel, through its download link (download.latest): the release link it
+ * leads to names the release, whose BLAKE3SUMS and signature lie beside it.
+ * The CLI runs only when the signature verifies against the CI key, its
+ * trusted comment names that release, and the box's hash is the one listed.
+ */
+async function fetchCli(): Promise<string> {
+  const name = `${PAHKAT_REPOSITORY}/${PAHKAT_CLI_PACKAGE}`
+  const os = Deno.build.os === "darwin" ? "macos" : Deno.build.os
+  const query = new URLSearchParams({
+    os,
+    arch: Deno.build.arch,
+    channel: "dev",
+  })
+  const latest = new URL(
+    `v1/download/${name}/latest?${query}`,
+    PAHKAT_SERVER,
+  )
+  const answer = await fetch(latest, { redirect: "manual" })
+  await answer.body?.cancel()
+  const location = answer.headers.get("location")
+  if (answer.status !== 303 || location == null) {
+    throw ExpectedError.create(
+      `${PAHKAT_SERVER} offers no ${name} for ${os} on ${Deno.build.arch} (it answered ${answer.status}), so there is no pahkat CLI to run`,
+    )
+  }
+  const link = new URL(location, latest)
+  const parts = link.pathname.split("/")
+  const file = decodeURIComponent(parts.at(-1)!)
+  const version = decodeURIComponent(parts.at(-2)!)
+
+  // The CLI is run until the process exits, so its directory lasts as long.
+  const dir = await Deno.makeTempDir({ prefix: "pahkat-cli-" })
+  globalThis.addEventListener("unload", () => {
     try {
-      const { stdout } = await new Deno.Command(PAHKAT_CLI, {
-        args: ["--version"],
-        stdout: "piped",
-        stderr: "inherit",
-      }).output()
-      logger.info(`Using ${new TextDecoder().decode(stdout).trim()}`)
-    } catch (e) {
-      if (e instanceof Deno.errors.NotFound) {
-        throw ExpectedError.create(
-          `There is no ${PAHKAT_CLI} on this agent's PATH to publish with (see PAHKAT_CLI in util/pahkat.ts)`,
-        )
-      }
-      throw e
+      Deno.removeSync(dir, { recursive: true })
+    } catch {
+      // Already gone.
     }
-    return PAHKAT_CLI
-  })()
+  })
+  const save = async (url: URL, as: string) => {
+    const response = await fetch(url)
+    if (!response.ok) {
+      await response.body?.cancel()
+      throw new Error(`Could not fetch ${url}: ${response.status}`)
+    }
+    const target = path.join(dir, as)
+    await Deno.writeFile(target, new Uint8Array(await response.arrayBuffer()))
+    return target
+  }
+  const sums = await save(new URL("BLAKE3SUMS", link), "BLAKE3SUMS")
+  const signature = await save(
+    new URL("BLAKE3SUMS.minisig", link),
+    "BLAKE3SUMS.minisig",
+  )
+  const box = await save(link, "pahkat.pkt.box")
+
+  await checkRelease({
+    sums,
+    signature,
+    saved: box,
+    file,
+    name,
+    version,
+    key: PAHKAT_CI_KEY,
+  })
+
+  const root = path.join(dir, "root")
+  await builder.exec("box", ["extract", "--quiet", "-o", root, box])
+  const cli = path.join(root, "bin", os === "windows" ? "pahkat.exe" : "pahkat")
+  if (os !== "windows") await Deno.chmod(cli, 0o755)
+  const { stdout } = await new Deno.Command(cli, {
+    args: ["--version"],
+    stdout: "piped",
+    stderr: "inherit",
+  }).output()
+  logger.info(
+    `Using ${new TextDecoder().decode(stdout).trim()}, ${name} ${version}`,
+  )
   return cli
 }
 
@@ -97,6 +166,11 @@ export type PahkatRelease = {
   tag: string
   metadata: Metadata
   artifacts: Artifact[]
+  /**
+   * The pahkat CLI to publish with, rather than the server's. pahkat-next
+   * publishes its CLI with the one it has just built.
+   */
+  cli?: string
 }
 
 /** A Pahkat version (version.grammar): no `v`, and only these suffixes. */
@@ -381,7 +455,7 @@ export async function publishRelease(pahkat: PahkatRelease): Promise<void> {
     dir.path,
   )
 
-  await upload(dir.path, `${name} ${pahkat.version}`)
+  await upload(dir.path, `${name} ${pahkat.version}`, pahkat.cli)
 }
 
 /** What `pahkat upload --json` and the client commands print. */
@@ -411,12 +485,17 @@ const UPLOAD_RETRY_DELAY_MS = 30_000
  * only repeat, and 2 when it failed in a way a fresh run with a fresh
  * token may fix (upload.client-outcome).
  */
-async function upload(dir: string, release: string): Promise<void> {
-  const pahkat = await pahkatCli()
+async function upload(
+  dir: string,
+  release: string,
+  cli?: string,
+): Promise<void> {
+  const pahkat = cli ?? await pahkatCli()
   const job = Deno.env.get("BUILDKITE_BUILD_URL")
-  const build = job == null
-    ? []
-    : ["--build", `job=${job}${builder.env.jobId ? `#${builder.env.jobId}` : ""}`]
+  const build = job == null ? [] : [
+    "--build",
+    `job=${job}${builder.env.jobId ? `#${builder.env.jobId}` : ""}`,
+  ]
   let opened: number | undefined
 
   for (let attempt = 1;; attempt++) {

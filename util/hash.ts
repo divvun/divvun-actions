@@ -168,3 +168,58 @@ export async function createSignedChecksums(
 
   return { checksumFile, signatureFile }
 }
+
+/**
+ * Check a release fetched from the server before anything in it runs: the
+ * signature over its BLAKE3SUMS verifies against `key`, its trusted comment
+ * names `name` at `version`, and `file`, saved at `saved`, has the BLAKE3
+ * hash BLAKE3SUMS lists for it.
+ */
+export async function checkRelease(
+  { sums, signature, saved, file, name, version, key }: {
+    sums: string
+    signature: string
+    saved: string
+    file: string
+    name: string
+    version: string
+    key: string
+  },
+): Promise<void> {
+  const verified = await new Deno.Command("minisign", {
+    args: ["-V", "-Q", "-P", key, "-m", sums, "-x", signature],
+    stdout: "piped",
+    stderr: "piped",
+  }).output()
+  if (verified.code !== 0) {
+    throw new Error(
+      `The signature over ${name} ${version}'s BLAKE3SUMS does not verify against the CI key: ${
+        new TextDecoder().decode(verified.stderr).trim()
+      }`,
+    )
+  }
+  const comment = new Map(
+    new TextDecoder().decode(verified.stdout).trim().split(", ").map(
+      (field) => {
+        const space = field.indexOf(" ")
+        return [field.slice(0, space), field.slice(space + 1)]
+      },
+    ),
+  )
+  if (comment.get("package") !== name || comment.get("version") !== version) {
+    throw new Error(
+      `${name} ${version}'s BLAKE3SUMS is signed for ${
+        comment.get("package")
+      } ${comment.get("version")}`,
+    )
+  }
+  const listed = (await Deno.readTextFile(sums)).split("\n")
+    .map((line) => /^([0-9a-f]{64}) {2}(.+)$/.exec(line))
+    .find((line) => line?.[2] === file)?.[1]
+  const hash = await blake3Hash(saved)
+  if (listed == null || hash !== listed) {
+    throw new Error(
+      `${file} of ${name} ${version} is not the file its BLAKE3SUMS lists`,
+    )
+  }
+}

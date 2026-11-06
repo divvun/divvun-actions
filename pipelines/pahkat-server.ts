@@ -2,6 +2,7 @@ import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
 import { bumpArgoKustomizeImageTag } from "~/util/k8s-config.ts"
+import { pahkatCliSteps } from "./pahkat-cli.ts"
 
 const IMAGE = "ghcr.io/divvun/pahkat-server"
 const APPLICATION_PATH = "apps/services/pahkat-server-app.yaml"
@@ -42,6 +43,7 @@ export function pipelinePahkatServer(): BuildkitePipeline {
         branches: "main",
         depends_on: "build-push",
       }),
+      ...pahkatCliSteps(command),
     ],
   }
 }

@@ -91,6 +91,7 @@ import {
   runPahkatServerBumpManifest,
   runPahkatServerDeploy,
 } from "./pipelines/pahkat-server.ts"
+import { runPahkatCliPublish } from "./pipelines/pahkat-cli.ts"
 import {
   DIVVUN_WORKER_GRAMMAR,
   DIVVUN_WORKER_SPELLER,
@@ -635,6 +636,10 @@ async function runPipeline(args: any) {
     }
     case "pahkat-server-bump-manifest": {
       await runPahkatServerBumpManifest()
+      break
+    }
+    case "pahkat-cli-publish": {
+      await runPahkatCliPublish()
       break
     }
     case "divvun-worker-grammar-deploy": {

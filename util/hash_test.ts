@@ -1,6 +1,12 @@
 import { ok, rejects, strictEqual, throws } from "node:assert/strict"
 import * as path from "@std/path"
-import { createSignedChecksums, type Release, trustedComment } from "./hash.ts"
+import {
+  blake3Hash,
+  checkRelease,
+  createSignedChecksums,
+  type Release,
+  trustedComment,
+} from "./hash.ts"
 import { makeTempDir } from "./temp.ts"
 
 const COMMIT = "4f2c0a9e7b1d3c5e6f8a9b0c1d2e3f4a5b6c7d8e"
@@ -20,7 +26,12 @@ Deno.test("the trusted comment names the release in quoted Styx", () => {
   )
   const { package: _, ...tool } = RELEASE
   strictEqual(
-    trustedComment({ ...tool, repo: "divvun/box", tag: "v0.3.0", version: "0.3.0" }),
+    trustedComment({
+      ...tool,
+      repo: "divvun/box",
+      tag: "v0.3.0",
+      version: "0.3.0",
+    }),
     `repo "divvun/box", tag "v0.3.0", version "0.3.0", commit "${COMMIT}"`,
   )
   throws(() => trustedComment({ ...RELEASE, tag: 'v1"2' }))
@@ -99,4 +110,79 @@ Deno.test("release checksums use portable names, verify with the comment, and de
     )
     await Deno.remove(scratch.path, { recursive: true })
   }
+})
+
+async function run(command: string, args: string[], cwd: string) {
+  const { code, stderr } = await new Deno.Command(command, {
+    args,
+    cwd,
+    stdin: "null",
+    stdout: "null",
+    stderr: "piped",
+  }).output()
+  if (code !== 0) {
+    throw new Error(
+      `${command} failed: ${new TextDecoder().decode(stderr)}`,
+    )
+  }
+}
+
+/** A key, and a release of main/pahkat 3.0.0 holding one box signed with it. */
+async function signed(dir: string) {
+  await run("minisign", ["-G", "-W", "-p", "ci.pub", "-s", "ci.key"], dir)
+  const key = (await Deno.readTextFile(path.join(dir, "ci.pub")))
+    .trim().split("\n")[1]
+  const file = "pahkat_3.0.0_linux_x86_64.pkt.box"
+  const saved = path.join(dir, "pahkat.pkt.box")
+  await Deno.writeTextFile(saved, "the CLI")
+  const hash = await blake3Hash(saved)
+  const sums = path.join(dir, "BLAKE3SUMS")
+  await Deno.writeTextFile(sums, `${hash}  ${file}\n`)
+  const comment =
+    "repo divvun/pahkat-next, tag dev-latest, package main/pahkat, version 3.0.0, commit " +
+    "ab".repeat(20)
+  await run("minisign", [
+    "-S",
+    "-s",
+    "ci.key",
+    "-m",
+    "BLAKE3SUMS",
+    "-t",
+    comment,
+  ], dir)
+  return {
+    sums,
+    signature: `${sums}.minisig`,
+    saved,
+    file,
+    name: "main/pahkat",
+    version: "3.0.0",
+    key,
+  }
+}
+
+Deno.test("a fetched release runs only when its attestation holds", async () => {
+  using dir = await makeTempDir()
+  const release = await signed(dir.path)
+  await checkRelease(release)
+
+  await rejects(checkRelease({ ...release, version: "3.0.1" }), /signed for/)
+  await rejects(
+    checkRelease({ ...release, name: "main/kbdgen" }),
+    /signed for/,
+  )
+  await rejects(
+    checkRelease({ ...release, file: "other.pkt.box" }),
+    /not the file its BLAKE3SUMS lists/,
+  )
+  await rejects(
+    checkRelease({
+      ...release,
+      key: "RWQkp7YVzweZBSfw15ZgnFk5JC2XL7RpuRMf+Py/i+THc1JMVpUzBR3r",
+    }),
+    /does not verify/,
+  )
+
+  await Deno.writeTextFile(release.saved, "another CLI")
+  await rejects(checkRelease(release), /not the file its BLAKE3SUMS lists/)
 })
