@@ -1,8 +1,15 @@
-import { ok, rejects, strictEqual, throws } from "node:assert/strict"
+import {
+  deepStrictEqual,
+  ok,
+  rejects,
+  strictEqual,
+  throws,
+} from "node:assert/strict"
 import * as path from "@std/path"
 import {
   blake3Hash,
   checkRelease,
+  commentFields,
   createSignedChecksums,
   type Release,
   trustedComment,
@@ -138,9 +145,13 @@ async function signed(dir: string) {
   const hash = await blake3Hash(saved)
   const sums = path.join(dir, "BLAKE3SUMS")
   await Deno.writeTextFile(sums, `${hash}  ${file}\n`)
-  const comment =
-    "repo divvun/pahkat-next, tag dev-latest, package main/pahkat, version 3.0.0, commit " +
-    "ab".repeat(20)
+  const comment = trustedComment({
+    repo: "divvun/pahkat-next",
+    tag: "dev-latest",
+    package: "main/pahkat",
+    version: "3.0.0",
+    commit: COMMIT,
+  })
   await run("minisign", [
     "-S",
     "-s",
@@ -185,4 +196,23 @@ Deno.test("a fetched release runs only when its attestation holds", async () => 
 
   await Deno.writeTextFile(release.saved, "another CLI")
   await rejects(checkRelease(release), /not the file its BLAKE3SUMS lists/)
+})
+
+Deno.test("a trusted comment's fields are read quoted, as signed, or bare", () => {
+  const expected = new Map([
+    ["repo", RELEASE.repo],
+    ["tag", RELEASE.tag],
+    ["package", RELEASE.package!],
+    ["version", RELEASE.version],
+    ["commit", COMMIT],
+  ])
+  deepStrictEqual(commentFields(trustedComment(RELEASE)), expected)
+  deepStrictEqual(
+    commentFields(
+      `repo giellalt/lang-sme, tag speller-sme/v4.5.2, package main/speller-sme, version 4.5.2, commit ${COMMIT}`,
+    ),
+    expected,
+  )
+  deepStrictEqual(commentFields('package "main/pahkat" junk'), new Map())
+  deepStrictEqual(commentFields(""), new Map())
 })

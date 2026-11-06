@@ -170,6 +170,22 @@ export async function createSignedChecksums(
 }
 
 /**
+ * The fields of a trusted comment: `name value` pairs joined by `, `, each
+ * value quoted, as trustedComment writes it, or bare, as Styx also allows.
+ * Empty for a comment of any other form.
+ */
+export function commentFields(comment: string): Map<string, string> {
+  const fields = new Map<string, string>()
+  const field = /([a-z]+) (?:"([^"\\]*)"|([^\s",]+))(?:, |$)/y
+  while (field.lastIndex < comment.length) {
+    const match = field.exec(comment)
+    if (match == null) return new Map()
+    fields.set(match[1], match[2] ?? match[3])
+  }
+  return fields
+}
+
+/**
  * Check a release fetched from the server before anything in it runs: the
  * signature over its BLAKE3SUMS verifies against `key`, its trusted comment
  * names `name` at `version`, and `file`, saved at `saved`, has the BLAKE3
@@ -198,13 +214,8 @@ export async function checkRelease(
       }`,
     )
   }
-  const comment = new Map(
-    new TextDecoder().decode(verified.stdout).trim().split(", ").map(
-      (field) => {
-        const space = field.indexOf(" ")
-        return [field.slice(0, space), field.slice(space + 1)]
-      },
-    ),
+  const comment = commentFields(
+    new TextDecoder().decode(verified.stdout).trim(),
   )
   if (comment.get("package") !== name || comment.get("version") !== version) {
     throw new Error(
