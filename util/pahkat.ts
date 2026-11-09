@@ -72,14 +72,9 @@ async function fetchCli(): Promise<string> {
   const version = decodeURIComponent(parts.at(-2)!)
 
   // The CLI is run until the process exits, so its directory lasts as long.
-  const dir = await Deno.makeTempDir({ prefix: "pahkat-cli-" })
-  globalThis.addEventListener("unload", () => {
-    try {
-      Deno.removeSync(dir, { recursive: true })
-    } catch {
-      // Already gone.
-    }
-  })
+  const temp = await makeTempDir({ prefix: "pahkat-cli-" })
+  globalThis.addEventListener("unload", () => temp[Symbol.dispose]())
+  const dir = temp.path
   const save = async (url: URL, as: string) => {
     const response = await fetch(url)
     if (!response.ok) {
