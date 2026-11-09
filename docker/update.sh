@@ -22,11 +22,12 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Environment Variables:"
             echo "  BUILDKITE_AGENT_TOKEN    Required: Buildkite agent token"
-            echo "  INSTANCE_COUNT           Number of builder instances (default: 4)"
-            echo "  CONTAINER_PREFIX         Container name prefix (default: 'builder-')"
-            echo "  QUEUE_TAGS               Buildkite queue tags (default: 'queue=linux')"
-            echo "  MEMORY_RESERVATION       Memory reservation per container (default: 6g)"
-            echo "  MEMORY_LIMIT             Memory limit per container (default: 24g)"
+            echo "  IMAGE_TARGET             'linux' or 'alpine' (default: linux)"
+            echo "  INSTANCE_COUNT           Number of builder instances (default: linux 4, alpine 2)"
+            echo "  CONTAINER_PREFIX         Container name prefix (default: linux 'builder-', alpine 'builder-alpine-')"
+            echo "  QUEUE_TAGS               Buildkite queue tags (default: linux 'queue=linux', alpine 'queue=alpine')"
+            echo "  MEMORY_RESERVATION       Memory reservation per container (default: linux 6g, alpine 4g)"
+            echo "  MEMORY_LIMIT             Memory limit per container (default: linux 24g, alpine 16g)"
             exit 0
             ;;
         *)
@@ -37,13 +38,33 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Configuration with defaults
-INSTANCE_COUNT=${INSTANCE_COUNT:-4}
-MEMORY_RESERVATION=${MEMORY_RESERVATION:-6g}
-MEMORY_LIMIT=${MEMORY_LIMIT:-24g}
-CONTAINER_PREFIX=${CONTAINER_PREFIX:-"builder-"}
-QUEUE_TAGS=${QUEUE_TAGS:-"queue=linux"}
-IMAGE_NAME="ghcr.io/divvun/divvun-actions:ubuntu-latest"
+# The linux image runs Docker inside its containers, which needs sysbox; the
+# alpine one does not.
+IMAGE_TARGET=${IMAGE_TARGET:-linux}
+case "$IMAGE_TARGET" in
+    linux)
+        IMAGE_NAME="ghcr.io/divvun/divvun-actions:ubuntu-latest"
+        RUNTIME_ARGS=(--runtime sysbox-runc)
+        INSTANCE_COUNT=${INSTANCE_COUNT:-4}
+        MEMORY_RESERVATION=${MEMORY_RESERVATION:-6g}
+        MEMORY_LIMIT=${MEMORY_LIMIT:-24g}
+        CONTAINER_PREFIX=${CONTAINER_PREFIX:-"builder-"}
+        QUEUE_TAGS=${QUEUE_TAGS:-"queue=linux"}
+        ;;
+    alpine)
+        IMAGE_NAME="ghcr.io/divvun/divvun-actions:alpine-latest"
+        RUNTIME_ARGS=()
+        INSTANCE_COUNT=${INSTANCE_COUNT:-2}
+        MEMORY_RESERVATION=${MEMORY_RESERVATION:-4g}
+        MEMORY_LIMIT=${MEMORY_LIMIT:-16g}
+        CONTAINER_PREFIX=${CONTAINER_PREFIX:-"builder-alpine-"}
+        QUEUE_TAGS=${QUEUE_TAGS:-"queue=alpine"}
+        ;;
+    *)
+        echo "Error: IMAGE_TARGET must be 'linux' or 'alpine', not '$IMAGE_TARGET'"
+        exit 1
+        ;;
+esac
 
 # Check required environment variables
 if [[ -z "${BUILDKITE_AGENT_TOKEN:-}" ]]; then
@@ -62,7 +83,8 @@ echo "  Container Prefix: $CONTAINER_PREFIX"
 echo "  Queue Tags: $QUEUE_TAGS"
 echo "  Memory Reservation: $MEMORY_RESERVATION"
 echo "  Memory Limit: $MEMORY_LIMIT"
-echo "  Image: $IMAGE_NAME"
+echo "  Image: $IMAGE_NAME ($IMAGE_TARGET)"
+echo "  Runtime: ${RUNTIME_ARGS[1]:-default}"
 echo "  Force Update: $FORCE_UPDATE"
 echo ""
 
@@ -236,7 +258,7 @@ update_container() {
     # Recreate
     echo "[$N] Creating new $CONTAINER_NAME..."
     if ! docker run \
-        --runtime sysbox-runc \
+        ${RUNTIME_ARGS[@]+"${RUNTIME_ARGS[@]}"} \
         -v "/var/lib/buildkite/hooks:/buildkite/hooks" \
         -v "/var/lib/buildkite-secrets:/buildkite-secrets:ro" \
         -e BUILDKITE_AGENT_TOKEN="$BUILDKITE_AGENT_TOKEN" \

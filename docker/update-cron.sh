@@ -37,7 +37,9 @@ fi
 # Load configuration file if it exists
 if [[ -f "$CONFIG_FILE" ]]; then
     log "Loading configuration from $CONFIG_FILE"
+    set -a
     source "$CONFIG_FILE"
+    set +a
 else
     log "WARNING: Configuration file not found at $CONFIG_FILE, using defaults"
 fi
@@ -65,13 +67,8 @@ fi
 
 log "Starting Docker update check..."
 
-# Export environment variables for the update script
+# update.sh picks its defaults by IMAGE_TARGET, so fill none in here.
 export BUILDKITE_AGENT_TOKEN
-export INSTANCE_COUNT="${INSTANCE_COUNT:-4}"
-export CONTAINER_PREFIX="${CONTAINER_PREFIX:-builder-}"
-export QUEUE_TAGS="${QUEUE_TAGS:-queue=linux}"
-export MEMORY_RESERVATION="${MEMORY_RESERVATION:-6g}"
-export MEMORY_LIMIT="${MEMORY_LIMIT:-24g}"
 
 # Run the update script and capture output
 if "$UPDATE_SCRIPT" 2>&1 | while IFS= read -r line; do

@@ -17,12 +17,13 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --config TYPE    Configuration type: 'standard' or 'large' (default: standard)"
+            echo "  --config TYPE    Configuration type: 'standard', 'large' or 'alpine' (default: standard)"
             echo "  -h, --help       Show this help message"
             echo ""
             echo "Examples:"
             echo "  $0                    # Use standard configuration"
             echo "  $0 --config large    # Use large server configuration"
+            echo "  $0 --config alpine   # Use Alpine musl server configuration"
             exit 0
             ;;
         *)
@@ -43,7 +44,7 @@ fi
 CONFIG_FILE="$SCRIPT_DIR/config-${CONFIG_TYPE}.env"
 if [[ ! -f "$CONFIG_FILE" ]]; then
     echo "ERROR: Configuration file not found: $CONFIG_FILE"
-    echo "Available configurations: standard, large"
+    echo "Available configurations: standard, large, alpine"
     exit 1
 fi
 
