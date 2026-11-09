@@ -20,10 +20,10 @@ RUN echo "Get cache-busted, loser" && apk update && apk upgrade && apk add --no-
     build-base \
     bison \
     ca-certificates \
-    clang21 \
-    clang21-dev \
-    clang21-extra-tools \
-    clang21-static \
+    clang22 \
+    clang22-dev \
+    clang22-extra-tools \
+    clang22-static \
     cmake \
     compiler-rt \
     curl \
@@ -39,9 +39,9 @@ RUN echo "Get cache-busted, loser" && apk update && apk upgrade && apk add --no-
     llvm-libunwind-static \
     libtool \
     linux-headers \
-    lld21 \
-    llvm21 \
-    llvm21-dev \
+    lld22 \
+    llvm22 \
+    llvm22-dev \
     make \
     ninja \
     openssl-dev \
@@ -61,11 +61,11 @@ RUN echo "Get cache-busted, loser" && apk update && apk upgrade && apk add --no-
     zlib-dev \
     zlib-static
 
-# clang-21 symlinks as default
-RUN ln -sf /usr/bin/clang-21 /usr/local/bin/clang && \
-    ln -sf /usr/bin/clang++-21 /usr/local/bin/clang++ && \
-    ln -sf /usr/bin/lld21 /usr/local/bin/lld && \
-    ln -sf /usr/bin/ld.lld21 /usr/local/bin/ld.lld
+# clang-22 symlinks as default
+RUN ln -sf /usr/bin/clang-22 /usr/local/bin/clang && \
+    ln -sf /usr/bin/clang++-22 /usr/local/bin/clang++ && \
+    ln -sf /usr/bin/lld22 /usr/local/bin/lld && \
+    ln -sf /usr/bin/ld.lld22 /usr/local/bin/ld.lld
 
 # rust@1.99.1 (targets: x86_64-unknown-linux-musl, aarch64-unknown-linux-musl)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
@@ -90,10 +90,10 @@ RUN mkdir -p /opt/sysroot-aarch64 && \
     build-base \
     bison \
     ca-certificates \
-    clang21 \
-    clang21-dev \
-    clang21-extra-tools \
-    clang21-static \
+    clang22 \
+    clang22-dev \
+    clang22-extra-tools \
+    clang22-static \
     cmake \
     compiler-rt \
     curl \
@@ -109,9 +109,9 @@ RUN mkdir -p /opt/sysroot-aarch64 && \
     llvm-libunwind-static \
     libtool \
     linux-headers \
-    lld21 \
-    llvm21 \
-    llvm21-dev \
+    lld22 \
+    llvm22 \
+    llvm22-dev \
     make \
     ninja \
     openssl-dev \

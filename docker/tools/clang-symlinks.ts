@@ -1,11 +1,11 @@
 import type { Tool } from "../lib/image.ts"
 
 /**
- * Symlink the clang-21 / lld-21 etc. binaries to unversioned names so
+ * Symlink the clang-22 / lld-22 etc. binaries to unversioned names so
  * that plain `clang` / `lld` pick up the right version.
  *
- * Alpine names the LLVM binaries without the hyphen (`clang-21` -> `clang21`,
- * `ld.lld-21` -> `ld.lld21`), so we gate on platform.
+ * Alpine names the LLVM binaries without the hyphen (`clang-22` -> `clang22`,
+ * `ld.lld-22` -> `ld.lld22`), so we gate on platform.
  */
 export function clangSymlinks(opts: { version: number }): Tool {
   return {

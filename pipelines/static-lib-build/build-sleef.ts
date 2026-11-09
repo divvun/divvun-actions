@@ -244,8 +244,8 @@ export async function buildSleef(options: BuildSleefOptions) {
       cmakeArgs.push(`-DCMAKE_C_FLAGS=-flto=thin -fPIC${archFlags}`)
       cmakeArgs.push(`-DCMAKE_CXX_FLAGS=-flto=thin -fPIC${archFlags}`)
       cmakeArgs.push("-DCMAKE_EXE_LINKER_FLAGS=-flto=thin -fuse-ld=lld -static")
-      cmakeArgs.push("-DCMAKE_AR=/usr/lib/llvm21/bin/llvm-ar")
-      cmakeArgs.push("-DCMAKE_RANLIB=/usr/lib/llvm21/bin/llvm-ranlib")
+      cmakeArgs.push("-DCMAKE_AR=/usr/lib/llvm22/bin/llvm-ar")
+      cmakeArgs.push("-DCMAKE_RANLIB=/usr/lib/llvm22/bin/llvm-ranlib")
     }
   }
 

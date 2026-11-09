@@ -9,8 +9,8 @@ export const versions = {
   llvm: 23,
   // Alpine's own LLVM packages, which stop short of the Ubuntu version above.
   // The alpine image's package list and the static-lib-build pipelines
-  // (/usr/lib/llvm21) hardcode this too.
-  alpineLlvm: 21,
+  // (/usr/lib/llvm22) hardcode this too.
+  alpineLlvm: 22,
   ndk: "30.0.16248370",
   cmake: "3.31.12",
   ninja: "1.13.2",
