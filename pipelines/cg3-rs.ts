@@ -205,10 +205,15 @@ export function pipelineCg3Rs(): BuildkitePipeline {
   }
 
   steps.push(wasmPackageStep())
+  publishDependKeys.push("wasm-package")
 
+  // Nothing publishes unless every target and the wasm package built, so a
+  // release never ships the tools without @divvun/cg3 or the other way round.
+  // npm goes last: a GitHub release can be made again, an npm version cannot.
   if (isRelease || isMainBranch) {
     steps.push(
       command({
+        key: "publish",
         label: `Publish (${isRelease ? "Release" : "Dev"})`,
         command: "divvun-actions run cg3-rs-publish",
         agents: { queue: "linux" },
@@ -223,7 +228,7 @@ export function pipelineCg3Rs(): BuildkitePipeline {
         label: "Publish @divvun/cg3 to npm",
         command: "divvun-actions run cg3-rs-npm-publish",
         agents: { queue: "linux" },
-        depends_on: "wasm-package",
+        depends_on: "publish",
       }),
     )
   }
