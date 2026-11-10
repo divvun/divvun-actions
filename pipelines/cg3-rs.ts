@@ -36,6 +36,55 @@ const CARGO_BUILD = `cargo build --release --locked -p cg3-cli --bins`
 // binaryen, for wasm-opt, which js/build.mjs runs.
 const BINARYEN = "version_123"
 
+// maturin builds the divvun-cg3 wheels from python/. 1.9.4 is the first to set
+// PYO3_BUILD_EXTENSION_MODULE, which pyo3 0.30 needs; the zig extra brings the
+// linker the Linux wheels are made with.
+const MATURIN = "maturin[zig]>=1.9.4,<2"
+
+/** One divvun-cg3 wheel: an abi3 wheel for CPython 3.11 and later. */
+type Wheel = {
+  target: string
+  queue: string
+  /**
+   * The platform tag zig links the wheel for: the oldest glibc or musl it
+   * claims, where a native build would claim the agent's own glibc. Absent for
+   * the macOS wheel, built natively, and the Windows ones, which link with the
+   * cargo-xwin the linux image carries.
+   */
+  platform?: string
+  /** Whether the agent that builds the wheel can also run it, to test it. */
+  tested?: boolean
+}
+
+const WHEELS: Wheel[] = [
+  {
+    target: "x86_64-unknown-linux-gnu",
+    queue: "linux",
+    platform: "manylinux2014",
+    tested: true,
+  },
+  {
+    target: "aarch64-unknown-linux-gnu",
+    queue: "linux",
+    platform: "manylinux2014",
+  },
+  {
+    target: "x86_64-unknown-linux-musl",
+    queue: "linux",
+    platform: "musllinux_1_2",
+  },
+  {
+    target: "aarch64-unknown-linux-musl",
+    queue: "linux",
+    platform: "musllinux_1_2",
+  },
+  { target: "x86_64-pc-windows-msvc", queue: "linux" },
+  { target: "aarch64-pc-windows-msvc", queue: "linux" },
+  { target: "aarch64-apple-darwin", queue: "macos", tested: true },
+]
+
+const PYTHON_DIST = "dist/python"
+
 function command(input: CommandStep): CommandStep {
   return {
     ...input,
@@ -145,6 +194,76 @@ function wasmPackageStep(): CommandStep {
   })
 }
 
+function wheelKey(wheel: Wheel): string {
+  return `python-wheel-${wheel.target}`
+}
+
+function sdistStep(): CommandStep {
+  return command({
+    key: "python-sdist",
+    label: ":python: sdist",
+    agents: { queue: "linux" },
+    command: [
+      `(cd python && uvx --from '${MATURIN}' maturin sdist --out ../${PYTHON_DIST})`,
+      `buildkite-agent artifact upload '${PYTHON_DIST}/*.tar.gz'`,
+    ],
+  })
+}
+
+function wheelStep(wheel: Wheel): CommandStep {
+  const zig = wheel.platform ? ` --zig --compatibility ${wheel.platform}` : ""
+  return command({
+    key: wheelKey(wheel),
+    label: `:python: ${wheel.target}`,
+    agents: { queue: wheel.queue },
+    command: [
+      `rustup target add ${wheel.target}`,
+      `(cd python && uvx --from '${MATURIN}' maturin build --release --locked --target ${wheel.target}${zig} --out ../${PYTHON_DIST})`,
+      `buildkite-agent artifact upload '${PYTHON_DIST}/*.whl'`,
+    ],
+  })
+}
+
+/**
+ * Installs the wheel `wheel`'s step built into a fresh CPython 3.11, the oldest
+ * the abi3 wheels serve, and runs python/tests against it: the API, the
+ * package's metadata and contents, and byte-for-byte parity with vislcg3 over
+ * the corpus, loaded both as text and as .cg3b. The tests build vislcg3,
+ * cg-comp and the EXTERNAL example themselves.
+ */
+function wheelTestStep(wheel: Wheel): CommandStep {
+  const venv = "/tmp/divvun-cg3-test"
+  const wheels = `${PYTHON_DIST}/*.whl`
+  return command({
+    key: `python-test-${wheel.target}`,
+    label: `:python: test ${wheel.target}`,
+    agents: { queue: wheel.queue },
+    depends_on: wheelKey(wheel),
+    command: [
+      `buildkite-agent artifact download --step ${
+        wheelKey(wheel)
+      } '${wheels}' .`,
+      `rm -rf ${venv} && uv venv --python 3.11 ${venv}`,
+      `uv pip install --python ${venv}/bin/python ${wheels} pytest`,
+      `export CG3_WHEEL=$$(ls ${wheels})`,
+      `(cd python && ${venv}/bin/pytest -q -rs -p no:cacheprovider)`,
+    ],
+  })
+}
+
+/**
+ * The divvun-cg3 sdist, a step per wheel, and a step testing each wheel its
+ * agent can run. Each uploads what it built; the PyPI publish step downloads
+ * them all and uploads them in one go.
+ */
+function pythonPackageSteps(): CommandStep[] {
+  return [
+    sdistStep(),
+    ...WHEELS.map(wheelStep),
+    ...WHEELS.filter((w) => w.tested).map(wheelTestStep),
+  ]
+}
+
 export function pipelineCg3Rs(): BuildkitePipeline {
   const isRelease = !!builder.env.tag?.match(/^v/)
   const isMainBranch = builder.env.branch === "main"
@@ -206,10 +325,14 @@ export function pipelineCg3Rs(): BuildkitePipeline {
 
   steps.push(wasmPackageStep())
   publishDependKeys.push("wasm-package")
+  const pythonSteps = pythonPackageSteps()
+  steps.push({ group: "divvun-cg3", steps: pythonSteps })
+  publishDependKeys.push(...pythonSteps.map((step) => step.key as string))
 
-  // Nothing publishes unless every target and the wasm package built, so a
-  // release never ships the tools without @divvun/cg3 or the other way round.
-  // npm goes last: a GitHub release can be made again, an npm version cannot.
+  // Nothing publishes unless every target, the wasm package and the wheels
+  // built, so a release never ships the tools without both packages or the
+  // other way round. npm and PyPI go last: a GitHub release can be made again,
+  // an npm or PyPI version cannot.
   if (isRelease || isMainBranch) {
     steps.push(
       command({
@@ -227,6 +350,12 @@ export function pipelineCg3Rs(): BuildkitePipeline {
       command({
         label: "Publish @divvun/cg3 to npm",
         command: "divvun-actions run cg3-rs-npm-publish",
+        agents: { queue: "linux" },
+        depends_on: "publish",
+      }),
+      command({
+        label: "Publish divvun-cg3 to PyPI",
+        command: "divvun-actions run cg3-rs-pypi-publish",
         agents: { queue: "linux" },
         depends_on: "publish",
       }),
@@ -456,4 +585,43 @@ export async function runCg3RsNpmPublish() {
     `//registry.npmjs.org/:_authToken=${token}\n`,
   )
   await builder.exec("npm", ["publish", "--access", "public"], { cwd: pkgDir })
+}
+
+/**
+ * Publishes the divvun-cg3 sdist and every wheel in one upload, on a version
+ * tag only, and only when there is a file for each and every one names the
+ * tag's version. Needs
+ * the `pypiToken` secret, an account-wide PyPI token: the first release creates
+ * the divvun-cg3 project under its account.
+ */
+export async function runCg3RsPypiPublish() {
+  const tag = builder.env.tag
+  if (!tag?.match(/^v/)) {
+    throw new Error("cg3-rs-pypi-publish requires a version tag")
+  }
+  const version = tag.slice(1)
+
+  using tempDir = await makeTempDir()
+  await builder.downloadArtifacts(`${PYTHON_DIST}/*`, tempDir.path)
+  const dist = path.join(tempDir.path, PYTHON_DIST)
+  const files: string[] = []
+  for await (const entry of Deno.readDir(dist)) {
+    files.push(path.join(dist, entry.name))
+  }
+  const named = new RegExp(
+    `^divvun_cg3-${version.replaceAll(".", "\\.")}(-.+\\.whl|\\.tar\\.gz)$`,
+  )
+  const stray = files.filter((f) => !named.test(path.basename(f)))
+  if (stray.length > 0 || files.length !== WHEELS.length + 1) {
+    throw new Error(
+      `expected the sdist and ${WHEELS.length} wheels, all at ${version}: ${
+        files.map((f) => path.basename(f)).join(", ")
+      }`,
+    )
+  }
+
+  const token = (await builder.secrets("pypiToken")).get("pypiToken")
+  await builder.exec("uv", ["publish", ...files], {
+    env: { UV_PUBLISH_TOKEN: token },
+  })
 }

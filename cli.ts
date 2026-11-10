@@ -55,6 +55,7 @@ import {
   pipelineCg3Rs,
   runCg3RsNpmPublish,
   runCg3RsPublish,
+  runCg3RsPypiPublish,
 } from "./pipelines/cg3-rs.ts"
 import {
   pipelineDivvunActions,
@@ -535,6 +536,10 @@ async function runPipeline(args: any) {
     }
     case "cg3-rs-npm-publish": {
       await runCg3RsNpmPublish()
+      break
+    }
+    case "cg3-rs-pypi-publish": {
+      await runCg3RsPypiPublish()
       break
     }
     case "divvun-actions-build-image": {
