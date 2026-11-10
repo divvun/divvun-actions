@@ -120,6 +120,11 @@ const PYTHON_PACKAGE: PythonPackage = {
     // are built with its plain clang driver.
     XWIN_CROSS_COMPILER: "clang",
   },
+  // Building them compiles hfst, which overflows the macOS agent's disk.
+  fixtures: {
+    build: "node js/test/fixtures.mjs",
+    env: "DIVVUN_HFST_FIXTURES",
+  },
 }
 
 export function pipelineHfstRs(): BuildkitePipeline {

@@ -181,10 +181,36 @@ export type PythonPackage = {
   wheelEnv: string
   /** What every wheel build needs in its environment. */
   buildEnv?: Record<string, string>
+  /**
+   * The fixtures the package's tests read. When given, a linux agent builds
+   * them once with `build <directory>` and each test step reads that directory
+   * from the variable `env`, so a test agent compiles nothing itself.
+   */
+  fixtures?: { build: string; env: string }
 }
 
 function wheelKey(wheel: Wheel): string {
   return `python-wheel-${wheel.target}`
+}
+
+const FIXTURES_KEY = "python-fixtures"
+const FIXTURES_DIR = "dist/python-fixtures"
+const FIXTURES_TARBALL = "python-fixtures.tgz"
+
+function fixturesStep(
+  command: Command,
+  fixtures: NonNullable<PythonPackage["fixtures"]>,
+): CommandStep {
+  return command({
+    key: FIXTURES_KEY,
+    label: ":python: test fixtures",
+    agents: { queue: "linux" },
+    command: [
+      `${fixtures.build} ${FIXTURES_DIR}`,
+      `tar -czf ${FIXTURES_TARBALL} ${FIXTURES_DIR}`,
+      `buildkite-agent artifact upload ${FIXTURES_TARBALL}`,
+    ],
+  })
 }
 
 function sdistStep(command: Command): CommandStep {
@@ -230,15 +256,25 @@ function wheelTestStep(
 ): CommandStep {
   const venv = `/tmp/${pkg.distribution.replaceAll("_", "-")}-test`
   const wheels = `${PYTHON_DIST}/*.whl`
+  const fixtures = pkg.fixtures
+    ? [
+      `buildkite-agent artifact download --step ${FIXTURES_KEY} ${FIXTURES_TARBALL} .`,
+      `tar -xzf ${FIXTURES_TARBALL}`,
+      `export ${pkg.fixtures.env}="$$PWD/${FIXTURES_DIR}"`,
+    ]
+    : []
   return command({
     key: `python-test-${wheel.target}`,
     label: `:python: test ${wheel.target}`,
     agents: { queue: wheel.queue },
-    depends_on: wheelKey(wheel),
+    depends_on: pkg.fixtures
+      ? [wheelKey(wheel), FIXTURES_KEY]
+      : wheelKey(wheel),
     command: [
       `buildkite-agent artifact download --step ${
         wheelKey(wheel)
       } '${wheels}' .`,
+      ...fixtures,
       `rm -rf ${venv} && uv venv --python 3.11 ${venv}`,
       `uv pip install --python ${venv}/bin/python ${wheels} pytest`,
       // pytest runs in python/, so the wheel is named from the checkout root.
@@ -260,6 +296,7 @@ export function pythonPackageSteps(
   return [
     sdistStep(command),
     ...WHEELS.map((wheel) => wheelStep(command, pkg, wheel)),
+    ...(pkg.fixtures ? [fixturesStep(command, pkg.fixtures)] : []),
     ...WHEELS.filter((w) => w.tested).map((wheel) =>
       wheelTestStep(command, pkg, wheel)
     ),
