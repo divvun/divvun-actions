@@ -547,7 +547,7 @@ async function runPipeline(args: any) {
       const pushArg = args._[2] as string
       if (!target || !pushArg) {
         throw new Error(
-          "Usage: divvun-actions-build-image <alpine|linux> <push|no-push>",
+          "Usage: divvun-actions-build-image <alpine|linux|windows-vsbase|windows|fc-kernel> <push|no-push>",
         )
       }
       await runDivvunActionsBuildImage(target, pushArg)

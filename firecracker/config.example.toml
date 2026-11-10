@@ -1,0 +1,75 @@
+# /etc/divvun-fc/config.toml: what one host runs. After editing, run
+# `deno task fc install` so the systemd units match.
+#
+# Every key outside [pools] has the default shown.
+
+# Images, kernels, cache disks and jails. Must be one filesystem: VMs boot
+# from hard links into their jails.
+# state_dir = "/var/lib/divvun-fc"
+
+# Slot n of the file's slots (counting across pools, in order) runs as
+# uid/gid uid_base + n.
+# uid_base = 900000
+
+[buildkite]
+# token_file = "/etc/divvun-fc/agent-token"
+# Copied into every VM as /buildkite/hooks and /buildkite-secrets, the paths
+# the Docker containers mounted them at.
+# hooks_dir = "/var/lib/buildkite/hooks"
+# secrets_dir = "/var/lib/buildkite-secrets"
+# Installed as the guest's /root/.docker/config.json, for `docker push`.
+# docker_config = "/etc/divvun-fc/docker-config.json"
+
+[network]
+# Each slot takes a /30 of this: host .1, guest .2.
+# subnet = "172.30.0.0/16"
+# Unset: the host's own upstream resolvers.
+# dns = ["192.168.1.1"]
+
+[kernel]
+# ref = "ghcr.io/divvun/divvun-actions:fc-kernel-latest"
+# Appended to the kernel command line. Drop "quiet" to see the boot.
+# extra_args = "quiet"
+
+[images]
+# mkfs.erofs -z; "none" for an uncompressed root filesystem.
+# compression = "lz4"
+
+[cache]
+# Each slot keeps a cache disk between jobs (builds, plugins, fs-cache,
+# docker, cargo, gradle, ~/.cache). Start it over when the pool's image
+# changes, as recreating the Docker containers did, and when it is fuller
+# than reset_usage at boot.
+# reset_on_image_change = true
+# reset_usage = 0.9
+
+# One table per kind of agent. Slots are <pool>-1 .. <pool>-<count>. Append
+# new pools at the end: inserting one renumbers the slots after it.
+#
+# vcpus defaults to the host's CPU count (at most 32, rounded down to even);
+# vCPUs are threads, so slots share the host's cores like containers did.
+# memory is the VM's RAM, allocated as the guest touches it and returned to
+# the host when the VM exits after its job.
+
+[pools.linux]
+image = "ghcr.io/divvun/divvun-actions:ubuntu-latest"
+count = 4
+memory = "24G"
+scratch = "64G"
+cache = "300G"
+tags = ["queue=linux"]
+# vcpus = 16
+# io_engine = "Sync"   # or "Async" (io_uring, developer preview in Firecracker)
+
+# [pools.linux-large]
+# image = "ghcr.io/divvun/divvun-actions:ubuntu-latest"
+# count = 2
+# memory = "32G"
+# cache = "500G"
+# tags = ["queue=linux", "size=large"]
+
+# [pools.alpine]
+# image = "ghcr.io/divvun/divvun-actions:alpine-latest"
+# count = 2
+# memory = "16G"
+# tags = ["queue=alpine"]
