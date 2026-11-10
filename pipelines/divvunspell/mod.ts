@@ -7,6 +7,38 @@ import logger from "../../util/log.ts"
 import { Tar, versionAsDev, Zip } from "../../util/shared.ts"
 import { makeTempDir } from "../../util/temp.ts"
 import { downloadBinaryCmd } from "~/util/artifact_download.ts"
+import {
+  packageReleaseOf,
+  publishToNpm,
+  publishToPypi,
+  type PythonPackage,
+  pythonPackageSteps,
+  type WasmPackage,
+  wasmPackageStep,
+} from "~/util/binding_packages.ts"
+
+const WASM_PACKAGE: WasmPackage = {
+  crate: "crates/divvun-fst-wasm",
+  packageDir: "fst",
+  name: "@divvun/fst",
+  // The test build also writes the fixtures and their native expectations.
+  // The suite runs the API contract and parity with the native library in
+  // each runtime the agent has, and skips the rest and the real spellers,
+  // which only a developer's machine has.
+  checks: [
+    "echo '--- Building @divvun/fst and its test build'",
+    "node js/build.mjs --test",
+    "echo '--- Its declarations'",
+    "(cd js && deno check)",
+    "echo '--- The JavaScript suite'",
+    "node js/test/run.mjs",
+  ],
+}
+
+const PYTHON_PACKAGE: PythonPackage = {
+  distribution: "divvun_fst",
+  wheelEnv: "DIVVUN_FST_WHEEL",
+}
 
 const binPlatforms = {
   macos: ["x86_64-apple-darwin", "aarch64-apple-darwin"],
@@ -185,8 +217,14 @@ export function pipelineDivvunspell() {
   } else if (builder.env.tag?.startsWith("divvunspell/v")) {
     isPublishBin = true
   }
+  // @divvun/fst and divvun-fst are each versioned on their own and released
+  // from `wasm/v<version>` and `python/v<version>`. A release tag builds only
+  // what it releases; every other build builds everything.
+  const pkg = packageReleaseOf(builder.env.tag)
+  const buildsPackage = (name: "wasm" | "python") =>
+    pkg ? pkg.package === name : !isPublishLib && !isPublishBin
 
-  if (!isPublishLib) {
+  if (!isPublishLib && !pkg) {
     const publishDependKeys: string[] = []
 
     for (const [os, archs] of Object.entries(binPlatforms)) {
@@ -238,7 +276,7 @@ export function pipelineDivvunspell() {
     }
   }
 
-  if (!isPublishBin) {
+  if (!isPublishBin && !pkg) {
     const libSteps: CommandStep[] = []
     const libPublishDependKeys: string[] = []
 
@@ -324,7 +362,52 @@ export function pipelineDivvunspell() {
     }
   }
 
+  if (buildsPackage("wasm")) {
+    steps.push(wasmPackageStep(command, WASM_PACKAGE))
+  }
+  const pythonSteps = pythonPackageSteps(command, PYTHON_PACKAGE)
+  if (buildsPackage("python")) {
+    steps.push({ group: "divvun-fst", steps: pythonSteps })
+  }
+
+  // An npm or PyPI version cannot be published again, so each package goes
+  // from its own tag only, once everything it is made of has passed.
+  if (pkg?.package === "wasm") {
+    steps.push(command({
+      label: "Publish @divvun/fst to npm",
+      command: "divvun-actions run divvunspell-npm-publish",
+      agents: { queue: "linux" },
+      depends_on: "wasm-package",
+    }))
+  }
+  if (pkg?.package === "python") {
+    steps.push(command({
+      label: "Publish divvun-fst to PyPI",
+      command: "divvun-actions run divvunspell-pypi-publish",
+      agents: { queue: "linux" },
+      depends_on: pythonSteps.map((step) => step.key as string),
+    }))
+  }
+
   return { steps }
+}
+
+/** Publishes @divvun/fst from a `wasm/v<version>` tag naming its version. */
+export async function runDivvunspellNpmPublish() {
+  const pkg = packageReleaseOf(builder.env.tag)
+  if (pkg?.package !== "wasm") {
+    throw new Error("divvunspell-npm-publish requires a wasm/v<version> tag")
+  }
+  await publishToNpm(WASM_PACKAGE, pkg.version)
+}
+
+/** Publishes divvun-fst from a `python/v<version>` tag naming its version. */
+export async function runDivvunspellPypiPublish() {
+  const pkg = packageReleaseOf(builder.env.tag)
+  if (pkg?.package !== "python") {
+    throw new Error("divvunspell-pypi-publish requires a python/v<version> tag")
+  }
+  await publishToPypi(PYTHON_PACKAGE, pkg.version)
 }
 
 export async function runLibdivvunFstPublish() {

@@ -9,6 +9,15 @@ import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums, release } from "~/util/hash.ts"
 import { Tar, versionAsDev, Zip } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
+import {
+  packageReleaseOf,
+  publishToNpm,
+  publishToPypi,
+  type PythonPackage,
+  pythonPackageSteps,
+  type WasmPackage,
+  wasmPackageStep,
+} from "~/util/binding_packages.ts"
 
 const TARGETS = [
   "aarch64-apple-darwin",
@@ -32,58 +41,6 @@ const BINARIES = [
 
 // The tools live in cg3-cli; cg3 is the library alone.
 const CARGO_BUILD = `cargo build --release --locked -p cg3-cli --bins`
-
-// binaryen, for wasm-opt, which js/build.mjs runs.
-const BINARYEN = "version_123"
-
-// maturin builds the divvun-cg3 wheels from python/. 1.9.4 is the first to set
-// PYO3_BUILD_EXTENSION_MODULE, which pyo3 0.30 needs; the zig extra brings the
-// linker the Linux wheels are made with.
-const MATURIN = "maturin[zig]>=1.9.4,<2"
-
-/** One divvun-cg3 wheel: an abi3 wheel for CPython 3.11 and later. */
-type Wheel = {
-  target: string
-  queue: string
-  /**
-   * The platform tag zig links the wheel for: the oldest glibc or musl it
-   * claims, where a native build would claim the agent's own glibc. Absent for
-   * the macOS wheel, built natively, and the Windows ones, which link with the
-   * cargo-xwin the linux image carries.
-   */
-  platform?: string
-  /** Whether the agent that builds the wheel can also run it, to test it. */
-  tested?: boolean
-}
-
-const WHEELS: Wheel[] = [
-  {
-    target: "x86_64-unknown-linux-gnu",
-    queue: "linux",
-    platform: "manylinux2014",
-    tested: true,
-  },
-  {
-    target: "aarch64-unknown-linux-gnu",
-    queue: "linux",
-    platform: "manylinux2014",
-  },
-  {
-    target: "x86_64-unknown-linux-musl",
-    queue: "linux",
-    platform: "musllinux_1_2",
-  },
-  {
-    target: "aarch64-unknown-linux-musl",
-    queue: "linux",
-    platform: "musllinux_1_2",
-  },
-  { target: "x86_64-pc-windows-msvc", queue: "linux" },
-  { target: "aarch64-pc-windows-msvc", queue: "linux" },
-  { target: "aarch64-apple-darwin", queue: "macos", tested: true },
-]
-
-const PYTHON_DIST = "dist/python"
 
 function command(input: CommandStep): CommandStep {
   return {
@@ -143,128 +100,6 @@ function createSignStep(target: string, buildKey: string): CommandStep {
   })
 }
 
-// The wasm-bindgen CLI must be the exact version cg3-wasm pins, so read the pin
-// rather than repeat it here.
-function wasmBindgenVersion(): string {
-  // deno-lint-ignore no-explicit-any
-  const manifest = toml.parse(
-    Deno.readTextFileSync("crates/cg3-wasm/Cargo.toml"),
-  ) as any
-  const pin = manifest?.dependencies?.["wasm-bindgen"]
-  const version = typeof pin === "string" ? pin.replace(/^=/, "") : undefined
-  if (!version) {
-    throw new Error("crates/cg3-wasm/Cargo.toml does not pin wasm-bindgen")
-  }
-  return version
-}
-
-/**
- * Builds the @divvun/cg3 npm package and checks it: the library on wasm32,
- * the binding's tests under Node, the declarations under `deno check`, and the
- * JavaScript suite, which runs the API contract and byte-for-byte parity with
- * vislcg3 over the corpus in each runtime the agent has and skips the rest.
- * The image has no wasm32 target, wasm-bindgen or wasm-opt, so the step
- * installs them. The package is uploaded for the npm publish step.
- */
-function wasmPackageStep(): CommandStep {
-  const binaryen = `/tmp/binaryen-${BINARYEN}`
-  return command({
-    key: "wasm-package",
-    label: "wasm package",
-    agents: { queue: "linux" },
-    command: [
-      "echo '--- Installing the wasm tools'",
-      "rustup target add wasm32-unknown-unknown",
-      `cargo binstall -y --force wasm-bindgen-cli@${wasmBindgenVersion()}`,
-      `curl -sSfL https://github.com/WebAssembly/binaryen/releases/download/${BINARYEN}/binaryen-${BINARYEN}-x86_64-linux.tar.gz | tar xz -C /tmp`,
-      `export PATH="${binaryen}/bin:$$PATH"`,
-      "echo '--- The library on wasm32'",
-      "cargo check --locked -p cg3 --lib --target wasm32-unknown-unknown",
-      "echo '--- Tests under Node'",
-      "cargo test --locked -p cg3-wasm --target wasm32-unknown-unknown",
-      "echo '--- Building @divvun/cg3 and its test build'",
-      "node js/build.mjs --test",
-      "echo '--- Its declarations'",
-      "deno check",
-      "echo '--- Checking it against vislcg3'",
-      "node js/test/run.mjs",
-      "tar -czf cg3-npm-package.tgz -C js cg3",
-      "buildkite-agent artifact upload cg3-npm-package.tgz",
-    ],
-  })
-}
-
-function wheelKey(wheel: Wheel): string {
-  return `python-wheel-${wheel.target}`
-}
-
-function sdistStep(): CommandStep {
-  return command({
-    key: "python-sdist",
-    label: ":python: sdist",
-    agents: { queue: "linux" },
-    command: [
-      `(cd python && uvx --from '${MATURIN}' maturin sdist --out ../${PYTHON_DIST})`,
-      `buildkite-agent artifact upload '${PYTHON_DIST}/*.tar.gz'`,
-    ],
-  })
-}
-
-function wheelStep(wheel: Wheel): CommandStep {
-  const zig = wheel.platform ? ` --zig --compatibility ${wheel.platform}` : ""
-  return command({
-    key: wheelKey(wheel),
-    label: `:python: ${wheel.target}`,
-    agents: { queue: wheel.queue },
-    command: [
-      `rustup target add ${wheel.target}`,
-      `(cd python && uvx --from '${MATURIN}' maturin build --release --locked --target ${wheel.target}${zig} --out ../${PYTHON_DIST})`,
-      `buildkite-agent artifact upload '${PYTHON_DIST}/*.whl'`,
-    ],
-  })
-}
-
-/**
- * Installs the wheel `wheel`'s step built into a fresh CPython 3.11, the oldest
- * the abi3 wheels serve, and runs python/tests against it: the API, the
- * package's metadata and contents, and byte-for-byte parity with vislcg3 over
- * the corpus, loaded both as text and as .cg3b. The tests build vislcg3,
- * cg-comp and the EXTERNAL example themselves.
- */
-function wheelTestStep(wheel: Wheel): CommandStep {
-  const venv = "/tmp/divvun-cg3-test"
-  const wheels = `${PYTHON_DIST}/*.whl`
-  return command({
-    key: `python-test-${wheel.target}`,
-    label: `:python: test ${wheel.target}`,
-    agents: { queue: wheel.queue },
-    depends_on: wheelKey(wheel),
-    command: [
-      `buildkite-agent artifact download --step ${
-        wheelKey(wheel)
-      } '${wheels}' .`,
-      `rm -rf ${venv} && uv venv --python 3.11 ${venv}`,
-      `uv pip install --python ${venv}/bin/python ${wheels} pytest`,
-      // pytest runs in python/, so the wheel is named from the checkout root.
-      `export CG3_WHEEL="$$PWD/$$(ls ${wheels})"`,
-      `(cd python && ${venv}/bin/pytest -q -rs -p no:cacheprovider)`,
-    ],
-  })
-}
-
-/**
- * The divvun-cg3 sdist, a step per wheel, and a step testing each wheel its
- * agent can run. Each uploads what it built; the PyPI publish step downloads
- * them all and uploads them in one go.
- */
-function pythonPackageSteps(): CommandStep[] {
-  return [
-    sdistStep(),
-    ...WHEELS.map(wheelStep),
-    ...WHEELS.filter((w) => w.tested).map(wheelTestStep),
-  ]
-}
-
 /**
  * What a release tag releases. The library and the tools share one version
  * and are released from `v<version>`; @divvun/cg3 and divvun-cg3 are each
@@ -274,10 +109,39 @@ function pythonPackageSteps(): CommandStep[] {
 type Release = { part: "tools" | "wasm" | "python"; version: string }
 
 function releaseOf(tag: string | undefined): Release | null {
-  const match = tag?.match(/^(?:(wasm|python)\/)?v(\d.*)$/)
-  if (!match) return null
-  const part = (match[1] ?? "tools") as Release["part"]
-  return { part, version: match[2] }
+  const pkg = packageReleaseOf(tag)
+  if (pkg) return { part: pkg.package, version: pkg.version }
+  const match = tag?.match(/^v(\d.*)$/)
+  return match ? { part: "tools", version: match[1] } : null
+}
+
+const WASM_PACKAGE: WasmPackage = {
+  crate: "crates/cg3-wasm",
+  packageDir: "cg3",
+  name: "@divvun/cg3",
+  // The library on wasm32, the binding's tests under Node, the declarations
+  // under `deno check`, and the JavaScript suite, which runs the API contract
+  // and byte-for-byte parity with vislcg3 over the corpus in each runtime the
+  // agent has and skips the rest.
+  checks: [
+    "echo '--- The library on wasm32'",
+    "cargo check --locked -p cg3 --lib --target wasm32-unknown-unknown",
+    "echo '--- Tests under Node'",
+    "cargo test --locked -p cg3-wasm --target wasm32-unknown-unknown",
+    "echo '--- Building @divvun/cg3 and its test build'",
+    "node js/build.mjs --test",
+    "echo '--- Its declarations'",
+    "deno check",
+    "echo '--- Checking it against vislcg3'",
+    "node js/test/run.mjs",
+  ],
+}
+
+// The Python suite builds vislcg3, cg-comp and the EXTERNAL example itself,
+// and checks parity with vislcg3 over the corpus.
+const PYTHON_PACKAGE: PythonPackage = {
+  distribution: "divvun_cg3",
+  wheelEnv: "CG3_WHEEL",
 }
 
 export function pipelineCg3Rs(): BuildkitePipeline {
@@ -345,10 +209,10 @@ export function pipelineCg3Rs(): BuildkitePipeline {
   }
 
   if (builds("wasm")) {
-    steps.push(wasmPackageStep())
+    steps.push(wasmPackageStep(command, WASM_PACKAGE))
     publishDependKeys.push("wasm-package")
   }
-  const pythonSteps = pythonPackageSteps()
+  const pythonSteps = pythonPackageSteps(command, PYTHON_PACKAGE)
   if (builds("python")) {
     steps.push({ group: "divvun-cg3", steps: pythonSteps })
     publishDependKeys.push(...pythonSteps.map((step) => step.key as string))
@@ -580,38 +444,11 @@ export async function runCg3RsPublish() {
  * the @divvun scope.
  */
 export async function runCg3RsNpmPublish() {
-  const tag = builder.env.tag
-  const release = releaseOf(tag)
+  const release = releaseOf(builder.env.tag)
   if (release?.part !== "wasm") {
     throw new Error("cg3-rs-npm-publish requires a wasm/v<version> tag")
   }
-
-  using tempDir = await makeTempDir()
-  await builder.downloadArtifacts("cg3-npm-package.tgz", tempDir.path)
-  await builder.exec("tar", [
-    "-xzf",
-    path.join(tempDir.path, "cg3-npm-package.tgz"),
-    "-C",
-    tempDir.path,
-  ])
-  const pkgDir = path.join(tempDir.path, "cg3")
-
-  const manifest = JSON.parse(
-    await Deno.readTextFile(path.join(pkgDir, "package.json")),
-  )
-  if (manifest.version !== release.version) {
-    throw new Error(
-      `tag ${tag} does not name the package version ${manifest.version}`,
-    )
-  }
-
-  // npm never packs .npmrc, so the token stays out of the published package.
-  const token = (await builder.secrets("npm/token")).get("npm/token")
-  await Deno.writeTextFile(
-    path.join(pkgDir, ".npmrc"),
-    `//registry.npmjs.org/:_authToken=${token}\n`,
-  )
-  await builder.exec("npm", ["publish", "--access", "public"], { cwd: pkgDir })
+  await publishToNpm(WASM_PACKAGE, release.version)
 }
 
 /**
@@ -626,29 +463,5 @@ export async function runCg3RsPypiPublish() {
   if (release?.part !== "python") {
     throw new Error("cg3-rs-pypi-publish requires a python/v<version> tag")
   }
-  const version = release.version
-
-  using tempDir = await makeTempDir()
-  await builder.downloadArtifacts(`${PYTHON_DIST}/*`, tempDir.path)
-  const dist = path.join(tempDir.path, PYTHON_DIST)
-  const files: string[] = []
-  for await (const entry of Deno.readDir(dist)) {
-    files.push(path.join(dist, entry.name))
-  }
-  const named = new RegExp(
-    `^divvun_cg3-${version.replaceAll(".", "\\.")}(-.+\\.whl|\\.tar\\.gz)$`,
-  )
-  const stray = files.filter((f) => !named.test(path.basename(f)))
-  if (stray.length > 0 || files.length !== WHEELS.length + 1) {
-    throw new Error(
-      `expected the sdist and ${WHEELS.length} wheels, all at ${version}: ${
-        files.map((f) => path.basename(f)).join(", ")
-      }`,
-    )
-  }
-
-  const token = (await builder.secrets("pypiToken")).get("pypiToken")
-  await builder.exec("uv", ["publish", ...files], {
-    env: { UV_PUBLISH_TOKEN: token },
-  })
+  await publishToPypi(PYTHON_PACKAGE, release.version)
 }

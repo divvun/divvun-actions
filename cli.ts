@@ -49,7 +49,12 @@ import {
   pipelineRsigncode,
   runRsigncodePublish,
 } from "./pipelines/rsigncode.ts"
-import { pipelineHfstRs, runHfstRsPublish } from "./pipelines/hfst-rs.ts"
+import {
+  pipelineHfstRs,
+  runHfstRsNpmPublish,
+  runHfstRsPublish,
+  runHfstRsPypiPublish,
+} from "./pipelines/hfst-rs.ts"
 import { pipelineFomaRs, runFomaRsPublish } from "./pipelines/foma-rs.ts"
 import {
   pipelineCg3Rs,
@@ -109,7 +114,9 @@ import { pipelineDocsData } from "./pipelines/docsdata/mod.ts"
 import { runDocsDataPublish } from "./actions/docsdata/publish.ts"
 import {
   pipelineDivvunspell,
+  runDivvunspellNpmPublish,
   runDivvunspellPublish,
+  runDivvunspellPypiPublish,
   runLibdivvunFstPublish,
 } from "./pipelines/divvunspell/mod.ts"
 import { pipelineKbdgen } from "./pipelines/kbdgen/mod.ts"
@@ -526,6 +533,14 @@ async function runPipeline(args: any) {
       await runHfstRsPublish()
       break
     }
+    case "hfst-rs-npm-publish": {
+      await runHfstRsNpmPublish()
+      break
+    }
+    case "hfst-rs-pypi-publish": {
+      await runHfstRsPypiPublish()
+      break
+    }
     case "foma-rs-publish": {
       await runFomaRsPublish()
       break
@@ -671,6 +686,14 @@ async function runPipeline(args: any) {
     }
     case "divvunspell-publish": {
       await runDivvunspellPublish()
+      break
+    }
+    case "divvunspell-npm-publish": {
+      await runDivvunspellNpmPublish()
+      break
+    }
+    case "divvunspell-pypi-publish": {
+      await runDivvunspellPypiPublish()
       break
     }
     case "pdf-strings-publish": {

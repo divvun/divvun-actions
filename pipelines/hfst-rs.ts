@@ -9,6 +9,15 @@ import { GitHub } from "~/util/github.ts"
 import { createSignedChecksums, release } from "~/util/hash.ts"
 import { Tar, versionAsDev, Zip } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
+import {
+  packageReleaseOf,
+  publishToNpm,
+  publishToPypi,
+  type PythonPackage,
+  pythonPackageSteps,
+  type WasmPackage,
+  wasmPackageStep,
+} from "~/util/binding_packages.ts"
 
 const TARGETS = [
   "aarch64-apple-darwin",
@@ -83,17 +92,47 @@ function createSignStep(
   })
 }
 
+const WASM_PACKAGE: WasmPackage = {
+  crate: "crates/hfst-wasm",
+  packageDir: "hfst",
+  name: "@divvun/hfst",
+  // The test build also builds the hfst tools and the transducer fixtures the
+  // suite reads, and the release build refuses a module that carries the
+  // compilers or the algebra. The suite runs the API contract and parity with
+  // the native library in each runtime the agent has, and skips the rest.
+  checks: [
+    "echo '--- Building @divvun/hfst and its test build'",
+    "node js/build.mjs --test",
+    "echo '--- Its declarations'",
+    "(cd js && deno check)",
+    "echo '--- The JavaScript suite'",
+    "node js/test/run.mjs",
+  ],
+}
+
+const PYTHON_PACKAGE: PythonPackage = {
+  distribution: "divvun_hfst",
+  wheelEnv: "DIVVUN_HFST_WHEEL",
+}
+
 export function pipelineHfstRs(): BuildkitePipeline {
-  const isRelease = !!builder.env.tag?.match(/^v/)
+  // The tools are released from `v<version>`; @divvun/hfst and divvun-hfst,
+  // each versioned on its own, from `wasm/v<version>` and `python/v<version>`.
+  const pkg = packageReleaseOf(builder.env.tag)
+  const isRelease = !!builder.env.tag?.match(/^v\d/)
   const isMainBranch = builder.env.branch === "main"
   // Sign everything we publish, dev-latest included: an unsigned Mach-O
   // binary is killed by Gatekeeper the moment someone downloads it.
   const isSigned = isRelease || isMainBranch
+  // A release tag builds only what it releases. Every other build builds
+  // everything, so a package that breaks on the library fails on main.
+  const buildsPackage = (name: "wasm" | "python") =>
+    pkg ? pkg.package === name : !isRelease
 
   const steps: BuildkitePipeline["steps"] = []
   const publishDependKeys: string[] = []
 
-  for (const target of TARGETS) {
+  for (const target of pkg ? [] : TARGETS) {
     const isWindows = target.includes("windows")
     const isMacos = target.includes("apple")
     const buildKey = `build-${target}`
@@ -143,6 +182,18 @@ export function pipelineHfstRs(): BuildkitePipeline {
     })
   }
 
+  if (buildsPackage("wasm")) {
+    steps.push(wasmPackageStep(command, WASM_PACKAGE))
+    publishDependKeys.push("wasm-package")
+  }
+  const pythonSteps = pythonPackageSteps(command, PYTHON_PACKAGE)
+  if (buildsPackage("python")) {
+    steps.push({ group: "divvun-hfst", steps: pythonSteps })
+    publishDependKeys.push(...pythonSteps.map((step) => step.key as string))
+  }
+
+  // The GitHub release of the tools, or dev-latest from main, once everything
+  // the build built has passed: on main that includes both packages.
   if (isRelease || isMainBranch) {
     steps.push(
       command({
@@ -154,7 +205,44 @@ export function pipelineHfstRs(): BuildkitePipeline {
     )
   }
 
+  // An npm or PyPI version cannot be published again, so each package goes
+  // from its own tag only, once everything it is made of has passed.
+  if (pkg?.package === "wasm") {
+    steps.push(command({
+      label: "Publish @divvun/hfst to npm",
+      command: "divvun-actions run hfst-rs-npm-publish",
+      agents: { queue: "linux" },
+      depends_on: "wasm-package",
+    }))
+  }
+  if (pkg?.package === "python") {
+    steps.push(command({
+      label: "Publish divvun-hfst to PyPI",
+      command: "divvun-actions run hfst-rs-pypi-publish",
+      agents: { queue: "linux" },
+      depends_on: pythonSteps.map((step) => step.key as string),
+    }))
+  }
+
   return { steps }
+}
+
+/** Publishes @divvun/hfst from a `wasm/v<version>` tag naming its version. */
+export async function runHfstRsNpmPublish() {
+  const pkg = packageReleaseOf(builder.env.tag)
+  if (pkg?.package !== "wasm") {
+    throw new Error("hfst-rs-npm-publish requires a wasm/v<version> tag")
+  }
+  await publishToNpm(WASM_PACKAGE, pkg.version)
+}
+
+/** Publishes divvun-hfst from a `python/v<version>` tag naming its version. */
+export async function runHfstRsPypiPublish() {
+  const pkg = packageReleaseOf(builder.env.tag)
+  if (pkg?.package !== "python") {
+    throw new Error("hfst-rs-pypi-publish requires a python/v<version> tag")
+  }
+  await publishToPypi(PYTHON_PACKAGE, pkg.version)
 }
 
 function muslCrossEnv(
