@@ -245,7 +245,8 @@ function wheelTestStep(wheel: Wheel): CommandStep {
       } '${wheels}' .`,
       `rm -rf ${venv} && uv venv --python 3.11 ${venv}`,
       `uv pip install --python ${venv}/bin/python ${wheels} pytest`,
-      `export CG3_WHEEL=$$(ls ${wheels})`,
+      // pytest runs in python/, so the wheel is named from the checkout root.
+      `export CG3_WHEEL="$$PWD/$$(ls ${wheels})"`,
       `(cd python && ${venv}/bin/pytest -q -rs -p no:cacheprovider)`,
     ],
   })
@@ -264,17 +265,37 @@ function pythonPackageSteps(): CommandStep[] {
   ]
 }
 
+/**
+ * What a release tag releases. The library and the tools share one version
+ * and are released from `v<version>`; @divvun/cg3 and divvun-cg3 are each
+ * versioned on their own and released from `wasm/v<version>` and
+ * `python/v<version>`.
+ */
+type Release = { part: "tools" | "wasm" | "python"; version: string }
+
+function releaseOf(tag: string | undefined): Release | null {
+  const match = tag?.match(/^(?:(wasm|python)\/)?v(\d.*)$/)
+  if (!match) return null
+  const part = (match[1] ?? "tools") as Release["part"]
+  return { part, version: match[2] }
+}
+
 export function pipelineCg3Rs(): BuildkitePipeline {
-  const isRelease = !!builder.env.tag?.match(/^v/)
+  const release = releaseOf(builder.env.tag)
+  const isRelease = release?.part === "tools"
   const isMainBranch = builder.env.branch === "main"
   // Sign everything we publish, dev-latest included: an unsigned Mach-O
   // binary is killed by Gatekeeper the moment someone downloads it.
   const isSigned = isRelease || isMainBranch
+  // A release tag builds only what it releases. Every other build builds
+  // everything, so a package that breaks on the library fails on main.
+  const builds = (part: Release["part"]) =>
+    release === null || release.part === part
 
   const steps: BuildkitePipeline["steps"] = []
   const publishDependKeys: string[] = []
 
-  for (const target of TARGETS) {
+  for (const target of builds("tools") ? TARGETS : []) {
     const isWindows = target.includes("windows")
     const isMacos = target.includes("apple")
     const buildKey = `build-${target}`
@@ -323,16 +344,18 @@ export function pipelineCg3Rs(): BuildkitePipeline {
     })
   }
 
-  steps.push(wasmPackageStep())
-  publishDependKeys.push("wasm-package")
+  if (builds("wasm")) {
+    steps.push(wasmPackageStep())
+    publishDependKeys.push("wasm-package")
+  }
   const pythonSteps = pythonPackageSteps()
-  steps.push({ group: "divvun-cg3", steps: pythonSteps })
-  publishDependKeys.push(...pythonSteps.map((step) => step.key as string))
+  if (builds("python")) {
+    steps.push({ group: "divvun-cg3", steps: pythonSteps })
+    publishDependKeys.push(...pythonSteps.map((step) => step.key as string))
+  }
 
-  // Nothing publishes unless every target, the wasm package and the wheels
-  // built, so a release never ships the tools without both packages or the
-  // other way round. npm and PyPI go last: a GitHub release can be made again,
-  // an npm or PyPI version cannot.
+  // The GitHub release of the tools, or dev-latest from main, once everything
+  // the build built has passed: on main that includes both packages.
   if (isRelease || isMainBranch) {
     steps.push(
       command({
@@ -345,21 +368,23 @@ export function pipelineCg3Rs(): BuildkitePipeline {
     )
   }
 
-  if (isRelease) {
-    steps.push(
-      command({
-        label: "Publish @divvun/cg3 to npm",
-        command: "divvun-actions run cg3-rs-npm-publish",
-        agents: { queue: "linux" },
-        depends_on: "publish",
-      }),
-      command({
-        label: "Publish divvun-cg3 to PyPI",
-        command: "divvun-actions run cg3-rs-pypi-publish",
-        agents: { queue: "linux" },
-        depends_on: "publish",
-      }),
-    )
+  // An npm or PyPI version cannot be published again, so each package goes
+  // from its own tag only, once everything it is made of has passed.
+  if (release?.part === "wasm") {
+    steps.push(command({
+      label: "Publish @divvun/cg3 to npm",
+      command: "divvun-actions run cg3-rs-npm-publish",
+      agents: { queue: "linux" },
+      depends_on: "wasm-package",
+    }))
+  }
+  if (release?.part === "python") {
+    steps.push(command({
+      label: "Publish divvun-cg3 to PyPI",
+      command: "divvun-actions run cg3-rs-pypi-publish",
+      agents: { queue: "linux" },
+      depends_on: pythonSteps.map((step) => step.key as string),
+    }))
   }
 
   return { steps }
@@ -425,7 +450,7 @@ async function readCrateVersion(crateTomlPath: string): Promise<string> {
 }
 
 export async function runCg3RsPublish() {
-  const isRelease = !!builder.env.tag?.match(/^v/)
+  const isRelease = releaseOf(builder.env.tag)?.part === "tools"
   const isMainBranch = builder.env.branch === "main"
 
   if (!isRelease && !isMainBranch) {
@@ -549,14 +574,16 @@ export async function runCg3RsPublish() {
 }
 
 /**
- * Publishes the @divvun/cg3 package the wasm-package step built, on a version
- * tag only, and only when the tag names the package's version. Needs the
- * `npm/token` secret: an npm token allowed to publish to the @divvun scope.
+ * Publishes the @divvun/cg3 package the wasm-package step built, on a
+ * `wasm/v<version>` tag only, and only when the tag names the package's
+ * version. Needs the `npm/token` secret: an npm token allowed to publish to
+ * the @divvun scope.
  */
 export async function runCg3RsNpmPublish() {
   const tag = builder.env.tag
-  if (!tag?.match(/^v/)) {
-    throw new Error("cg3-rs-npm-publish requires a version tag")
+  const release = releaseOf(tag)
+  if (release?.part !== "wasm") {
+    throw new Error("cg3-rs-npm-publish requires a wasm/v<version> tag")
   }
 
   using tempDir = await makeTempDir()
@@ -572,7 +599,7 @@ export async function runCg3RsNpmPublish() {
   const manifest = JSON.parse(
     await Deno.readTextFile(path.join(pkgDir, "package.json")),
   )
-  if (`v${manifest.version}` !== tag) {
+  if (manifest.version !== release.version) {
     throw new Error(
       `tag ${tag} does not name the package version ${manifest.version}`,
     )
@@ -588,18 +615,18 @@ export async function runCg3RsNpmPublish() {
 }
 
 /**
- * Publishes the divvun-cg3 sdist and every wheel in one upload, on a version
- * tag only, and only when there is a file for each and every one names the
- * tag's version. Needs
+ * Publishes the divvun-cg3 sdist and every wheel in one upload, on a
+ * `python/v<version>` tag only, and only when there is a file for each and
+ * every one names the tag's version. Needs
  * the `pypiToken` secret, an account-wide PyPI token: the first release creates
  * the divvun-cg3 project under its account.
  */
 export async function runCg3RsPypiPublish() {
-  const tag = builder.env.tag
-  if (!tag?.match(/^v/)) {
-    throw new Error("cg3-rs-pypi-publish requires a version tag")
+  const release = releaseOf(builder.env.tag)
+  if (release?.part !== "python") {
+    throw new Error("cg3-rs-pypi-publish requires a python/v<version> tag")
   }
-  const version = tag.slice(1)
+  const version = release.version
 
   using tempDir = await makeTempDir()
   await builder.downloadArtifacts(`${PYTHON_DIST}/*`, tempDir.path)
