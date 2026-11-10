@@ -113,6 +113,13 @@ const WASM_PACKAGE: WasmPackage = {
 const PYTHON_PACKAGE: PythonPackage = {
   distribution: "divvun_hfst",
   wheelEnv: "DIVVUN_HFST_WHEEL",
+  buildEnv: {
+    // chumsky, through the nfst compilers, needs psm, whose arm64 Windows
+    // assembly must be preprocessed, and psm asks for that only of a compiler
+    // that is not MSVC-like. cargo-xwin's clang-cl is, so the Windows wheels
+    // are built with its plain clang driver.
+    XWIN_CROSS_COMPILER: "clang",
+  },
 }
 
 export function pipelineHfstRs(): BuildkitePipeline {
