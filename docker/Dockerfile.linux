@@ -380,5 +380,7 @@ RUN mkdir -p /etc/divvun-actions && date -u +%Y-%m-%dT%H:%M:%SZ > /etc/divvun-ac
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+COPY vm-init.sh /usr/local/sbin/divvun-vm-init
+RUN chmod +x /usr/local/sbin/divvun-vm-init
 
 ENTRYPOINT ["/entrypoint.sh"]

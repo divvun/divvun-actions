@@ -3,6 +3,7 @@ import * as target from "~/target.ts"
 import {
   IMAGE_BUILT_FILE,
   INSTALLED_TOOLS_FILE,
+  MICROVM_FILE,
 } from "~/util/image_manifest.ts"
 import logger from "~/util/log.ts"
 
@@ -58,6 +59,15 @@ export async function logJobEnvironment(): Promise<void> {
       `Agent: ${Deno.env.get("BUILDKITE_AGENT_NAME") ?? "?"} ` +
         `(queue ${env.agentMetaData?.queue ?? "?"}) on ${Deno.hostname()}`,
     )
+
+    const microvm = await readOrNull(MICROVM_FILE)
+    if (microvm) {
+      logger.info("MicroVM:")
+      for (const line of microvm.split("\n")) {
+        const space = line.indexOf(" ")
+        logger.info(`  ${line.slice(0, space)}: ${line.slice(space + 1)}`)
+      }
+    }
 
     const built = await readOrNull(IMAGE_BUILT_FILE)
     logger.info(

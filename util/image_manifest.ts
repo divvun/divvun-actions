@@ -13,6 +13,11 @@
 export const IMAGE_MANIFEST_DIR = "/etc/divvun-actions"
 export const INSTALLED_TOOLS_FILE = `${IMAGE_MANIFEST_DIR}/installed-tools`
 export const IMAGE_BUILT_FILE = `${IMAGE_MANIFEST_DIR}/image-built`
+/**
+ * Written at boot when the image runs as a Firecracker microVM: `<key>
+ * <value>` lines naming the slot, host, and the pinned image and kernel.
+ */
+export const MICROVM_FILE = `${IMAGE_MANIFEST_DIR}/microvm`
 
 /**
  * A `&& \`-continued RUN line recording the shell's `$URL` as where `name`
