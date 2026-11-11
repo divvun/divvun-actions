@@ -137,11 +137,17 @@ const WASM_PACKAGE: WasmPackage = {
   ],
 }
 
-// The Python suite builds vislcg3, cg-comp and the EXTERNAL example itself,
-// and checks parity with vislcg3 over the corpus.
+// The Python suite builds the cg3 tools and the EXTERNAL example itself, and
+// checks parity with vislcg3, cg-comp, cg-conv, cg-mwesplit, cg-proc and
+// cg-relabel. A linux agent writes the tool parity cases' fixtures once, with
+// node, so an agent that tests a wheel needs no node of its own.
 const PYTHON_PACKAGE: PythonPackage = {
   distribution: "divvun_cg3",
   wheelEnv: "CG3_WHEEL",
+  fixtures: {
+    build: "node js/test/tool-fixtures.mjs",
+    env: "CG3_TOOL_FIXTURES",
+  },
 }
 
 export function pipelineCg3Rs(): BuildkitePipeline {
