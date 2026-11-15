@@ -1,26 +1,31 @@
 /**
  * The steps and publish actions for a Rust library's language packages: an
- * npm package built from a wasm-bindgen crate, and a Python package built from
- * a pyo3 crate with maturin. Each package is versioned on its own, in its
- * binding crate, and released from its own tag: `wasm/v<version>` or
- * `python/v<version>`.
+ * npm package built from a wasm-bindgen crate, a Python package built from a
+ * pyo3 crate with maturin, and a Swift package built from UniFFI crates into
+ * an XCFramework and published to Pahkat's SwiftPM registry. Each package is
+ * versioned on its own, in its binding crate, and released from its own tag:
+ * `wasm/v<version>`, `python/v<version>` or `swift/v<version>`.
  */
 import * as path from "@std/path"
 import * as toml from "@std/toml"
 import * as builder from "~/builder.ts"
 import type { CommandStep } from "~/builder/pipeline.ts"
+import { publishRegistryPackage } from "~/util/pahkat.ts"
 import { makeTempDir } from "~/util/temp.ts"
 
 /** How a pipeline makes a step, adding its plugins. */
 export type Command = (input: CommandStep) => CommandStep
 
 /** A release of one of the packages, from its own tag. */
-export type PackageRelease = { package: "wasm" | "python"; version: string }
+export type PackageRelease = {
+  package: "wasm" | "python" | "swift"
+  version: string
+}
 
 export function packageReleaseOf(
   tag: string | undefined,
 ): PackageRelease | null {
-  const match = tag?.match(/^(wasm|python)\/v(\d.*)$/)
+  const match = tag?.match(/^(wasm|python|swift)\/v(\d.*)$/)
   if (!match) return null
   return { package: match[1] as PackageRelease["package"], version: match[2] }
 }
@@ -181,29 +186,38 @@ export type PythonPackage = {
   wheelEnv: string
   /** What every wheel build needs in its environment. */
   buildEnv?: Record<string, string>
-  /**
-   * The fixtures the package's tests read. When given, a linux agent builds
-   * them once with `build <directory>` and each test step reads that directory
-   * from the variable `env`, so a test agent compiles nothing itself.
-   */
-  fixtures?: { build: string; env: string }
+  /** The fixtures the package's tests read, built once on a linux agent. */
+  fixtures?: TestFixtures
 }
 
 function wheelKey(wheel: Wheel): string {
   return `python-wheel-${wheel.target}`
 }
 
-const FIXTURES_KEY = "python-fixtures"
-const FIXTURES_DIR = "dist/python-fixtures"
-const FIXTURES_TARBALL = "python-fixtures.tgz"
+/**
+ * Fixtures a package's test suites read. A linux agent builds them once with
+ * `build <directory>`, and each test step, of any of the library's packages,
+ * reads that directory from the variable `env`, so a test agent compiles
+ * nothing itself.
+ */
+export type TestFixtures = { build: string; env: string }
 
-function fixturesStep(
+const FIXTURES_KEY = "test-fixtures"
+const FIXTURES_DIR = "dist/test-fixtures"
+const FIXTURES_TARBALL = "test-fixtures.tgz"
+
+/**
+ * The step that builds `fixtures`. pythonPackageSteps includes it when its
+ * package has fixtures; a pipeline that builds another package reading them
+ * without the Python package adds it itself.
+ */
+export function fixturesStep(
   command: Command,
-  fixtures: NonNullable<PythonPackage["fixtures"]>,
+  fixtures: TestFixtures,
 ): CommandStep {
   return command({
     key: FIXTURES_KEY,
-    label: ":python: test fixtures",
+    label: ":test_tube: test fixtures",
     agents: { queue: "linux" },
     command: [
       `${fixtures.build} ${FIXTURES_DIR}`,
@@ -244,6 +258,15 @@ function wheelStep(
   })
 }
 
+/** The commands that fetch `fixtures` into a test step and name them in its environment. */
+function fixturesDownload(fixtures: TestFixtures): string[] {
+  return [
+    `buildkite-agent artifact download --step ${FIXTURES_KEY} ${FIXTURES_TARBALL} .`,
+    `tar -xzf ${FIXTURES_TARBALL}`,
+    `export ${fixtures.env}="$$PWD/${FIXTURES_DIR}"`,
+  ]
+}
+
 /**
  * Installs the wheel `wheel`'s step built into a fresh CPython 3.11, the oldest
  * the abi3 wheels serve, and runs the package's suite in python/tests against
@@ -256,13 +279,7 @@ function wheelTestStep(
 ): CommandStep {
   const venv = `/tmp/${pkg.distribution.replaceAll("_", "-")}-test`
   const wheels = `${PYTHON_DIST}/*.whl`
-  const fixtures = pkg.fixtures
-    ? [
-      `buildkite-agent artifact download --step ${FIXTURES_KEY} ${FIXTURES_TARBALL} .`,
-      `tar -xzf ${FIXTURES_TARBALL}`,
-      `export ${pkg.fixtures.env}="$$PWD/${FIXTURES_DIR}"`,
-    ]
-    : []
+  const fixtures = pkg.fixtures ? fixturesDownload(pkg.fixtures) : []
   return command({
     key: `python-test-${wheel.target}`,
     label: `:python: test ${wheel.target}`,
@@ -334,5 +351,114 @@ export async function publishToPypi(pkg: PythonPackage, version: string) {
   const token = (await builder.secrets("pypiToken")).get("pypiToken")
   await builder.exec("uv", ["publish", ...files], {
     env: { UV_PUBLISH_TOKEN: token },
+  })
+}
+
+/**
+ * A Swift package published to Pahkat's SwiftPM registry as a source
+ * archive, `swift package archive-source`'s zip of its manifest, its sources
+ * and its XCFramework, beside a `package-metadata.json`.
+ */
+export type SwiftPackage = {
+  /** The registry scope it is published in: `divvun` for `divvun.<name>`. */
+  scope: string
+  /** Its name in its identifier, and in its archive's name, `<name>-<version>.zip`. */
+  name: string
+  /** The Rust targets of the XCFramework's slices, which the agent installs. */
+  targets: string[]
+  /**
+   * What builds the archive and the XCFramework and tests the package, on
+   * macOS and on an iOS simulator, after the targets are installed.
+   */
+  checks: string[]
+  /** The directory the checks leave the archive and `package-metadata.json` in. */
+  release: string
+  /**
+   * The fixtures the package's tests read, when a linux agent builds them,
+   * named in the environment before the checks run, and as
+   * `TEST_RUNNER_<env>` too, which `xcodebuild test` passes to the tests it
+   * runs on a simulator.
+   */
+  fixtures?: TestFixtures
+}
+
+function swiftArtifact(pkg: SwiftPackage): string {
+  return `${pkg.name}-swift-package.tgz`
+}
+
+/**
+ * Builds the Swift package's archive and runs its checks on a macOS agent,
+ * which has Xcode and the simulators, then uploads the archive and its
+ * `package-metadata.json` for the publish step.
+ */
+export function swiftPackageStep(
+  command: Command,
+  pkg: SwiftPackage,
+): CommandStep {
+  const fixtures = pkg.fixtures
+    ? [
+      "echo '--- Fetching the test fixtures'",
+      ...fixturesDownload(pkg.fixtures),
+      `export TEST_RUNNER_${pkg.fixtures.env}="$$${pkg.fixtures.env}"`,
+    ]
+    : []
+  return command({
+    key: "swift-package",
+    label: ":swift: Swift package",
+    agents: { queue: "macos" },
+    ...(pkg.fixtures ? { depends_on: FIXTURES_KEY } : {}),
+    command: [
+      "echo '--- Installing the Apple targets'",
+      `rustup target add ${pkg.targets.join(" ")}`,
+      ...fixtures,
+      ...pkg.checks,
+      `(cd ${pkg.release} && tar -czf "$$OLDPWD/${
+        swiftArtifact(pkg)
+      }" ${pkg.name}-*.zip package-metadata.json)`,
+      `buildkite-agent artifact upload ${swiftArtifact(pkg)}`,
+    ],
+  })
+}
+
+/**
+ * Publishes the Swift package the swift-package step built to Pahkat's
+ * SwiftPM registry, from the tag being built, only when its archive is
+ * `<name>-<version>.zip`: attested with the Swift registry's CI key in the
+ * namespace `<scope>` and uploaded as that namespace. The registry signs it
+ * at commit.
+ */
+export async function publishToSwiftRegistry(
+  pkg: SwiftPackage,
+  version: string,
+) {
+  const tag = builder.env.tag
+  if (tag == null) {
+    throw new Error(`${pkg.scope}.${pkg.name} is published from a tag only`)
+  }
+  using tempDir = await makeTempDir()
+  await builder.downloadArtifacts(swiftArtifact(pkg), tempDir.path)
+  const dir = path.join(tempDir.path, "release")
+  await Deno.mkdir(dir)
+  await builder.exec("tar", [
+    "-xzf",
+    path.join(tempDir.path, swiftArtifact(pkg)),
+    "-C",
+    dir,
+  ])
+  const archive = `${pkg.name}-${version}.zip`
+  const files: string[] = []
+  for await (const entry of Deno.readDir(dir)) files.push(entry.name)
+  if (!files.includes(archive)) {
+    throw new Error(
+      `${pkg.scope}.${pkg.name} was built as ${
+        files.join(", ")
+      }, not at the tag's ${version}`,
+    )
+  }
+  await publishRegistryPackage({
+    module: "swift",
+    namespace: pkg.scope,
+    dir,
+    tag,
   })
 }

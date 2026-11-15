@@ -54,6 +54,7 @@ import {
   runHfstRsNpmPublish,
   runHfstRsPublish,
   runHfstRsPypiPublish,
+  runHfstRsSwiftPublish,
 } from "./pipelines/hfst-rs.ts"
 import { pipelineFomaRs, runFomaRsPublish } from "./pipelines/foma-rs.ts"
 import {
@@ -61,6 +62,7 @@ import {
   runCg3RsNpmPublish,
   runCg3RsPublish,
   runCg3RsPypiPublish,
+  runCg3RsSwiftPublish,
 } from "./pipelines/cg3-rs.ts"
 import {
   pipelineDivvunActions,
@@ -541,6 +543,10 @@ async function runPipeline(args: any) {
       await runHfstRsPypiPublish()
       break
     }
+    case "hfst-rs-swift-publish": {
+      await runHfstRsSwiftPublish()
+      break
+    }
     case "foma-rs-publish": {
       await runFomaRsPublish()
       break
@@ -555,6 +561,10 @@ async function runPipeline(args: any) {
     }
     case "cg3-rs-pypi-publish": {
       await runCg3RsPypiPublish()
+      break
+    }
+    case "cg3-rs-swift-publish": {
+      await runCg3RsSwiftPublish()
       break
     }
     case "divvun-actions-build-image": {

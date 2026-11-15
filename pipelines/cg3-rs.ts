@@ -13,8 +13,11 @@ import {
   packageReleaseOf,
   publishToNpm,
   publishToPypi,
+  publishToSwiftRegistry,
   type PythonPackage,
   pythonPackageSteps,
+  type SwiftPackage,
+  swiftPackageStep,
   type WasmPackage,
   wasmPackageStep,
 } from "~/util/binding_packages.ts"
@@ -102,11 +105,11 @@ function createSignStep(target: string, buildKey: string): CommandStep {
 
 /**
  * What a release tag releases. The library and the tools share one version
- * and are released from `v<version>`; @divvun/cg3 and divvun-cg3 are each
- * versioned on their own and released from `wasm/v<version>` and
- * `python/v<version>`.
+ * and are released from `v<version>`; @divvun/cg3, divvun-cg3 and divvun.cg3
+ * are each versioned on their own and released from `wasm/v<version>`,
+ * `python/v<version>` and `swift/v<version>`.
  */
-type Release = { part: "tools" | "wasm" | "python"; version: string }
+type Release = { part: "tools" | "wasm" | "python" | "swift"; version: string }
 
 function releaseOf(tag: string | undefined): Release | null {
   const pkg = packageReleaseOf(tag)
@@ -148,6 +151,36 @@ const PYTHON_PACKAGE: PythonPackage = {
     build: "node js/test/tool-fixtures.mjs",
     env: "CG3_TOOL_FIXTURES",
   },
+}
+
+// divvun.cg3: swift/build.ts builds the XCFramework for macOS, iOS and the
+// iOS simulator, checks that only the static library's C interface is global
+// and that CG3 alone carries no compiler, archives the package and builds
+// from the unpacked archive, and writes the fixtures js/test/fixtures.mjs
+// writes. The Swift suite then holds the package to vislcg3 and the tools on
+// macOS and on a simulator, and links it beside a second Rust library.
+const SWIFT_SIMULATOR = "platform=iOS Simulator,name=iPhone 17 Pro"
+const SWIFT_PACKAGE: SwiftPackage = {
+  scope: "divvun",
+  name: "cg3",
+  targets: [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "aarch64-apple-ios",
+    "aarch64-apple-ios-sim",
+  ],
+  checks: [
+    "echo '--- Building divvun.cg3, its archive and the fixtures'",
+    "node swift/build.ts --release --test",
+    "echo '--- The build script and the linking test library'",
+    "node --test swift/build.test.ts",
+    "cargo test --locked --manifest-path swift/link-probe/Cargo.toml --target-dir target/swift/link-probe",
+    "echo '--- The Swift suite on macOS'",
+    "(cd swift && swift test)",
+    "echo '--- The Swift suite on the iOS simulator'",
+    `(cd swift && TEST_RUNNER_CG3_SWIFT_FIXTURES="$$PWD/../target/swift/fixtures" xcodebuild test -scheme cg3-Package -destination '${SWIFT_SIMULATOR}' -derivedDataPath ../target/swift/simulator)`,
+  ],
+  release: "target/swift/release",
 }
 
 export function pipelineCg3Rs(): BuildkitePipeline {
@@ -223,6 +256,10 @@ export function pipelineCg3Rs(): BuildkitePipeline {
     steps.push({ group: "divvun-cg3", steps: pythonSteps })
     publishDependKeys.push(...pythonSteps.map((step) => step.key as string))
   }
+  if (builds("swift")) {
+    steps.push(swiftPackageStep(command, SWIFT_PACKAGE))
+    publishDependKeys.push("swift-package")
+  }
 
   // The GitHub release of the tools, or dev-latest from main, once everything
   // the build built has passed: on main that includes both packages.
@@ -254,6 +291,14 @@ export function pipelineCg3Rs(): BuildkitePipeline {
       command: "divvun-actions run cg3-rs-pypi-publish",
       agents: { queue: "linux" },
       depends_on: pythonSteps.map((step) => step.key as string),
+    }))
+  }
+  if (release?.part === "swift") {
+    steps.push(command({
+      label: "Publish divvun.cg3 to Pahkat's Swift registry",
+      command: "divvun-actions run cg3-rs-swift-publish",
+      agents: { queue: "linux" },
+      depends_on: "swift-package",
     }))
   }
 
@@ -470,4 +515,18 @@ export async function runCg3RsPypiPublish() {
     throw new Error("cg3-rs-pypi-publish requires a python/v<version> tag")
   }
   await publishToPypi(PYTHON_PACKAGE, release.version)
+}
+
+/**
+ * Publishes the divvun.cg3 archive the swift-package step built to Pahkat's
+ * SwiftPM registry, on a `swift/v<version>` tag only, and only when the
+ * archive is at the tag's version. Needs the Swift registry's CI key,
+ * ci/swift-ci-key, and the token role pahkat-swift-divvun.
+ */
+export async function runCg3RsSwiftPublish() {
+  const release = releaseOf(builder.env.tag)
+  if (release?.part !== "swift") {
+    throw new Error("cg3-rs-swift-publish requires a swift/v<version> tag")
+  }
+  await publishToSwiftRegistry(SWIFT_PACKAGE, release.version)
 }

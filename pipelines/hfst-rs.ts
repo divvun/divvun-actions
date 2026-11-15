@@ -10,11 +10,16 @@ import { createSignedChecksums, release } from "~/util/hash.ts"
 import { Tar, versionAsDev, Zip } from "~/util/shared.ts"
 import { makeTempDir } from "~/util/temp.ts"
 import {
+  fixturesStep,
   packageReleaseOf,
   publishToNpm,
   publishToPypi,
+  publishToSwiftRegistry,
   type PythonPackage,
   pythonPackageSteps,
+  type SwiftPackage,
+  swiftPackageStep,
+  type TestFixtures,
   type WasmPackage,
   wasmPackageStep,
 } from "~/util/binding_packages.ts"
@@ -110,6 +115,15 @@ const WASM_PACKAGE: WasmPackage = {
   ],
 }
 
+// The fixtures the Python and Swift suites read, which node
+// js/test/fixtures.mjs builds with this checkout's hfst tools. Building them
+// compiles hfst, which overflows the macOS agent's disk, so a linux agent
+// builds them once for both.
+const FIXTURES: TestFixtures = {
+  build: "node js/test/fixtures.mjs",
+  env: "DIVVUN_HFST_FIXTURES",
+}
+
 const PYTHON_PACKAGE: PythonPackage = {
   distribution: "divvun_hfst",
   wheelEnv: "DIVVUN_HFST_WHEEL",
@@ -120,16 +134,49 @@ const PYTHON_PACKAGE: PythonPackage = {
     // are built with its plain clang driver.
     XWIN_CROSS_COMPILER: "clang",
   },
-  // Building them compiles hfst, which overflows the macOS agent's disk.
-  fixtures: {
-    build: "node js/test/fixtures.mjs",
-    env: "DIVVUN_HFST_FIXTURES",
-  },
+  fixtures: FIXTURES,
+}
+
+// divvun.hfst: swift/build.sh --archive builds the library for macOS, iOS and
+// the iOS simulator with fat LTO, prelinks it, makes the XCFramework and the
+// archive, and builds an app from the unpacked archive to check that HFST
+// alone carries no compiler. The Swift suite then holds the package to the
+// native library and the tools on macOS and on a simulator, and links it
+// beside a second Rust library.
+//
+// The macOS agent's disk is small. The four slices' swift-release builds take
+// about 2.6 GB under target/, the host build of UniFFI's bindgen about 0.7 GB
+// more, and the Swift builds and the app the archive check builds under
+// 1 GB, so the step builds nothing else of hfst and reads the fixtures a
+// linux agent built.
+const SWIFT_SIMULATOR = "platform=iOS Simulator,name=iPhone 17 Pro"
+const SWIFT_PACKAGE: SwiftPackage = {
+  scope: "divvun",
+  name: "hfst",
+  targets: [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "aarch64-apple-ios",
+    "aarch64-apple-ios-sim",
+  ],
+  fixtures: FIXTURES,
+  checks: [
+    "echo '--- The linking test library'",
+    "cargo test --locked --manifest-path swift/link-probe/Cargo.toml --target-dir target/swift/link-probe",
+    "echo '--- Building divvun.hfst, its archive and an app of the archive'",
+    "swift/build.sh --archive",
+    "echo '--- The Swift suite on macOS'",
+    "(cd swift && swift test)",
+    "echo '--- The Swift suite on the iOS simulator'",
+    `(cd swift && xcodebuild test -scheme HFST-Package -destination '${SWIFT_SIMULATOR}' -derivedDataPath ../target/swift/simulator)`,
+  ],
+  release: "dist/swift",
 }
 
 export function pipelineHfstRs(): BuildkitePipeline {
-  // The tools are released from `v<version>`; @divvun/hfst and divvun-hfst,
-  // each versioned on its own, from `wasm/v<version>` and `python/v<version>`.
+  // The tools are released from `v<version>`; @divvun/hfst, divvun-hfst and
+  // divvun.hfst, each versioned on its own, from `wasm/v<version>`,
+  // `python/v<version>` and `swift/v<version>`.
   const pkg = packageReleaseOf(builder.env.tag)
   const isRelease = !!builder.env.tag?.match(/^v\d/)
   const isMainBranch = builder.env.branch === "main"
@@ -138,7 +185,7 @@ export function pipelineHfstRs(): BuildkitePipeline {
   const isSigned = isRelease || isMainBranch
   // A release tag builds only what it releases. Every other build builds
   // everything, so a package that breaks on the library fails on main.
-  const buildsPackage = (name: "wasm" | "python") =>
+  const buildsPackage = (name: "wasm" | "python" | "swift") =>
     pkg ? pkg.package === name : !isRelease
 
   const steps: BuildkitePipeline["steps"] = []
@@ -203,6 +250,13 @@ export function pipelineHfstRs(): BuildkitePipeline {
     steps.push({ group: "divvun-hfst", steps: pythonSteps })
     publishDependKeys.push(...pythonSteps.map((step) => step.key as string))
   }
+  if (buildsPackage("swift")) {
+    // The Python steps build the fixtures when they run; a swift/v tag runs
+    // none of them.
+    if (!buildsPackage("python")) steps.push(fixturesStep(command, FIXTURES))
+    steps.push(swiftPackageStep(command, SWIFT_PACKAGE))
+    publishDependKeys.push("swift-package")
+  }
 
   // The GitHub release of the tools, or dev-latest from main, once everything
   // the build built has passed: on main that includes both packages.
@@ -217,8 +271,9 @@ export function pipelineHfstRs(): BuildkitePipeline {
     )
   }
 
-  // An npm or PyPI version cannot be published again, so each package goes
-  // from its own tag only, once everything it is made of has passed.
+  // An npm, PyPI or Swift registry version cannot be published again, so
+  // each package goes from its own tag only, once everything it is made of
+  // has passed.
   if (pkg?.package === "wasm") {
     steps.push(command({
       label: "Publish @divvun/hfst to npm",
@@ -233,6 +288,14 @@ export function pipelineHfstRs(): BuildkitePipeline {
       command: "divvun-actions run hfst-rs-pypi-publish",
       agents: { queue: "linux" },
       depends_on: pythonSteps.map((step) => step.key as string),
+    }))
+  }
+  if (pkg?.package === "swift") {
+    steps.push(command({
+      label: "Publish divvun.hfst to Pahkat's Swift registry",
+      command: "divvun-actions run hfst-rs-swift-publish",
+      agents: { queue: "linux" },
+      depends_on: "swift-package",
     }))
   }
 
@@ -255,6 +318,20 @@ export async function runHfstRsPypiPublish() {
     throw new Error("hfst-rs-pypi-publish requires a python/v<version> tag")
   }
   await publishToPypi(PYTHON_PACKAGE, pkg.version)
+}
+
+/**
+ * Publishes the divvun.hfst archive the swift-package step built to Pahkat's
+ * SwiftPM registry, from a `swift/v<version>` tag naming its version. Needs
+ * the Swift registry's CI key, ci/swift-ci-key, and the token role
+ * pahkat-swift-divvun.
+ */
+export async function runHfstRsSwiftPublish() {
+  const pkg = packageReleaseOf(builder.env.tag)
+  if (pkg?.package !== "swift") {
+    throw new Error("hfst-rs-swift-publish requires a swift/v<version> tag")
+  }
+  await publishToSwiftRegistry(SWIFT_PACKAGE, pkg.version)
 }
 
 function muslCrossEnv(
