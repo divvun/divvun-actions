@@ -102,6 +102,11 @@ import {
 import { runPahkatCliPublish } from "./pipelines/pahkat-cli.ts"
 import { pipelineFrakt, runFraktPublish } from "./pipelines/frakt.ts"
 import {
+  runPahkatMobileMavenPublish,
+  runPahkatMobileSwiftArchive,
+  runPahkatMobileSwiftPublish,
+} from "./pipelines/pahkat-mobile.ts"
+import {
   DIVVUN_WORKER_GRAMMAR,
   DIVVUN_WORKER_SPELLER,
   pipelineWorkerCd,
@@ -665,6 +670,18 @@ async function runPipeline(args: any) {
     }
     case "frakt-publish": {
       await runFraktPublish()
+      break
+    }
+    case "pahkat-mobile-swift-archive": {
+      await runPahkatMobileSwiftArchive()
+      break
+    }
+    case "pahkat-mobile-swift-publish": {
+      await runPahkatMobileSwiftPublish()
+      break
+    }
+    case "pahkat-mobile-maven-publish": {
+      await runPahkatMobileMavenPublish()
       break
     }
     case "divvun-worker-grammar-deploy": {
