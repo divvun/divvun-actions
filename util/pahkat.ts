@@ -25,6 +25,20 @@ export const PAHKAT_REPOSITORY = "main"
 export const PAHKAT_CLI_PACKAGE = "pahkat"
 
 /**
+ * A module of the server that serves a registry, each with namespaces,
+ * a key list and a CI key of its own (registries.key-list).
+ */
+export type RegistryModule = "cargo" | "npm" | "swift" | "maven"
+
+/**
+ * Who a `pahkat upload` publishes as: a repository of the Pahkat module, or
+ * a registry module's namespace.
+ */
+export type PahkatPublisher =
+  | { repository: string }
+  | { module: RegistryModule; namespace: string }
+
+/**
  * The CI key the server's key list names, which signs every release's
  * BLAKE3SUMS, the CLI's too. A CLI fetched from the server runs only once
  * its release verifies against it.
@@ -322,23 +336,24 @@ const METADATA = "pahkat.styx"
 
 /** Every value quoted, as Styx reads it, except the enums', which are bare. */
 function quote(text: string): string {
-  // deno-lint-ignore no-control-regex
-  return `"${text.replace(/[\\"\x00-\x1f\x7f]/g, (c) => {
-    switch (c) {
-      case "\\":
-        return "\\\\"
-      case '"':
-        return '\\"'
-      case "\n":
-        return "\\n"
-      case "\r":
-        return "\\r"
-      case "\t":
-        return "\\t"
-      default:
-        return `\\u{${c.charCodeAt(0).toString(16)}}`
-    }
-  })}"`
+  return `"${
+    // deno-lint-ignore no-control-regex
+    text.replace(/[\\"\x00-\x1f\x7f]/g, (c) => {
+      switch (c) {
+        case "\\":
+          return "\\\\"
+        case '"':
+          return '\\"'
+        case "\n":
+          return "\\n"
+        case "\r":
+          return "\\r"
+        case "\t":
+          return "\\t"
+        default:
+          return `\\u{${c.charCodeAt(0).toString(16)}}`
+      }
+    })}"`
 }
 
 /**
@@ -380,7 +395,10 @@ export function pahkatStyx(
     "dependencies",
     Object.entries(metadata.dependencies ?? {}).map((
       [name, version],
-    ): [string, string] => [quote(name), version == null ? "@" : quote(version)]),
+    ): [string, string] => [
+      quote(name),
+      version == null ? "@" : quote(version),
+    ]),
   )
   lines.push("artifacts {")
   for (const [name, artifact] of artifacts) {
@@ -450,7 +468,79 @@ export async function publishRelease(pahkat: PahkatRelease): Promise<void> {
     dir.path,
   )
 
-  await upload(dir.path, `${name} ${pahkat.version}`, pahkat.cli)
+  await upload(
+    dir.path,
+    `${name} ${pahkat.version}`,
+    { repository: PAHKAT_REPOSITORY },
+    pahkat.cli,
+  )
+}
+
+/**
+ * A version of a package for one of the server's registries whose
+ * namespace `pahkat attest` is given by a flag: a crate, a Swift package or
+ * a Maven version.
+ */
+export type RegistryPackage = {
+  module: Exclude<RegistryModule, "npm">
+  namespace: string
+  /**
+   * A directory holding only its files, as `pahkat attest` takes them: a
+   * Swift package's `<name>-<version>.zip`, or the files Gradle's
+   * `publishToMavenLocal` lays out for one Maven version.
+   */
+  dir: string
+  /** The tag the version is built from, which its trusted comment names. */
+  tag: string
+}
+
+/**
+ * Publish a registry package: `pahkat attest` its directory with its
+ * module's CI key, which writes and signs its BLAKE3SUMS after checking it
+ * as the server will, then `pahkat upload` it as the module's namespace.
+ */
+export async function publishRegistryPackage(
+  pkg: RegistryPackage,
+): Promise<void> {
+  const commit = builder.env.commit
+  if (commit == null) {
+    throw new Error("BUILDKITE_COMMIT is not set")
+  }
+  const cli = await pahkatCli()
+  const key = await builder.ciKey(pkg.module)
+  const { code, stdout } = await new Deno.Command(cli, {
+    args: [
+      "attest",
+      pkg.dir,
+      `--${pkg.module}`,
+      pkg.namespace,
+      "--repo",
+      builder.env.repoPath,
+      "--tag",
+      pkg.tag,
+      "--commit",
+      commit,
+      "--json",
+    ],
+    env: {
+      PAHKAT_ATTEST_KEY: key.secretKey,
+      PAHKAT_ATTEST_KEY_PASSWORD: key.password,
+    },
+    stdout: "piped",
+    stderr: "inherit",
+  }).output()
+  const attested = outcome(stdout)
+  if (code !== 0) {
+    throw ExpectedError.create(
+      `pahkat attest refused ${pkg.dir} for ${pkg.module}:${pkg.namespace}: ${
+        attested.reason ?? `it exited with ${code}`
+      }`,
+    )
+  }
+  const name = `${attested.package} ${attested.version}`
+  logger.info(`Attested ${name}`)
+
+  await upload(pkg.dir, name, { module: pkg.module, namespace: pkg.namespace })
 }
 
 /** What `pahkat upload --json` and the client commands print. */
@@ -475,7 +565,8 @@ const UPLOAD_ATTEMPTS = 3
 const UPLOAD_RETRY_DELAY_MS = 30_000
 
 /**
- * `pahkat upload` the release prepared in `dir`. It exits 0 when the server
+ * `pahkat upload` the release prepared in `dir`, as `publisher`, with a
+ * fresh token for each attempt. It exits 0 when the server
  * committed it, 1 when the server refused it, which running it again would
  * only repeat, and 2 when it failed in a way a fresh run with a fresh
  * token may fix (upload.client-outcome).
@@ -483,6 +574,7 @@ const UPLOAD_RETRY_DELAY_MS = 30_000
 async function upload(
   dir: string,
   release: string,
+  publisher: PahkatPublisher,
   cli?: string,
 ): Promise<void> {
   const pahkat = cli ?? await pahkatCli()
@@ -494,7 +586,7 @@ async function upload(
   let opened: number | undefined
 
   for (let attempt = 1;; attempt++) {
-    const token = await builder.pahkatUploadToken(PAHKAT_REPOSITORY)
+    const token = await builder.pahkatUploadToken(publisher)
     const { code, stdout } = await new Deno.Command(pahkat, {
       args: ["upload", dir, "--server", PAHKAT_SERVER, "--json", ...build],
       env: { PAHKAT_UPLOAD_TOKEN: token },

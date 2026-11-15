@@ -7,6 +7,7 @@ import { buildkite as getEnv, Env } from "~/util/env.ts"
 import logger from "~/util/log.ts"
 import type { CiKey } from "~/util/hash.ts"
 import { OpenBao, SecretsStore } from "~/util/openbao.ts"
+import type { PahkatPublisher, RegistryModule } from "~/util/pahkat.ts"
 import { requireTrustedReleaseContext } from "~/util/trusted_context.ts"
 
 const decoder = new TextDecoder()
@@ -241,25 +242,30 @@ function vault(): Promise<OpenBao> {
   return vaultLogin
 }
 
-let redactedCiKey: CiKey | undefined
+const redactedCiKeys = new Map<string, CiKey>()
 
 /**
- * Pahkat's CI key, which signs every release's BLAKE3SUMS. Its secret half
- * and its password are separate entries, so a leak of one is not enough to
- * sign.
+ * A CI key of the Pahkat server: by default the Pahkat module's, which
+ * signs every release's BLAKE3SUMS, or a registry module's own, which only
+ * that module's key list names. Its secret half and its password are
+ * separate entries, ci/<module>-ci-key and ci/<module>-ci-key-password, so
+ * a leak of one is not enough to sign.
  */
-export async function ciKey(): Promise<CiKey> {
+export async function ciKey(
+  module: "pahkat" | RegistryModule = "pahkat",
+): Promise<CiKey> {
   requireTrustedReleaseContext(env, "sign with the CI key")
 
-  if (redactedCiKey != null) {
-    return redactedCiKey
+  const cached = redactedCiKeys.get(module)
+  if (cached != null) {
+    return cached
   }
 
   const client = await vault()
-  const { secretKey } = await client.entry("pahkat-ci-key")
-  const { password } = await client.entry("pahkat-ci-key-password")
+  const { secretKey } = await client.entry(`${module}-ci-key`)
+  const { password } = await client.entry(`${module}-ci-key-password`)
   if (!secretKey || !password) {
-    throw new Error("OpenBao's entries for the CI key are incomplete")
+    throw new Error(`OpenBao's entries for the ${module} CI key are incomplete`)
   }
 
   // Line by line, as the redactor takes one value at a time; the key file's
@@ -271,20 +277,27 @@ export async function ciKey(): Promise<CiKey> {
   }
   await redactSecret(password)
 
-  redactedCiKey = { secretKey, password }
-  return redactedCiKey
+  const key = { secretKey, password }
+  redactedCiKeys.set(module, key)
+  return key
 }
 
 /**
- * A publisher token for the Pahkat repository `repository`: an identity
- * token OpenBao signs for its role `pahkat-<repository>`, addressed to
+ * A publisher token for `publisher`: an identity token OpenBao signs for
+ * its role, `pahkat-<repository>` for a repository of the Pahkat module and
+ * `pahkat-<module>-<namespace>` for a registry's namespace, addressed to
  * pahkat-3.giellalt.org and valid for minutes. The server accepts each one
  * once, so every `pahkat upload` run needs a fresh one.
  */
-export async function pahkatUploadToken(repository: string): Promise<string> {
+export async function pahkatUploadToken(
+  publisher: PahkatPublisher,
+): Promise<string> {
   requireTrustedReleaseContext(env, "get a Pahkat publisher token")
 
-  const token = await (await vault()).identityToken(`pahkat-${repository}`)
+  const role = "repository" in publisher
+    ? `pahkat-${publisher.repository}`
+    : `pahkat-${publisher.module}-${publisher.namespace}`
+  const token = await (await vault()).identityToken(role)
   await redactSecret(token)
   return token
 }

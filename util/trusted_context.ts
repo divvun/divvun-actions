@@ -62,6 +62,7 @@ const DIVVUN_RELEASE_REPOSITORIES = new Set([
 function isTrustedRepository(owner: string, repoName: string): boolean {
   if (owner === "divvun") return DIVVUN_RELEASE_REPOSITORIES.has(repoName)
   if (owner === "subethaedit") return repoName === "subethaedit"
+  if (owner === "necessary-nu") return repoName === "frakt"
   if (owner !== "giellalt") return false
 
   return repoName === "giella-core" ||

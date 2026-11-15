@@ -100,6 +100,7 @@ import {
   runPahkatServerDeploy,
 } from "./pipelines/pahkat-server.ts"
 import { runPahkatCliPublish } from "./pipelines/pahkat-cli.ts"
+import { pipelineFrakt, runFraktPublish } from "./pipelines/frakt.ts"
 import {
   DIVVUN_WORKER_GRAMMAR,
   DIVVUN_WORKER_SPELLER,
@@ -662,6 +663,10 @@ async function runPipeline(args: any) {
       await runPahkatCliPublish()
       break
     }
+    case "frakt-publish": {
+      await runFraktPublish()
+      break
+    }
     case "divvun-worker-grammar-deploy": {
       await runWorkerCdDeploy(DIVVUN_WORKER_GRAMMAR)
       break
@@ -986,6 +991,10 @@ export async function createCiPipeline(): Promise<BuildkitePipeline> {
     }
     case "pahkat-next": {
       pipeline = pipelinePahkatServer()
+      break
+    }
+    case "frakt": {
+      pipeline = pipelineFrakt()
       break
     }
     case "divvun-worker-grammar": {
