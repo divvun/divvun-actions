@@ -193,9 +193,6 @@ export default defineImage({
     }),
     imageStamp(),
   ],
-  copy: [
-    { src: "entrypoint.sh", dest: "/entrypoint.sh", chmod: true },
-    { src: "vm-init.sh", dest: "/usr/local/sbin/divvun-vm-init", chmod: true },
-  ],
+  copy: [{ src: "entrypoint.sh", dest: "/entrypoint.sh", chmod: true }],
   entrypoint: "/entrypoint.sh",
 })

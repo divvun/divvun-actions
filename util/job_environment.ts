@@ -3,9 +3,11 @@ import * as target from "~/target.ts"
 import {
   IMAGE_BUILT_FILE,
   INSTALLED_TOOLS_FILE,
-  MICROVM_FILE,
 } from "~/util/image_manifest.ts"
 import logger from "~/util/log.ts"
+
+/** Where arsonist's init describes the microVM a job runs in. */
+const ARSONIST_VM_FILE = "/run/arsonist/vm.json"
 
 /** The tools a lang build's results depend on, and how each reports its version. */
 const TOOL_VERSIONS: { name: string; cmd: string; args: string[] }[] = [
@@ -60,12 +62,15 @@ export async function logJobEnvironment(): Promise<void> {
         `(queue ${env.agentMetaData?.queue ?? "?"}) on ${Deno.hostname()}`,
     )
 
-    const microvm = await readOrNull(MICROVM_FILE)
-    if (microvm) {
+    const vm = await readOrNull(ARSONIST_VM_FILE)
+    if (vm) {
       logger.info("MicroVM:")
-      for (const line of microvm.split("\n")) {
-        const space = line.indexOf(" ")
-        logger.info(`  ${line.slice(0, space)}: ${line.slice(space + 1)}`)
+      try {
+        for (const [key, value] of Object.entries(JSON.parse(vm))) {
+          logger.info(`  ${key}: ${value}`)
+        }
+      } catch {
+        logger.info(`  (unreadable ${ARSONIST_VM_FILE})`)
       }
     }
 

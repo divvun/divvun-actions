@@ -1,6 +1,5 @@
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
-import { fcVersions, KERNEL_IMAGE_REF } from "~/firecracker/versions.ts"
 import * as targetModule from "~/target.ts"
 
 type TargetSpec = {
@@ -17,16 +16,6 @@ type TargetSpec = {
    * Windows daemon only knows windows containers.
    */
   platform?: string
-  /**
-   * A hand-written Dockerfile, for images outside docker/images/*.ts. Omit
-   * to build what docker/generate.ts makes for `target`.
-   */
-  dockerfile?: {
-    ref: string
-    path: string
-    context: string
-    buildArgs: Record<string, string>
-  }
 }
 
 const TARGET_SPECS: TargetSpec[] = [
@@ -34,21 +23,6 @@ const TARGET_SPECS: TargetSpec[] = [
   { target: "linux", queue: "linux", platform: "linux/amd64" },
   { target: "windows-vsbase", queue: "windows" },
   { target: "windows", queue: "windows", dependsOn: "build-windows-vsbase" },
-  {
-    target: "fc-kernel",
-    queue: "linux",
-    platform: "linux/amd64",
-    dockerfile: {
-      ref: KERNEL_IMAGE_REF,
-      path: "firecracker/kernel/Dockerfile",
-      context: "firecracker/kernel",
-      buildArgs: {
-        KERNEL_TAG: fcVersions.kernel.tag,
-        FIRECRACKER_VERSION: fcVersions.firecracker.version,
-        KERNEL_CONFIG: fcVersions.kernel.config,
-      },
-    },
-  },
 ]
 const VALID_TARGETS = TARGET_SPECS.map((s) => s.target)
 
@@ -66,7 +40,7 @@ export function pipelineDivvunActions(): BuildkitePipeline {
   // Images are built only for tagged releases. They take a long time, the
   // agents pull `:latest` on their own schedule, and rebuilding on every commit
   // to main means the layer cache is the only thing standing between a routine
-  // change and a rebuild of every image.
+  // change and a full four-image rebuild.
   //
   // DOCKER_BUILD_IMAGES=true forces a build without tagging, set as a Buildkite
   // "New Build" environment variable override — same escape hatch as
@@ -122,30 +96,6 @@ export async function runDivvunActionsBuildImage(
   }
   const shouldPush = pushArg === "push"
 
-  const image = spec.dockerfile ?? (await generatedImage(target))
-
-  const buildArgs = ["build"]
-  if (spec.platform) buildArgs.push("--platform", spec.platform)
-  // Escape hatch for when an upstream dependency (e.g. a tool fetched via
-  // `curl` mid-Dockerfile) has moved but the layer instruction text hasn't,
-  // so Docker's cache would otherwise keep serving the stale layer. Set via
-  // a Buildkite "New Build" environment variable override.
-  if (Deno.env.get("DOCKER_NO_CACHE") === "true") buildArgs.push("--no-cache")
-  for (const [name, value] of Object.entries(image.buildArgs)) {
-    buildArgs.push("--build-arg", `${name}=${value}`)
-  }
-  buildArgs.push("-t", image.ref, "-f", image.path, image.context)
-
-  await builder.exec("docker", buildArgs)
-
-  if (shouldPush) {
-    await builder.exec("docker", ["push", image.ref])
-  }
-}
-
-async function generatedImage(
-  target: string,
-): Promise<NonNullable<TargetSpec["dockerfile"]>> {
   // Regenerate first; the upstream drift check guarantees no real changes,
   // but doing this here keeps the build hermetic if anyone runs the action
   // directly off the CI path.
@@ -171,10 +121,20 @@ async function generatedImage(
   if (!refOutput.success) {
     throw new Error(`failed to resolve image ref for ${target}`)
   }
-  return {
-    ref: new TextDecoder().decode(refOutput.stdout).trim(),
-    path: `docker/Dockerfile.${target}`,
-    context: "docker",
-    buildArgs: {},
+  const ref = new TextDecoder().decode(refOutput.stdout).trim()
+
+  const buildArgs = ["build"]
+  if (spec.platform) buildArgs.push("--platform", spec.platform)
+  // Escape hatch for when an upstream dependency (e.g. a tool fetched via
+  // `curl` mid-Dockerfile) has moved but the layer instruction text hasn't,
+  // so Docker's cache would otherwise keep serving the stale layer. Set via
+  // a Buildkite "New Build" environment variable override.
+  if (Deno.env.get("DOCKER_NO_CACHE") === "true") buildArgs.push("--no-cache")
+  buildArgs.push("-t", ref, "-f", `docker/Dockerfile.${target}`, "docker")
+
+  await builder.exec("docker", buildArgs)
+
+  if (shouldPush) {
+    await builder.exec("docker", ["push", ref])
   }
 }
