@@ -159,7 +159,7 @@ const PYTHON_PACKAGE: PythonPackage = {
 // from the unpacked archive, and writes the fixtures js/test/fixtures.mjs
 // writes. The Swift suite then holds the package to vislcg3 and the tools on
 // macOS and on a simulator, and links it beside a second Rust library.
-const SWIFT_SIMULATOR = "platform=iOS Simulator,name=iPhone 17 Pro"
+const SWIFT_SIMULATOR = "platform=iOS Simulator,name=iPhone 18 Pro"
 const SWIFT_PACKAGE: SwiftPackage = {
   scope: "divvun",
   name: "cg3",

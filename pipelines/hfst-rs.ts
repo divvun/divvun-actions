@@ -149,7 +149,7 @@ const PYTHON_PACKAGE: PythonPackage = {
 // more, and the Swift builds and the app the archive check builds under
 // 1 GB, so the step builds nothing else of hfst and reads the fixtures a
 // linux agent built.
-const SWIFT_SIMULATOR = "platform=iOS Simulator,name=iPhone 17 Pro"
+const SWIFT_SIMULATOR = "platform=iOS Simulator,name=iPhone 18 Pro"
 const SWIFT_PACKAGE: SwiftPackage = {
   scope: "divvun",
   name: "hfst",
