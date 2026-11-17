@@ -4,7 +4,7 @@ import * as builder from "~/builder.ts"
 import { download } from "~/util/download.ts"
 import logger from "~/util/log.ts"
 import { makeTempFile } from "~/util/temp.ts"
-import { Bash } from "./shared.ts"
+import { Bash, randomHexBytes } from "./shared.ts"
 
 export async function downloadAppleWWDRCA(version?: string) {
   if (version == undefined) {
@@ -152,6 +152,138 @@ export class Security {
       `"${password}"`,
       `${keychainName}.keychain`,
     ])
+  }
+}
+
+function keychainsDir(): string {
+  return path.join(Deno.env.get("HOME")!, "Library", "Keychains")
+}
+
+/** Runs `security`, whose arguments can hold a password, so only its subcommand is named in an error. */
+async function security(args: string[]): Promise<string> {
+  const result = await builder.output("security", args)
+  if (!result.status.success) {
+    throw new Error(
+      `security ${
+        args[0]
+      } failed (exit ${result.status.code}): ${result.stderr.trim()}`,
+    )
+  }
+  return result.stdout
+}
+
+/** The paths `security list-keychains` prints, one quoted path to a line. */
+export function parseKeychainSearchList(stdout: string): string[] {
+  return stdout.split("\n")
+    .map((line) => line.trim().match(/^"(.*)"$/)?.[1])
+    .filter((keychainPath): keychainPath is string => keychainPath != null)
+}
+
+/**
+ * `security` replaces the user's keychain search list as a whole, so two agents
+ * on one machine changing it at once can each drop the other's keychain. Every
+ * change is made holding this lock, which the kernel releases if the job dies.
+ */
+async function withSearchListLock<T>(body: () => Promise<T>): Promise<T> {
+  using lock = await Deno.open(
+    path.join(keychainsDir(), ".divvun-ci-search-list.lock"),
+    { create: true, write: true },
+  )
+  await lock.lock(true)
+  try {
+    return await body()
+  } finally {
+    await lock.unlock()
+  }
+}
+
+/**
+ * Puts a keychain first in the search list, where xcodebuild and codesign look
+ * for a signing identity, ahead of any other keychain holding the same one.
+ */
+async function prependToSearchList(keychainPath: string): Promise<void> {
+  await withSearchListLock(async () => {
+    const current = parseKeychainSearchList(
+      await security(["list-keychains", "-d", "user"]),
+    )
+    // A user always has the login keychain here, so nothing means the list was
+    // misread, and writing that back would cut every job off from it.
+    if (current.length === 0) {
+      throw new Error("The keychain search list read as empty; not changing it")
+    }
+    await security([
+      "list-keychains",
+      "-d",
+      "user",
+      "-s",
+      keychainPath,
+      ...current.filter((other) => other !== keychainPath),
+    ])
+  })
+}
+
+/** Deletes a keychain, which also takes it out of the search list. */
+async function removeKeychain(keychainPath: string): Promise<void> {
+  await withSearchListLock(() => security(["delete-keychain", keychainPath]))
+}
+
+/**
+ * The keychain an agent's jobs sign from. An agent runs one job at a time, so
+ * naming it after the agent keeps the agents on one machine apart, and lets a
+ * job replace the keychain that a killed job on the same agent left behind.
+ */
+export function jobKeychainName(
+  agentName: string | undefined = Deno.env.get("BUILDKITE_AGENT_NAME"),
+): string {
+  const agent = agentName?.replace(/[^A-Za-z0-9._-]+/g, "-")
+  return `divvun-ci-${agent || `pid-${Deno.pid}`}`
+}
+
+export type JobKeychain = {
+  /** As fastlane's `MATCH_KEYCHAIN_NAME` takes it: the file name less `-db`. */
+  name: string
+  path: string
+  password: string
+}
+
+/**
+ * Runs `body` with a keychain made for this job, unlocked, first in the search
+ * list and deleted afterwards, so signing keys never enter the login keychain.
+ *
+ * Nothing asks for a password: the job made the keychain and holds the only
+ * password to it, which is what lets the importer (fastlane match, given the
+ * name and password) allow codesign to use the keys it puts there.
+ */
+export async function withJobKeychain<T>(
+  body: (keychain: JobKeychain) => Promise<T>,
+): Promise<T> {
+  const name = jobKeychainName()
+  const keychainPath = path.join(keychainsDir(), `${name}.keychain-db`)
+  const password = randomHexBytes(32)
+  await builder.redactSecret(password)
+
+  if (await Security.keychainExists(name)) {
+    logger.info(`Replacing the keychain an earlier job left: ${keychainPath}`)
+    await removeKeychain(keychainPath)
+  }
+
+  await security(["create-keychain", "-p", password, keychainPath])
+  try {
+    await security(["unlock-keychain", "-p", password, keychainPath])
+    // A new keychain locks itself after five idle minutes, and an archive takes
+    // longer than that to reach signing. No options means it never does.
+    await security(["set-keychain-settings", keychainPath])
+    await prependToSearchList(keychainPath)
+
+    return await body({
+      name: `${name}.keychain`,
+      path: keychainPath,
+      password,
+    })
+  } finally {
+    await removeKeychain(keychainPath).catch((error) =>
+      logger.warning(`Could not delete ${keychainPath}:`, error)
+    )
   }
 }
 

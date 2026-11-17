@@ -8,7 +8,7 @@ import * as yaml from "@std/yaml"
 import * as builder from "~/builder.ts"
 import { download } from "~/util/download.ts"
 import logger from "~/util/log.ts"
-import { Security } from "./security.ts"
+import { withJobKeychain } from "./security.ts"
 import {
   makeTempDir,
   makeTempDirSync,
@@ -1039,44 +1039,57 @@ export class Kbdgen {
     fastlaneUser: string
     fastlanePassword: string
     appStoreKeyJson: string
-    adminPassword: string
   }): Promise<string> {
     const abs = path.resolve(bundlePath)
     const cwd = path.dirname(abs)
 
     // await Bash.runScript("brew install imagemagick")
-    await Security.unlockKeychain("login", secrets.adminPassword)
 
     using appStoreKeyJsonPath = await makeTempFile({ suffix: ".json" })
-    const env = {
-      GITHUB_USERNAME: secrets.githubUsername,
-      GITHUB_TOKEN: secrets.githubToken,
-      MATCH_GIT_URL: secrets.matchGitUrl,
-      MATCH_PASSWORD: secrets.matchPassword,
-      FASTLANE_USER: secrets.fastlaneUser,
-      PRODUCE_USERNAME: secrets.fastlaneUser,
-      FASTLANE_PASSWORD: secrets.fastlanePassword,
-      APP_STORE_KEY_JSON: appStoreKeyJsonPath.path,
-      MATCH_KEYCHAIN_NAME: "login.keychain",
-      MATCH_KEYCHAIN_PASSWORD: secrets.adminPassword,
-      LANG: "C.UTF-8",
-      RUST_LOG: "kbdgen=debug",
-    }
-
-    // Do the build
     await Deno.writeTextFile(appStoreKeyJsonPath.path, secrets.appStoreKeyJson)
 
-    await builder.exec("kbdgen", [
-      "target",
-      "--output-path",
-      "output",
-      "--bundle-path",
-      abs,
-      "ios",
-      "build",
-    ], {
-      cwd,
-      env,
+    await withJobKeychain(async (keychain) => {
+      const env = {
+        GITHUB_USERNAME: secrets.githubUsername,
+        GITHUB_TOKEN: secrets.githubToken,
+        MATCH_GIT_URL: secrets.matchGitUrl,
+        MATCH_PASSWORD: secrets.matchPassword,
+        FASTLANE_USER: secrets.fastlaneUser,
+        PRODUCE_USERNAME: secrets.fastlaneUser,
+        FASTLANE_PASSWORD: secrets.fastlanePassword,
+        APP_STORE_KEY_JSON: appStoreKeyJsonPath.path,
+        MATCH_KEYCHAIN_NAME: keychain.name,
+        MATCH_KEYCHAIN_PASSWORD: keychain.password,
+        LANG: "C.UTF-8",
+        RUST_LOG: "kbdgen=debug",
+      }
+
+      // kbdgen runs match for every bundle id at once, and the keychain is new
+      // for each job. Running it for the app first, as kbdgen will, leaves the
+      // certificate in place so none of those runs race to import it.
+      const target = await Kbdgen.loadTarget(abs, "ios")
+      await builder.exec("fastlane", [
+        "match",
+        "appstore",
+        `--app_identifier=${target.packageId}`,
+        `--api_key_path=${appStoreKeyJsonPath.path}`,
+      ], {
+        cwd,
+        env,
+      })
+
+      await builder.exec("kbdgen", [
+        "target",
+        "--output-path",
+        "output",
+        "--bundle-path",
+        abs,
+        "ios",
+        "build",
+      ], {
+        cwd,
+        env,
+      })
     })
 
     const files = await fs.expandGlob(

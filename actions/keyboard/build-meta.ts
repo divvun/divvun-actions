@@ -59,7 +59,6 @@ export default async function keyboardBuildMeta({
       "ios/fastlaneUser",
       "ios/fastlanePassword",
       "macos/appStoreKeyJson",
-      "macos/adminPassword",
     )
 
   if (keyboardType === KeyboardType.Android) {
@@ -86,7 +85,6 @@ export default async function keyboardBuildMeta({
       fastlaneUser: secrets.get("ios/fastlaneUser"),
       fastlanePassword: secrets.get("ios/fastlanePassword"),
       appStoreKeyJson: secrets.get("macos/appStoreKeyJson"),
-      adminPassword: secrets.get("macos/adminPassword"),
     })
   }
 
