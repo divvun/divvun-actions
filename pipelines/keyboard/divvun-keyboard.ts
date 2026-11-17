@@ -71,10 +71,13 @@ export async function runDivvunKeyboardIOS(kbdgenBundlePath: string) {
 }
 
 export async function runDivvunKeyboardAndroid(kbdgenBundlePath: string) {
+  using signingDir = await makeTempDir({ prefix: "android-signing-" })
+
   await builder.group("Building Divvun Keyboard for Android", async () => {
     await keyboardBuildMeta({
       keyboardType: KeyboardType.Android,
       bundlePath: kbdgenBundlePath,
+      androidSigningDir: signingDir.path,
     })
   })
 

@@ -1102,9 +1102,15 @@ export class Kbdgen {
     throw new Error("No output found for build.")
   }
 
+  /**
+   * kbdgen writes the keystore's and the Play p12's absolute paths into the
+   * generated project's app/local.gradle, so every later Gradle run there
+   * (publishApk) needs them still present: they are written into
+   * `signingDir`, which the caller removes once it is done with Gradle.
+   */
   static async buildAndroid(
     bundlePath: string,
-    // githubRepo: string,
+    signingDir: string,
     secrets: {
       githubUsername: string
       githubToken: string
@@ -1120,20 +1126,20 @@ export class Kbdgen {
     const cwd = path.dirname(abs)
     // await Bash.runScript("brew install imagemagick")
 
-    using keyStorePath = makeTempFileSync({ suffix: ".jks" })
-    using p12Path = makeTempFileSync({ suffix: ".p12" })
-    await Deno.writeFile(keyStorePath.path, secrets.keyStore)
-    await Deno.writeFile(p12Path.path, secrets.playStoreP12)
+    const keyStorePath = path.join(signingDir, "keystore.jks")
+    const p12Path = path.join(signingDir, "play-store.p12")
+    await Deno.writeFile(keyStorePath, secrets.keyStore)
+    await Deno.writeFile(p12Path, secrets.playStoreP12)
 
     const env = {
       GITHUB_USERNAME: secrets.githubUsername,
       GITHUB_TOKEN: secrets.githubToken,
       NDK_HOME: Deno.env.get("ANDROID_NDK_HOME")!,
-      ANDROID_KEYSTORE: keyStorePath.path,
+      ANDROID_KEYSTORE: keyStorePath,
       ANDROID_KEYALIAS: secrets.keyAlias,
       STORE_PW: secrets.storePassword,
       KEY_PW: secrets.keyPassword,
-      PLAY_STORE_P12: p12Path.path,
+      PLAY_STORE_P12: p12Path,
       PLAY_STORE_ACCOUNT: secrets.playStoreAccount,
       RUST_LOG: "debug",
     }

@@ -6,6 +6,8 @@ import { KeyboardType } from "./types.ts"
 export type Props = {
   keyboardType: KeyboardType
   bundlePath: string
+  /** Required for Android: see Kbdgen.buildAndroid. */
+  androidSigningDir?: string
 }
 
 export type Output = {
@@ -15,6 +17,7 @@ export type Output = {
 export default async function keyboardBuildMeta({
   keyboardType,
   bundlePath,
+  androidSigningDir,
 }: Props): Promise<Output> {
   if (
     keyboardType !== KeyboardType.iOS &&
@@ -62,9 +65,12 @@ export default async function keyboardBuildMeta({
     )
 
   if (keyboardType === KeyboardType.Android) {
+    if (androidSigningDir == null) {
+      throw new Error("An Android build requires androidSigningDir")
+    }
     await Kbdgen.setBuildNumber(bundlePath, "android", buildStart)
     logger.info("Building Android")
-    payloadPath = await Kbdgen.buildAndroid(bundlePath, {
+    payloadPath = await Kbdgen.buildAndroid(bundlePath, androidSigningDir, {
       githubUsername: secrets.get("github/username"),
       githubToken: secrets.get("github/token"),
       keyStore: secrets.base64ByteArray(`android/divvun/${repo}/keystore`),
