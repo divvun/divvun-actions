@@ -29,11 +29,14 @@ export type BumpArgoHelmImageTagOptions = {
   commitMessage: string
 }
 
-export type BumpArgoKustomizeImageTagOptions = {
+export type PinArgoKustomizeImageDigestOptions = {
   /** Full image name without tag, e.g. "ghcr.io/divvun/pahkat-server". */
   imageName: string
-  /** New tag (e.g. "sha-deadbeef"). Replaces any existing tag or digest. */
-  tag: string
+  /**
+   * The pushed image's digest, `sha256:` and 64 hex digits. Replaces any
+   * existing tag or digest.
+   */
+  digest: string
   /** Path within the k8s-config repo to the Argo CD Application manifest. */
   applicationPath: string
   commitMessage: string
@@ -181,39 +184,88 @@ function kustomizeOverrideImage(override: string): string {
   return tagStart === -1 ? image : image.slice(0, tagStart)
 }
 
+const IMAGE_DIGEST = /^sha256:[0-9a-f]{64}$/
+
+function kustomizeOverrides(
+  doc: YAML.Document,
+  imageName: string,
+  applicationPath: string,
+): YAML.Scalar<string>[] {
+  const images = doc.getIn(["spec", "source", "kustomize", "images"])
+  if (!YAML.isSeq(images)) {
+    throw new Error(
+      `No spec.source.kustomize.images sequence in ${applicationPath}`,
+    )
+  }
+  return images.items.filter((item) =>
+    YAML.isScalar(item) && typeof item.value === "string" &&
+    kustomizeOverrideImage(item.value) === imageName
+  ) as YAML.Scalar<string>[]
+}
+
 /**
- * Bump an image tag in an Argo CD Application's
+ * The Application `source` with its kustomize image override for
+ * `imageName` pinned to `digest`, as `<image>@sha256:<hex>`. A tag can be
+ * pushed again to name other content, so the cluster is only bound to the
+ * image CI built and pushed by its digest. Anything but a sha256 digest is
+ * refused, and the pin is read back from the output, so an update can never
+ * leave the override pinned by a tag.
+ */
+export function pinArgoKustomizeImage(
+  source: string,
+  opts: Pick<
+    PinArgoKustomizeImageDigestOptions,
+    "imageName" | "digest" | "applicationPath"
+  >,
+): string {
+  if (!IMAGE_DIGEST.test(opts.digest)) {
+    throw new Error(
+      `Refusing to pin ${opts.imageName} to ${
+        JSON.stringify(opts.digest)
+      }, which is not a sha256 digest`,
+    )
+  }
+
+  const doc = YAML.parseDocument(source)
+  const entries = kustomizeOverrides(doc, opts.imageName, opts.applicationPath)
+  if (entries.length !== 1) {
+    throw new Error(
+      `Expected one kustomize image override for ${opts.imageName} in ${opts.applicationPath}, found ${entries.length}`,
+    )
+  }
+  const [entry] = entries
+  const prefix = entry.value.slice(0, entry.value.indexOf("=") + 1)
+  const pin = `${prefix}${opts.imageName}@${opts.digest}`
+  entry.value = pin
+  const updated = String(doc)
+
+  const written = kustomizeOverrides(
+    YAML.parseDocument(updated),
+    opts.imageName,
+    opts.applicationPath,
+  ).map((item) => item.value)
+  if (written.length !== 1 || written[0] !== pin) {
+    throw new Error(
+      `${opts.applicationPath} would pin ${opts.imageName} as ${
+        JSON.stringify(written)
+      }, not ${pin}`,
+    )
+  }
+  return updated
+}
+
+/**
+ * Pin an image by digest in an Argo CD Application's
  * `spec.source.kustomize.images`: for a service whose Kustomize manifests
  * live in its own repository, the pin is kept here in k8s-config instead.
  */
-export async function bumpArgoKustomizeImageTag(
-  opts: BumpArgoKustomizeImageTagOptions,
+export async function pinArgoKustomizeImageDigest(
+  opts: PinArgoKustomizeImageDigestOptions,
 ): Promise<void> {
   await updateK8sConfigFile({
     path: opts.applicationPath,
     commitMessage: opts.commitMessage,
-    update(source) {
-      const doc = YAML.parseDocument(source)
-      const images = doc.getIn(["spec", "source", "kustomize", "images"])
-      if (!YAML.isSeq(images)) {
-        throw new Error(
-          `No spec.source.kustomize.images sequence in ${opts.applicationPath}`,
-        )
-      }
-      const entry = images.items.find((item) =>
-        YAML.isScalar(item) && typeof item.value === "string" &&
-        kustomizeOverrideImage(item.value) === opts.imageName
-      ) as YAML.Scalar<string> | undefined
-      if (!entry) {
-        throw new Error(
-          `No kustomize image override for ${opts.imageName} in ${opts.applicationPath}`,
-        )
-      }
-      const value = entry.value
-      const prefix = value.slice(0, value.indexOf("=") + 1)
-      entry.value = `${prefix}${opts.imageName}:${opts.tag}`
-      return String(doc)
-    },
+    update: (source) => pinArgoKustomizeImage(source, opts),
   })
 }
 

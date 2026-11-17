@@ -1,13 +1,15 @@
 import * as builder from "~/builder.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as targetModule from "~/target.ts"
-import { bumpArgoKustomizeImageTag } from "~/util/k8s-config.ts"
+import { pinArgoKustomizeImageDigest } from "~/util/k8s-config.ts"
+import logger from "~/util/log.ts"
 import { pahkatCliSteps } from "./pahkat-cli.ts"
 import { pahkatMobileSteps } from "./pahkat-mobile.ts"
 
 const IMAGE = "ghcr.io/divvun/pahkat-server"
 const APPLICATION_PATH = "apps/services/pahkat-server-app.yaml"
 const TAG_METADATA = "pahkat-server-tag"
+const DIGEST_METADATA = "pahkat-server-digest"
 
 function command(input: CommandStep): CommandStep {
   return {
@@ -22,10 +24,11 @@ function command(input: CommandStep): CommandStep {
 /**
  * CD for the Pahkat server, from divvun/pahkat-next. On push to main: build
  * the repo's Containerfile, push `ghcr.io/divvun/pahkat-server:sha-<commit>`,
- * and pin that tag in the server's Argo CD Application in k8s-config. The
- * Kustomize manifests live in pahkat-next itself, so the pin is the
- * Application's `spec.source.kustomize.images` rather than a
- * kustomization.yaml in k8s-config. No mutable `:latest`.
+ * and pin the digest that push reports in the server's Argo CD Application in
+ * k8s-config. The Kustomize manifests live in pahkat-next itself, so the pin
+ * is the Application's `spec.source.kustomize.images` rather than a
+ * kustomization.yaml in k8s-config. The cluster never deploys by tag, which
+ * anyone who can push to the package could point elsewhere.
  */
 export function pipelinePahkatServer(): BuildkitePipeline {
   return {
@@ -50,6 +53,28 @@ export function pipelinePahkatServer(): BuildkitePipeline {
   }
 }
 
+/**
+ * The digest `docker push` reports for `tag` on its line
+ * `<tag>: digest: sha256:<hex> size: <bytes>`: that of the manifest, or
+ * manifest list, the push stored under the tag.
+ */
+export function pushedDigest(pushOutput: string, tag: string): string {
+  const digests = new Set(
+    pushOutput.split("\n").flatMap((line) => {
+      const match = line.trim().match(
+        /^(\S+): digest: (sha256:[0-9a-f]{64}) size: \d+$/,
+      )
+      return match && match[1] === tag ? [match[2]] : []
+    }),
+  )
+  if (digests.size !== 1) {
+    throw new Error(
+      `docker push reported ${digests.size} digests for ${tag}, not one`,
+    )
+  }
+  return [...digests][0]
+}
+
 export async function runPahkatServerDeploy() {
   const commit = builder.env.commit
   if (!commit) {
@@ -68,11 +93,20 @@ export async function runPahkatServerDeploy() {
     ".",
   ], { env: { DOCKER_BUILDKIT: "1" } })
 
+  let digest = ""
   await builder.group("Pushing image", async () => {
-    await builder.exec("docker", ["push", `${IMAGE}:${tag}`])
+    const push = await builder.output("docker", ["push", `${IMAGE}:${tag}`])
+    logger.info(push.stdout)
+    if (!push.status.success) {
+      throw new Error(
+        `docker push exited with code ${push.status.code}: ${push.stderr}`,
+      )
+    }
+    digest = pushedDigest(`${push.stdout}\n${push.stderr}`, tag)
   })
 
   await builder.setMetadata(TAG_METADATA, tag)
+  await builder.setMetadata(DIGEST_METADATA, digest)
 }
 
 export async function runPahkatServerBumpManifest() {
@@ -80,11 +114,12 @@ export async function runPahkatServerBumpManifest() {
   if (tag.length === 0) {
     throw new Error(`Buildkite metadata ${TAG_METADATA} was empty`)
   }
+  const digest = (await builder.metadata(DIGEST_METADATA)).trim()
 
-  await bumpArgoKustomizeImageTag({
+  await pinArgoKustomizeImageDigest({
     imageName: IMAGE,
-    tag,
+    digest,
     applicationPath: APPLICATION_PATH,
-    commitMessage: `Update pahkat-server image to ${tag}`,
+    commitMessage: `Update pahkat-server image to ${tag}, digest ${digest}`,
   })
 }
