@@ -78,6 +78,10 @@ export async function notarizeAndStaple(inputFile: string) {
   await notarize(inputFile, keyJson)
 }
 
+// rcodesign stops waiting after 600 seconds unless told otherwise, and Apple's
+// queue is sometimes slower than that even with no incident reported.
+const NOTARY_MAX_WAIT_SECONDS = 3600
+
 async function notarize(inputFile: string, keyJson: string) {
   const fileInfo = await Deno.stat(inputFile)
   const isDirectory = fileInfo.isDirectory
@@ -90,6 +94,8 @@ async function notarize(inputFile: string, keyJson: string) {
       "--api-key-file",
       keyJson,
       "--wait",
+      "--max-wait-seconds",
+      String(NOTARY_MAX_WAIT_SECONDS),
       "--staple",
       inputFile,
     ])
@@ -110,6 +116,8 @@ async function notarize(inputFile: string, keyJson: string) {
       "--api-key-file",
       keyJson,
       "--wait",
+      "--max-wait-seconds",
+      String(NOTARY_MAX_WAIT_SECONDS),
       zipPath,
     ])
 
