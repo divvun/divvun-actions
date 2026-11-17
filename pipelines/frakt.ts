@@ -58,11 +58,8 @@ export function pipelineFrakt(): BuildkitePipeline {
     command({
       key: "test-windows",
       label: "Test on Windows (WinHTTP)",
-      // WinHTTP follows redirects itself and frakt's cookie jar reads only
-      // the final response, so a cookie set by a redirect, as httpbin's
-      // /cookies/set does, is lost and test_cookie_jar fails.
       command:
-        `cargo test --locked --features backend-winhttp -- ${ONE_AT_A_TIME} --skip test_cookie_jar`,
+        `cargo test --locked --features backend-winhttp -- ${ONE_AT_A_TIME}`,
       env: { BACKEND: "windows" },
       agents: { queue: "windows" },
     }),
