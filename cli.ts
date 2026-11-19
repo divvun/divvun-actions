@@ -185,7 +185,6 @@ import {
   pipelinePdfStrings,
   runPdfStringsPublish,
 } from "./pipelines/pdf-strings/mod.ts"
-import { pipelineStaticLibBuild } from "./pipelines/static-lib-build/mod.ts"
 import {
   pipelineSubethaedit,
   runSubethaeditBuildMacOS,
@@ -824,94 +823,6 @@ async function runPipeline(args: any) {
       await macosSign(file, version, entitlementsPath)
       break
     }
-    case "icu4c-build": {
-      const { buildIcu4c } = await import(
-        "./pipelines/static-lib-build/build-icu4c.ts"
-      )
-      await buildIcu4c({
-        target: args._[1] as string,
-        version: args._[2] != null ? String(args._[2]) : undefined,
-      })
-      break
-    }
-    case "libomp-build": {
-      const { buildLibomp } = await import(
-        "./pipelines/static-lib-build/build-libomp.ts"
-      )
-      await buildLibomp({
-        target: args._[1] as string,
-        version: args._[2] != null ? String(args._[2]) : undefined,
-      })
-      break
-    }
-    case "protobuf-build": {
-      const { buildProtobuf } = await import(
-        "./pipelines/static-lib-build/build-protobuf.ts"
-      )
-      await buildProtobuf({
-        target: args._[1] as string,
-        version: args._[2] != null ? String(args._[2]) : undefined,
-      })
-      break
-    }
-    case "sleef-build": {
-      const { buildSleef } = await import(
-        "./pipelines/static-lib-build/build-sleef.ts"
-      )
-      await buildSleef({
-        target: args._[1] as string,
-        version: args._[2] != null ? String(args._[2]) : undefined,
-      })
-      break
-    }
-    case "pytorch-cache-download": {
-      const { downloadCache } = await import(
-        "./pipelines/static-lib-build/download-cache.ts"
-      )
-      await downloadCache(args._[1] != null ? String(args._[1]) : undefined)
-      break
-    }
-    case "pytorch-build": {
-      const { buildPytorch } = await import(
-        "./pipelines/static-lib-build/build-pytorch.ts"
-      )
-      await buildPytorch({
-        target: args._[1] as string,
-        version: args._[2] != null ? String(args._[2]) : undefined,
-      })
-      break
-    }
-    case "executorch-cache-download": {
-      const { downloadExecutorchCache } = await import(
-        "./pipelines/static-lib-build/download-executorch-cache.ts"
-      )
-      await downloadExecutorchCache(
-        args._[1] != null ? String(args._[1]) : undefined,
-      )
-      break
-    }
-    case "executorch-build": {
-      const { buildExecutorch } = await import(
-        "./pipelines/static-lib-build/build-executorch.ts"
-      )
-      await buildExecutorch({
-        target: args._[1] as string,
-        version: args._[2] != null ? String(args._[2]) : undefined,
-      })
-      break
-    }
-    case "publish-library": {
-      const { publishLibrary } = await import(
-        "./pipelines/static-lib-build/publish.ts"
-      )
-      const library = args._[1] as string
-      const version = args._[2] as string
-      if (!library || !version) {
-        throw new Error("Usage: publish-library <library> <version>")
-      }
-      await publishLibrary(library, version)
-      break
-    }
     default: {
       throw new Error(`Unknown repo: ${builder.env.repoName}`)
     }
@@ -1040,10 +951,6 @@ export async function createCiPipeline(): Promise<BuildkitePipeline> {
     }
     case "divvunspell-libreoffice": {
       pipeline = pipelineLibreOfficeExtension()
-      break
-    }
-    case "static-lib-build": {
-      pipeline = pipelineStaticLibBuild()
       break
     }
     case "subethaedit": {

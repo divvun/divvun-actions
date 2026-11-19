@@ -56,7 +56,6 @@ const DIVVUN_RELEASE_REPOSITORIES = new Set([
   "pdf-strings",
   "kielipankki-donatespeech-app",
   "divvunspell-libreoffice",
-  "static-lib-build",
 ])
 
 function isTrustedRepository(owner: string, repoName: string): boolean {

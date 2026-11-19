@@ -21,9 +21,8 @@
  * until the pin moves.
  *
  * Not this convention: pahkat artifacts (`thfst-tools_1.0.0-alpha.2_linux_amd64.txz`,
- * `<name>_<version>_<platform>`) and static-lib-build's internal caches
- * (`protobuf_<version>_<triple>`), which put the version second and have
- * their own producer/consumer pairs.
+ * `<name>_<version>_<platform>`), which put the version second and have
+ * their own producer/consumer pair.
  */
 
 /** Normalize target spelling for release names, without changing build triples. */
