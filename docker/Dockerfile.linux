@@ -10,6 +10,8 @@ SHELL ["bash", "-lic"]
 ENV BUILDKITE_PLUGIN_FS_CACHE_FOLDER="/var/cache/buildkite"
 ENV ANDROID_HOME="/root/Android/sdk"
 ENV ANDROID_NDK_HOME="/root/Android/sdk/ndk/30.0.16248370"
+ENV PYTHONUNBUFFERED="1"
+ENV CARGO_TERM_COLOR="always"
 
 # ubuntu: Finnish mirror + amd64 only + apertium nightly
 RUN sed -i 's/archive\.ubuntu/fi\.archive\.ubuntu/g' /etc/apt/sources.list.d/ubuntu.sources && \

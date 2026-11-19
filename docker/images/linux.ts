@@ -77,6 +77,12 @@ export default defineImage({
     BUILDKITE_PLUGIN_FS_CACHE_FOLDER: "/var/cache/buildkite",
     ANDROID_HOME: "/root/Android/sdk",
     ANDROID_NDK_HOME: `/root/Android/sdk/ndk/${versions.ndk}`,
+    // On microVM builders jobs get no terminal, so that nothing can wait at a
+    // prompt. Without one, Python would hold stdout back until it exits, and
+    // a long step would look hung; cargo would drop the colour from its
+    // errors.
+    PYTHONUNBUFFERED: "1",
+    CARGO_TERM_COLOR: "always",
   },
   aptPackages: [
     // Build essentials & general dev tools
