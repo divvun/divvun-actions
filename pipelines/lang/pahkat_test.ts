@@ -5,6 +5,7 @@ Deno.env.set("BUILDKITE", "true")
 Deno.env.set("BUILDKITE_REPO", "git@github.com:giellalt/lang-sjd.git")
 Deno.env.delete("BUILDKITE_PLUGINS")
 const { pahkatSkipReason } = await import("./mod.ts")
+const { proofingName } = await import("./pahkat.ts")
 
 const spellers = (on: boolean) => ({ spellers: on }) as BuildProps
 
@@ -39,4 +40,17 @@ Deno.test("pahkatSkipReason skips private and sensitive repos", () => {
     pahkatSkipReason("lang-isl", spellers(true), true),
     "repo is private",
   )
+})
+
+Deno.test("proofingName names the release by the language's English name", async () => {
+  strictEqual(
+    await proofingName("se", "Northern Sami"),
+    "North Sámi (proofing)",
+  )
+  strictEqual(await proofingName("kl", "Kalaallisut"), "Kalaallisut (proofing)")
+  strictEqual(await proofingName("sjd", "Kildin"), "Kildin Sámi (proofing)")
+})
+
+Deno.test("proofingName falls back to manifest.toml's name for an unknown language", async () => {
+  strictEqual(await proofingName("qqq", "Private"), "Private (proofing)")
 })

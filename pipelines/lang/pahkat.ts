@@ -3,6 +3,7 @@
 // Pahkat-3 packages: proofing does their work, spelling always and grammar
 // where the language has it.
 
+import { getAutonym, init as initIso639 } from "@divvun/iso639"
 import * as toml from "@std/toml"
 import { proofingLocales, proofingPackage } from "~/actions/proofing/source.ts"
 import {
@@ -59,6 +60,20 @@ async function readManifest(): Promise<SpellerManifest> {
   ) as unknown as SpellerManifest
 }
 
+/**
+ * The proofing release's English name: the language's English name, from
+ * the same iso639 data the Pahkat server names languages by, or `fallback`,
+ * manifest.toml's name, where the data does not know the language.
+ */
+export async function proofingName(
+  langTag: string,
+  fallback: string,
+): Promise<string> {
+  await initIso639()
+  const name = getAutonym(langTag)?.commonName ?? fallback
+  return `${name} (proofing)`
+}
+
 /** Why this build publishes nothing to Pahkat, or null if it does. */
 async function skipReason(): Promise<string | null> {
   return await pahkatSkipReasonForBuild(new GitHub(builder.env.repo))
@@ -93,7 +108,7 @@ export async function runProofingPahkatPublish() {
     version: oneVersion(artifacts, id),
     tag: builder.env.tag || `x-proofing-${langTag}/dev-latest`,
     metadata: {
-      names: { en: `${info.name} (proofing)` },
+      names: { en: await proofingName(langTag, info.name) },
       authors: GIELLALT_AUTHORS,
       ...await repositoryLicense(),
       languages: [...new Set([langTag, ...proofingLocales(manifest)])],

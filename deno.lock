@@ -42,6 +42,7 @@
     "jsr:@std/toml@^1.0.11": "1.0.11",
     "jsr:@std/uuid@^1.0.9": "1.1.1",
     "jsr:@std/yaml@^1.0.10": "1.1.0",
+    "npm:@divvun/iso639@0.1": "0.1.0",
     "npm:ajv@^8.17.1": "8.20.0",
     "npm:badge-maker@6": "6.0.0",
     "npm:fets@~0.8.5": "0.8.6",
@@ -205,6 +206,9 @@
   "npm": {
     "@babel/runtime@7.29.2": {
       "integrity": "sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g=="
+    },
+    "@divvun/iso639@0.1.0": {
+      "integrity": "sha512-LVzw6s+g4rUfBAEO7qy4JY96lN+pVw9mTxlmh/WwC4DDTVsbwbOjzShlR+NkP1mmLcYLul6sVxdCIM7B7n4o/A=="
     },
     "@envelop/instrumentation@1.0.0": {
       "integrity": "sha512-cxgkB66RQB95H3X27jlnxCRNTmPuSTgmBAq6/4n2Dtv4hsk4yz8FadA1ggmd0uZzvKqWD6CR+WFgTjhDqg7eyw==",
@@ -582,6 +586,7 @@
       "jsr:@std/toml@^1.0.11",
       "jsr:@std/uuid@^1.0.9",
       "jsr:@std/yaml@^1.0.10",
+      "npm:@divvun/iso639@0.1",
       "npm:ajv@^8.17.1",
       "npm:badge-maker@6",
       "npm:yaml@^2.6.0"
