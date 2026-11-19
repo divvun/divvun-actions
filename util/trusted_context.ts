@@ -10,13 +10,10 @@ const SEMVER = String.raw`(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)` +
  * Release tags accepted by the central trust boundary.
  *
  * Repositories use either `v1.2.3`, a namespaced tag such as
- * `speller-sme/v1.2.3`, or `kbd-tsf-v1.2.3`. Static-library tags have
- * historically allowed the version with or without the `v` prefix.
+ * `speller-sme/v1.2.3`, or `kbd-tsf-v1.2.3`.
  */
 export const TRUSTED_RELEASE_TAG = new RegExp(
-  String.raw`^(?:v|kbd-tsf-v|[A-Za-z0-9._-]+/v)${SEMVER}$|` +
-    String
-      .raw`^(?:icu4c|libomp|protobuf|sleef|pytorch|executorch)/(?:v)?${SEMVER}$`,
+  String.raw`^(?:v|kbd-tsf-v|[A-Za-z0-9._-]+/v)${SEMVER}$`,
 )
 
 type TrustEnv = Pick<
