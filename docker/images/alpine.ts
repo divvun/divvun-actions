@@ -7,8 +7,9 @@ import {
   foma,
   gh,
   gitLfsInit,
-  imageStamp,
   hfst,
+  imageStamp,
+  knownHosts,
   minisign,
   mkdir,
   openbao,
@@ -99,6 +100,7 @@ export default defineImage({
     foma(),
     cg3(),
     gitLfsInit(),
+    knownHosts(),
     mkdir({
       path: "$BUILDKITE_PLUGIN_FS_CACHE_FOLDER",
       label: "Buildkite fs-cache folder",

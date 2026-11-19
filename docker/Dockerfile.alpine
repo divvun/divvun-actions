@@ -208,6 +208,11 @@ RUN set -eu && \
 # git-lfs init
 RUN git lfs install
 
+# known_hosts (github.com)
+RUN mkdir -p /etc/ssh && \
+    ssh-keyscan github.com >> /etc/ssh/ssh_known_hosts && \
+    grep -q '^github.com ' /etc/ssh/ssh_known_hosts
+
 # Buildkite fs-cache folder
 RUN mkdir -p $BUILDKITE_PLUGIN_FS_CACHE_FOLDER
 
