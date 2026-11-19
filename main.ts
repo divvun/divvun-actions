@@ -18,20 +18,7 @@ function prettyPlatform() {
 
 logger.debug(`Loading Divvun Actions [Platform: ${prettyPlatform()}]`)
 
-async function main() {
-  const envFilePath = Deno.env.get("ENV_FILE")
-  if (envFilePath != null) {
-    const envFile = await Deno.readTextFile(envFilePath)
-    const env = JSON.parse(envFile)
-    for (const [key, value] of Object.entries(env)) {
-      Deno.env.set(key, value as string)
-    }
-  }
-
-  await runCli(Deno.args)
-}
-
-main()
+runCli(Deno.args)
   .then(() => {
     logger.info("Finished successfully")
     Deno.exit(0)
@@ -45,6 +32,7 @@ main()
     logger.error("Build failed with error:")
     if (e instanceof ExpectedError) {
       logger.error(e.message)
+      if (e.cause) logger.error(e.cause)
     } else {
       logger.error(e)
     }
