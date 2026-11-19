@@ -1,18 +1,8 @@
-const provider = Deno.env.get("BUILDKITE") ? "buildkite" : null
-
-if (!provider) {
-  throw new Error("No supported CI provider detected")
+if (!Deno.env.get("BUILDKITE")) {
+  throw new Error("divvun-actions only runs in a Buildkite job")
 }
 
-let selectedBuilder: typeof import("~/builder/buildkite/mod.ts")
-
-switch (provider) {
-  case "buildkite":
-    selectedBuilder = await import("~/builder/buildkite/mod.ts")
-    break
-}
-
-export const mode = provider
+const buildkite = await import("~/builder/buildkite/mod.ts")
 
 export const {
   exec,
@@ -28,4 +18,4 @@ export const {
   ciKey,
   pahkatUploadToken,
   group,
-} = selectedBuilder
+} = buildkite

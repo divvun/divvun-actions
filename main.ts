@@ -1,4 +1,3 @@
-import * as builder from "~/builder.ts"
 import logger from "~/util/log.ts"
 import runCli from "./cli.ts"
 import { ExpectedError } from "./util/error.ts"
@@ -17,9 +16,7 @@ function prettyPlatform() {
   }
 }
 
-logger.debug(
-  `Loading Divvun Actions [Mode: ${builder.mode}] [Platform: ${prettyPlatform()}]`,
-)
+logger.debug(`Loading Divvun Actions [Platform: ${prettyPlatform()}]`)
 
 async function main() {
   const envFilePath = Deno.env.get("ENV_FILE")
@@ -31,17 +28,6 @@ async function main() {
     }
   }
 
-  switch (builder.mode) {
-    case "buildkite": {
-      await buildkiteMain()
-      return
-    }
-    default:
-      throw new Error(`Unknown mode: ${builder.mode}`)
-  }
-}
-
-async function buildkiteMain() {
   await runCli(Deno.args)
 }
 

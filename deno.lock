@@ -1,9 +1,10 @@
 {
   "version": "5",
   "specifiers": {
-    "jsr:@david/which@0.8": "0.8.0",
     "jsr:@denosaurs/emoji@~0.3.1": "0.3.1",
     "jsr:@openbao/api@^0.0.3": "0.0.3",
+    "jsr:@optique/core@^1.3.7": "1.3.7",
+    "jsr:@optique/run@^1.3.7": "1.3.7",
     "jsr:@std/async@^1.5.1": "1.5.1",
     "jsr:@std/bytes@^1.0.6": "1.0.6",
     "jsr:@std/cache@~0.2.4": "0.2.4",
@@ -29,9 +30,6 @@
     "npm:yaml@^2.9.1": "2.9.1"
   },
   "jsr": {
-    "@david/which@0.8.0": {
-      "integrity": "7095cce2671bcd0fb6c87a15e0b651f44d3fa876cf376bb45cf9322eaee7f3b2"
-    },
     "@denosaurs/emoji@0.3.1": {
       "integrity": "b0aed5f55dec99e83da7c9637fe0a36d1d6252b7c99deaaa3fc5dea3fcf3da8b"
     },
@@ -39,6 +37,15 @@
       "integrity": "bb1fe8daa81dcda6e7924c6317b77d4f82a8eb0ac5a2ec1815e72d9a069afe08",
       "dependencies": [
         "npm:fets"
+      ]
+    },
+    "@optique/core@1.3.7": {
+      "integrity": "575e299a379796cc6cf172cedc9dbb5bd3262550bacfcd6abb8674741c808dc5"
+    },
+    "@optique/run@1.3.7": {
+      "integrity": "0bbb0ead4fafd36d3c536a80d188370ca6f1c027c39fd9450779b699d1809023",
+      "dependencies": [
+        "jsr:@optique/core"
       ]
     },
     "@std/async@1.5.1": {
@@ -406,9 +413,10 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@david/which@0.8",
       "jsr:@denosaurs/emoji@~0.3.1",
       "jsr:@openbao/api@^0.0.3",
+      "jsr:@optique/core@^1.3.7",
+      "jsr:@optique/run@^1.3.7",
       "jsr:@std/async@^1.5.1",
       "jsr:@std/cache@~0.2.4",
       "jsr:@std/cli@^1.0.32",

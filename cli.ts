@@ -1,5 +1,10 @@
-// deno-lint-ignore-file no-explicit-any
-import { parseArgs, ParseOptions } from "@std/cli/parse-args"
+import { group, object, or } from "@optique/core/constructs"
+import { message } from "@optique/core/message"
+import { map, optional, withDefault } from "@optique/core/modifiers"
+import type { Parser } from "@optique/core/parser"
+import { argument, command, constant } from "@optique/core/primitives"
+import { choice, string } from "@optique/core/valueparser"
+import { run } from "@optique/run"
 import * as yaml from "@std/yaml"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
 import * as builder from "~/builder.ts"
@@ -180,7 +185,7 @@ import {
   runLibreOfficeExtensionWindowsInstaller,
   runLibreOfficeExtensionWindowsOxt,
 } from "./pipelines/divvunspell-libreoffice/mod.ts"
-import { isWindowsArch } from "./pipelines/divvunspell-libreoffice/windows.ts"
+import type { WindowsArch } from "./pipelines/divvunspell-libreoffice/windows.ts"
 import {
   pipelinePdfStrings,
   runPdfStringsPublish,
@@ -194,103 +199,335 @@ import macosSign from "./services/macos-codesign.ts"
 import sign from "./services/windows-codesign.ts"
 import { makeTempFile } from "./util/temp.ts"
 import type { InstallerKind } from "./actions/keyboard/build/mod.ts"
+import type { ProofingTarget } from "./actions/proofing/bundle.ts"
 import {
   isPrivilegedPipelineAction,
   securePipelineForContext,
 } from "./util/privileged_action.ts"
 import { requireTrustedReleaseContext } from "./util/trusted_context.ts"
 
-/** Coerce a positional CLI arg to InstallerKind, or undefined when absent/unknown. */
-function installerArg(value: unknown): InstallerKind | undefined {
-  if (value === "outto" || value === "legacy") return value
-  return undefined
+/** One `divvun-actions run` action, as its command line parsed. */
+type Action = {
+  readonly name: string
+  /**
+   * The action's arguments, which `isPrivilegedPipelineAction` reads
+   * alongside its name, as `commandRequiresTrustedContext` reads them in a
+   * generated step's command.
+   */
+  readonly args: readonly string[]
+  readonly run: () => Promise<void>
 }
 
-enum Command {
-  Run = "run",
-  Ci = "ci",
-  Sign = "sign",
-}
+type ActionParser = Parser<"sync", Action, unknown>
+type ActionArgs = Record<string, string | undefined>
 
-const commands: Record<Command, { options: ParseOptions; help: string }> = {
-  [Command.Run]: {
-    options: {
-      boolean: ["help"],
-      alias: {
-        help: "h",
-      },
-    },
-    help: "Run a specific pipeline",
-  },
-  [Command.Ci]: {
-    options: {
-      boolean: ["help"],
-      alias: {
-        help: "h",
-      },
-    },
-    help: "Automatically determine pipelines in CI",
-  },
-  [Command.Sign]: {
-    options: {
-      boolean: ["help"],
-      alias: {
-        help: "h",
-      },
-    },
-    help: "Sign a file",
-  },
-}
-
-function printHelp(command?: Command) {
-  if (!command) {
-    logger.info(`Usage: <command> [options]\n`)
-    logger.info()
-    logger.info("Commands:")
-    for (const [command, commandOptions] of Object.entries(commands)) {
-      logger.info(`  ${command}\t${commandOptions.help}`)
-    }
-    return
-  }
-
-  const commandOptions = commands[command as Command]
-  logger.info(`Usage: ${Deno.args[0]} ${command} [options]`)
-  logger.info(commandOptions.help)
-}
-
-function parseCommand(input: string[]) {
-  const args = parseArgs(input, {
-    boolean: ["help"],
-    stopEarly: true,
-    alias: {
-      help: "h",
-    },
-  })
-
-  if (args.help) {
-    printHelp(args._[0] as Command)
-    Deno.exit(0)
-  }
-
-  const command = args._[0] as Command
-  const commandOptions = commands[command]?.options
-  if (!commandOptions) {
-    logger.error(`Unknown command: ${command}`)
-    printHelp()
-    Deno.exit(1)
-  }
-
-  const commandArgs = parseArgs(
-    args._.slice(1).map((x) => x.toString()),
-    commandOptions,
+function action(name: string, handler: () => Promise<void>): ActionParser
+function action<T extends ActionArgs>(
+  name: string,
+  args: Parser<"sync", T, unknown>,
+  handler: (args: T) => Promise<void>,
+): ActionParser
+function action(
+  name: string,
+  argsOrHandler: Parser<"sync", ActionArgs, unknown> | (() => Promise<void>),
+  handler?: (args: ActionArgs) => Promise<void>,
+): ActionParser {
+  const [args, run] = typeof argsOrHandler === "function"
+    ? [object({}), argsOrHandler]
+    : [argsOrHandler, handler!]
+  return command(
+    name,
+    map(args, (value: ActionArgs) => ({
+      name,
+      args: Object.values(value).filter((arg) => arg != null),
+      run: () => run(value),
+    })),
   )
-  if (commandArgs.help) {
-    printHelp(command)
-    Deno.exit(0)
-  }
-
-  return { command, args: commandArgs }
 }
+
+const installer = (fallback?: InstallerKind) => {
+  const parser = argument(
+    choice<InstallerKind>(["outto", "legacy"], { metavar: "INSTALLER" }),
+    {
+      description: message`The installer to build`,
+    },
+  )
+  return fallback == null ? optional(parser) : withDefault(parser, fallback)
+}
+
+const windowsArch = argument(
+  choice<WindowsArch>(["x86_64", "aarch64"], { metavar: "ARCH" }),
+)
+
+function kbdgenBundlePathMobile(): string {
+  return builder.env.repoName.toLowerCase() === "divvun-dev-keyboard"
+    ? "divvun-dev.kbdgen"
+    : "divvun.kbdgen"
+}
+
+const languageActions: ActionParser[] = [
+  action("lang-deps", runLangDeps),
+  action("lang-speller-build", runLangSpellerBuild),
+  action("lang-speller-test", runLangSpellerTest),
+  action("lang-grammar-build", runLangGrammarBuild),
+  action("lang-grammar-test", runLangGrammarTest),
+  action("lang-grammar-deploy", runLangGrammarDeploy),
+  action(
+    "lang-bundle",
+    object({
+      target: argument(
+        choice<Parameters<typeof runLangBundle>[0]["target"]>([
+          "windows",
+          "macos",
+          "mobile",
+        ], { metavar: "TARGET" }),
+      ),
+    }),
+    runLangBundle,
+  ),
+  action("lang-deploy", runLangDeploy),
+  action("lang-proofing-build", runLangProofingBuild),
+  action(
+    "lang-proofing-bundle",
+    object({
+      target: argument(
+        choice<ProofingTarget>(["macos", "windows", "linux"], {
+          metavar: "TARGET",
+        }),
+      ),
+    }),
+    runLangProofingBundle,
+  ),
+  action("lang-proofing-deploy", runLangProofingDeploy),
+  action("proofing-pahkat-publish", runProofingPahkatPublish),
+  action("lang-tts-textproc-build", runLangTtsTextprocBuild),
+  action("lang-tts-textproc-deploy", runLangTtsTextprocDeploy),
+  action("lang-analyser-build", runLangAnalyserBuild),
+  action("lang-analyser-deploy", runLangAnalyserDeploy),
+  action("lang-teaksta-bundle-build", runLangTeakstaBundleBuild),
+  action("lang-teaksta-bundle-deploy", runLangTeakstaBundleDeploy),
+  action("lang-docs-publish", runLangDocsPublish),
+  action("docs-data-publish", runDocsDataPublish),
+]
+
+const dictionaryActions: ActionParser[] = [
+  action("dict-build", runDictBuild),
+  action("dict-deploy", runDictDeploy),
+]
+
+const keyboardActions: ActionParser[] = [
+  action(
+    "divvun-keyboard-ios",
+    () => runDivvunKeyboardIOS(kbdgenBundlePathMobile()),
+  ),
+  action(
+    "divvun-keyboard-android",
+    () => runDivvunKeyboardAndroid(kbdgenBundlePathMobile()),
+  ),
+  action(
+    "divvun-keyboard-windows",
+    object({ installer: installer() }),
+    ({ installer }) =>
+      runDesktopKeyboardWindows(desktopKeyboardBundlePath(), installer),
+  ),
+  action(
+    "divvun-keyboard-windows-v4",
+    object({ installer: installer("outto") }),
+    ({ installer }) =>
+      runDesktopKeyboardWindows(desktopKeyboardBundlePath(), installer, "v4"),
+  ),
+  action(
+    "divvun-keyboard-macos",
+    object({ installer: installer() }),
+    ({ installer }) =>
+      runDesktopKeyboardMacOS(desktopKeyboardBundlePath(), installer),
+  ),
+  action(
+    "divvun-keyboard-deploy-windows",
+    () => runDesktopKeyboardDeploy(KeyboardType.Windows),
+  ),
+  action(
+    "divvun-keyboard-deploy-macos",
+    () => runDesktopKeyboardDeploy(KeyboardType.MacOS),
+  ),
+  action("divvun-keyboard-deploy-outto", runDesktopKeyboardDeployOutto),
+  action(
+    "divvun-keyboard-deploy-windows-v4",
+    runDesktopKeyboardDeployWindowsV4,
+  ),
+  action("keyboard-pahkat-publish", runKeyboardPahkatPublish),
+  action("kbdgen-deploy", runKbdgenDeploy),
+  action("kbdgen-pahkat-publish", runKbdgenPahkatPublish),
+  action("kbdgen-publish-v4", runKbdgenPublishV4),
+  action("kbdi-publish", runKbdiPublish),
+  action("kbd-tsf-installer", runTipInstaller),
+  action("kbd-tsf-publish", runTipPublish),
+]
+
+const libraryActions: ActionParser[] = [
+  action("divvunspell-publish", runDivvunspellPublish),
+  action("divvunspell-npm-publish", runDivvunspellNpmPublish),
+  action("divvunspell-pypi-publish", runDivvunspellPypiPublish),
+  action("libdivvun-fst-publish", runLibdivvunFstPublish),
+  action("hfst-rs-publish", runHfstRsPublish),
+  action("hfst-rs-npm-publish", runHfstRsNpmPublish),
+  action("hfst-rs-pypi-publish", runHfstRsPypiPublish),
+  action("hfst-rs-swift-publish", runHfstRsSwiftPublish),
+  action("foma-rs-publish", runFomaRsPublish),
+  action("cg3-rs-publish", runCg3RsPublish),
+  action("cg3-rs-npm-publish", runCg3RsNpmPublish),
+  action("cg3-rs-pypi-publish", runCg3RsPypiPublish),
+  action("cg3-rs-swift-publish", runCg3RsSwiftPublish),
+  action("divvun-runtime-publish", runDivvunRuntimePublish),
+  action("gut-publish", runGutPublish),
+  action("box-publish", runBoxPublish),
+  action("outto-publish", runOuttoPublish),
+  action("rsigncode-publish", runRsigncodePublish),
+  action("pahkat-cli-publish", runPahkatCliPublish),
+  action("libpahkat-android", runLibpahkatAndroid),
+  action("libpahkat-ios", runLibpahkatIos),
+  action("libpahkat-publish", runLibpahkatPublish),
+  action("pahkat-mobile-swift-archive", runPahkatMobileSwiftArchive),
+  action("pahkat-mobile-swift-publish", runPahkatMobileSwiftPublish),
+  action("pahkat-mobile-maven-publish", runPahkatMobileMavenPublish),
+  action("frakt-publish", runFraktPublish),
+  action("pdf-strings-publish", runPdfStringsPublish),
+]
+
+const applicationActions: ActionParser[] = [
+  action("msgrammar-installer", runMsgrammarInstaller),
+  action("msgrammar-publish", runMsgrammarPublish),
+  action("divvun-wind-installer", runWindInstaller),
+  action("divvun-wind-publish", runWindPublish),
+  action("donate-speech-build-ios", runDonateSpeechBuildIOS),
+  action("donate-speech-deploy-ios", runDonateSpeechDeployIOS),
+  action("donate-speech-build-android", runDonateSpeechBuildAndroid),
+  action("donate-speech-deploy-android", runDonateSpeechDeployAndroid),
+  action("donate-speech-build-macos", runDonateSpeechBuildMacOS),
+  action("donate-speech-deploy-macos", runDonateSpeechDeployMacOS),
+  action("donate-speech-build-windows", runDonateSpeechBuildWindows),
+  action("donate-speech-deploy-windows", runDonateSpeechDeployWindows),
+  action(
+    "libreoffice-extension-build-oxt-macos",
+    runLibreOfficeExtensionMacosOxt,
+  ),
+  action(
+    "libreoffice-extension-installer-macos",
+    runLibreOfficeExtensionMacosInstaller,
+  ),
+  action(
+    "libreoffice-extension-build-oxt-linux",
+    runLibreOfficeExtensionLinuxOxt,
+  ),
+  action(
+    "libreoffice-extension-build-oxt-windows",
+    object({ arch: windowsArch }),
+    ({ arch }) => runLibreOfficeExtensionWindowsOxt(arch),
+  ),
+  action(
+    "libreoffice-extension-installer-windows",
+    object({ arch: windowsArch }),
+    ({ arch }) => runLibreOfficeExtensionWindowsInstaller(arch),
+  ),
+  action("libreoffice-extension-publish", runLibreOfficeExtensionPublish),
+  action("subethaedit-build-macos", runSubethaeditBuildMacOS),
+  action("subethaedit-publish", runSubethaeditPublish),
+  action("divvun-speech-py-export", runDivvunSpeechPyExport),
+]
+
+const serviceActions: ActionParser[] = [
+  action("borealium-lint", runBorealiumLint),
+  action("borealium-build", runBorealiumBuild),
+  action("borealium-deploy", runBorealiumDeploy),
+  action("borealium-bump-manifest", runBorealiumBumpManifest),
+  action("keyboard-viewer-lint", runKeyboardViewerLint),
+  action("keyboard-viewer-deploy", runKeyboardViewerDeploy),
+  action("keyboard-viewer-bump-manifest", runKeyboardViewerBumpManifest),
+  action("drb-kicker-lint", runDrbKickerLint),
+  action("drb-kicker-deploy", runDrbKickerDeploy),
+  action("drb-kicker-bump-manifest", runDrbKickerBumpManifest),
+  action("teaksta-check", runTeakstaCheck),
+  action("teaksta-models", runTeakstaModels),
+  action("teaksta-deploy", runTeakstaDeploy),
+  action("teaksta-bump-manifest", runTeakstaBumpManifest),
+  action("pahkat-server-deploy", runPahkatServerDeploy),
+  action("pahkat-server-bump-manifest", runPahkatServerBumpManifest),
+  ...[DIVVUN_WORKER_GRAMMAR, DIVVUN_WORKER_SPELLER].flatMap((worker) => [
+    action(`${worker.name}-deploy`, () => runWorkerCdDeploy(worker)),
+    action(
+      `${worker.name}-bump-manifest`,
+      () => runWorkerCdBumpManifest(worker),
+    ),
+  ]),
+  action("divvun-worker-tts-publish", runDivvunWorkerTtsPublish),
+]
+
+const divvunActionsActions: ActionParser[] = [
+  action(
+    "divvun-actions-build-image",
+    object({
+      target: argument(string({ metavar: "TARGET" }), {
+        description: message`The image to build, such as alpine or linux`,
+      }),
+      push: argument(choice(["push", "no-push"], { metavar: "PUSH" })),
+    }),
+    ({ target, push }) => runDivvunActionsBuildImage(target, push),
+  ),
+  action(
+    "macos-sign",
+    object({
+      file: argument(string({ metavar: "FILE" })),
+      version: optional(argument(string({ metavar: "VERSION" }), {
+        description: message`The version to stamp, or '' for none`,
+      })),
+      entitlements: optional(argument(string({ metavar: "ENTITLEMENTS" }), {
+        description: message`An entitlements plist, or '' for none`,
+      })),
+    }),
+    ({ file, version, entitlements }) =>
+      macosSign(file, version || undefined, entitlements || undefined),
+  ),
+  action("debug", () => {
+    logger.info("Environment:")
+    logger.info(JSON.stringify(builder.env, null, 2))
+    return Promise.resolve()
+  }),
+]
+
+export const pipelineActions = or(
+  group("Languages", or(...languageActions)),
+  group("Dictionaries", or(...dictionaryActions)),
+  group("Keyboards", or(...keyboardActions)),
+  group("Libraries and tools", or(...libraryActions)),
+  group("Applications", or(...applicationActions)),
+  group("Services", or(...serviceActions)),
+  group("divvun-actions", or(...divvunActionsActions)),
+)
+
+const cli = or(
+  command("run", map(pipelineActions, (action) => () => runAction(action)), {
+    brief: message`Run one action of a pipeline`,
+  }),
+  command("ci", constant(runCi), {
+    brief: message`Generate this repository's pipeline and upload it`,
+  }),
+  command(
+    "sign",
+    map(
+      object({
+        file: argument(string({ metavar: "FILE" })),
+        skip: withDefault(
+          argument(choice(["true", "false"], { metavar: "SKIP" }), {
+            description: message`true to leave the file unsigned`,
+          }),
+          "false",
+        ),
+      }),
+      (args) => () => runSign(args),
+    ),
+    { brief: message`Sign a Windows executable` },
+  ),
+)
 
 export default async function runCli(input: string[]) {
   const logLevel = Deno.env.get("LOG_LEVEL")
@@ -298,692 +535,108 @@ export default async function runCli(input: string[]) {
     logger.setLogLevel(logLevel)
   }
 
-  const { command, args } = parseCommand(input)
-
-  switch (command) {
-    case Command.Run:
-      await runPipeline(args)
-      break
-    case Command.Ci:
-      await runCi(args)
-      break
-    case Command.Sign:
-      await runSign(args)
-      break
-  }
+  const execute = run(cli, {
+    programName: "divvun-actions",
+    args: input,
+    help: { option: { names: ["--help", "-h"] } },
+    aboveError: "none",
+    showUsage: false,
+    commandList: "top-level",
+  })
+  await execute()
 }
 
-async function runSign(args: any) {
-  const inputFile = args._[0]
-  const skipSign = args._[1] === "true"
-  if (skipSign) {
+async function runAction(action: Action) {
+  if (isPrivilegedPipelineAction(action.name, action.args)) {
+    requireTrustedReleaseContext(builder.env, `run '${action.name}'`)
+  }
+  await action.run()
+}
+
+async function runSign({ file, skip }: { file: string; skip: string }) {
+  if (skip === "true") {
     return
   }
   requireTrustedReleaseContext(builder.env, "sign an artifact")
-  await sign(inputFile)
+  await sign(file)
 }
 
-function kbdgenBundlePathMobile(): string {
-  return builder.env.repoName === "divvun-dev-keyboard"
-    ? "divvun-dev.kbdgen"
-    : "divvun.kbdgen"
-}
+type PipelineFactory = () => BuildkitePipeline | Promise<BuildkitePipeline>
 
-async function runPipeline(args: any) {
-  const pipeline = args._[0]
+const REPOSITORY_PIPELINES = new Map<string, PipelineFactory>([
+  ["msgrammar", pipelineMsgrammar],
+  ["divvunspell", pipelineDivvunspell],
+  ["divvun-keyboard", pipelineDivvunKeyboard],
+  ["divvun-dev-keyboard", pipelineDivvunKeyboard],
+  ["kbdgen", pipelineKbdgen],
+  ["kbdi", pipelineKbdi],
+  ["divvun-runtime", pipelineDivvunRuntime],
+  ["gut", pipelineGut],
+  ["divvun-worker-tts", pipelineDivvunWorkerTts],
+  ["divvun-speech-py", pipelineDivvunSpeechPy],
+  ["box", pipelineBox],
+  ["divvun-wind", pipelineDivvunWind],
+  ["outto", pipelineOutto],
+  ["rsigncode", pipelineRsigncode],
+  ["hfst-rs", pipelineHfstRs],
+  ["foma-rs", pipelineFomaRs],
+  ["cg3-rs", pipelineCg3Rs],
+  ["divvun-actions", pipelineDivvunActions],
+  ["borealium.org", pipelineBorealium],
+  ["keyboard-viewer", pipelineKeyboardViewer],
+  ["drb-kicker", pipelineDrbKicker],
+  ["teaksta", pipelineTeaksta],
+  ["pahkat-next", pipelinePahkatServer],
+  ["frakt", pipelineFrakt],
+  ["divvun-worker-grammar", () => pipelineWorkerCd(DIVVUN_WORKER_GRAMMAR)],
+  ["divvun-worker-speller", () => pipelineWorkerCd(DIVVUN_WORKER_SPELLER)],
+  ["pahkat", () => {
+    if (builder.env.pipelineSlug !== "libpahkat") {
+      throw new Error(`Unknown pipeline slug: ${builder.env.pipelineSlug}`)
+    }
+    return pipelineLibpahkat()
+  }],
+  ["pdf-strings", pipelinePdfStrings],
+  ["kielipankki-donatespeech-app", pipelineDonateSpeech],
+  ["divvunspell-libreoffice", pipelineLibreOfficeExtension],
+  ["subethaedit", pipelineSubethaedit],
+  ["giella-core", pipelineDocsData],
+])
 
-  if (
-    isPrivilegedPipelineAction(
-      String(pipeline),
-      args._.slice(1).map((value: unknown) => String(value)),
-    )
-  ) {
-    requireTrustedReleaseContext(builder.env, `run '${pipeline}'`)
-  }
+/** The families of repositories that share a pipeline, by name prefix. */
+const REPOSITORY_FAMILY_PIPELINES: [prefix: string, PipelineFactory][] = [
+  ["keyboard-", pipelineDesktopKeyboard],
+  ["lang-", pipelineLang],
+  ["dict-", pipelineDict],
+  // No FST/speller build for either family — just the Class-1 badge
+  // publish. See pipelines/docsdata/mod.ts.
+  ["shared-", pipelineDocsData],
+  ["template-", pipelineDocsData],
+]
 
-  switch (pipeline) {
-    case "divvunspell":
-      // await build()
-      break
-    case "divvun-keyboard-ios": {
-      await runDivvunKeyboardIOS(kbdgenBundlePathMobile())
-      break
-    }
-    case "divvun-keyboard-android": {
-      await runDivvunKeyboardAndroid(kbdgenBundlePathMobile())
-      break
-    }
-    case "divvun-keyboard-windows": {
-      const kbdgenBundlePath = builder.env.repoName.split("-")[1] + ".kbdgen"
-      await runDesktopKeyboardWindows(
-        kbdgenBundlePath,
-        installerArg(args._[1]),
-      )
-      break
-    }
-    case "divvun-keyboard-windows-v4": {
-      await runDesktopKeyboardWindows(
-        desktopKeyboardBundlePath(),
-        installerArg(args._[1]) ?? "outto",
-        "v4",
-      )
-      break
-    }
-    case "divvun-keyboard-macos": {
-      const kbdgenBundlePath = builder.env.repoName.split("-")[1] + ".kbdgen"
-      await runDesktopKeyboardMacOS(kbdgenBundlePath, installerArg(args._[1]))
-      break
-    }
-    case "lang-deps": {
-      await runLangDeps()
-      break
-    }
-    case "lang-speller-build": {
-      await runLangSpellerBuild()
-      break
-    }
-    case "lang-grammar-build": {
-      await runLangGrammarBuild()
-      break
-    }
-    case "lang-speller-test": {
-      await runLangSpellerTest()
-      break
-    }
-    case "lang-grammar-test": {
-      await runLangGrammarTest()
-      break
-    }
-    case "lang-docs-publish": {
-      await runLangDocsPublish()
-      break
-    }
-    case "docs-data-publish": {
-      await runDocsDataPublish()
-      break
-    }
-    case "lang-bundle": {
-      await runLangBundle({ target: args._[1] })
-      break
-    }
-    case "lang-deploy": {
-      await runLangDeploy()
-      break
-    }
-    case "lang-grammar-deploy": {
-      await runLangGrammarDeploy()
-      break
-    }
-    case "lang-proofing-build": {
-      await runLangProofingBuild()
-      break
-    }
-    case "lang-proofing-bundle": {
-      await runLangProofingBundle({
-        target: args._[1],
-      })
-      break
-    }
-    case "lang-proofing-deploy": {
-      await runLangProofingDeploy()
-      break
-    }
-    case "proofing-pahkat-publish": {
-      await runProofingPahkatPublish()
-      break
-    }
-    case "lang-tts-textproc-build": {
-      await runLangTtsTextprocBuild()
-      break
-    }
-    case "lang-tts-textproc-deploy": {
-      await runLangTtsTextprocDeploy()
-      break
-    }
-    case "lang-analyser-build": {
-      await runLangAnalyserBuild()
-      break
-    }
-    case "lang-analyser-deploy": {
-      await runLangAnalyserDeploy()
-      break
-    }
-    case "lang-teaksta-bundle-build": {
-      await runLangTeakstaBundleBuild()
-      break
-    }
-    case "lang-teaksta-bundle-deploy": {
-      await runLangTeakstaBundleDeploy()
-      break
-    }
-    case "dict-build": {
-      await runDictBuild()
-      break
-    }
-    case "dict-deploy": {
-      await runDictDeploy()
-      break
-    }
-    case "kbdgen-deploy": {
-      await runKbdgenDeploy()
-      break
-    }
-    case "kbdgen-pahkat-publish": {
-      await runKbdgenPahkatPublish()
-      break
-    }
-    case "kbdgen-publish-v4": {
-      await runKbdgenPublishV4()
-      break
-    }
-    case "kbdi-publish": {
-      await runKbdiPublish()
-      break
-    }
-    case "kbd-tsf-installer": {
-      await runTipInstaller()
-      break
-    }
-    case "kbd-tsf-publish": {
-      await runTipPublish()
-      break
-    }
-    case "divvun-keyboard-deploy-windows": {
-      await runDesktopKeyboardDeploy(KeyboardType.Windows)
-      break
-    }
-    case "divvun-keyboard-deploy-macos": {
-      await runDesktopKeyboardDeploy(KeyboardType.MacOS)
-      break
-    }
-    case "divvun-keyboard-deploy-outto": {
-      await runDesktopKeyboardDeployOutto()
-      break
-    }
-    case "divvun-keyboard-deploy-windows-v4": {
-      await runDesktopKeyboardDeployWindowsV4()
-      break
-    }
-    case "keyboard-pahkat-publish": {
-      await runKeyboardPahkatPublish()
-      break
-    }
-    case "box-publish": {
-      await runBoxPublish()
-      break
-    }
-    case "divvun-wind-installer": {
-      await runWindInstaller()
-      break
-    }
-    case "msgrammar-installer": {
-      await runMsgrammarInstaller()
-      break
-    }
-    case "msgrammar-publish": {
-      await runMsgrammarPublish()
-      break
-    }
-    case "divvun-wind-publish": {
-      await runWindPublish()
-      break
-    }
-    case "outto-publish": {
-      await runOuttoPublish()
-      break
-    }
-    case "rsigncode-publish": {
-      await runRsigncodePublish()
-      break
-    }
-    case "hfst-rs-publish": {
-      await runHfstRsPublish()
-      break
-    }
-    case "hfst-rs-npm-publish": {
-      await runHfstRsNpmPublish()
-      break
-    }
-    case "hfst-rs-pypi-publish": {
-      await runHfstRsPypiPublish()
-      break
-    }
-    case "hfst-rs-swift-publish": {
-      await runHfstRsSwiftPublish()
-      break
-    }
-    case "foma-rs-publish": {
-      await runFomaRsPublish()
-      break
-    }
-    case "cg3-rs-publish": {
-      await runCg3RsPublish()
-      break
-    }
-    case "cg3-rs-npm-publish": {
-      await runCg3RsNpmPublish()
-      break
-    }
-    case "cg3-rs-pypi-publish": {
-      await runCg3RsPypiPublish()
-      break
-    }
-    case "cg3-rs-swift-publish": {
-      await runCg3RsSwiftPublish()
-      break
-    }
-    case "divvun-actions-build-image": {
-      const target = args._[1] as string
-      const pushArg = args._[2] as string
-      if (!target || !pushArg) {
-        throw new Error(
-          "Usage: divvun-actions-build-image <alpine|linux> <push|no-push>",
-        )
-      }
-      await runDivvunActionsBuildImage(target, pushArg)
-      break
-    }
-    case "divvun-runtime-publish": {
-      await runDivvunRuntimePublish()
-      break
-    }
-    case "gut-publish": {
-      await runGutPublish()
-      break
-    }
-    case "divvun-worker-tts-publish": {
-      await runDivvunWorkerTtsPublish()
-      break
-    }
-    case "divvun-speech-py-export": {
-      await runDivvunSpeechPyExport()
-      break
-    }
-    case "borealium-lint": {
-      await runBorealiumLint()
-      break
-    }
-    case "borealium-build": {
-      await runBorealiumBuild()
-      break
-    }
-    case "borealium-deploy": {
-      await runBorealiumDeploy()
-      break
-    }
-    case "borealium-bump-manifest": {
-      await runBorealiumBumpManifest()
-      break
-    }
-    case "keyboard-viewer-lint": {
-      await runKeyboardViewerLint()
-      break
-    }
-    case "keyboard-viewer-deploy": {
-      await runKeyboardViewerDeploy()
-      break
-    }
-    case "keyboard-viewer-bump-manifest": {
-      await runKeyboardViewerBumpManifest()
-      break
-    }
-    case "drb-kicker-lint": {
-      await runDrbKickerLint()
-      break
-    }
-    case "drb-kicker-deploy": {
-      await runDrbKickerDeploy()
-      break
-    }
-    case "drb-kicker-bump-manifest": {
-      await runDrbKickerBumpManifest()
-      break
-    }
-    case "teaksta-check": {
-      await runTeakstaCheck()
-      break
-    }
-    case "teaksta-models": {
-      await runTeakstaModels()
-      break
-    }
-    case "teaksta-deploy": {
-      await runTeakstaDeploy()
-      break
-    }
-    case "teaksta-bump-manifest": {
-      await runTeakstaBumpManifest()
-      break
-    }
-    case "pahkat-server-deploy": {
-      await runPahkatServerDeploy()
-      break
-    }
-    case "pahkat-server-bump-manifest": {
-      await runPahkatServerBumpManifest()
-      break
-    }
-    case "pahkat-cli-publish": {
-      await runPahkatCliPublish()
-      break
-    }
-    case "frakt-publish": {
-      await runFraktPublish()
-      break
-    }
-    case "pahkat-mobile-swift-archive": {
-      await runPahkatMobileSwiftArchive()
-      break
-    }
-    case "pahkat-mobile-swift-publish": {
-      await runPahkatMobileSwiftPublish()
-      break
-    }
-    case "pahkat-mobile-maven-publish": {
-      await runPahkatMobileMavenPublish()
-      break
-    }
-    case "divvun-worker-grammar-deploy": {
-      await runWorkerCdDeploy(DIVVUN_WORKER_GRAMMAR)
-      break
-    }
-    case "divvun-worker-grammar-bump-manifest": {
-      await runWorkerCdBumpManifest(DIVVUN_WORKER_GRAMMAR)
-      break
-    }
-    case "divvun-worker-speller-deploy": {
-      await runWorkerCdDeploy(DIVVUN_WORKER_SPELLER)
-      break
-    }
-    case "divvun-worker-speller-bump-manifest": {
-      await runWorkerCdBumpManifest(DIVVUN_WORKER_SPELLER)
-      break
-    }
-    case "libpahkat-android": {
-      await runLibpahkatAndroid()
-      break
-    }
-    case "libpahkat-ios": {
-      await runLibpahkatIos()
-      break
-    }
-    case "libpahkat-publish": {
-      await runLibpahkatPublish()
-      break
-    }
-    case "libdivvun-fst-publish": {
-      await runLibdivvunFstPublish()
-      break
-    }
-    case "divvunspell-publish": {
-      await runDivvunspellPublish()
-      break
-    }
-    case "divvunspell-npm-publish": {
-      await runDivvunspellNpmPublish()
-      break
-    }
-    case "divvunspell-pypi-publish": {
-      await runDivvunspellPypiPublish()
-      break
-    }
-    case "pdf-strings-publish": {
-      await runPdfStringsPublish()
-      break
-    }
-    case "donate-speech-build-ios": {
-      await runDonateSpeechBuildIOS()
-      break
-    }
-    case "donate-speech-deploy-ios": {
-      await runDonateSpeechDeployIOS()
-      break
-    }
-    case "donate-speech-build-android": {
-      await runDonateSpeechBuildAndroid()
-      break
-    }
-    case "donate-speech-deploy-android": {
-      await runDonateSpeechDeployAndroid()
-      break
-    }
-    case "donate-speech-build-macos": {
-      await runDonateSpeechBuildMacOS()
-      break
-    }
-    case "donate-speech-deploy-macos": {
-      await runDonateSpeechDeployMacOS()
-      break
-    }
-    case "donate-speech-build-windows": {
-      await runDonateSpeechBuildWindows()
-      break
-    }
-    case "donate-speech-deploy-windows": {
-      await runDonateSpeechDeployWindows()
-      break
-    }
-    case "libreoffice-extension-build-oxt-macos": {
-      await runLibreOfficeExtensionMacosOxt()
-      break
-    }
-    case "libreoffice-extension-installer-macos": {
-      await runLibreOfficeExtensionMacosInstaller()
-      break
-    }
-    case "libreoffice-extension-build-oxt-linux": {
-      await runLibreOfficeExtensionLinuxOxt()
-      break
-    }
-    case "libreoffice-extension-build-oxt-windows": {
-      const arch = String(args._[1] ?? "")
-      if (!isWindowsArch(arch)) {
-        throw new Error(
-          `Usage: libreoffice-extension-build-oxt-windows <x86_64|aarch64>`,
-        )
-      }
-      await runLibreOfficeExtensionWindowsOxt(arch)
-      break
-    }
-    case "libreoffice-extension-installer-windows": {
-      const arch = String(args._[1] ?? "")
-      if (!isWindowsArch(arch)) {
-        throw new Error(
-          `Usage: libreoffice-extension-installer-windows <x86_64|aarch64>`,
-        )
-      }
-      await runLibreOfficeExtensionWindowsInstaller(arch)
-      break
-    }
-    case "libreoffice-extension-publish": {
-      await runLibreOfficeExtensionPublish()
-      break
-    }
-    case "subethaedit-build-macos": {
-      await runSubethaeditBuildMacOS()
-      break
-    }
-    case "subethaedit-publish": {
-      await runSubethaeditPublish()
-      break
-    }
-    case "debug": {
-      logger.info("Environment:")
-      logger.info(JSON.stringify(builder.env, null, 2))
-      break
-    }
-    case "macos-sign": {
-      const file = args._[1]
-      if (!file) {
-        throw new Error("No file provided to sign")
-      }
-      const version = args._[2] || undefined
-      const entitlementsPath = args._[3] || undefined
-
-      await macosSign(file, version, entitlementsPath)
-      break
-    }
-    default: {
-      throw new Error(`Unknown repo: ${builder.env.repoName}`)
-    }
-  }
+/**
+ * The pipeline a repository builds with. A repository named in
+ * `REPOSITORY_PIPELINES` gets its own pipeline even when a family's prefix
+ * also matches it, as keyboard-viewer does `keyboard-`.
+ */
+export function repositoryPipeline(
+  repoName: string,
+): PipelineFactory | undefined {
+  const name = repoName.toLowerCase()
+  return REPOSITORY_PIPELINES.get(name) ??
+    REPOSITORY_FAMILY_PIPELINES.find(([prefix]) => name.startsWith(prefix))
+      ?.[1]
 }
 
 export async function createCiPipeline(): Promise<BuildkitePipeline> {
-  let pipeline: BuildkitePipeline
-  const repoName = builder.env.repoName.toLowerCase()
-  switch (repoName) {
-    case "msgrammar": {
-      pipeline = pipelineMsgrammar()
-      break
-    }
-    case "divvunspell":
-      pipeline = pipelineDivvunspell()
-      break
-    case "divvun-keyboard":
-    case "divvun-dev-keyboard": {
-      pipeline = pipelineDivvunKeyboard()
-      break
-    }
-    case "kbdgen": {
-      pipeline = pipelineKbdgen()
-      break
-    }
-    case "kbdi": {
-      pipeline = pipelineKbdi()
-      break
-    }
-    case "divvun-runtime": {
-      pipeline = await pipelineDivvunRuntime()
-      break
-    }
-    case "gut": {
-      pipeline = await pipelineGut()
-      break
-    }
-    case "divvun-worker-tts": {
-      pipeline = pipelineDivvunWorkerTts()
-      break
-    }
-    case "divvun-speech-py": {
-      pipeline = pipelineDivvunSpeechPy()
-      break
-    }
-    case "box": {
-      pipeline = pipelineBox()
-      break
-    }
-    case "divvun-wind": {
-      pipeline = pipelineDivvunWind()
-      break
-    }
-    case "outto": {
-      pipeline = await pipelineOutto()
-      break
-    }
-    case "rsigncode": {
-      pipeline = pipelineRsigncode()
-      break
-    }
-    case "hfst-rs": {
-      pipeline = pipelineHfstRs()
-      break
-    }
-    case "foma-rs": {
-      pipeline = pipelineFomaRs()
-      break
-    }
-    case "cg3-rs": {
-      pipeline = pipelineCg3Rs()
-      break
-    }
-    case "divvun-actions": {
-      pipeline = pipelineDivvunActions()
-      break
-    }
-    case "borealium.org": {
-      pipeline = pipelineBorealium()
-      break
-    }
-    case "keyboard-viewer": {
-      pipeline = pipelineKeyboardViewer()
-      break
-    }
-    case "drb-kicker": {
-      pipeline = pipelineDrbKicker()
-      break
-    }
-    case "teaksta": {
-      pipeline = pipelineTeaksta()
-      break
-    }
-    case "pahkat-next": {
-      pipeline = pipelinePahkatServer()
-      break
-    }
-    case "frakt": {
-      pipeline = pipelineFrakt()
-      break
-    }
-    case "divvun-worker-grammar": {
-      pipeline = pipelineWorkerCd(DIVVUN_WORKER_GRAMMAR)
-      break
-    }
-    case "divvun-worker-speller": {
-      pipeline = pipelineWorkerCd(DIVVUN_WORKER_SPELLER)
-      break
-    }
-    case "pahkat": {
-      if (builder.env.pipelineSlug === "libpahkat") {
-        pipeline = await pipelineLibpahkat()
-      } else {
-        throw new Error(`Unknown pipeline slug: ${builder.env.pipelineSlug}`)
-      }
-      break
-    }
-    case "pdf-strings": {
-      pipeline = pipelinePdfStrings()
-      break
-    }
-    case "kielipankki-donatespeech-app": {
-      pipeline = pipelineDonateSpeech()
-      break
-    }
-    case "divvunspell-libreoffice": {
-      pipeline = pipelineLibreOfficeExtension()
-      break
-    }
-    case "subethaedit": {
-      pipeline = pipelineSubethaedit()
-      break
-    }
-    case "giella-core": {
-      pipeline = pipelineDocsData()
-      break
-    }
-    default: {
-      if (repoName.startsWith("keyboard-")) {
-        pipeline = pipelineDesktopKeyboard()
-      } else if (repoName.startsWith("lang-")) {
-        pipeline = await pipelineLang()
-      } else if (repoName.startsWith("dict-")) {
-        pipeline = pipelineDict()
-      } else if (
-        repoName.startsWith("shared-") || repoName.startsWith("template-")
-      ) {
-        // No FST/speller build for either family — just the Class-1 badge
-        // publish. See pipelines/docsdata/mod.ts.
-        pipeline = pipelineDocsData()
-      } else {
-        throw new Error(`Unknown repo: ${builder.env.repoName}`)
-      }
-    }
+  const pipeline = repositoryPipeline(builder.env.repoName)
+  if (pipeline == null) {
+    throw new Error(`Unknown repo: ${builder.env.repoName}`)
   }
-
-  return securePipelineForContext(pipeline, builder.env)
+  return securePipelineForContext(await pipeline(), builder.env)
 }
 
-async function runCi(_args: any) {
+async function runCi() {
   logger.info("Running CI")
   await logJobEnvironment()
   const pipeline = await createCiPipeline()
