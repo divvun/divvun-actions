@@ -1,5 +1,9 @@
-if (!Deno.env.get("BUILDKITE")) {
-  throw new Error("divvun-actions only runs in a Buildkite job")
+import { isBuildkiteJob } from "~/util/env.ts"
+
+if (!isBuildkiteJob()) {
+  throw new Error(
+    "builder.ts only loads in a Buildkite job: BUILDKITE is not set",
+  )
 }
 
 const buildkite = await import("~/builder/buildkite/mod.ts")

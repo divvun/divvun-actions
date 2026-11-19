@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-divvun-actions is a Buildkite plugin (`plugin.yml`, `hooks/`). Its `environment` hook puts `bin/` on the agent's `PATH`, and pipeline steps call `divvun-actions`, which runs `main.ts` with Deno on the agent itself. It only runs inside a Buildkite job: `builder.ts` refuses to load unless `BUILDKITE` is set. There is no local mode.
+divvun-actions is a Buildkite plugin (`plugin.yml`, `hooks/`). Its `environment` hook puts `bin/` on the agent's `PATH`, and pipeline steps call `divvun-actions`, which runs `main.ts` with Deno on the agent itself. Almost all of it runs only inside a Buildkite job: `builder.ts` refuses to load unless `BUILDKITE` is set, and so does everything that imports it.
 
 ## Commands
 
@@ -16,7 +16,12 @@ divvun-actions is a Buildkite plugin (`plugin.yml`, `hooks/`). Its `environment`
 
 ## CLI
 
-`cli.ts` parses the command line with `@optique`; `--help` lists everything.
+The command line is parsed with `@optique`. `main.ts` picks one of two CLIs by `isBuildkiteJob()` (`util/env.ts`), and `--help` lists what the chosen one offers:
+
+- `cli_local.ts`, outside a Buildkite job: only `localCommands`, the commands that run anywhere (none yet). Nothing it imports may import `~/builder.ts`. `run`, `ci` and `sign` fail there with a message that they need a Buildkite job.
+- `cli.ts`, in a Buildkite job: `localCommands` plus the commands below, one for each name in `BUILDKITE_COMMANDS`.
+
+The commands that only run in a Buildkite job:
 
 - `divvun-actions ci` chooses the repository's pipeline by name, first in `REPOSITORY_PIPELINES` and then by the `lang-`, `dict-`, `keyboard-`, `shared-` and `template-` families in `REPOSITORY_FAMILY_PIPELINES`. It drops privileged steps when the build is untrusted, then uploads the pipeline with `buildkite-agent pipeline upload`.
 - `divvun-actions run <action> [args]` runs one step of a pipeline. The actions are a table in `cli.ts`, grouped by family. `cli_test.ts` lists every command line the pipelines generate and checks that each still parses, so update it when a step's command changes.

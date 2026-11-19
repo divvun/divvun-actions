@@ -128,3 +128,8 @@ export type Env = {
 }
 
 export const buildkite = memoize(() => env("BUILDKITE"))
+
+/** Whether this process runs in a Buildkite job, the only place builder.ts loads. */
+export function isBuildkiteJob(): boolean {
+  return Boolean(Deno.env.get("BUILDKITE"))
+}

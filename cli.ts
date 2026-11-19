@@ -1,10 +1,16 @@
 import { group, object, or } from "@optique/core/constructs"
-import { message } from "@optique/core/message"
+import { type Message, message } from "@optique/core/message"
 import { map, optional, withDefault } from "@optique/core/modifiers"
 import type { Parser } from "@optique/core/parser"
 import { argument, command, constant } from "@optique/core/primitives"
 import { choice, string } from "@optique/core/valueparser"
 import { run } from "@optique/run"
+import {
+  type BuildkiteCommand,
+  type CommandParser,
+  localCommands,
+  RUN_OPTIONS,
+} from "./cli_local.ts"
 import * as yaml from "@std/yaml"
 import { KeyboardType } from "~/actions/keyboard/types.ts"
 import * as builder from "~/builder.ts"
@@ -504,16 +510,21 @@ export const pipelineActions = or(
   group("divvun-actions", or(...divvunActionsActions)),
 )
 
-const cli = or(
-  command("run", map(pipelineActions, (action) => () => runAction(action)), {
+const buildkiteCommands: Record<
+  BuildkiteCommand,
+  { brief: Message; parser: CommandParser }
+> = {
+  run: {
     brief: message`Run one action of a pipeline`,
-  }),
-  command("ci", constant(runCi), {
+    parser: map(pipelineActions, (action) => () => runAction(action)),
+  },
+  ci: {
     brief: message`Generate this repository's pipeline and upload it`,
-  }),
-  command(
-    "sign",
-    map(
+    parser: constant(runCi),
+  },
+  sign: {
+    brief: message`Sign a Windows executable`,
+    parser: map(
       object({
         file: argument(string({ metavar: "FILE" })),
         skip: withDefault(
@@ -525,19 +536,19 @@ const cli = or(
       }),
       (args) => () => runSign(args),
     ),
-    { brief: message`Sign a Windows executable` },
+  },
+}
+
+const cli = or(
+  ...localCommands,
+  ...Object.entries(buildkiteCommands).map(([name, { brief, parser }]) =>
+    command(name, parser, { brief })
   ),
 )
 
+/** The command line in a Buildkite job: `localCommands` and `buildkiteCommands`. */
 export default async function runCli(input: string[]) {
-  const execute = run(cli, {
-    programName: "divvun-actions",
-    args: input,
-    help: { option: { names: ["--help", "-h"] } },
-    aboveError: "none",
-    showUsage: false,
-    commandList: "top-level",
-  })
+  const execute = run(cli, { ...RUN_OPTIONS, args: input })
   await execute()
 }
 
