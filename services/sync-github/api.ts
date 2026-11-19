@@ -18,6 +18,15 @@ function isRetryable(status: number): boolean {
   return status >= 500 || status === 408
 }
 
+// A request that failed with a server error may still have taken effect, so
+// only one that is safe to repeat is retried: a repeated POST could, say,
+// start the same build twice.
+function isIdempotent(method = "GET"): boolean {
+  return ["GET", "HEAD", "PUT", "DELETE", "OPTIONS"].includes(
+    method.toUpperCase(),
+  )
+}
+
 async function httpError(
   url: string,
   options: RequestInit | undefined,
@@ -129,7 +138,10 @@ export async function fetchBuildkite(
     }
 
     if (!response.ok) {
-      if (isRetryable(response.status) && attempt < maxAttempts) {
+      if (
+        isRetryable(response.status) && isIdempotent(options?.method) &&
+        attempt < maxAttempts
+      ) {
         const waitMs = 1000 * Math.pow(2, attempt - 1)
         await sleep(waitMs)
         continue

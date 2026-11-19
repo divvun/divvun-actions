@@ -18,8 +18,12 @@ divvun-actions is a Buildkite plugin (`plugin.yml`, `hooks/`). Its `environment`
 
 The command line is parsed with `@optique`. `main.ts` picks one of two CLIs by `isBuildkiteJob()` (`util/env.ts`), and `--help` lists what the chosen one offers:
 
-- `cli_local.ts`, outside a Buildkite job: only `localCommands`, the commands that run anywhere (none yet). Nothing it imports may import `~/builder.ts`. `run`, `ci` and `sign` fail there with a message that they need a Buildkite job.
+- `cli_local.ts`, outside a Buildkite job: only `localCommands`, the commands that run anywhere. Nothing it imports may import `~/builder.ts`. `run`, `ci` and `sign` fail there with a message that they need a Buildkite job.
 - `cli.ts`, in a Buildkite job: `localCommands` plus the commands below, one for each name in `BUILDKITE_COMMANDS`.
+
+The command that runs anywhere:
+
+- `divvun-actions trigger <regex>` starts a build of each unarchived Buildkite pipeline whose slug matches, at the head of its default branch or of `--branch`. It lists them and asks first, unless given `--yes`; `--dry-run` only lists them. It reads an API access token with the `read_pipelines` and `write_builds` scopes from `BUILDKITE_API_TOKEN`, or else from `~/.buildkite-token` (`services/trigger-builds/`).
 
 The commands that only run in a Buildkite job:
 
@@ -33,7 +37,7 @@ The commands that only run in a Buildkite job:
 - `actions/`: the building blocks the pipelines use: bundling, installers (Inno Setup, outto), signing, deploys, Pahkat publishing.
 - `builder.ts` and `builder/buildkite/`: the job's environment (`builder.env`), running commands, artifacts, metadata and secrets.
 - `util/`: shared helpers.
-- `services/`: `macos-codesign.ts` (rcodesign and notarisation) and `windows-codesign.ts`. `sync-github/` is a standalone CLI that compares GitHub repositories with their Buildkite pipelines and syncs them.
+- `services/`: `macos-codesign.ts` (rcodesign and notarisation) and `windows-codesign.ts`. `sync-github/` is a standalone CLI that compares GitHub repositories with their Buildkite pipelines and syncs them, and holds the Buildkite API client. `trigger-builds/` is what `divvun-actions trigger` runs.
 - `docker/`: the agent images (alpine, linux, windows-vsbase, windows), generated from `docker/images/*.ts` and `docker/versions.ts`. The divvun-actions pipeline builds and pushes them.
 - `hooks/` and `bin/`: the plugin's hooks, and the `divvun-actions` wrappers the hooks put on `PATH`.
 

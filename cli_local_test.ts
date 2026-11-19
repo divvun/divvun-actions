@@ -19,6 +19,7 @@ Deno.test("outside a Buildkite job, help offers only what runs there", async () 
   const { code, output } = await divvunActions("--help")
   equal(code, 0)
   match(output, /run, ci and sign only run in a Buildkite job/)
+  match(output, /^\s+trigger\s/m)
   equal(/^\s+run\s/m.test(output), false)
 })
 

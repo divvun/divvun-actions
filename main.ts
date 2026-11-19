@@ -35,7 +35,7 @@ runCli(Deno.args)
       if (e.cause) logger.error(e.cause)
       Deno.exit(SOFT_FAIL_EXIT_STATUS)
     }
-    logger.error("Build failed with error:")
+    logger.error("divvun-actions failed:")
     if (e instanceof ExpectedError) {
       logger.error(e.message)
       if (e.cause) logger.error(e.cause)
