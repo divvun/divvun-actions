@@ -143,8 +143,14 @@ export const env: Env = getEnv()
 
 let redactedSecrets: SecretsStore | undefined
 
-// Fire-and-forget token renewal
-async function renewTokenInBackground(
+/** How long either renewal request may take before it is abandoned. */
+const RENEWAL_TIMEOUT_MS = 30_000
+
+/**
+ * Renews the OpenBao service token when it expires within 7 days. A failure
+ * is logged, never thrown, so it cannot fail the job.
+ */
+async function renewTokenIfExpiring(
   token: string,
   endpoint: string,
 ): Promise<void> {
@@ -157,6 +163,7 @@ async function renewTokenInBackground(
         headers: {
           "X-Vault-Token": token,
         },
+        signal: AbortSignal.timeout(RENEWAL_TIMEOUT_MS),
       },
     )
 
@@ -173,7 +180,7 @@ async function renewTokenInBackground(
 
     // If expiring within 7 days, renew it
     if (ttlDays < 7) {
-      logger.debug("Token expiring soon, renewing in background...")
+      logger.debug("Token expiring soon, renewing...")
 
       const renewResponse = await fetch(
         `${endpoint}/v1/auth/token/renew-self`,
@@ -184,6 +191,7 @@ async function renewTokenInBackground(
             "Content-Type": "application/json",
           },
           body: JSON.stringify({}),
+          signal: AbortSignal.timeout(RENEWAL_TIMEOUT_MS),
         },
       )
 
@@ -195,11 +203,11 @@ async function renewTokenInBackground(
           } days`,
         )
       } else {
-        logger.error("Failed to renew token in background")
+        logger.error("Failed to renew the OpenBao service token")
       }
     }
   } catch (e) {
-    logger.error("Background token renewal failed:", e)
+    logger.error("OpenBao service token renewal failed:", e)
   }
 }
 
@@ -234,10 +242,15 @@ function vault(): Promise<OpenBao> {
     }
     const endpoint = "https://vault.giellalt.org"
 
-    // Fire off renewal check in background - doesn't block
-    renewTokenInBackground(serviceToken, endpoint)
-
-    return await OpenBao.fromServiceToken(endpoint, serviceToken)
+    // Renews alongside the login, and the login waits for it, because
+    // main.ts exits the moment the step is done and would cut off a renewal
+    // still in flight.
+    const renewal = renewTokenIfExpiring(serviceToken, endpoint)
+    try {
+      return await OpenBao.fromServiceToken(endpoint, serviceToken)
+    } finally {
+      await renewal
+    }
   })()
   return vaultLogin
 }

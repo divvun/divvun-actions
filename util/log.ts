@@ -8,7 +8,44 @@ export enum LogLevel {
   Error,
 }
 
-let logLevel: LogLevel = LogLevel.Info
+const LOG_LEVELS = new Map([
+  ["trace", LogLevel.Trace],
+  ["debug", LogLevel.Debug],
+  ["info", LogLevel.Info],
+  ["warn", LogLevel.Warning],
+  ["warning", LogLevel.Warning],
+  ["error", LogLevel.Error],
+])
+
+function parseLogLevel(name: string): LogLevel | undefined {
+  return LOG_LEVELS.get(name.toLowerCase())
+}
+
+/**
+ * The level LOG_LEVEL names, read when this module loads so that it covers
+ * the first line logged. A name it does not know leaves the level at info
+ * rather than failing the build.
+ */
+function initialLogLevel(): LogLevel {
+  const permission = Deno.permissions.querySync({
+    name: "env",
+    variable: "LOG_LEVEL",
+  })
+  const name = permission.state === "granted"
+    ? Deno.env.get("LOG_LEVEL")
+    : undefined
+  if (!name) return LogLevel.Info
+  const level = parseLogLevel(name)
+  if (level == null) {
+    console.warn(
+      `Ignoring LOG_LEVEL=${name}: expected trace, debug, info, warn or error`,
+    )
+    return LogLevel.Info
+  }
+  return level
+}
+
+let logLevel: LogLevel = initialLogLevel()
 
 export type Logger = {
   setLogLevel(level: LogLevel | string): void
@@ -27,25 +64,9 @@ const logger: Logger = {
   },
   setLogLevel(level: LogLevel | string) {
     if (typeof level === "string") {
-      switch (level) {
-        case "trace":
-          level = LogLevel.Trace
-          break
-        case "debug":
-          level = LogLevel.Debug
-          break
-        case "info":
-          level = LogLevel.Info
-          break
-        case "warning":
-          level = LogLevel.Warning
-          break
-        case "error":
-          level = LogLevel.Error
-          break
-        default:
-          throw new Error(`Invalid log level: ${level}`)
-      }
+      const parsed = parseLogLevel(level)
+      if (parsed == null) throw new Error(`Invalid log level: ${level}`)
+      level = parsed
     }
     logLevel = level
   },

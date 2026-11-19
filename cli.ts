@@ -530,11 +530,6 @@ const cli = or(
 )
 
 export default async function runCli(input: string[]) {
-  const logLevel = Deno.env.get("LOG_LEVEL")
-  if (logLevel) {
-    logger.setLogLevel(logLevel)
-  }
-
   const execute = run(cli, {
     programName: "divvun-actions",
     args: input,
