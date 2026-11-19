@@ -177,7 +177,10 @@ export async function runMsgrammarPublish() {
       PACKAGE,
     ])
   }
-  const version = await verifyMsgrammarInstaller(artifacts.path, expectedVersion)
+  const version = await verifyMsgrammarInstaller(
+    artifacts.path,
+    expectedVersion,
+  )
   const releaseStem = assetStem("msgrammar", MSGRAMMAR_TARGET, version)
   const files: string[] = []
   for (const name of names) {

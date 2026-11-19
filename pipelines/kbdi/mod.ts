@@ -2,11 +2,7 @@ import * as fs from "@std/fs"
 import * as path from "@std/path"
 import * as toml from "@std/toml"
 import * as builder from "~/builder.ts"
-import {
-  KBDI_BUILDS,
-  KBDI_NAME,
-  kbdiPrerelease,
-} from "~/actions/kbdi/v4.ts"
+import { KBDI_BUILDS, KBDI_NAME, kbdiPrerelease } from "~/actions/kbdi/v4.ts"
 import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import { downloadBinary, downloadBinaryCmd } from "~/util/artifact_download.ts"

@@ -16,10 +16,7 @@ import {
   TIP_TARGET,
 } from "~/actions/kbd-tsf/installer.ts"
 import type { CommandStep } from "~/builder/pipeline.ts"
-import {
-  isKbdgenV4Build,
-  KBDGEN_WINDOWS_TARGET,
-} from "~/actions/kbdgen/v4.ts"
+import { isKbdgenV4Build, KBDGEN_WINDOWS_TARGET } from "~/actions/kbdgen/v4.ts"
 import { assetFileName } from "~/util/asset_name.ts"
 import { downloadBinary } from "~/util/artifact_download.ts"
 import { GitHub } from "~/util/github.ts"
@@ -124,8 +121,7 @@ export async function runTipInstaller() {
   await setTipVersion(".", version)
 
   using work = await makeTempDir({ prefix: "kbd-tsf-" })
-  const kbdgenPath =
-    `signed/target/${KBDGEN_WINDOWS_TARGET}/release/kbdgen.exe`
+  const kbdgenPath = `signed/target/${KBDGEN_WINDOWS_TARGET}/release/kbdgen.exe`
   await downloadBinary(kbdgenPath, work.path)
   const kbdgen = path.join(work.path, kbdgenPath)
 

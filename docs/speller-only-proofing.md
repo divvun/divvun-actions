@@ -3,11 +3,11 @@
 On main and `x-proofing-*/v*` tags, the language pipeline selects its proofing
 source from `.build-config.yml`:
 
-| Enabled features | DRB producer | Package name/version |
-| --- | --- | --- |
-| Grammar | `grammar-build` (existing combined pipeline) | `package.grammar` |
-| Spellers, grammar disabled | `speller-build` → `proofing-build` | `package.speller` |
-| Neither | No proofing packages | — |
+| Enabled features           | DRB producer                                 | Package name/version |
+| -------------------------- | -------------------------------------------- | -------------------- |
+| Grammar                    | `grammar-build` (existing combined pipeline) | `package.grammar`    |
+| Spellers, grammar disabled | `speller-build` → `proofing-build`           | `package.speller`    |
+| Neither                    | No proofing packages                         | —                    |
 
 The spelling-only build restores the speller workspace and configure flags,
 with grammar disabled. It requests the HFST support models explicitly. Some

@@ -2,10 +2,7 @@ import { BuildkitePipeline, CommandStep } from "~/builder/pipeline.ts"
 import * as target from "~/target.ts"
 import * as builder from "~/builder.ts"
 import { downloadBinaryCmd } from "~/util/artifact_download.ts"
-import {
-  isKbdgenV4Build,
-  KBDGEN_WINDOWS_TARGET,
-} from "~/actions/kbdgen/v4.ts"
+import { isKbdgenV4Build, KBDGEN_WINDOWS_TARGET } from "~/actions/kbdgen/v4.ts"
 import { hasTextService } from "~/actions/kbd-tsf/installer.ts"
 import { TIP_BUILD_KEY, tipSteps } from "./tip.ts"
 import { v4PublishStep } from "./v4.ts"

@@ -93,16 +93,18 @@ export async function ghWithRetry(
     }
     if (Date.now() + delay > deadline) {
       logger.warning(
-        `gh ${args[0]} ${args[1] ?? ""}: still failing after ${attempt} attempts over ${
+        `gh ${args[0]} ${
+          args[1] ?? ""
+        }: still failing after ${attempt} attempts over ${
           RETRY_DEADLINE_MS / 60000
         } minutes; giving up`,
       )
       return result
     }
     logger.warning(
-      `gh ${args[0]} ${args[1] ?? ""} failed transiently (attempt ${attempt}); retrying in ${
-        delay / 1000
-      }s`,
+      `gh ${args[0]} ${
+        args[1] ?? ""
+      } failed transiently (attempt ${attempt}); retrying in ${delay / 1000}s`,
     )
     await new Promise((resolve) => setTimeout(resolve, delay))
     delay = Math.min(delay * 2, RETRY_MAX_DELAY_MS)

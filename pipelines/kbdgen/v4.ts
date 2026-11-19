@@ -131,7 +131,11 @@ export async function runKbdgenPublishV4() {
   logger.info(`Publishing to ${KBDGEN_V4_TAG}: ${names.join(", ")}`)
   await new GitHub(builder.env.repo).updateRelease(
     KBDGEN_V4_TAG,
-    [...names.map((name) => path.join(assets, name)), checksumFile, signatureFile],
+    [
+      ...names.map((name) => path.join(assets, name)),
+      checksumFile,
+      signatureFile,
+    ],
     {
       draft: false,
       prerelease: true,

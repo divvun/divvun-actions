@@ -95,13 +95,22 @@ export async function runDivvunWorkerTtsPublish() {
   for (const target of TARGETS) {
     const outPath = path.join(
       archivePath.path,
-      assetFileName("divvun-worker-tts", target, builder.env.tag ?? "untagged", "tgz"),
+      assetFileName(
+        "divvun-worker-tts",
+        target,
+        builder.env.tag ?? "untagged",
+        "tgz",
+      ),
     )
     const inputPath = path.join(tempDir.path, `divvun-worker-tts-${target}`)
 
     await Deno.chmod(inputPath, 0o755)
 
-    const stagingDir = assetStem("divvun-worker-tts", target, builder.env.tag ?? "untagged")
+    const stagingDir = assetStem(
+      "divvun-worker-tts",
+      target,
+      builder.env.tag ?? "untagged",
+    )
     await Deno.mkdir(stagingDir)
     await Deno.copyFile(inputPath, path.join(stagingDir, "divvun-worker-tts"))
 

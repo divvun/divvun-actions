@@ -48,7 +48,9 @@ export function cg3(opts: { prefix?: string } = {}): Tool {
         `RUN set -eu && \\`,
         `    echo 'cg3 ${RELEASE_TAG} refresh: ${REFRESH}' && \\`,
         `    URL=$(curl -fsSL https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG} \\`,
-        `          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*${assetGrepPattern("cg3", TARGET, "tgz")}"' \\`,
+        `          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*${
+          assetGrepPattern("cg3", TARGET, "tgz")
+        }"' \\`,
         `          | head -1 \\`,
         `          | sed -E 's/.*"(https:[^"]+)"$/\\1/') && \\`,
         `    test -n "$URL" || { echo 'no cg3 asset for ${TARGET} on ${RELEASE_TAG}' >&2; exit 1; } && \\`,
@@ -57,7 +59,9 @@ export function cg3(opts: { prefix?: string } = {}): Tool {
         `    curl -fsSL "$URL" -o /tmp/cg3.tgz && \\`,
         `    tar -xf /tmp/cg3.tgz -C /tmp && \\`,
         `    install -d ${prefix} && \\`,
-        `    install -m 755 /tmp/${assetGlob("cg3", TARGET)}/* ${prefix}/ && \\`,
+        `    install -m 755 /tmp/${
+          assetGlob("cg3", TARGET)
+        }/* ${prefix}/ && \\`,
         `    test -x ${prefix}/vislcg3 || { echo 'cg3 archive is missing vislcg3' >&2; exit 1; } && \\`,
         `    rm -rf /tmp/cg3.tgz /tmp/${assetGlob("cg3", TARGET)}`,
       ].join("\n")

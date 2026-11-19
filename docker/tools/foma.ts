@@ -30,7 +30,9 @@ const REFRESH = "2026-10-07"
  */
 export function foma(opts: { prefix?: string } = {}): Tool {
   const prefix = opts.prefix ?? PREFIX
-  const installed = BINARIES.map((b) => `/tmp/${assetGlob("foma", TARGET)}/${b}`)
+  const installed = BINARIES.map((b) =>
+    `/tmp/${assetGlob("foma", TARGET)}/${b}`
+  )
 
   return {
     name: `foma-rs (${RELEASE_TAG} @ ${REFRESH}, ${prefix}, off PATH)`,
@@ -47,7 +49,9 @@ export function foma(opts: { prefix?: string } = {}): Tool {
         `RUN set -eu && \\`,
         `    echo 'foma-rs ${RELEASE_TAG} refresh: ${REFRESH}' && \\`,
         `    URL=$(curl -fsSL https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG} \\`,
-        `          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*${assetGrepPattern("foma", TARGET, "tgz")}"' \\`,
+        `          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*${
+          assetGrepPattern("foma", TARGET, "tgz")
+        }"' \\`,
         `          | head -1 \\`,
         `          | sed -E 's/.*"(https:[^"]+)"$/\\1/') && \\`,
         `    test -n "$URL" || { echo 'no foma asset for ${TARGET} on ${RELEASE_TAG}' >&2; exit 1; } && \\`,

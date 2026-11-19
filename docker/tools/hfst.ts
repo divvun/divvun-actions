@@ -49,7 +49,9 @@ export function hfst(opts: { prefix?: string } = {}): Tool {
         `RUN set -eu && \\`,
         `    echo 'hfst ${RELEASE_TAG} refresh: ${REFRESH}' && \\`,
         `    URL=$(curl -fsSL https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG} \\`,
-        `          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*${assetGrepPattern("hfst", TARGET, "tgz")}"' \\`,
+        `          | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"https://[^"]*${
+          assetGrepPattern("hfst", TARGET, "tgz")
+        }"' \\`,
         `          | head -1 \\`,
         `          | sed -E 's/.*"(https:[^"]+)"$/\\1/') && \\`,
         `    test -n "$URL" || { echo 'no hfst asset for ${TARGET} on ${RELEASE_TAG}' >&2; exit 1; } && \\`,
@@ -58,7 +60,9 @@ export function hfst(opts: { prefix?: string } = {}): Tool {
         `    curl -fsSL "$URL" -o /tmp/hfst.tgz && \\`,
         `    tar -xf /tmp/hfst.tgz -C /tmp && \\`,
         `    install -d ${prefix} && \\`,
-        `    install -m 755 /tmp/${assetGlob("hfst", TARGET)}/hfst ${prefix}/hfst && \\`,
+        `    install -m 755 /tmp/${
+          assetGlob("hfst", TARGET)
+        }/hfst ${prefix}/hfst && \\`,
         `    ${prefix}/hfst install-symlinks ${prefix} && \\`,
         `    test -L ${prefix}/hfst-lexc || { echo 'hfst install-symlinks produced no symlinks' >&2; exit 1; } && \\`,
         `    rm -rf /tmp/hfst.tgz /tmp/${assetGlob("hfst", TARGET)}`,

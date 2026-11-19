@@ -90,7 +90,9 @@ async function keyboardMetadata(bundlePath: string): Promise<Metadata> {
  */
 export async function runKeyboardPahkatPublish() {
   if (await new GitHub(builder.env.repo).isPrivate()) {
-    logger.info(`Not publishing ${builder.env.repoName} to Pahkat: it is private`)
+    logger.info(
+      `Not publishing ${builder.env.repoName} to Pahkat: it is private`,
+    )
     return
   }
 
