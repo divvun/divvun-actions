@@ -43,6 +43,18 @@ Deno.test("trusted release builds retain signing and publication", async () => {
   ok(generated.some((command) => command.includes("box-publish")))
 })
 
+Deno.test("Borealium's main builds push its image and bump its manifest", async () => {
+  builder.env.repoName = "borealium.org"
+  builder.env.repoPath = "borealium/borealium.org"
+  builder.env.branch = "main"
+  builder.env.tag = undefined
+  builder.env.pullRequest = "false"
+
+  const generated = commands((await createCiPipeline()).steps)
+  ok(generated.some((command) => command.includes("borealium-deploy")))
+  ok(generated.some((command) => command.includes("borealium-bump-manifest")))
+})
+
 Deno.test("mobile pull requests skip credential-dependent packaging", async () => {
   builder.env.repoName = "divvun-keyboard"
   builder.env.repoPath = "divvun/divvun-keyboard"

@@ -92,6 +92,19 @@ Deno.test("trusted context accepts only protected branches and strict release ta
     false,
   )
   ok(
+    isTrustedReleaseContext(
+      environment({ repoPath: "borealium/borealium.org" }),
+    ),
+  )
+  equal(
+    isTrustedReleaseContext(environment({ repoPath: "borealium/other" })),
+    false,
+  )
+  equal(
+    isTrustedReleaseContext(environment({ repoPath: "divvun/borealium.org" })),
+    false,
+  )
+  ok(
     isTrustedReleaseContext(environment({ repoPath: "giellalt/lang-sme" })),
   )
   equal(

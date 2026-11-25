@@ -42,7 +42,6 @@ const DIVVUN_RELEASE_REPOSITORIES = new Set([
   "foma-rs",
   "cg3-rs",
   "divvun-actions",
-  "borealium.org",
   "keyboard-viewer",
   "drb-kicker",
   "teaksta",
@@ -59,6 +58,7 @@ function isTrustedRepository(owner: string, repoName: string): boolean {
   if (owner === "divvun") return DIVVUN_RELEASE_REPOSITORIES.has(repoName)
   if (owner === "subethaedit") return repoName === "subethaedit"
   if (owner === "necessary-nu") return repoName === "frakt"
+  if (owner === "borealium") return repoName === "borealium.org"
   if (owner !== "giellalt") return false
 
   return repoName === "giella-core" ||
