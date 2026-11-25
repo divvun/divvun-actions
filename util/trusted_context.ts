@@ -23,6 +23,8 @@ type TrustEnv = Pick<
 
 export type TrustedReleaseMode = "release" | "dev" | null
 
+// deploy/openbao.sh admits the pipelines of the repositories trusted here,
+// by slug: change the two together.
 const DIVVUN_RELEASE_REPOSITORIES = new Set([
   "msgrammar",
   "divvunspell",
@@ -106,7 +108,8 @@ export function trustedReleaseMode(
 
 /**
  * The in-process boundary for access to CI credentials and privileged actions.
- * Buildkite secret-access policies remain the authoritative outer boundary.
+ * OpenBao's roles for Buildkite jobs (deploy/openbao.sh) are the
+ * authoritative outer boundary.
  */
 export function isTrustedReleaseContext(env: TrustEnv): boolean {
   if (env.repoHost !== "github.com" || !env.repoPath.includes("/")) {

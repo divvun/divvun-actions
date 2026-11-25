@@ -1,108 +1,46 @@
 import { Client, createClient, Schema } from "@openbao/api"
 import { decodeBase64 } from "@std/encoding/base64"
-import logger from "~/util/log.ts"
-
-type AppRoleLoginResponse = {
-  auth: {
-    client_token: string
-  }
-}
 
 export class OpenBao {
   #client: Client
 
-  static async fromServiceToken(
+  /** When the login's token expires, in milliseconds since the epoch. */
+  readonly expiresAt: number
+
+  /**
+   * Logs in to the JWT auth method mounted at `mount` as `role`, with `jwt`,
+   * such as a Buildkite job's OIDC token.
+   */
+  static async fromJwt(
     endpoint: string,
-    serviceToken: string,
+    mount: string,
+    role: string,
+    jwt: string,
   ): Promise<OpenBao> {
-    const client = createClient<Schema>({
-      endpoint: `${endpoint}/v1`,
-      plugins: [
-        {
-          onRequestInit: ({ requestInit }) => {
-            Object.assign(requestInit, {
-              headers: {
-                ...(requestInit as { headers?: Record<string, string> })
-                  .headers,
-                Authorization: `Bearer ${serviceToken}`,
-              },
-            })
-          },
-        },
-      ],
+    const response = await fetch(`${endpoint}/v1/auth/${mount}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role, jwt }),
     })
-
-    const roleResponse =
-      await client["/auth/{approle_mount_path}/role/{role_name}/role-id"].get({
-        params: {
-          approle_mount_path: "approle",
-          role_name: "builder",
-        },
-      }).json() as any
-
-    if (roleResponse?.errors != null) {
-      logger.error(roleResponse)
+    const json = await response.json().catch(() => null)
+    const token = json?.auth?.client_token
+    if (typeof token !== "string" || token === "") {
+      const errors = Array.isArray(json?.errors)
+        ? `: ${json.errors.join(", ")}`
+        : ""
       throw new Error(
-        `OpenBao: ${roleResponse.errors.map((e: any) => e.message).join(", ")}`,
+        `OpenBao refused the login as ${role} (HTTP ${response.status})${errors}`,
       )
     }
-
-    const secretResponse =
-      await client["/auth/{approle_mount_path}/role/{role_name}/secret-id"]
-        .post({
-          params: {
-            approle_mount_path: "approle",
-            role_name: "builder",
-          },
-          json: {},
-        }).json() as any
-
-    if (secretResponse?.errors != null) {
-      throw new Error(
-        `OpenBao: ${
-          secretResponse.errors.map((e: any) => e.message).join(", ")
-        }`,
-      )
-    }
-
-    const { role_id: roleId } = roleResponse?.data
-    const { secret_id: roleSecret } = secretResponse?.data
-
-    if (endpoint == null || roleId == null || roleSecret == null) {
-      throw new Error("OpenBao endpoint, roleId or roleSecret not found")
-    }
-
-    return OpenBao.fromAppRole(endpoint, roleId, roleSecret)
+    return new OpenBao(
+      endpoint,
+      token,
+      Date.now() + json.auth.lease_duration * 1000,
+    )
   }
 
-  static async fromAppRole(
-    endpoint: string,
-    roleId: string,
-    roleSecret: string,
-  ): Promise<OpenBao> {
-    const client = createClient<Schema>({
-      endpoint: `${endpoint}/v1`,
-    })
-    const response = await client["/auth/{approle_mount_path}/login"].post({
-      params: {
-        approle_mount_path: "approle",
-      },
-      json: {
-        role_id: roleId,
-        secret_id: roleSecret,
-      },
-    })
-    const json = await response.json() as AppRoleLoginResponse
-
-    if (json?.auth?.client_token == null) {
-      logger.error(json)
-      throw new Error("OpenBao client token not found")
-    }
-
-    return new OpenBao(endpoint, json.auth.client_token)
-  }
-
-  constructor(endpoint: string, token: string) {
+  constructor(endpoint: string, token: string, expiresAt: number) {
+    this.expiresAt = expiresAt
     this.#client = createClient<Schema>({
       endpoint: `${endpoint}/v1`,
       plugins: [

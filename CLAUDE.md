@@ -38,6 +38,7 @@ The commands that only run in a Buildkite job:
 - `builder.ts` and `builder/buildkite/`: the job's environment (`builder.env`), running commands, artifacts, metadata and secrets.
 - `util/`: shared helpers.
 - `services/`: `macos-codesign.ts` (rcodesign and notarisation) and `windows-codesign.ts`. `sync-github/` is a standalone CLI that compares GitHub repositories with their Buildkite pipelines and syncs them, and holds the Buildkite API client. `trigger-builds/` is what `divvun-actions trigger` runs.
+- `deploy/openbao.sh`: sets up OpenBao's login and roles for Buildkite jobs.
 - `docker/`: the agent images (alpine, linux, windows-vsbase, windows), generated from `docker/images/*.ts` and `docker/versions.ts`. The divvun-actions pipeline builds and pushes them.
 - `hooks/` and `bin/`: the plugin's hooks, and the `divvun-actions` wrappers the hooks put on `PATH`.
 
@@ -47,6 +48,6 @@ Steps choose an agent with a `queue`: `linux`, `macos`, `windows` or `alpine`. L
 
 ## Security
 
-- `util/trusted_context.ts` decides whether a build is a trusted release context. That needs a trusted GitHub repository, and either a release tag matching `TRUSTED_RELEASE_TAG` or a non-pull-request build of `main` (for kbdgen and kbdi, `main` or `v4`). Buildkite's secret-access policies remain the outer boundary.
+- `util/trusted_context.ts` decides whether a build is a trusted release context. That needs a trusted GitHub repository, and either a release tag matching `TRUSTED_RELEASE_TAG` or a non-pull-request build of `main` (for kbdgen and kbdi, `main` or `v4`). OpenBao's roles for Buildkite jobs (`deploy/openbao.sh`) are the outer boundary: they admit only release-tag, `main` and kbdgen's and kbdi's `v4` builds of the same repositories' pipelines.
 - `util/privileged_action.ts` defines the privileged actions: deploy, publish, bump-manifest, signing, `divvun-actions-build-image … push`, and the builds that need secrets. `ci` drops them from untrusted builds' pipelines, and `run` refuses them in an untrusted build.
-- Secrets come from OpenBao (`util/openbao.ts`) and are redacted from the log.
+- Secrets come from OpenBao (`util/openbao.ts`), which a job logs in to with its own Buildkite OIDC token, and are redacted from the log.

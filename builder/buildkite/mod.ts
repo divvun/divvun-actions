@@ -123,14 +123,6 @@ export async function setMetadata(name: string, value: any) {
   await exec("buildkite-agent", ["meta-data", "set", name, value.toString()])
 }
 
-async function bkSecret(name: string) {
-  const result = await output("buildkite-agent", ["secret", "get", name])
-  if (result.status.code !== 0) {
-    throw new Error(`Failed to get metadata for ${name}`)
-  }
-  return result.stdout.trim()
-}
-
 export async function metadata(name: string) {
   const result = await output("buildkite-agent", ["meta-data", "get", name])
   if (result.status.code !== 0) {
@@ -142,74 +134,6 @@ export async function metadata(name: string) {
 export const env: Env = getEnv()
 
 let redactedSecrets: SecretsStore | undefined
-
-/** How long either renewal request may take before it is abandoned. */
-const RENEWAL_TIMEOUT_MS = 30_000
-
-/**
- * Renews the OpenBao service token when it expires within 7 days. A failure
- * is logged, never thrown, so it cannot fail the job.
- */
-async function renewTokenIfExpiring(
-  token: string,
-  endpoint: string,
-): Promise<void> {
-  try {
-    // Check token TTL
-    const lookupResponse = await fetch(
-      `${endpoint}/v1/auth/token/lookup-self`,
-      {
-        method: "GET",
-        headers: {
-          "X-Vault-Token": token,
-        },
-        signal: AbortSignal.timeout(RENEWAL_TIMEOUT_MS),
-      },
-    )
-
-    if (!lookupResponse.ok) {
-      logger.error("Failed to lookup token TTL")
-      return
-    }
-
-    const lookupData = await lookupResponse.json()
-    const ttlSeconds = lookupData.data.ttl
-    const ttlDays = ttlSeconds / (24 * 60 * 60)
-
-    logger.debug(`Token TTL: ${ttlDays.toFixed(1)} days`)
-
-    // If expiring within 7 days, renew it
-    if (ttlDays < 7) {
-      logger.debug("Token expiring soon, renewing...")
-
-      const renewResponse = await fetch(
-        `${endpoint}/v1/auth/token/renew-self`,
-        {
-          method: "POST",
-          headers: {
-            "X-Vault-Token": token,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({}),
-          signal: AbortSignal.timeout(RENEWAL_TIMEOUT_MS),
-        },
-      )
-
-      if (renewResponse.ok) {
-        const renewData = await renewResponse.json()
-        logger.debug(
-          `✅ Token renewed. New TTL: ${
-            (renewData.auth.lease_duration / 86400).toFixed(1)
-          } days`,
-        )
-      } else {
-        logger.error("Failed to renew the OpenBao service token")
-      }
-    }
-  } catch (e) {
-    logger.error("OpenBao service token renewal failed:", e)
-  }
-}
 
 export async function secrets(
   ...keys: [string, ...string[]]
@@ -231,27 +155,50 @@ export async function secrets(
   return redactedSecrets.only(keys)
 }
 
+const OPENBAO = "https://vault.giellalt.org"
+
+/**
+ * The role this build logs in to OpenBao as: `release` for a tag, else its
+ * branch's, `main` or kbdgen's and kbdi's `v4`. Each role admits only the
+ * builds whose OIDC claims it is bound to (deploy/openbao.sh), so naming the
+ * wrong one only gets the login refused.
+ */
+function vaultRole(): string {
+  return env.tag ? "release" : env.branch ?? ""
+}
+
+/** A login to OpenBao with this job's Buildkite OIDC token. */
+async function logIn(): Promise<OpenBao> {
+  const result = await output("buildkite-agent", [
+    "oidc",
+    "request-token",
+    "--audience",
+    OPENBAO,
+    "--lifetime",
+    "60",
+  ])
+  if (result.status.code !== 0) {
+    throw new Error(`Failed to get a Buildkite OIDC token: ${result.stderr}`)
+  }
+  return await OpenBao.fromJwt(
+    OPENBAO,
+    "buildkite",
+    vaultRole(),
+    result.stdout.trim(),
+  )
+}
+
+/** How long before its token expires a login is replaced. */
+const RELOGIN_MARGIN_MS = 5 * 60_000
+
 let vaultLogin: Promise<OpenBao> | undefined
 
-/** One OpenBao login per process: each mints a one-use AppRole secret id. */
+/** The process's OpenBao login, replaced as its token nears expiry. */
 function vault(): Promise<OpenBao> {
-  vaultLogin ??= (async () => {
-    const serviceToken = await bkSecret("divvun_actions_openbao_service_token")
-    if (serviceToken == null) {
-      throw new Error("No service token found")
-    }
-    const endpoint = "https://vault.giellalt.org"
-
-    // Renews alongside the login, and the login waits for it, because
-    // main.ts exits the moment the step is done and would cut off a renewal
-    // still in flight.
-    const renewal = renewTokenIfExpiring(serviceToken, endpoint)
-    try {
-      return await OpenBao.fromServiceToken(endpoint, serviceToken)
-    } finally {
-      await renewal
-    }
-  })()
+  vaultLogin =
+    vaultLogin?.then((login) =>
+      login.expiresAt - Date.now() > RELOGIN_MARGIN_MS ? login : logIn()
+    ) ?? logIn()
   return vaultLogin
 }
 
