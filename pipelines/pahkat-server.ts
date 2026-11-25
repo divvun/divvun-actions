@@ -9,6 +9,8 @@ import { pahkatMobileSteps } from "./pahkat-mobile.ts"
 const IMAGE = "ghcr.io/divvun/pahkat-server"
 const APPLICATION_PATH = "apps/services/pahkat-server-app.yaml"
 const TAG_METADATA = "pahkat-server-tag"
+/** The step that pins the new image, which deploys it. */
+const BUMP_KEY = "bump-manifest"
 const DIGEST_METADATA = "pahkat-server-digest"
 
 function command(input: CommandStep): CommandStep {
@@ -41,13 +43,14 @@ export function pipelinePahkatServer(): BuildkitePipeline {
         branches: "main",
       }),
       command({
+        key: BUMP_KEY,
         label: "Bump k8s app manifest",
         command: "divvun-actions run pahkat-server-bump-manifest",
         agents: { queue: "linux" },
         branches: "main",
         depends_on: "build-push",
       }),
-      ...pahkatCliSteps(command),
+      ...pahkatCliSteps(command, BUMP_KEY),
       ...pahkatMobileSteps(command),
     ],
   }
@@ -83,11 +86,14 @@ export async function runPahkatServerDeploy() {
   const tag = `sha-${commit}`
 
   // The file is a Containerfile, which docker does not look for by itself.
-  // It needs BuildKit for its cache mounts and TARGETARCH.
+  // It needs BuildKit for its cache mounts and TARGETARCH. The server
+  // answers its commit at /version, which the CLI's publish waits for.
   await builder.exec("docker", [
     "build",
     "-f",
     "Containerfile",
+    "--build-arg",
+    `PAHKAT_COMMIT=${commit}`,
     "-t",
     `${IMAGE}:${tag}`,
     ".",

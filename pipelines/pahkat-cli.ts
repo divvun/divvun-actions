@@ -11,6 +11,7 @@ import {
   type Artifact,
   PAHKAT_CLI_PACKAGE,
   publishRelease,
+  waitUntilServing,
 } from "~/util/pahkat.ts"
 import { createPktBox } from "~/util/pkt_box.ts"
 import { versionAsNightly } from "~/util/shared.ts"
@@ -29,11 +30,13 @@ const buildKey = (target: string) => `pahkat-cli-${target}`
 const binary = (target: string) => `target/${target}/release/pahkat`
 
 /**
- * Build the CLI for each target, and on main publish them as one release.
- * `command` adds the divvun-actions plugin, as for every step.
+ * Build the CLI for each target, and on main publish them as one release
+ * once the step keyed `deployed`, which deploys this build's server, has
+ * run. `command` adds the divvun-actions plugin, as for every step.
  */
 export function pahkatCliSteps(
   command: (step: CommandStep) => CommandStep,
+  deployed: string,
 ): CommandStep[] {
   const steps = TARGETS.map((target) =>
     command({
@@ -51,7 +54,7 @@ export function pahkatCliSteps(
     steps.push(command({
       label: "Publish CLI to Pahkat",
       command: "divvun-actions run pahkat-cli-publish",
-      depends_on: TARGETS.map(buildKey),
+      depends_on: [...TARGETS.map(buildKey), deployed],
       soft_fail: true,
       agents: { queue: "linux" },
     }))
@@ -61,7 +64,9 @@ export function pahkatCliSteps(
 
 /**
  * Publish this build's CLI for every target as a dev release of
- * main/pahkat, uploaded with the CLI for this agent's architecture.
+ * main/pahkat, uploaded with the CLI for this agent's architecture, once
+ * the server serves this build: a CLI must not meet an older server than
+ * its own, which may not know what it sends.
  */
 export async function runPahkatCliPublish() {
   const cargo = toml.parse(await Deno.readTextFile("Cargo.toml")) as {
@@ -96,6 +101,11 @@ export async function runPahkatCliPublish() {
       `This build makes no pahkat CLI for ${Deno.build.arch} to publish with`,
     )
   }
+  const commit = builder.env.commit
+  if (!commit) {
+    throw new Error("BUILDKITE_COMMIT is not set")
+  }
+  await waitUntilServing(commit)
 
   await publishRelease({
     package: PAHKAT_CLI_PACKAGE,

@@ -560,6 +560,70 @@ function outcome(stdout: Uint8Array): Outcome {
   }
 }
 
+/** How long to wait for the server to serve a build before giving up. */
+const SERVING_TIMEOUT_MS = 15 * 60_000
+/** How long to wait between asks while the server serves another build. */
+const SERVING_POLL_MS = 5_000
+/**
+ * Answers in a row naming a build that show every replica serves it:
+ * requests reach the server's three replicas in turn.
+ */
+const SERVING_IN_A_ROW = 10
+
+/** What `waitUntilServing` asks with, and how it waits; tests replace them. */
+export type ServingClock = {
+  fetch: typeof fetch
+  sleep: (ms: number) => Promise<void>
+  now: () => number
+}
+
+const realClock: ServingClock = {
+  fetch: (input, init) => fetch(input, init),
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  now: () => Date.now(),
+}
+
+/**
+ * Wait until `server` answers `GET /version` with `commit` ten times in a
+ * row, so that every replica serves the build made from it
+ * (dec:pahkat:public-version), failing after 15 minutes.
+ */
+export async function waitUntilServing(
+  commit: string,
+  server: string = PAHKAT_SERVER,
+  clock: ServingClock = realClock,
+): Promise<void> {
+  const url = new URL("version", server)
+  const started = clock.now()
+  let inARow = 0
+  let last = "nothing"
+  for (;;) {
+    try {
+      const response = await clock.fetch(url)
+      const answer = response.ok ? await response.json() : null
+      last = answer == null
+        ? `${response.status}`
+        : `commit ${answer.commit ?? "null"}`
+      inARow = answer?.commit === commit ? inARow + 1 : 0
+    } catch (e) {
+      last = `${e}`
+      inARow = 0
+    }
+    if (inARow >= SERVING_IN_A_ROW) {
+      logger.info(`${server} serves ${commit} on every replica`)
+      return
+    }
+    if (clock.now() - started >= SERVING_TIMEOUT_MS) {
+      throw new Error(
+        `${server} did not serve ${commit} within ${
+          SERVING_TIMEOUT_MS / 60_000
+        } minutes; it last answered ${last}`,
+      )
+    }
+    await clock.sleep(inARow > 0 ? 0 : SERVING_POLL_MS)
+  }
+}
+
 /** Runs of `pahkat upload` before a failure fails the step. */
 const UPLOAD_ATTEMPTS = 3
 const UPLOAD_RETRY_DELAY_MS = 30_000
